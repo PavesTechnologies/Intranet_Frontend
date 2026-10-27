@@ -15,6 +15,7 @@ import BackIconButton from "../components/common/BackIconButton";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
 import { fetchActiveBillingConfigurations } from "../services/billingDataAcquisitionService";
+import { getBillingConfigurationById } from "../services/billingConfigurationService";
  
 import InvoiceContextCards from "../components/invoice/InvoiceContextCards";
 import InvoiceDraftBanner from "../components/invoice/InvoiceDraftBanner";
@@ -213,12 +214,33 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
               (preview?.projectCode && cfg.projectCode === preview.projectCode) ||
               (passedState.item?.projectCode && cfg.projectCode === passedState.item.projectCode) ||
               (preview?.projectName && cfg.projectName === preview.projectName) ||
-              (passedState.item?.projectName && cfg.projectName === passedState.item.projectName)
+              (passedState.item?.projectName && cfg.projectName === passedState.item.projectName) ||
+              (passedState.snapshotData?.projectId && cfg.projectId === passedState.snapshotData.projectId)
           );
           if (matched) {
+            let fullConfig = matched;
+            const configId = matched.billingConfigurationId || matched.id;
+            if (configId) {
+              try {
+                const configDetail = await getBillingConfigurationById(configId);
+                if (configDetail?.detail?.billingConfig) {
+                  fullConfig = {
+                    ...matched,
+                    ...configDetail.detail,
+                    billingConfig: configDetail.detail.billingConfig,
+                    timeAndMaterial: configDetail.detail.billingConfig.timeAndMaterial,
+                  };
+                }
+              } catch (detailErr) {
+                console.warn("[InvoiceGenerationDetail] Detail hydration notice:", detailErr?.message);
+              }
+            }
+
             setSnapshotData((prev) => ({
-              ...matched,
+              ...fullConfig,
               ...prev,
+              timeAndMaterial: fullConfig.timeAndMaterial || prev?.timeAndMaterial,
+              billingConfig: fullConfig.billingConfig || prev?.billingConfig,
               countryName:
                 matched.countryName ||
                 matched.country ||
@@ -483,6 +505,32 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
           companyProfile?.paymentInstructions ||
           companyProfile?.paymentInstruction ||
           null,
+        timeAndMaterial: previewData.timeAndMaterial || snapshotData?.timeAndMaterial || snapshotData?.billingConfig?.timeAndMaterial || null,
+        billingConfig: previewData.billingConfig || snapshotData?.billingConfig || null,
+        discountPeriods:
+          previewData.discountPeriods ||
+          snapshotData?.timeAndMaterial?.discountPeriods ||
+          snapshotData?.billingConfig?.timeAndMaterial?.discountPeriods ||
+          snapshotData?.discountPeriods ||
+          [],
+        standardRate:
+          previewData.standardRate ||
+          snapshotData?.timeAndMaterial?.rate ||
+          snapshotData?.billingConfig?.timeAndMaterial?.rate ||
+          snapshotData?.standardRate ||
+          null,
+        baseRate:
+          previewData.baseRate ||
+          snapshotData?.timeAndMaterial?.rate ||
+          snapshotData?.billingConfig?.timeAndMaterial?.rate ||
+          snapshotData?.baseRate ||
+          null,
+        includeBaseRateInInvoice:
+          previewData.includeBaseRateInInvoice ??
+          snapshotData?.timeAndMaterial?.includeBaseRateInInvoice ??
+          snapshotData?.billingConfig?.timeAndMaterial?.includeBaseRateInInvoice ??
+          snapshotData?.includeBaseRateInInvoice ??
+          true,
       };
     }
     if (invoice) return invoice;
@@ -569,6 +617,28 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         companyProfile?.paymentInstructions ||
         companyProfile?.paymentInstruction ||
         null,
+      timeAndMaterial: snapshotData?.timeAndMaterial || snapshotData?.billingConfig?.timeAndMaterial || null,
+      billingConfig: snapshotData?.billingConfig || null,
+      discountPeriods:
+        snapshotData?.timeAndMaterial?.discountPeriods ||
+        snapshotData?.billingConfig?.timeAndMaterial?.discountPeriods ||
+        snapshotData?.discountPeriods ||
+        [],
+      standardRate:
+        snapshotData?.timeAndMaterial?.rate ||
+        snapshotData?.billingConfig?.timeAndMaterial?.rate ||
+        snapshotData?.standardRate ||
+        null,
+      baseRate:
+        snapshotData?.timeAndMaterial?.rate ||
+        snapshotData?.billingConfig?.timeAndMaterial?.rate ||
+        snapshotData?.baseRate ||
+        null,
+      includeBaseRateInInvoice:
+        snapshotData?.timeAndMaterial?.includeBaseRateInInvoice ??
+        snapshotData?.billingConfig?.timeAndMaterial?.includeBaseRateInInvoice ??
+        snapshotData?.includeBaseRateInInvoice ??
+        true,
     };
   }, [
     invoice,

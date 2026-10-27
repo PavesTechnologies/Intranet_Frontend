@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { Wallet, Receipt, Pencil, ChevronRight, Building2, Calendar, Info } from "lucide-react";
+import { Wallet, Receipt, Pencil, ChevronRight, Building2, Calendar, Info, Lock } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
 import SearchInput from "../../../../components/filter/Searchbar";
@@ -14,6 +14,7 @@ import {
   getBillingRecurringSchedule,
   getBillingRecurringScheduleByBillingConfigurationId,
 } from "../../services/billingConfigurationService";
+import { isMilestoneEntryFrozen } from "../../services/projectMilestoneService";
 
 // Display-time safety net: a Project Code must never be the project's own
 // internal id — see the matching guard in ProjectStep.jsx / billingConfigurationService.js.
@@ -281,60 +282,125 @@ function MetaGrid({ items }) {
 
 function RoleRatesTable({ roles, currency }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-100">
+    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-medium text-slate-500">
-            <th className="px-3 py-2 font-medium">Role</th>
-            <th className="px-3 py-2 font-medium">Standard Rate</th>
-            <th className="px-3 py-2 font-medium">Discount / Net Rate</th>
-            <th className="px-3 py-2 font-medium">Frequency</th>
-            <th className="px-3 py-2 font-medium">Effective Period</th>
-            <th className="px-3 py-2 font-medium">Invoice</th>
-            <th className="px-3 py-2 font-medium">Commercial Notes</th>
+          <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold text-slate-600">
+            <th className="px-3 py-2.5">Role</th>
+            <th className="px-3 py-2.5">Base Rate</th>
+            <th className="px-3 py-2.5">Frequency</th>
+            <th className="px-3 py-2.5">Effective Period</th>
+            <th className="px-3 py-2.5 text-center">Base Rate Inv.</th>
+            <th className="px-3 py-2.5">Discount Schedule & Net Rates</th>
+            <th className="px-3 py-2.5">Commercial Notes</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 text-[13px]">
           {roles.map((role, index) => {
             const roleName = role.role || role.roleName || "—";
-            const hasDiscount = Boolean(role.hasDiscount);
-            const discType = role.discountType || "PERCENTAGE";
-            const discVal = role.discountValue;
-            const netRate = hasDiscount && role.rate && discVal
-              ? (role.discountedRate || calculateDiscountedRate(role.rate, discType, discVal))
-              : null;
-            const discLabel = discType === "PERCENTAGE" ? `${discVal}% off` : `${formatMoney(discVal, currency)} off`;
-            const isIncluded = role.includeInInvoice !== false;
+            const isBaseIncluded = role.includeBaseRateInInvoice !== undefined
+              ? role.includeBaseRateInInvoice !== false
+              : role.includeInInvoice !== false;
+            const discountPeriods = Array.isArray(role.discountPeriods) ? role.discountPeriods : [];
+            const hasLegacyDiscount = Boolean(role.hasDiscount && role.discountValue);
             const notes = role.remarks || role.notes || "";
 
             return (
-              <tr key={`${roleName}-${index}`}>
-                <td className="px-3 py-2 font-medium text-slate-800">{roleName}</td>
-                <td className="px-3 py-2 font-semibold tabular-nums text-slate-900">{formatMoney(role.rate, currency) || "—"}</td>
-                <td className="px-3 py-2">
-                  {hasDiscount && netRate ? (
-                    <div>
-                      <span className="font-semibold text-indigo-700 tabular-nums">{formatMoney(netRate, currency)}</span>
-                      <span className="ml-1 text-[11px] text-slate-500">({discLabel})</span>
-                    </div>
-                  ) : (
-                    <span className="text-slate-400">None</span>
-                  )}
+              <tr key={`${roleName}-${index}`} className="align-top hover:bg-slate-50/60 transition-colors">
+                <td className="px-3 py-2.5 font-semibold text-slate-900">{roleName}</td>
+                <td className="px-3 py-2.5 font-semibold tabular-nums text-slate-900">
+                  {formatMoney(role.rate, currency) || "—"}
                 </td>
-                <td className="px-3 py-2 text-slate-600">{ratePeriodLabel(role.ratePeriod)}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-slate-600">{rateDateRange(role) || "—"}</td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2.5 text-slate-600">{ratePeriodLabel(role.ratePeriod)}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{rateDateRange(role) || "—"}</td>
+                <td className="px-3 py-2.5 text-center">
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                      isIncluded
-                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                      isBaseIncluded
+                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
                         : "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200"
                     }`}
                   >
-                    {isIncluded ? "Included" : "Excluded"}
+                    {isBaseIncluded ? "Included" : "Excluded"}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-slate-600 max-w-[150px] truncate" title={notes}>
+                <td className="px-3 py-2.5 min-w-[240px]">
+                  {discountPeriods.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {discountPeriods.map((period, pIdx) => {
+                        const discType = period.discountType || "PERCENTAGE";
+                        const discVal = period.discountValue;
+                        const numBase = Number(role.rate);
+                        const dv = Number(discVal);
+                        const isPersistedNet = period.netRate !== null && period.netRate !== undefined && period.netRate !== "";
+                        let netRateVal = period.netRate;
+                        if (!isPersistedNet) {
+                          if (numBase > 0 && dv > 0) {
+                            const discAmount = discType === "PERCENTAGE" ? (numBase * dv / 100) : dv;
+                            netRateVal = Math.max(0, numBase - discAmount);
+                          }
+                        }
+                        const discLabel = discType === "PERCENTAGE" ? `${discVal}% off` : `${formatMoney(discVal, currency)} off`;
+                        const isPeriodIncluded = period.includeInInvoice !== false;
+
+                        return (
+                          <div
+                            key={period.discountId || period._uid || pIdx}
+                            className="flex flex-col gap-0.5 rounded-md border border-slate-200 bg-slate-50/70 p-2 text-xs"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-slate-800">
+                                {period.periodName || `Period ${pIdx + 1}`}
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[10px] font-medium ${
+                                  isPeriodIncluded
+                                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
+                                    : "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20"
+                                }`}
+                              >
+                                {isPeriodIncluded ? "Included" : "Excluded"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-slate-600">
+                              <span className="font-semibold text-indigo-700 tabular-nums">
+                                {netRateVal !== null && netRateVal !== undefined ? formatMoney(netRateVal, currency) : "—"}
+                                {!isPersistedNet && netRateVal !== null && netRateVal !== undefined && (
+                                  <span className="ml-1 text-[10px] font-normal text-slate-400">(preview)</span>
+                                )}
+                              </span>
+                              <span className="text-[11px] text-slate-500">({discLabel})</span>
+                            </div>
+                            {period.effectiveFrom && period.effectiveTo && (
+                              <div className="text-[10px] text-slate-500 tabular-nums">
+                                {period.effectiveFrom} to {period.effectiveTo}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : hasLegacyDiscount ? (
+                    (() => {
+                      const discType = role.discountType || "PERCENTAGE";
+                      const discVal = role.discountValue;
+                      const netRate = role.discountedRate || calculateDiscountedRate(role.rate, discType, discVal);
+                      const discLabel = discType === "PERCENTAGE" ? `${discVal}% off` : `${formatMoney(discVal, currency)} off`;
+                      return (
+                        <div className="text-xs">
+                          <span className="font-semibold text-indigo-700 tabular-nums">{formatMoney(netRate, currency)}</span>
+                          <span className="ml-1 text-[11px] text-slate-500">({discLabel})</span>
+                          {role.discountStartDate && role.discountEndDate && (
+                            <div className="text-[10px] text-slate-500">{role.discountStartDate} to {role.discountEndDate}</div>
+                          )}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-xs text-slate-400 italic">No discounts (Base rate only)</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 text-slate-600 max-w-[150px] truncate" title={notes}>
                   {notes || "—"}
                 </td>
               </tr>
@@ -519,10 +585,12 @@ function buildMilestonePlanReview(wizardData, projectInfo) {
   const paymentStructure =
     milestonePlan.paymentStructure || (rawEntries.length > 1 ? "INSTALLMENTS" : "FULL_PAYMENT");
   const isFullPayment = paymentStructure === "FULL_PAYMENT";
+  const isMilestones = paymentStructure === "MILESTONES";
 
   // Full Payment is always one 100% payment, even before an entry is saved.
-  // Installments show exactly what's configured — possibly nothing yet, or a
-  // partial allocation such as 55%.
+  // Milestones and Installments show exactly what's configured — possibly
+  // nothing yet, or a partial allocation such as 55%. Milestone entries are the
+  // saved plan's entries (each carries its PMS milestone id).
   const sourceEntries =
     isFullPayment && rawEntries.length === 0
       ? [{ sequence: 1, percentage: 100, billingDate: "", remarks: "" }]
@@ -545,10 +613,18 @@ function buildMilestonePlanReview(wizardData, projectInfo) {
     milestonePlan,
     totalValue,
     isFullPayment,
-    paymentStructureLabel: isFullPayment ? "Full Payment" : "Installments",
+    isMilestones,
+    paymentStructureLabel: isFullPayment
+      ? "Full Payment"
+      : isMilestones
+      ? "Milestones (Managed by PMS)"
+      : "Installments",
     payments,
     allocationPercentage,
+    scheduledTotal,
     remainingAmount,
+    previouslyBilledAmount: milestonePlan.previouslyBilledAmount,
+    remainingContractBalance: milestonePlan.remainingContractBalance,
     isFullyAllocated: Math.abs(allocationPercentage - 100) < 0.01,
     firstPaymentDate: billingDates[0] || null,
     lastPaymentDate: billingDates[billingDates.length - 1] || null,
@@ -612,10 +688,22 @@ export function ReviewHeader({ projectInfo, isProductService, leading, actions, 
 }
 
 function PaymentCard({ payment, index, currency }) {
+  const isFrozen = isMilestoneEntryFrozen(payment);
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3.5 py-2.5">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Payment {index + 1}</span>
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+          <span>Payment {index + 1}</span>
+          {payment.pmsMilestoneId ? <span>· PMS milestone {payment.pmsMilestoneId}</span> : ""}
+          {isFrozen && (
+            <span
+              className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700"
+              title="This milestone is already in billing or invoiced and cannot be modified or removed."
+            >
+              <Lock className="h-2.5 w-2.5 text-slate-500" /> Locked
+            </span>
+          )}
+        </span>
         <span className="rounded bg-[#0A0082]/10 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[#0A0082]">
           {payment.percentage}%
         </span>
@@ -644,7 +732,7 @@ function PaymentSchedule({ review, currency }) {
   const meta = review.isFullPayment
     ? [{ label: "Schedule Type", value: "One-Time Payment" }]
     : [
-      { label: "Schedule Type", value: "Custom Payment Dates" },
+      { label: "Schedule Type", value: review.isMilestones ? "PMS Milestones" : "Custom Payment Dates" },
       { label: "Number of Payments", value: String(review.payments.length) },
       { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
       { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
@@ -660,7 +748,7 @@ function PaymentSchedule({ review, currency }) {
         </div>
       ) : (
         <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-center text-xs text-slate-500">
-          No payments configured yet.
+          {review.isMilestones ? "No milestones selected yet." : "No payments configured yet."}
         </p>
       )}
     </div>
@@ -838,15 +926,15 @@ function TimeMaterialPricing({ billingConfig, currency }) {
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-200 text-xs">
+            <table className="w-full table-fixed divide-y divide-slate-200 text-xs">
               <thead className="bg-slate-50 text-slate-600 font-semibold">
                 <tr>
-                  <th className="px-3 py-2 text-left">Period Name</th>
-                  <th className="px-3 py-2 text-left">Date Range</th>
-                  <th className="px-3 py-2 text-left">Discount</th>
-                  <th className="px-3 py-2 text-left">Net Rate</th>
-                  <th className="px-3 py-2 text-center">Invoice</th>
-                  <th className="px-3 py-2 text-left">Commercial Notes</th>
+                  <th className="w-[18%] px-3.5 py-2.5 text-left align-middle">Period Name</th>
+                  <th className="w-[26%] px-3.5 py-2.5 text-left align-middle">Date Range</th>
+                  <th className="w-[16%] px-3.5 py-2.5 text-left align-middle">Discount</th>
+                  <th className="w-[16%] px-3.5 py-2.5 text-left align-middle">Net Rate</th>
+                  <th className="w-[11%] px-3.5 py-2.5 text-center align-middle">Invoice</th>
+                  <th className="w-[13%] px-3.5 py-2.5 text-left align-middle">Commercial Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -861,24 +949,30 @@ function TimeMaterialPricing({ billingConfig, currency }) {
                       netRateVal = Math.max(0, numBase - discAmount);
                     }
                   }
-                  const discLabel = discType === "PERCENTAGE" ? `${p.discountValue}%` : formatMoney(p.discountValue, currency);
+                  const isPercentage = discType === "PERCENTAGE";
+                  const discLabel = isPercentage ? `${p.discountValue}%` : `-${formatMoney(p.discountValue, currency)}`;
+                  const discTypeLabel = isPercentage ? "Percentage" : "Fixed";
                   const isPeriodIncluded = p.includeInInvoice !== false;
 
                   return (
-                    <tr key={p.discountId || idx} className="hover:bg-slate-50">
-                      <td className="px-3 py-2 font-medium text-slate-900">{p.periodName || `Period ${idx + 1}`}</td>
-                      <td className="px-3 py-2 tabular-nums text-slate-600">{p.effectiveFrom || "—"} to {p.effectiveTo || "—"}</td>
-                      <td className="px-3 py-2 text-slate-700">
-                        <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700">
-                          {discLabel} ({discType === "PERCENTAGE" ? "%" : "Fixed"})
+                    <tr key={p.discountId || idx} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-3.5 py-2.5 align-middle font-medium text-slate-900 truncate" title={p.periodName || `Period ${idx + 1}`}>
+                        {p.periodName || `Period ${idx + 1}`}
+                      </td>
+                      <td className="px-3.5 py-2.5 align-middle tabular-nums text-slate-600 whitespace-nowrap">
+                        {p.effectiveFrom || "—"} to {p.effectiveTo || "—"}
+                      </td>
+                      <td className="px-3.5 py-2.5 align-middle text-slate-700">
+                        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                          {discLabel} ({discTypeLabel})
                         </span>
                       </td>
-                      <td className="px-3 py-2 font-semibold text-indigo-900 tabular-nums">
+                      <td className="px-3.5 py-2.5 align-middle font-semibold text-indigo-900 tabular-nums whitespace-nowrap">
                         {netRateVal !== null && netRateVal !== undefined
                           ? `${formatMoney(netRateVal, currency)} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim()
                           : "—"}
                       </td>
-                      <td className="px-3 py-2 text-center">
+                      <td className="px-3.5 py-2.5 align-middle text-center">
                         {isPeriodIncluded ? (
                           <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
                             Included
@@ -889,7 +983,7 @@ function TimeMaterialPricing({ billingConfig, currency }) {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate" title={p.notes || ""}>
+                      <td className="px-3.5 py-2.5 align-middle text-slate-500 truncate" title={p.notes || ""}>
                         {p.notes || "—"}
                       </td>
                     </tr>
@@ -945,6 +1039,16 @@ function RecurringPricing({ billingConfig, currency, projectBudgetValue, isProdu
 }
 
 function MilestonePlanPricing({ review, currency, projectBudgetValue }) {
+  const isMilestones = review.isMilestones;
+  const hasAuthoritativePriorBilling =
+    review.previouslyBilledAmount !== undefined &&
+    review.previouslyBilledAmount !== null &&
+    !Number.isNaN(Number(review.previouslyBilledAmount));
+  const hasAuthoritativeRemaining =
+    review.remainingContractBalance !== undefined &&
+    review.remainingContractBalance !== null &&
+    !Number.isNaN(Number(review.remainingContractBalance));
+
   return (
     <FieldList
       fields={[
@@ -954,17 +1058,49 @@ function MilestonePlanPricing({ review, currency, projectBudgetValue }) {
         ...(isSameAmount(review.totalValue, projectBudgetValue)
           ? []
           : [{ label: "Total Value", value: formatMoney(review.totalValue, currency), money: true }]),
-        {
-          label: "Allocation Percentage",
-          value: `${review.allocationPercentage}%`,
-          tone: review.isFullyAllocated ? undefined : "warning",
-        },
-        {
-          label: "Remaining Amount",
-          value: formatMoney(review.remainingAmount, currency),
-          money: true,
-          tone: review.remainingAmount > 0 ? "warning" : "success",
-        },
+        ...(isMilestones
+          ? [
+              {
+                label: "Current Cycle Allocation",
+                value: `${review.allocationPercentage}%`,
+              },
+              {
+                label: "Scheduled (Current Cycle)",
+                value: formatMoney(review.scheduledTotal, currency),
+                money: true,
+              },
+              ...(hasAuthoritativePriorBilling
+                ? [
+                    {
+                      label: "Previously Billed",
+                      value: formatMoney(Number(review.previouslyBilledAmount), currency),
+                      money: true,
+                    },
+                  ]
+                : []),
+              ...(hasAuthoritativeRemaining
+                ? [
+                    {
+                      label: "Remaining Contract Balance",
+                      value: formatMoney(Number(review.remainingContractBalance), currency),
+                      money: true,
+                    },
+                  ]
+                : []),
+            ]
+          : [
+              {
+                label: "Allocation Percentage",
+                value: `${review.allocationPercentage}%`,
+                tone: review.isFullyAllocated ? undefined : "warning",
+              },
+              {
+                label: "Remaining Amount",
+                value: formatMoney(review.remainingAmount, currency),
+                money: true,
+                tone: review.remainingAmount > 0 ? "warning" : "success",
+              },
+            ]),
         ...(review.milestonePlan.remarks ? [{ label: "Remarks", value: review.milestonePlan.remarks }] : []),
       ]}
     />
@@ -980,9 +1116,10 @@ function MilestonePlanPricing({ review, currency, projectBudgetValue }) {
 // live only in the overview; lower sections show a total only when it is a
 // genuinely different amount, and individual payment amounts appear only in
 // Payment Schedule.
-export default function ReviewActivateStep({ wizardData, onEditStep, leading, headerActions, pendingChanges }) {
-  const { billingConfig = {}, controls = {}, approvalStatus, billingStatus } = wizardData;
-  const projectInfo = wizardData.projectInfo || wizardData.project || {};
+export default function ReviewActivateStep({ wizardData, data, onEditStep, leading, headerActions, pendingChanges }) {
+  const resolvedWizardData = wizardData || data || {};
+  const { billingConfig = {}, controls = {}, approvalStatus, billingStatus } = resolvedWizardData;
+  const projectInfo = resolvedWizardData.projectInfo || resolvedWizardData.project || {};
 
   const billingContext = projectInfo.billingContext || "PROJECT";
   const isProductService = billingContext === "PRODUCT_SERVICE";
@@ -1026,7 +1163,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
   // Duration, shown in the primary summary).
   const hasSchedule = Boolean(commercialEffectiveDates.from || commercialEffectiveDates.to);
 
-  const milestoneReview = isMilestonePlan ? buildMilestonePlanReview(wizardData, projectInfo) : null;
+  const milestoneReview = isMilestonePlan ? buildMilestonePlanReview(resolvedWizardData, projectInfo) : null;
   // Labels of fields the backend reports as changed — drives the subtle
   // "Changed" chips on matching review rows. Empty outside the view page.
   const changedFieldLabels = useMemo(() => getChangedFieldLabels(pendingChanges), [pendingChanges]);
@@ -1106,7 +1243,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
                 {billingConfig.billingType === "RECURRING" && (
                   <RecurringOccurrences
                     recurringConfigurationId={billingConfig.recurring?.recurringConfigurationId}
-                    billingConfigurationId={billingConfig.billingConfigurationId || wizardData.billingConfigurationId}
+                    billingConfigurationId={billingConfig.billingConfigurationId || resolvedWizardData.billingConfigurationId}
                     currency={currency}
                   />
                 )}

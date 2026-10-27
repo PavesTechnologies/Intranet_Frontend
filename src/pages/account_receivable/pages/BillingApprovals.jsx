@@ -138,7 +138,7 @@ function formatAmount(value, currency) {
   return value === null || value === undefined ? null : formatCurrency(value, currency || "INR");
 }
 
-const PAYMENT_STRUCTURE_LABELS = { FULL_PAYMENT: "Full Payment", INSTALLMENTS: "Installments" };
+const PAYMENT_STRUCTURE_LABELS = { FULL_PAYMENT: "Full Payment", INSTALLMENTS: "Installments", MILESTONES: "Milestones (PMS)" };
 const CONTRACT_VALUE_SOURCE_LABELS = { PMS: "PMS Project Budget", MANUAL: "Manual Input" };
 const RATE_PERIOD_SUFFIX = { HOURLY: "/ hr", DAILY: "/ day", WEEKLY: "/ wk", MONTHLY: "/ month" };
 
@@ -213,7 +213,7 @@ function ReviewTable({ title, headers, rows, emptyMessage }) {
 // Read-only Review modal body. Renders ONLY config.review (built by
 // buildApprovalReviewModel in billingApprovalService.js) — every value has a
 // single definition there and is shown in exactly one section here.
-function ApprovalReviewDetails({ config }) {
+export function ApprovalReviewDetails({ config }) {
   const review = config.review || {};
   const { billingType, currency, projectBudget, totalValue, pricingDetails = {}, schedule = { items: [] } } = review;
   const money = (value) => formatAmount(value, currency);
@@ -320,31 +320,227 @@ function ApprovalReviewDetails({ config }) {
           </PageCard>
         )}
 
-        {billingType === "TIME_MATERIAL" && (
-          <>
-            <ReviewSection
-              title="Time & Material Pricing"
-              rows={[
-                {
-                  label: "Pricing Model",
-                  value: BILLING_MODE_LABELS[pricingDetails.pricingModel] || pricingDetails.pricingModel || "Standard",
-                },
-              ]}
-            />
-            <ReviewTable
-              title="Rate Card"
-              headers={["Role", "Rate"]}
-              rows={(pricingDetails.rateCards || []).map((card) => ({
-                key: card.key,
-                cells: [
-                  card.role,
-                  card.rate !== null ? `${money(card.rate)} ${RATE_PERIOD_SUFFIX[card.ratePeriod] || ""}`.trim() : null,
-                ],
-              }))}
-              emptyMessage="No rate cards have been configured."
-            />
-          </>
-        )}
+        {billingType === "TIME_MATERIAL" && (() => {
+          const isStandardModel = pricingDetails.pricingModel === "STANDARD" || !pricingDetails.pricingModel;
+          const standardDiscountPeriods = pricingDetails.standardDiscountPeriods || [];
+          const hasStandardDiscounts = isStandardModel && standardDiscountPeriods.length > 0;
+          const hasRoleDiscounts = !isStandardModel && (pricingDetails.rateCards || []).some((c) => (c.discountPeriods || []).length > 0);
+
+          return (
+            <>
+              <ReviewSection
+                title="Time & Material Pricing"
+                rows={[
+                  {
+                    label: "Pricing Model",
+                    value: BILLING_MODE_LABELS[pricingDetails.pricingModel] || pricingDetails.pricingModel || "Standard Rate",
+                  },
+                ]}
+              />
+
+              {!hasRoleDiscounts ? (
+                <ReviewTable
+                  title="Rate Card"
+                  headers={["Role", "Rate"]}
+                  rows={(pricingDetails.rateCards || []).map((card) => ({
+                    key: card.key,
+                    cells: [
+                      card.role,
+                      card.rate !== null ? `${money(card.rate)} ${RATE_PERIOD_SUFFIX[card.ratePeriod] || ""}`.trim() : null,
+                    ],
+                  }))}
+                  emptyMessage="No rate cards have been configured."
+                />
+              ) : (
+                <PageCard className="overflow-hidden">
+                  <PageCardContent className="p-0">
+                    <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                        Rate Cards & Discounts ({pricingDetails.rateCards.length})
+                      </h3>
+                      <span className="text-xs text-slate-500">
+                        Currency: <strong className="text-slate-800">{currency || "—"}</strong>
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto p-2">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-medium text-slate-500">
+                            <th className="px-3 py-2">Role</th>
+                            <th className="px-3 py-2">Base Rate</th>
+                            <th className="px-3 py-2">Base Rate Inv.</th>
+                            <th className="px-3 py-2">Discount Schedule & Net Rates</th>
+                            <th className="px-3 py-2">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {pricingDetails.rateCards.map((card) => {
+                            const discounts = card.discountPeriods || [];
+                            return (
+                              <tr key={card.key} className="align-top hover:bg-slate-50/60">
+                                <td className="px-3 py-2.5 font-semibold text-slate-900">{card.role}</td>
+                                <td className="px-3 py-2.5 font-semibold tabular-nums text-slate-900">
+                                  {card.rate !== null ? `${money(card.rate)} ${RATE_PERIOD_SUFFIX[card.ratePeriod] || ""}`.trim() : "—"}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                      card.includeBaseRateInInvoice !== false
+                                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
+                                        : "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200"
+                                    }`}
+                                  >
+                                    {card.includeBaseRateInInvoice !== false ? "Included" : "Excluded"}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 min-w-[220px]">
+                                  {discounts.length > 0 ? (
+                                    <div className="space-y-1.5">
+                                      {discounts.map((p, pIdx) => {
+                                        const numBase = Number(card.rate);
+                                        const dv = Number(p.discountValue);
+                                        const discType = p.discountType || "PERCENTAGE";
+                                        let netRateVal = p.netRate;
+                                        if (netRateVal === null || netRateVal === undefined || netRateVal === "") {
+                                          if (numBase > 0 && dv > 0) {
+                                            const discAmount = discType === "PERCENTAGE" ? (numBase * dv / 100) : dv;
+                                            netRateVal = Math.max(0, numBase - discAmount);
+                                          }
+                                        }
+                                        const isPerc = discType === "PERCENTAGE";
+                                        const discLabel = isPerc ? `${p.discountValue}%` : `-${money(p.discountValue)}`;
+                                        const isInc = p.includeInInvoice !== false;
+                                        return (
+                                          <div key={p.discountId || pIdx} className="rounded border border-slate-200 bg-slate-50/70 p-2 text-xs space-y-1">
+                                            <div className="flex items-center justify-between font-semibold text-slate-800">
+                                              <span>{p.periodName || `Period ${pIdx + 1}`}</span>
+                                              <span className={`rounded-full px-1.5 text-[10px] ${isInc ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                                                {isInc ? "Included" : "Excluded"}
+                                              </span>
+                                            </div>
+                                            <div className="text-slate-500 text-[11px] tabular-nums">
+                                              {p.effectiveFrom || "—"} to {p.effectiveTo || "—"}
+                                            </div>
+                                            <div className="flex items-center justify-between font-medium pt-0.5">
+                                              <span className="text-slate-700 bg-slate-200/80 px-1 rounded text-[11px]">{discLabel} ({isPerc ? "Percentage" : "Fixed"})</span>
+                                              <span className="text-indigo-900 font-semibold">{netRateVal !== null ? `${money(netRateVal)} ${RATE_PERIOD_SUFFIX[card.ratePeriod] || ""}`.trim() : "—"}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 italic text-xs">No discounts</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5 text-slate-500 max-w-[150px] truncate" title={card.remarks || ""}>
+                                  {card.remarks || "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </PageCardContent>
+                </PageCard>
+              )}
+
+              {hasStandardDiscounts && (
+                <PageCard className="overflow-hidden">
+                  <PageCardContent className="p-0">
+                    <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                        Standard Rate Schedule ({standardDiscountPeriods.length} {standardDiscountPeriods.length === 1 ? "Period" : "Periods"})
+                      </h3>
+                      <span className="text-xs text-slate-500">
+                        Currency: <strong className="text-slate-800">{currency || "—"}</strong>
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto p-2">
+                      <table className="w-full table-fixed divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold">
+                          <tr>
+                            <th className="w-[18%] px-3.5 py-2.5 text-left align-middle">Period Name</th>
+                            <th className="w-[26%] px-3.5 py-2.5 text-left align-middle">Date Range</th>
+                            <th className="w-[16%] px-3.5 py-2.5 text-left align-middle">Discount</th>
+                            <th className="w-[16%] px-3.5 py-2.5 text-left align-middle">Net Rate</th>
+                            <th className="w-[11%] px-3.5 py-2.5 text-center align-middle">Invoice</th>
+                            <th className="w-[13%] px-3.5 py-2.5 text-left align-middle">Commercial Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {standardDiscountPeriods.map((p, idx) => {
+                            const numBase = Number(pricingDetails.rateCards?.[0]?.rate);
+                            const dv = Number(p.discountValue);
+                            const discType = p.discountType || "PERCENTAGE";
+                            let netRateVal = p.netRate;
+                            if (netRateVal === null || netRateVal === undefined || netRateVal === "") {
+                              if (numBase > 0 && dv > 0) {
+                                const discAmount = discType === "PERCENTAGE" ? (numBase * dv / 100) : dv;
+                                netRateVal = Math.max(0, numBase - discAmount);
+                              }
+                            }
+                            const isPercentage = discType === "PERCENTAGE";
+                            const discLabel = isPercentage ? `${p.discountValue}%` : `-${money(p.discountValue)}`;
+                            const discTypeLabel = isPercentage ? "Percentage" : "Fixed";
+                            const isPeriodIncluded = p.includeInInvoice !== false;
+
+                            return (
+                              <tr key={p.discountId || p.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="px-3.5 py-2.5 align-middle font-medium text-slate-900 truncate" title={p.periodName || `Period ${idx + 1}`}>
+                                  {p.periodName || `Period ${idx + 1}`}
+                                </td>
+                                <td className="px-3.5 py-2.5 align-middle tabular-nums text-slate-600 whitespace-nowrap">
+                                  {p.effectiveFrom || "—"} to {p.effectiveTo || "—"}
+                                </td>
+                                <td className="px-3.5 py-2.5 align-middle text-slate-700">
+                                  <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                    {discLabel} ({discTypeLabel})
+                                  </span>
+                                </td>
+                                <td className="px-3.5 py-2.5 align-middle font-semibold text-indigo-900 tabular-nums whitespace-nowrap">
+                                  {netRateVal !== null && netRateVal !== undefined
+                                    ? `${money(netRateVal)} ${RATE_PERIOD_SUFFIX[pricingDetails.rateCards?.[0]?.ratePeriod] || "/ hr"}`.trim()
+                                    : "—"}
+                                </td>
+                                <td className="px-3.5 py-2.5 align-middle text-center">
+                                  {isPeriodIncluded ? (
+                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                      Included
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                                      Excluded
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3.5 py-2.5 align-middle text-slate-500 truncate" title={p.notes || p.remarks || ""}>
+                                  {p.notes || p.remarks || "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="p-3 border-t border-slate-100 bg-slate-50/60">
+                      <div className="rounded-lg bg-slate-100/70 p-2.5 text-xs text-slate-600 flex items-start gap-1.5">
+                        <Info className="h-4 w-4 shrink-0 text-slate-500 mt-0.5" />
+                        <span>
+                          <strong>Base-Rate Fallback:</strong> Outside configured discount periods, billing falls back automatically to the standard base rate of{" "}
+                          <strong>{money(pricingDetails.rateCards?.[0]?.rate)} {RATE_PERIOD_SUFFIX[pricingDetails.rateCards?.[0]?.ratePeriod] || "/ hr"}</strong>.
+                        </span>
+                      </div>
+                    </div>
+                  </PageCardContent>
+                </PageCard>
+              )}
+            </>
+          );
+        })()}
 
         {billingType === "RECURRING" && (() => {
           const isProductServiceContext = pricingDetails.billingContext === "PRODUCT_SERVICE";
