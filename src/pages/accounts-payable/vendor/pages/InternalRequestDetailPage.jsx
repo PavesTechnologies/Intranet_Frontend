@@ -45,14 +45,15 @@ const DetailRow = ({ label, value }) => (
  * purpose from the request, never from this screen), and whatever vendor identity the officer
  * supplied.
  *
- * "Start Vendor Onboarding" hands off to the existing Register Vendor / Vendor Intake page
- * with `?onboardingRequestId=`; no second intake form exists.
+ * "Onboard Vendor" (offered only while the backend reports `awaiting_intake`) hands off to the
+ * existing Register Vendor / Vendor Intake page with `?onboardingRequestId=`; no second intake
+ * form exists.
  */
 export default function InternalRequestDetailPage() {
   const { requestId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { canViewOnboarding, canProcessOnboarding, canViewNda } = useApPermissions();
+  const { canViewOnboarding, canProcessOnboarding, canViewNda, canViewPR } = useApPermissions();
 
   const {
     data: request,
@@ -63,7 +64,8 @@ export default function InternalRequestDetailPage() {
 
   const { data: departments = [] } = useDepartments();
   const { data: categories = [] } = usePurchaseCategories();
-  const { data: pr } = usePurchaseRequisitionDetail(request?.pr_id);
+  // PR detail needs PR_VIEW; without it the request's own pr_number is shown instead.
+  const { data: pr } = usePurchaseRequisitionDetail(canViewPR ? request?.pr_id : undefined);
   const { vendor } = useVendorDetail(request?.vendor_id);
 
   const { data: ndaLookup } = useVendorNda(request?.vendor_id, {
@@ -117,8 +119,12 @@ export default function InternalRequestDetailPage() {
     );
   }
 
-  const departmentName = departments.find((d) => d.id === request.department_id)?.name;
-  const categoryName = categories.find((c) => c.id === request.purchase_category_id)?.name;
+  const departmentName =
+    request.department_name || departments.find((d) => d.id === request.department_id)?.name;
+  const categoryName =
+    request.purchase_category_name ||
+    categories.find((c) => c.id === request.purchase_category_id)?.name;
+  const prNumber = request.pr_number || pr?.pr_number;
   const ndaStatusCode = ndaLookup?.nda?.status_code;
 
   // GST lives on the vendor's tax registrations, which only exist once intake has created
@@ -129,6 +135,9 @@ export default function InternalRequestDetailPage() {
 
   const isOpen = isOnboardingOpen(request.status_code);
   const hasStarted = Boolean(request.engagement_id);
+  // Eligibility for a new intake is the backend's call (awaiting_intake), not the status code.
+  const canStartIntake = canProcessOnboarding && Boolean(request.awaiting_intake);
+  const canContinue = canProcessOnboarding && hasStarted && isOpen;
 
   return (
     <div className="p-6">
@@ -151,14 +160,12 @@ export default function InternalRequestDetailPage() {
             >
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
-            {canProcessOnboarding && isOpen && (
+            {(canStartIntake || canContinue) && (
               <Button
                 variant="primary"
-                onClick={() =>
-                  navigate(`${AP_ROUTES.VENDOR_ONBOARD}?onboardingRequestId=${request.id}`)
-                }
+                onClick={() => navigate(AP_ROUTES.VENDOR_ONBOARD_FOR_REQUEST(request.id))}
               >
-                {hasStarted ? "Continue Vendor Onboarding" : "Start Vendor Onboarding"}{" "}
+                {canStartIntake ? "Onboard Vendor" : "Continue Vendor Onboarding"}{" "}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             )}
@@ -237,13 +244,13 @@ export default function InternalRequestDetailPage() {
             <DetailRow
               label="PR Number"
               value={
-                pr?.pr_number ? (
+                prNumber ? (
                   <button
                     type="button"
                     className="text-sm font-semibold text-[#0A0082] hover:underline"
                     onClick={() => navigate(AP_ROUTES.PROCUREMENT_PR_DETAIL(request.pr_id))}
                   >
-                    {pr.pr_number}
+                    {prNumber}
                   </button>
                 ) : (
                   `PR #${request.pr_id}`
@@ -314,17 +321,24 @@ export default function InternalRequestDetailPage() {
               />
             </div>
 
-            {!hasStarted && (
+            {!hasStarted && request.awaiting_intake && (
               <p className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                Vendor details are captured during Vendor Intake. Start the onboarding to open
-                the Vendor Intake form with this request's context.
+                Vendor details are captured during Vendor Intake. Onboard the vendor to open the
+                Vendor Intake form prefilled with this request's details.
+              </p>
+            )}
+
+            {!hasStarted && !request.awaiting_intake && (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                This request is not awaiting vendor intake, so a vendor cannot be onboarded from
+                it.
               </p>
             )}
 
             {request.status_code === ONBOARDING_STATUS.COMPLETED && (
               <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                 Onboarding completed. This vendor is available to purchase requisition{" "}
-                {pr?.pr_number || `#${request.pr_id}`}, which can now continue with RFQ.
+                {prNumber || `#${request.pr_id}`}, which can now continue with RFQ.
               </p>
             )}
           </PageCardContent>

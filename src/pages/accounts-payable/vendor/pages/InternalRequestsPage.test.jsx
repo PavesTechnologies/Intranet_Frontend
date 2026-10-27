@@ -156,6 +156,61 @@ describe("InternalRequestsPage", () => {
     );
   });
 
+  describe("Onboard Vendor action", () => {
+    const AWAITING = {
+      id: 5,
+      pr_id: 14,
+      department_id: 1,
+      purchase_category_id: 10,
+      status_code: "ASSIGNED",
+      pr_number: "PR-0014",
+      department_name: "Engineering",
+      purchase_category_name: "Laptops",
+      awaiting_intake: true,
+      requested_vendor_name: "Initech",
+      vendor_id: null,
+      created_by: "officer-1",
+      created_at: "2026-09-03T10:00:00Z",
+    };
+
+    beforeEach(() => {
+      useOnboardingRequests.mockReturnValue({
+        data: [...REQUESTS, AWAITING],
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+    });
+
+    it("is offered only on requests awaiting intake and opens the intake form for that request", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const onboardButtons = screen.getAllByRole("button", { name: /onboard vendor/i });
+      expect(onboardButtons).toHaveLength(1);
+
+      await user.click(onboardButtons[0]);
+      expect(mockNavigate).toHaveBeenCalledWith(
+        "/accounts-payable/vendors/onboard?onboardingRequestId=5",
+      );
+    });
+
+    it("shows the request's own PR number, department and category names", () => {
+      renderPage();
+
+      expect(screen.getByText("PR-0014")).toBeInTheDocument();
+      expect(screen.getByText("Engineering")).toBeInTheDocument();
+      expect(screen.getByText("Laptops")).toBeInTheDocument();
+    });
+
+    it("is hidden without the process permission", () => {
+      permissions = { canViewOnboarding: true, canProcessOnboarding: false, canViewNda: true };
+      renderPage();
+
+      expect(screen.queryByRole("button", { name: /onboard vendor/i })).not.toBeInTheDocument();
+    });
+  });
+
   it("offers View only, never a process action, without the process permission", () => {
     permissions = { canViewOnboarding: true, canProcessOnboarding: false, canViewNda: true };
     renderPage();

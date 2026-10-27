@@ -8,6 +8,8 @@ import FormTextArea from "@/components/forms/FormTextArea";
 import FormSelect from "@/components/forms/FormSelect";
 import { taxService } from "@/pages/expense-management/api/expenseReportsApi";
 import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
+import { showStatusToast } from "@/components/toastfy/toast";
+import { useSetSupplierGstin } from "../hooks/useFinanceVerification";
 import { formatMoney } from "../../../approval-engine/constants/approvalLabels";
 
 /** Statuses Finance must explicitly confirm before verifying (BR-TAX-011). */
@@ -18,6 +20,7 @@ const REASON_TEXT = {
   OVERRIDE: "Tax differs from the tax code's calculation",
   CONFIG_MISMATCH: "Receipt agrees with the entered tax, not the tax code",
   OCR_MISMATCH: "Tax differs from what OCR read on the receipt",
+  SUPPLY_TYPE_MISMATCH: "Supplier state and tax type disagree: same state = CGST + SGST, other state = IGST",
   NO_TAX_CODE: "Tax entered for a category with no tax code",
   LOW_OCR_CONFIDENCE: "OCR reading too uncertain to compare",
 };
@@ -33,14 +36,19 @@ const Item = ({ label, value, emphasis }) => (
  * Finance view of one line's tax snapshot (design §13): code, components, entered vs calculated
  * vs OCR, ITC and status. FINANCE_EXECUTIVE can open the adjust dialog.
  */
-export default function FinanceTaxPanel({ line, canAdjust, onAdjust }) {
+export default function FinanceTaxPanel({ line, reportId, canAdjust, onAdjust }) {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [gstinOpen, setGstinOpen] = useState(false);
   const tax = line?.tax;
   const cur = line?.currencyCode;
   if (!tax) {
     return line?.taxAmount != null ? <Item label="Tax / GST" value={formatMoney(line.taxAmount, cur)} /> : null;
   }
   const reasons = (tax.validationReasons || []).filter((r) => REASON_TEXT[r]);
+  // Foreign-currency receipts: also show what the tax is in the organization's base currency.
+  const base = line?.baseCurrencyCode;
+  const showBase = !!base && !!cur && base !== cur;
+  const gstin = tax.supplierGstin;
 
   return (
     <div className="space-y-3">
@@ -71,6 +79,20 @@ export default function FinanceTaxPanel({ line, canAdjust, onAdjust }) {
         <Item label="OCR read" value={tax.ocrTaxAmount != null ? formatMoney(tax.ocrTaxAmount, cur) : "—"} />
         <Item label="ITC recoverable" value={`${Number(tax.itcRecoverablePercent || 0)}% · ${formatMoney(tax.recoverableTaxAmount, cur)}`} />
         <Item label="Source" value={(tax.taxSource || "—").replace(/_/g, " ").toLowerCase()} />
+        {showBase && <Item label={`Tax in ${base}`} value={formatMoney(tax.baseTaxAmount, base)} />}
+        <Item
+          label="Supplier GSTIN"
+          value={
+            <span className="inline-flex items-center gap-1.5">
+              <span className="font-mono">{gstin ? `${gstin} · state ${gstin.slice(0, 2)}` : "Not captured"}</span>
+              {canAdjust && (
+                <button type="button" className="text-xs font-semibold text-indigo-600 hover:underline" onClick={() => setGstinOpen(true)}>
+                  {gstin ? "Change" : "Set"}
+                </button>
+              )}
+            </span>
+          }
+        />
       </div>
 
       {(tax.components || []).length > 0 && (
@@ -78,11 +100,22 @@ export default function FinanceTaxPanel({ line, canAdjust, onAdjust }) {
           {tax.components.map((c) => (
             <div key={c.componentCode} className="flex justify-between py-0.5 text-xs text-gray-600">
               <span>{c.label}</span>
-              <span className="tabular-nums">{formatMoney(c.taxAmount, cur)}</span>
+              <span className="tabular-nums">
+                {formatMoney(c.taxAmount, cur)}
+                {showBase && c.baseTaxAmount != null && <span className="ml-1.5 text-gray-400">({formatMoney(c.baseTaxAmount, base)})</span>}
+              </span>
             </div>
           ))}
         </div>
       )}
+
+      <SupplierGstinModal
+        key={gstinOpen ? "open" : "closed"}
+        isOpen={gstinOpen}
+        onClose={() => setGstinOpen(false)}
+        reportId={reportId}
+        line={line}
+      />
 
       {reasons.length > 0 && (
         <ul className="list-disc space-y-0.5 pl-5 text-xs text-amber-700">
@@ -216,6 +249,81 @@ export function AdjustTaxModal({ isOpen, onClose, line, onSubmit, submitting }) 
           placeholder="Recorded in the audit log, e.g. inter-state hotel - IGST applies"
           value={form.reason}
           onChange={(e) => set("reason", e.target.value)}
+          requiredMark
+          error={errors.reason}
+        />
+      </div>
+    </Modal>
+  );
+}
+
+/** Indian GSTIN: 2-digit state code, PAN, entity digit, Z, check character. */
+const GSTIN_PATTERN = /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/;
+
+/**
+ * FINANCE_EXECUTIVE records (or corrects) the supplier GSTIN behind a line's input tax credit. Its
+ * state code decides whether the bill should be CGST + SGST (same state) or IGST (another state),
+ * so the line's tax status is re-checked on save.
+ */
+function SupplierGstinModal({ isOpen, onClose, reportId, line }) {
+  const setSupplierGstin = useSetSupplierGstin();
+  const [gstin, setGstin] = useState(line?.tax?.supplierGstin || "");
+  const [reason, setReason] = useState("");
+  const [errors, setErrors] = useState({});
+  if (!isOpen || !line) return null;
+
+  const submit = () => {
+    const value = gstin.trim().toUpperCase();
+    const next = {};
+    if (value && !GSTIN_PATTERN.test(value)) next.gstin = "Enter a 15-character GSTIN, e.g. 29ABCDE1234F1Z5 (leave blank to clear).";
+    if (!reason.trim()) next.reason = "A reason is required - it is recorded in the audit log.";
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    setSupplierGstin.mutate(
+      { reportId, lineItemId: line.lineItemId, payload: { supplierGstin: value || null, reason: reason.trim() } },
+      {
+        onSuccess: () => {
+          showStatusToast("Supplier GSTIN saved", "success");
+          onClose();
+        },
+        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to save the supplier GSTIN", "error"),
+      }
+    );
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Supplier GSTIN"
+      subtitle="Its state code decides CGST + SGST (same state as us) or IGST (another state). Tax amounts don't change here."
+      size="md"
+      closeOnBackdrop={false}
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={onClose} disabled={setSupplierGstin.isPending}>Cancel</Button>
+          <Button variant="primary" onClick={submit} loading={setSupplierGstin.isPending} loadingText="Saving...">
+            Save GSTIN
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <FormInput
+          label="GSTIN"
+          name="supplierGstin"
+          placeholder="29ABCDE1234F1Z5"
+          value={gstin}
+          onChange={(e) => setGstin(e.target.value)}
+          maxLength={15}
+          error={errors.gstin}
+        />
+        <FormTextArea
+          label="Reason"
+          name="reason"
+          placeholder="e.g. GSTIN read from the hotel invoice"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
           requiredMark
           error={errors.reason}
         />

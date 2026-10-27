@@ -4,13 +4,20 @@ import {
   VENDOR_ENGAGEMENT_KEY,
   VENDOR_ENGAGEMENTS_BY_VENDOR_KEY,
 } from "./useVendorIntake";
+import { invalidateOnboardingGraph } from "../../procurement/hooks/useVendorOnboardingMutations";
 
 /** Saving an intake can also create a vendor master record, so the vendor lists go stale too. */
 const invalidateVendorLists = (qc) =>
   qc.invalidateQueries({ queryKey: ["accountsPayable", "vendors"] });
 
-/** POST /apm/vendor-intake — step 1 of the flow. */
-export const useCreateVendorIntake = () => {
+/**
+ * POST /apm/vendor-intake — step 1 of the flow.
+ *
+ * `prId` is only passed for an intake run against an internal vendor request: the response
+ * then echoes `onboarding_request_id`, and the request, its PR and everything else the
+ * onboarding drives are refreshed alongside the vendor lists.
+ */
+export const useCreateVendorIntake = ({ prId } = {}) => {
   const qc = useQueryClient();
 
   return useMutation({
@@ -18,6 +25,15 @@ export const useCreateVendorIntake = () => {
     onSuccess: (data) => {
       invalidateVendorLists(qc);
       qc.invalidateQueries({ queryKey: VENDOR_ENGAGEMENTS_BY_VENDOR_KEY(data?.vendor_id) });
+
+      if (data?.onboarding_request_id) {
+        invalidateOnboardingGraph(qc, {
+          prId,
+          requestId: data.onboarding_request_id,
+          engagementId: data.engagement_id,
+          vendorId: data.vendor_id,
+        });
+      }
     },
   });
 };

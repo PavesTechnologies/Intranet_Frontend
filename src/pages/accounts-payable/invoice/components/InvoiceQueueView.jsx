@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
@@ -37,7 +38,17 @@ const PAGE_SIZE = 10;
  * VendorSelectionTab/QuotationTab. An unrecognized or not-currently-visible value is ignored, same
  * as an unrecognized defaultQueueType.
  */
-export default function InvoiceQueueView({ title, subtitle, defaultQueueType, showUploadAction = false, showKpis = false }) {
+// What an empty tab means, and what brings invoices into it.
+const EMPTY_QUEUE = {
+  all_invoices: { title: "No invoices yet.", hint: "Upload an invoice, or let the mailbox / SharePoint pickup bring them in." },
+  ocr_review: { title: "Nothing to review.", hint: "New invoices land here after upload - their details are read for you to check." },
+  approval: { title: "Nothing waiting for approval.", hint: "Invoices come here when an AP Executive sends them for approval." },
+  approved: { title: "No approved invoices waiting.", hint: "Approved invoices wait here until Finance verifies TDS and marks them ready for payment." },
+  ready_for_payment: { title: "Nothing ready for payment.", hint: "Invoices come here once Finance marks them ready." },
+  paid: { title: "No paid invoices yet.", hint: "Invoices move here when their payment is recorded with its receipt." },
+};
+
+export default function InvoiceQueueView({ title, subtitle, defaultQueueType, showUploadAction = false, showKpis = false, guide = false }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const permissions = useApPermissions();
@@ -95,8 +106,9 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
           ) : undefined
         }
       />
+      {guide && <PageGuide page="invoices" />}
 
-      {showKpis && <InvoiceKpiCards />}
+      {showKpis && <InvoiceKpiCards onSelect={handleQueueChange} visibleQueues={visibleQueueTypes} />}
 
       <InvoiceStatusTabs activeQueueType={queueType} onChange={handleQueueChange} />
 
@@ -117,10 +129,16 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
       ) : isLoading ? (
         <InvoiceTable invoices={[]} loading />
       ) : invoices.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white py-10 text-center text-sm text-gray-500">
-          {hasActiveFilters
-            ? "No invoices match your filters. Try changing your search criteria."
-            : "No invoices found."}
+        <div className="rounded-lg border border-gray-200 bg-white px-6 py-10 text-center">
+          <p className="text-sm font-medium text-gray-700">
+            {hasActiveFilters ? "No invoices match your filters." : (EMPTY_QUEUE[queueType] || EMPTY_QUEUE.all_invoices).title}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            {hasActiveFilters ? "Try changing or clearing the filters." : (EMPTY_QUEUE[queueType] || EMPTY_QUEUE.all_invoices).hint}
+          </p>
+          {!hasActiveFilters && permissions.canUploadInvoice && ["all_invoices", "ocr_review"].includes(queueType) && (
+            <Button variant="primary" className="mt-4" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>Upload Invoice</Button>
+          )}
         </div>
       ) : (
         <>

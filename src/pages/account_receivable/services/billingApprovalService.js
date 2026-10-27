@@ -13,7 +13,9 @@ import {
   getApiErrorMessage,
   getConfigurationDetailProject,
   getMilestonePlanByBillingConfiguration,
+  getTmRateDiscounts,
   normalizeMilestonePlanConfig,
+  normalizeTmRateDiscount,
   rejectBillingConfiguration,
   resolveConfigurationProject,
   unwrapData,
@@ -276,7 +278,10 @@ const buildMilestonePlanReview = (milestonePlanRecord) => {
             { label: "Billing Date", value: payments[0].billingDate, isDate: true },
           ]
         : [
-            { label: "Schedule Type", value: "Installments" },
+            {
+              label: "Schedule Type",
+              value: paymentStructure === "MILESTONES" ? "PMS Milestones" : "Installments",
+            },
             { label: "Number of Payments", value: String(payments.length) },
             { label: "First Billing Date", value: payments[0].billingDate, isDate: true },
             { label: "Last Billing Date", value: payments[payments.length - 1].billingDate, isDate: true },
@@ -381,16 +386,52 @@ export const buildApprovalReviewModel = (record = {}, milestonePlanRecord = null
     );
   } else if (billingType === "TIME_MATERIAL") {
     const rawCards = Array.isArray(record.tmRateCards) ? record.tmRateCards : [];
-    const rateCards = rawCards.map((card, index) => ({
-      key: firstPresent(card.rateCardId, card.tmRateCardId, card.id) || `rate-${index}`,
-      role: firstPresent(card.roleName, card.role, card.resourceRole, card.designation) || "Standard Rate",
-      rate: toAmount(firstPresent(card.rate, card.amount)),
-      ratePeriod: String(firstPresent(card.ratePeriod, card.period) || "HOURLY").toUpperCase(),
-    }));
+    const rateCards = rawCards.map((card, index) => {
+      const discountPeriods = asArray(card.discountPeriods).map(normalizeTmRateDiscount);
+      const isBaseIncluded = card.includeBaseRateInInvoice !== undefined
+        ? card.includeBaseRateInInvoice !== false
+        : card.includeInInvoice !== false;
+      return {
+        key: firstPresent(card.rateCardId, card.tmRateCardId, card.id) || `rate-${index}`,
+        rateCardId: firstPresent(card.rateCardId, card.tmRateCardId, card.id),
+        role: firstPresent(card.roleName, card.role, card.resourceRole, card.designation) || "Standard Rate",
+        rate: toAmount(firstPresent(card.rate, card.amount)),
+        ratePeriod: String(firstPresent(card.ratePeriod, card.period) || "HOURLY").toUpperCase(),
+        effectiveFrom: firstPresent(card.effectiveFrom, record.effectiveFrom),
+        effectiveTo: firstPresent(card.effectiveTo, record.effectiveTo),
+        includeBaseRateInInvoice: isBaseIncluded,
+        remarks: firstPresent(card.remarks, card.notes, ""),
+        discountPeriods,
+        hasDiscount: Boolean(card.hasDiscount || discountPeriods.length > 0),
+        discountType: card.discountType || "PERCENTAGE",
+        discountValue: card.discountValue,
+        discountedRate: card.discountedRate,
+      };
+    });
     if (rateCards.length === 0 && toAmount(record.hourlyRate) !== null) {
-      rateCards.push({ key: "rate-standard", role: "Standard Rate", rate: toAmount(record.hourlyRate), ratePeriod: "HOURLY" });
+      const discountPeriods = asArray(record.discountPeriods).map(normalizeTmRateDiscount);
+      rateCards.push({
+        key: "rate-standard",
+        role: "Standard Rate",
+        rate: toAmount(record.hourlyRate),
+        ratePeriod: "HOURLY",
+        effectiveFrom: record.effectiveFrom,
+        effectiveTo: record.effectiveTo,
+        includeBaseRateInInvoice: record.includeInInvoice !== false,
+        remarks: firstPresent(record.remarks, record.notes, ""),
+        discountPeriods,
+        hasDiscount: Boolean(record.hasDiscount || discountPeriods.length > 0),
+        discountType: record.discountType || "PERCENTAGE",
+        discountValue: record.discountValue,
+        discountedRate: record.discountedRate,
+      });
     }
-    model.pricingDetails = { pricingModel: record.pricingModel || record.billingMode || "", rateCards };
+    const standardDiscountPeriods = rateCards[0]?.discountPeriods || asArray(record.discountPeriods).map(normalizeTmRateDiscount);
+    model.pricingDetails = {
+      pricingModel: record.pricingModel || record.billingMode || "",
+      rateCards,
+      standardDiscountPeriods,
+    };
     model.schedule = periodSchedule(
       firstPresent(rawCards[0]?.effectiveFrom, record.effectiveFrom),
       firstPresent(rawCards[0]?.effectiveTo, record.effectiveTo),
@@ -448,18 +489,77 @@ export const getBillingConfigurationForApproval = async (billingConfigurationId)
     }
   };
 
-  // Project master data resolves in parallel with the Milestone Plan — the
-  // same resolution the wizard's View/Review uses, so Project Duration etc.
-  // match across all three screens.
-  const [milestonePlanRecord, resolvedProject] = await Promise.all([
+  const loadTmDiscounts = async () => {
+    if (resolveReviewBillingType(record) !== "TIME_MATERIAL") return record;
+    const rawCards = Array.isArray(record.tmRateCards) ? [...record.tmRateCards] : [];
+    if (rawCards.length === 0) {
+      const cardId = firstPresent(record.rateCardId, record.tmRateCardId, record.id);
+      let discountPeriods = asArray(record.discountPeriods);
+      if (discountPeriods.length === 0 && cardId) {
+        try {
+          const apiDiscounts = await getTmRateDiscounts(cardId);
+          discountPeriods = asArray(apiDiscounts).map(normalizeTmRateDiscount);
+        } catch (err) {
+          console.warn("Unable to load discount periods for approval record", cardId, err);
+        }
+      }
+      return {
+        ...record,
+        discountPeriods,
+      };
+    }
+
+    const cardsWithDiscounts = await Promise.all(
+      rawCards.map(async (card) => {
+        let discountPeriods = asArray(card.discountPeriods);
+        const cardId = firstPresent(card.rateCardId, card.tmRateCardId, card.id);
+        if (discountPeriods.length === 0 && cardId) {
+          try {
+            const apiDiscounts = await getTmRateDiscounts(cardId);
+            discountPeriods = asArray(apiDiscounts).map(normalizeTmRateDiscount);
+          } catch (err) {
+            console.warn("Unable to load discount periods for approval rate card", cardId, err);
+          }
+        }
+        if (discountPeriods.length === 0 && card.hasDiscount && (card.discountValue || card.discountStartDate)) {
+          discountPeriods = [
+            normalizeTmRateDiscount({
+              periodName: card.roleName ? `${card.roleName} Discount` : "Standard Discount",
+              discountType: card.discountType,
+              discountValue: card.discountValue,
+              effectiveFrom: card.discountStartDate,
+              effectiveTo: card.discountEndDate,
+              notes: card.remarks || card.notes,
+              includeInInvoice: card.includeInInvoice !== false,
+              baseRate: card.rate || card.amount,
+              netRate: card.discountedRate,
+            }),
+          ];
+        }
+        return {
+          ...card,
+          discountPeriods,
+        };
+      })
+    );
+    return {
+      ...record,
+      tmRateCards: cardsWithDiscounts,
+    };
+  };
+
+  // Project master data resolves in parallel with the Milestone Plan and T&M discounts
+  // (same resolution the wizard's View/Review uses, so figures match across all screens).
+  const [milestonePlanRecord, resolvedProject, hydratedRecord] = await Promise.all([
     loadMilestonePlan(),
     resolveConfigurationProject(getConfigurationDetailProject(record)).catch((error) => {
       console.warn("Unable to resolve project for approval review", error);
       return {};
     }),
+    loadTmDiscounts(),
   ]);
 
-  return { ...normalized, review: buildApprovalReviewModel(record, milestonePlanRecord, resolvedProject) };
+  return { ...normalized, review: buildApprovalReviewModel(hydratedRecord || record, milestonePlanRecord, resolvedProject) };
 };
 
 // PUT /api/billing-configurations/{billingConfigurationId}/approve — no

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import { toast } from "react-toastify";
@@ -136,6 +137,7 @@ export default function VendorNotesPage() {
           </>
         )}
       />
+      <PageGuide page="notes" />
       {data?.summary && (
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-4">

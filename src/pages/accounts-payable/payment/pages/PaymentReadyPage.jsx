@@ -1,10 +1,11 @@
 import { useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { Link, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import EmptyState from "../../procurement/components/EmptyState";
@@ -84,7 +85,7 @@ export default function PaymentReadyPage() {
       netPayable: formatCurrency(invoice.netPayable, symbol),
       paid: formatCurrency(invoice.amountPaid, symbol),
       remaining: <span className="font-semibold">{formatCurrency(invoice.remainingAmount, symbol)}</span>,
-      status: <StatusBadge label={invoice.statusName || invoice.statusCode} size="sm" />,
+      status: <ApStatusBadge status={invoice.statusName || invoice.statusCode} />,
       terms: <PaymentTermStatusBadge status={invoice.paymentTermStatus} />,
       action:
         canRecordPayment && invoice.remainingAmount > 0 ? (
@@ -104,13 +105,13 @@ export default function PaymentReadyPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="Ready for Payment"
-        subtitle="Approved invoices with verified TDS and an outstanding payable balance"
+        title="Payment Management"
+        subtitle="Ready for payment - approved invoices with verified TDS and a balance to pay"
         actions={
           <div className="flex items-center gap-3">
             {canRecordPayment && (
-              <Link to={`${AP_ROUTES.BULK_IMPORT}?type=payments`}>
-                <Button variant="outline">Bulk import payments</Button>
+              <Link to={AP_ROUTES.BULK_IMPORT}>
+                <Button variant="outline">Upload receipts</Button>
               </Link>
             )}
             <Link to={AP_ROUTES.PAYMENT_HISTORY} className="text-sm font-medium text-[#0A0082] hover:underline">
@@ -119,6 +120,7 @@ export default function PaymentReadyPage() {
           </div>
         }
       />
+      <PageGuide page="payments" />
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
         <FormInput
@@ -142,8 +144,15 @@ export default function PaymentReadyPage() {
         </div>
       ) : !isLoading && items.length === 0 ? (
         <EmptyState
-          title="No invoices are currently ready for payment."
-          description={filtered ? "Try clearing the filters." : undefined}
+          title="No invoices are ready for payment right now."
+          description={filtered
+            ? "Try clearing the filters."
+            : "Invoices appear here once they are approved, their TDS is verified and Finance marks them ready for payment."}
+          action={!filtered && (
+            <Link to={`${AP_ROUTES.INVOICE_LIST}?queue=approved`}>
+              <Button variant="outline">See approved invoices</Button>
+            </Link>
+          )}
         />
       ) : (
         <>

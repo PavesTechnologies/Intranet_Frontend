@@ -6,7 +6,7 @@ import { AP_MANAGEMENT_ANY, AP_MANAGEMENT_PERMISSIONS } from "../pages/accounts-
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/tdsTrackingPermissions";
 import { VENDOR_ANY_PERMISSIONS } from "../pages/accounts-payable/constants/vendorPermissions";
 import { AP_AUTOMATION_PERMISSIONS } from "../pages/accounts-payable/constants/apAutomation";
-import { PROCUREMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/procurementPermissions";
+import { PROCUREMENT_ANY_VIEW_PERMISSIONS, ONBOARDING_ANY } from "../pages/accounts-payable/constants/procurementPermissions";
 import { RECURRING_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/recurring";
 import { GST_ITC_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/gstItc";
 import { ACCOUNTING_EXPORT_PERMISSIONS } from "../pages/accounts-payable/constants/accountingExport";
@@ -341,6 +341,8 @@ export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
   // Every AP user has their own notifications; the backend decides which from the JWT.
   { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
+  // The whole AP flow by role, with links into each step, plus the terms used (guide/pages/ApGuidePage.jsx).
+  { label: "How It Works", to: AP_ROUTES.GUIDE, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
   {
     label: "Invoices & Vendors",
     to: AP_ROUTES.INVOICE_LIST,
@@ -354,6 +356,8 @@ export const AP_SUBMENU = [
       { label: "Credit & Debit Notes", to: AP_ROUTES.VENDOR_NOTES, requiredPermissions: VENDOR_NOTE_VIEW_PERMISSIONS },
       // VENDOR_VIEW / VENDOR_MANAGE / VENDOR_BANK_MANAGE (vendor_permissions.py).
       { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES, requiredPermissions: VENDOR_ANY_PERMISSIONS },
+      // Internal vendor requests raised from approved PRs — same any-of gate as GET /vendor-onboarding-requests.
+      { label: "Internal Requests", to: AP_ROUTES.VENDOR_INTERNAL_REQUESTS, allowedRoles: AP_ALL_ROLES, requiredPermissions: ONBOARDING_ANY.VIEW },
       // Same gate as the Procurement route: an AP role plus any Procurement view permission.
       { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES, requiredPermissions: PROCUREMENT_ANY_VIEW_PERMISSIONS },
     ],
@@ -368,8 +372,8 @@ export const AP_SUBMENU = [
       { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
       // ITC register + GSTR-2B match (gst_itc_route.py, gstr2b_route.py).
       { label: "GST Input Credit", to: AP_ROUTES.GST_ITC, requiredPermissions: GST_ITC_VIEW_PERMISSIONS },
-      // Payments / TDS challans / filings from one Excel sheet (backend checks the permission per type).
-      { label: "Bulk Import", to: AP_ROUTES.BULK_IMPORT, requiredPermissions: ["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"] },
+      // Paid outside the intranet: drop the receipts, each is matched to its invoice (bulk_import_route.py).
+      { label: "Upload Receipts", to: AP_ROUTES.BULK_IMPORT, requiredPermissions: ["PAYMENT_PROCESS"] },
     ],
   },
   {
@@ -396,6 +400,8 @@ export const AP_SUBMENU = [
       { label: "AP Automation", to: AP_ROUTES.AP_AUTOMATION, requiredPermissions: [AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE] },
       // AP lead: team workload, routing rules, leave cover (work_assignment_route.py).
       { label: "AP Team", to: AP_ROUTES.WORK_ASSIGNMENT, requiredPermissions: WORK_ASSIGN_LEAD_PERMISSIONS },
+      // One-time: past challans / quarterly filings from a sheet when setting up or catching up.
+      { label: "Import Past TDS Records", to: AP_ROUTES.TDS_HISTORY_IMPORT, requiredPermissions: ["TDS_TRACKING_UPDATE"] },
     ],
   },
 ];

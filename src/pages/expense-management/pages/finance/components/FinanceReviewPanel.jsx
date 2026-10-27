@@ -24,6 +24,7 @@ import ReceiptViewer from "../../../approval-engine/components/ReceiptViewer";
 import CommentPromptModal from "../../../approval-engine/components/CommentPromptModal";
 import { useFinanceStatus, useFinanceReviews, useVerifyLineItem, useQueryLineItem, useAdjustLineTax } from "../hooks/useFinanceVerification";
 import FinanceTaxPanel, { AdjustTaxModal, needsTaxConfirmation } from "./FinanceTaxPanel";
+import LineAllocationDetails from "@/pages/expense-management/components/expense-reports/LineAllocationDetails";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatMoney, formatDate } from "../../../approval-engine/constants/approvalLabels";
 
@@ -62,6 +63,34 @@ const Field = ({ label, value }) => (
 );
 
 const glLabel = (code, name) => [code, name].filter(Boolean).join(" — ");
+
+/**
+ * Pre-filled text for a tax correction: what the receipt says vs. what the expense says, so the
+ * employee knows exactly what to fix. Finance can edit it before sending. Kept short on purpose.
+ */
+const taxCorrectionText = (line) => {
+  const tax = line?.tax || {};
+  const ccy = line?.currencyCode || "";
+  const entered = `${formatMoney(line?.taxAmount ?? tax.taxAmount, ccy)}${tax.taxCode ? ` (${tax.taxCode})` : ""}`;
+  const split = (tax.components || [])
+    .map((c) => `${c.componentCode || c.code} ${formatMoney(c.taxAmount ?? c.amount, ccy)}`)
+    .join(" + ");
+  const parts = [];
+  if (tax.ocrTaxAmount != null) {
+    parts.push(`Tax mismatch: the receipt shows ${formatMoney(tax.ocrTaxAmount, ccy)} of GST but the expense has ${entered}${split ? ` = ${split}` : ""}.`);
+  } else {
+    parts.push(`Tax mismatch: the expense has ${entered}${split ? ` = ${split}` : ""}, which doesn't match the receipt.`);
+  }
+  if ((tax.validationReasons || []).includes("SUPPLY_TYPE_MISMATCH")) {
+    parts.push(
+      tax.taxType === "IGST"
+        ? "The supplier is in our state, so the bill should be CGST + SGST, not IGST."
+        : "The supplier is in another state, so the bill should be IGST, not CGST + SGST."
+    );
+  }
+  parts.push("Please correct the tax to match the receipt and resubmit.");
+  return parts.join(" ");
+};
 
 // GL detail for the selected line. Pending lines carry the full account and the posting split
 // (FinancePendingLineItemResponse.glAccount); a line already reviewed only has the GL code that
@@ -387,6 +416,12 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                     </div>
                   )}
 
+                  <LineAllocationDetails
+                    lineItemId={selectedLine.lineItemId}
+                    allocationReason={selectedLine.allocationReason}
+                    baseCurrencyCode={selectedLine.baseCurrencyCode || selectedLine.currencyCode}
+                  />
+
                   {!isLineEligible(selectedLine) && selectedLine.ineligibleReason && (
                     <div className="mt-3 border-t border-gray-100 pt-3 flex items-start gap-2 text-sm text-rose-700 font-medium bg-rose-50 p-2.5 rounded-lg border border-rose-200">
                       <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -412,6 +447,7 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                 <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Tax">
                   <FinanceTaxPanel
                     line={selectedLine}
+                    reportId={reportId}
                     canAdjust={canAct && canAdjustTax && !!selectedLine.tax}
                     onAdjust={() => setAdjustingLine(selectedLine)}
                   />
@@ -441,6 +477,15 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
               >
                 <MessageSquareWarning className="h-4 w-4" /> Request Correction
               </Button>
+              {selectedLine?.tax && (
+                <Button
+                  variant="outline"
+                  disabled={isMutating}
+                  onClick={() => setQueryingLine({ ...selectedLine, correctionCategory: "TAX_MISMATCH" })}
+                >
+                  <MessageSquareWarning className="h-4 w-4" /> Request Tax Correction
+                </Button>
+              )}
               {taxNeedsConfirmation && (
                 <label className="mr-auto flex items-center gap-2 text-xs text-gray-700">
                   <input
@@ -491,17 +536,20 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
       />
 
       <CommentPromptModal
+        // Remount per request so a tax correction's pre-filled text never carries over.
+        key={queryingLine ? `${queryingLine.lineItemId}-${queryingLine.correctionCategory || "OTHER"}` : "closed"}
         isOpen={!!queryingLine}
-        title="Request correction"
+        title={queryingLine?.correctionCategory === "TAX_MISMATCH" ? "Request tax correction" : "Request correction"}
         description="The employee will see this comment and can fix the line item details, then resubmit the report."
         contextLabel={queryingLine ? `Correcting: ${queryingLine.merchantName || queryingLine.categoryName || "Line item"} — ${formatMoney(queryingLine.amount, queryingLine.currencyCode)}` : ""}
+        initialValue={queryingLine?.correctionCategory === "TAX_MISMATCH" ? taxCorrectionText(queryingLine) : ""}
         confirmLabel="Request Correction"
         confirmVariant="danger"
         isLoading={queryLineItem.isPending}
         onCancel={() => setQueryingLine(null)}
         onConfirm={(reason) => {
           queryLineItem.mutate(
-            { reportId, lineItemId: queryingLine.lineItemId, reason },
+            { reportId, lineItemId: queryingLine.lineItemId, reason, category: queryingLine.correctionCategory || "OTHER" },
             {
               onSuccess: () => {
                 showStatusToast("Correction requested — the report has been returned to the employee.", "success");

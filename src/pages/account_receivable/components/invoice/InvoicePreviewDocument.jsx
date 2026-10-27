@@ -7,7 +7,10 @@ import {
   formatDateRange,
   formatPaymentTerms,
   resolveInvoiceBillingType,
+  isExpenseLine,
+  TIME_ENTRY_ITEM_TYPES,
 } from "../../utils/invoicePresentation";
+import { toIsoDateOnly } from "../../services/billingDataAcquisitionService";
 import pavesLogo from "../../assets/paves-logo.png";
 import useSignatureImage from "../../hooks/useSignatureImage";
 import {
@@ -16,6 +19,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  CreditCard,
   FileText,
   Landmark,
   Mail,
@@ -139,6 +143,83 @@ export function extractStateCodeFromGstin(gstin) {
   return null;
 }
 
+/**
+ * Formats a raw address string into clean, logical lines (e.g. building/area, city/state/PIN, country)
+ * to avoid awkward mid-word or single-item dangling wraps.
+ */
+export function formatAddressString(rawAddress) {
+  if (!rawAddress || typeof rawAddress !== "string") return rawAddress || "—";
+  const trimmed = rawAddress.trim();
+  if (!trimmed || trimmed === "—") return "—";
+  if (trimmed.includes("\n")) return trimmed;
+
+  const parts = trimmed
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length <= 2) return trimmed;
+
+  // Search for postal code (e.g. 5-6 digits like 500020 or 500081)
+  const pinIdx = parts.findIndex((p) => /^\d{5,6}$/.test(p));
+  if (pinIdx !== -1) {
+    const pin = parts[pinIdx];
+    const state = pinIdx > 0 ? parts[pinIdx - 1] : "";
+    const city = pinIdx > 1 ? parts[pinIdx - 2] : "";
+    const streetParts = pinIdx > 2 ? parts.slice(0, pinIdx - 2) : [];
+    const countryParts = parts.slice(pinIdx + 1);
+
+    const lines = [];
+    if (streetParts.length > 0) {
+      lines.push(streetParts.join(", "));
+    }
+    const cityStatePin = [[city, state].filter(Boolean).join(", "), pin].filter(Boolean).join(" ");
+    if (cityStatePin) {
+      lines.push(cityStatePin);
+    }
+    if (countryParts.length > 0) {
+      lines.push(countryParts.join(", "));
+    }
+
+    if (lines.length > 0) {
+      return lines.join("\n");
+    }
+  }
+
+  // Fallback: group into street parts, city/state, country
+  if (parts.length >= 4) {
+    const country = parts[parts.length - 1];
+    const cityState = parts[parts.length - 2];
+    const streets = parts.slice(0, parts.length - 2).join(", ");
+    return [streets, cityState, country].filter(Boolean).join("\n");
+  }
+
+  return parts.join("\n");
+}
+
+
+// A4 print rules, scoped to the invoice document: only .invoice-print-area is printed, so the surrounding app
+// (navigation, preview banner, Generate / Submit buttons) never lands on paper or in a "Save as PDF".
+const INVOICE_PRINT_CSS = `
+@page { size: A4; margin: 12mm; }
+@media print {
+  body * { visibility: hidden !important; }
+  .invoice-print-area, .invoice-print-area * { visibility: visible !important; }
+  .invoice-print-area { position: absolute; left: 0; top: 0; width: 100%; font-size: 11px; }
+  .invoice-print-area table { width: 100%; }
+  .invoice-print-area thead { display: table-header-group; }
+  .invoice-print-area tr, .invoice-print-area section { break-inside: avoid; }
+}
+`;
+
+function InvoiceMeta({ label, children }) {
+  return (
+    <div className="min-w-0 bg-white p-3 sm:p-3.5 flex flex-col justify-center">
+      <dt className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</dt>
+      <dd className="mt-1 font-semibold text-slate-900 text-xs sm:text-sm">{children}</dd>
+    </div>
+  );
+}
 
 /**
  * InvoicePreviewDocument
@@ -218,12 +299,11 @@ export default function InvoicePreviewDocument({
     "—";
 
   // Client billing information
+  const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const clientName =
-    invoice?.clientName ||
-    invoice?.clientInfo?.clientName ||
-    taxCalc?.clientName ||
-    snapshotData?.clientName ||
-    "—";
+    [invoice?.clientName, invoice?.clientInfo?.clientName, taxCalc?.clientName, snapshotData?.clientName]
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .find((value) => value && value !== "—" && !UUID_PATTERN.test(value)) || "Client name not available";
 
   const clientAddress =
     invoice?.billingAddress ||
@@ -274,31 +354,46 @@ export default function InvoicePreviewDocument({
     companyProfile?.companyName ||
     "—";
 
-  const invoiceSellerParts = [
-    invoice?.sellerAddressLine1,
-    invoice?.sellerAddressLine2,
-    [invoice?.sellerCity, invoice?.sellerState].filter(Boolean).join(", "),
-    invoice?.sellerPostalCode,
-    invoice?.sellerCountry,
-  ].filter(Boolean);
+  // One line per address element ("City, State PIN" together), so a long address wraps by line, not as one run.
+  const addressLines = ({ line1, line2, city, state, postalCode, country }) =>
+    [
+      line1,
+      line2,
+      [[city, state].filter(Boolean).join(", "), postalCode].filter(Boolean).join(" "),
+      country,
+    ]
+      .map((part) => (typeof part === "string" ? part.trim() : part))
+      .filter(Boolean);
 
-  const sellerAddressParts = [
-    companyProfile?.addressLine1,
-    companyProfile?.addressLine2,
-    [companyProfile?.city, companyProfile?.state].filter(Boolean).join(", "),
-    companyProfile?.postalCode,
-    companyProfile?.country,
-  ].filter(Boolean);
+  const invoiceSellerParts = addressLines({
+    line1: invoice?.sellerAddressLine1,
+    line2: invoice?.sellerAddressLine2,
+    city: invoice?.sellerCity,
+    state: invoice?.sellerState,
+    postalCode: invoice?.sellerPostalCode,
+    country: invoice?.sellerCountry,
+  });
 
-  const sellerAddress =
-    invoice?.sellerAddress ||
-    invoice?.sellerInfo?.address ||
+  const sellerAddressParts = addressLines({
+    line1: companyProfile?.addressLine1,
+    line2: companyProfile?.addressLine2,
+    city: companyProfile?.city,
+    state: companyProfile?.state,
+    postalCode: companyProfile?.postalCode,
+    country: companyProfile?.country,
+  });
+
+  const rawSellerAddress =
     (invoiceSellerParts.length > 0
-      ? invoiceSellerParts.join(", ")
+      ? invoiceSellerParts.join("\n")
       : sellerAddressParts.length > 0
-      ? sellerAddressParts.join(", ")
-      : companyProfile?.address ||
-        "—");
+        ? sellerAddressParts.join("\n")
+        : invoice?.sellerAddress ||
+          invoice?.sellerInfo?.address ||
+          companyProfile?.address ||
+          "—");
+
+  const sellerAddress = formatAddressString(rawSellerAddress);
 
   const sellerGstin =
     invoice?.sellerGstin ||
@@ -444,14 +539,12 @@ export default function InvoicePreviewDocument({
   const displayInvoiceDate = invoice?.invoiceDate
     ? formatDisplayDate(invoice.invoiceDate)
     : isDocumentGenerated
-    ? (rawEnd ? formatDisplayDate(rawEnd) : "—")
-    : "Upon Generation";
+      ? (rawEnd ? formatDisplayDate(rawEnd) : "—")
+      : "Upon Generation";
 
-  const displayDueDate = invoice?.dueDate
-    ? formatDisplayDate(invoice.dueDate)
-    : isDocumentGenerated
-    ? "—"
-    : "Upon Generation";
+  // The backend resolves the due date (invoice date + the payment term's days) for the draft and for the generated
+  // invoice alike; when it cannot (no payment term), say so instead of inventing one.
+  const displayDueDate = invoice?.dueDate ? formatDisplayDate(invoice.dueDate) : "Not available";
 
   // Client location
   const clientCountryName =
@@ -485,13 +578,20 @@ export default function InvoicePreviewDocument({
     taxCalc?.primaryLocation ||
     null;
 
-  const clientLocationDisplay = explicitClientLocation
+  const isDialCode = (val) => Boolean(val && /^\+\d+$/.test(String(val).trim()));
+
+  const cleanClientCountryCode =
+    clientCountryCode && !isDialCode(clientCountryCode)
+      ? String(clientCountryCode).trim()
+      : null;
+
+  const clientLocationDisplay = (explicitClientLocation && !isDialCode(explicitClientLocation))
     ? String(explicitClientLocation).trim()
-    : clientCountryName
-    ? String(clientCountryName).trim()
-    : clientCountryCode
-    ? String(clientCountryCode).trim()
-    : "—";
+    : (clientCountryName && !isDialCode(clientCountryName))
+      ? String(clientCountryName).trim()
+      : cleanClientCountryCode
+        ? String(cleanClientCountryCode).trim()
+        : "—";
 
   // Place of Supply
   const explicitPlaceOfSupply =
@@ -509,15 +609,15 @@ export default function InvoicePreviewDocument({
     taxCalc?.customerState ||
     null;
 
-  const placeOfSupplyDisplay = explicitPlaceOfSupply
+  const placeOfSupplyDisplay = (explicitPlaceOfSupply && !isDialCode(explicitPlaceOfSupply))
     ? String(explicitPlaceOfSupply).trim()
-    : authoritativeTaxField
-    ? String(authoritativeTaxField).trim()
-    : clientCountryName
-    ? String(clientCountryName).trim()
-    : clientCountryCode
-    ? String(clientCountryCode).trim()
-    : "—";
+    : (authoritativeTaxField && !isDialCode(authoritativeTaxField))
+      ? String(authoritativeTaxField).trim()
+      : (clientCountryName && !isDialCode(clientCountryName))
+        ? String(clientCountryName).trim()
+        : cleanClientCountryCode
+          ? String(cleanClientCountryCode).trim()
+          : "—";
 
   // Line items
   const rawItems = Array.isArray(invoice?.items) ? invoice.items : [];
@@ -531,10 +631,10 @@ export default function InvoicePreviewDocument({
     Array.isArray(invoice?.taxBreakdown) && invoice.taxBreakdown.length > 0
       ? invoice.taxBreakdown
       : Array.isArray(invoice?.taxComponents) && invoice.taxComponents.length > 0
-      ? invoice.taxComponents
-      : Array.isArray(taxCalc?.components) && taxCalc.components.length > 0
-      ? taxCalc.components
-      : [];
+        ? invoice.taxComponents
+        : Array.isArray(taxCalc?.components) && taxCalc.components.length > 0
+          ? taxCalc.components
+          : [];
 
   const effectiveTaxBreakdown = rawBreakdown.map((c, idx) => ({
     id:
@@ -560,26 +660,26 @@ export default function InvoicePreviewDocument({
       c.appliedRate !== undefined && c.appliedRate !== null
         ? Number(c.appliedRate)
         : c.rate !== undefined && c.rate !== null
-        ? Number(c.rate)
-        : c.taxRate !== undefined && c.taxRate !== null
-        ? Number(c.taxRate)
-        : null,
+          ? Number(c.rate)
+          : c.taxRate !== undefined && c.taxRate !== null
+            ? Number(c.taxRate)
+            : null,
     taxableAmount:
       c.taxableAmount !== undefined && c.taxableAmount !== null
         ? Number(c.taxableAmount)
         : c.taxable_amount !== undefined && c.taxable_amount !== null
-        ? Number(c.taxable_amount)
-        : c.taxableBase !== undefined && c.taxableBase !== null
-        ? Number(c.taxableBase)
-        : c.baseAmount !== undefined && c.baseAmount !== null
-        ? Number(c.baseAmount)
-        : null,
+          ? Number(c.taxable_amount)
+          : c.taxableBase !== undefined && c.taxableBase !== null
+            ? Number(c.taxableBase)
+            : c.baseAmount !== undefined && c.baseAmount !== null
+              ? Number(c.baseAmount)
+              : null,
     amount:
       c.taxAmount !== undefined && c.taxAmount !== null
         ? Number(c.taxAmount)
         : c.amount !== undefined && c.amount !== null
-        ? Number(c.amount)
-        : 0,
+          ? Number(c.amount)
+          : 0,
   }));
 
   const sumFromComponents = effectiveTaxBreakdown.reduce(
@@ -591,38 +691,38 @@ export default function InvoicePreviewDocument({
     invoice?.subtotal !== undefined && invoice?.subtotal !== null
       ? Number(invoice.subtotal)
       : invoice?.taxableAmount !== undefined && invoice?.taxableAmount !== null
-      ? Number(invoice.taxableAmount)
-      : taxCalc?.taxableAmount !== undefined && taxCalc?.taxableAmount !== null
-      ? Number(taxCalc.taxableAmount)
-      : snapshotData?.subtotal !== undefined && snapshotData?.subtotal !== null
-      ? Number(snapshotData.subtotal)
-      : 0;
+        ? Number(invoice.taxableAmount)
+        : taxCalc?.taxableAmount !== undefined && taxCalc?.taxableAmount !== null
+          ? Number(taxCalc.taxableAmount)
+          : snapshotData?.subtotal !== undefined && snapshotData?.subtotal !== null
+            ? Number(snapshotData.subtotal)
+            : 0;
 
   const totalTax =
     invoice?.totalTax !== undefined &&
-    invoice?.totalTax !== null &&
-    Number(invoice.totalTax) > 0
+      invoice?.totalTax !== null &&
+      Number(invoice.totalTax) > 0
       ? Number(invoice.totalTax)
       : invoice?.totalTaxAmount !== undefined &&
         invoice?.totalTaxAmount !== null &&
         Number(invoice.totalTaxAmount) > 0
-      ? Number(invoice.totalTaxAmount)
-      : taxCalc?.totalTaxAmount !== undefined &&
-        taxCalc?.totalTaxAmount !== null &&
-        Number(taxCalc.totalTaxAmount) > 0
-      ? Number(taxCalc.totalTaxAmount)
-      : sumFromComponents > 0
-      ? sumFromComponents
-      : 0;
+        ? Number(invoice.totalTaxAmount)
+        : taxCalc?.totalTaxAmount !== undefined &&
+          taxCalc?.totalTaxAmount !== null &&
+          Number(taxCalc.totalTaxAmount) > 0
+          ? Number(taxCalc.totalTaxAmount)
+          : sumFromComponents > 0
+            ? sumFromComponents
+            : 0;
 
   const grandTotal =
     invoice?.grandTotal !== undefined && invoice?.grandTotal !== null
       ? Number(invoice.grandTotal)
       : invoice?.totalAmount !== undefined && invoice?.totalAmount !== null
-      ? Number(invoice.totalAmount)
-      : taxCalc?.grandTotal !== undefined && taxCalc?.grandTotal !== null
-      ? Number(taxCalc.grandTotal)
-      : subtotal + totalTax;
+        ? Number(invoice.totalAmount)
+        : taxCalc?.grandTotal !== undefined && taxCalc?.grandTotal !== null
+          ? Number(taxCalc.grandTotal)
+          : subtotal + totalTax;
 
   const expenses = Number(
     invoice?.expenseAmount ??
@@ -636,8 +736,8 @@ export default function InvoicePreviewDocument({
     subtotal > 0 && totalTax > 0
       ? ((totalTax / subtotal) * 100).toFixed(1)
       : effectiveTaxBreakdown.length > 0 && effectiveTaxBreakdown[0].rate !== null && effectiveTaxBreakdown[0].rate !== undefined
-      ? Number(effectiveTaxBreakdown[0].rate).toFixed(1)
-      : "0.0";
+        ? Number(effectiveTaxBreakdown[0].rate).toFixed(1)
+        : "0.0";
 
   const explicitSupplyClassification =
     invoice?.supplyClassification ||
@@ -665,14 +765,14 @@ export default function InvoicePreviewDocument({
       (totalTax === 0 &&
         (effectiveTaxBreakdown.length === 0 ||
           effectiveTaxBreakdown.every((c) => Number(c.rate || 0) === 0))) ||
-        invoice?.taxRegionCode === "EXPORT" ||
-        invoice?.taxRegionCode === "ZERO_RATED" ||
-        taxCalc?.taxRegionCode === "EXPORT" ||
-        taxCalc?.taxRegionCode === "ZERO_RATED" ||
-        taxCalc?.isZeroRated ||
-        taxCalc?.isExempt ||
-        String(taxCalc?.taxRuleName || "").toLowerCase().includes("export") ||
-        String(taxCalc?.taxRuleName || "").toLowerCase().includes("zero")
+      invoice?.taxRegionCode === "EXPORT" ||
+      invoice?.taxRegionCode === "ZERO_RATED" ||
+      taxCalc?.taxRegionCode === "EXPORT" ||
+      taxCalc?.taxRegionCode === "ZERO_RATED" ||
+      taxCalc?.isZeroRated ||
+      taxCalc?.isExempt ||
+      String(taxCalc?.taxRuleName || "").toLowerCase().includes("export") ||
+      String(taxCalc?.taxRuleName || "").toLowerCase().includes("zero")
     );
 
   const supplyClassification =
@@ -680,8 +780,8 @@ export default function InvoicePreviewDocument({
     (isZeroRatedOrExport
       ? "Export of Services (Zero Rated)"
       : totalTax > 0
-      ? "Taxable Supply of Services"
-      : taxCalc?.taxRuleName || "Taxable Supply of Services");
+        ? "Taxable Supply of Services"
+        : taxCalc?.taxRuleName || "Taxable Supply of Services");
 
   // Reverse charge: strictly from persisted invoice or tax data; never hardcoded
   const isReverseCharge = Boolean(
@@ -712,10 +812,23 @@ export default function InvoicePreviewDocument({
     String(taxCalc?.taxRuleName || "").toLowerCase().includes("reverse charge")
   );
 
-  // Line items formatting for the table
+  // ---- Line items --------------------------------------------------------------------------------------
+  // Everything shown for a line comes from that backend line: the net rate and amount are the backend-calculated
+  // values, and base rate / discount are the rate audit frozen on a TIME line. Nothing is derived here from the
+  // configuration's discount periods, and an expense line never shows a T&M discount. Tax is shown only in the
+  // invoice-level summary (the backend does not tax line by line).
+  const toNumberOrNull = (value) => {
+    if (value === undefined || value === null || value === "") return null;
+    const num = Number(value);
+    return Number.isNaN(num) ? null : num;
+  };
+
   const formattedRows = lineItems.rows.map((row, idx) => {
-    const raw = items[idx] || {};
-    const itemTitle =
+    const raw = items[idx] || row.raw || {};
+    const isExpense = row.lineType === "EXPENSE" || isExpenseLine(raw);
+    const isTime = row.lineType === "TIME" || TIME_ENTRY_ITEM_TYPES.has(String(raw?.itemType || "").toUpperCase());
+    const kind = isExpense ? "EXPENSE" : isTime ? "TIME" : "OTHER";
+    const title =
       row.item ||
       row.payment ||
       raw.itemName ||
@@ -724,73 +837,96 @@ export default function InvoicePreviewDocument({
       projectName ||
       "Line Item";
 
-    const hsnOrSac = raw.hsnCode || raw.sacCode || raw.hsn || raw.sac || "—";
+    const amountNumber =
+      [row.rawAmount, raw.amount, raw.totalAmount].map(toNumberOrNull).find((v) => v !== null) ?? null;
+    const amountDisplay =
+      row.amount && row.amount !== "—"
+        ? row.amount
+        : amountNumber !== null
+          ? formatCurrency(amountNumber, currency)
+          : "—";
 
-    const subDetails = [];
-    if (row.role && row.role !== "—") subDetails.push(`Role: ${row.role}`);
-    if (row.workDate && row.workDate !== "—") subDetails.push(`Date: ${row.workDate}`);
-    if (row.billingPeriod && row.billingPeriod !== "—") subDetails.push(`Period: ${row.billingPeriod}`);
-    if (row.percent && row.percent !== "—") subDetails.push(`Installment: ${row.percent}`);
-    if (row.discountApplied || raw.discountApplied || raw.hasDiscount) subDetails.push("Discounted Rate");
-    if (raw.description && raw.description !== itemTitle) subDetails.push(raw.description);
+    const details = [];
+    if (kind === "OTHER") {
+      if (row.role && row.role !== "—" && String(row.role).trim().toLowerCase() !== "unknown") {
+        details.push(`Role: ${row.role}`);
+      }
+      if (row.workDate && row.workDate !== "—") details.push(`Date: ${row.workDate}`);
+      if (row.billingPeriod && row.billingPeriod !== "—") details.push(`Period: ${row.billingPeriod}`);
+      if (row.percent && row.percent !== "—") details.push(`Installment: ${row.percent}`);
+    }
+    if (raw.description && raw.description !== title) details.push(raw.description);
 
-    const qtyNum = parseFloat(row.quantity) || 1;
-    const qtyDisplay = row.quantity && row.quantity !== "—" ? row.quantity : (raw.quantity !== undefined && raw.quantity !== null ? Number(raw.quantity).toFixed(2) : "1.00");
-
-    let lineTaxable =
-      raw.taxableAmount !== undefined && raw.taxableAmount !== null
-        ? Number(raw.taxableAmount)
-        : raw.amount !== undefined && raw.amount !== null
-        ? Number(raw.amount)
-        : lineItems.rows.length === 1 && subtotal > 0
-        ? subtotal
-        : subtotal > 0
-        ? subtotal / (lineItems.rows.length || 1)
-        : 0;
-
-    let lineTax =
-      raw.taxAmount !== undefined && raw.taxAmount !== null
-        ? Number(raw.taxAmount)
-        : lineItems.rows.length === 1 && totalTax > 0
-        ? totalTax
-        : totalTax > 0
-        ? (lineTaxable * Number(effectiveTaxRatePct)) / 100
-        : 0;
-
-    let lineTotal =
-      raw.totalAmount !== undefined && raw.totalAmount !== null
-        ? Number(raw.totalAmount)
-        : lineTaxable + lineTax;
+    const qtyDisplay =
+      row.quantity && row.quantity !== "—"
+        ? row.quantity
+        : raw.quantity !== undefined && raw.quantity !== null
+          ? Number(raw.quantity).toFixed(2)
+          : "1.00";
 
     const rateDisplay =
       row.rate && row.rate !== "—"
         ? row.rate
         : raw.rate !== undefined && raw.rate !== null
-        ? formatCurrency(raw.rate, currency)
-        : qtyNum > 0 && lineTaxable > 0
-        ? formatCurrency(lineTaxable / qtyNum, currency)
-        : "—";
+          ? formatCurrency(raw.rate, currency)
+          : "—";
 
     return {
       index: idx + 1,
-      title: itemTitle,
-      hsnOrSac,
-      subDetails,
-      rateDisplay,
+      kind,
+      title,
+      role: row.role && row.role !== "—" ? row.role : null,
+      dateDisplay: row.workDate && row.workDate !== "—" ? row.workDate : "—",
       qtyDisplay,
-      taxableAmount: lineTaxable,
-      taxAmount: lineTax,
-      totalAmount: lineTotal,
+      baseRateDisplay:
+        kind === "TIME" && row.baseRate !== null && row.baseRate !== undefined
+          ? formatCurrency(row.baseRate, currency)
+          : "—",
+      discountDisplay: kind === "TIME" && row.discountApplied ? row.discountLabel || "Discount applied" : null,
+      discountPeriod: kind === "TIME" && row.discountApplied ? row.periodName || null : null,
+      rateDisplay,
+      amountDisplay,
+      amountNumber,
+      isPercentageDiscount: Boolean(row.isPercentageDiscount),
+      isFixedDiscount: Boolean(row.isFixedDiscount),
+      category: row.category || raw.category || raw.expenseCategory || null,
+      receiptReference: row.receiptReference || raw.receiptNumber || null,
+      expenseMerchant: row.expenseMerchant || null,
+      expenseReportRef: row.expenseReportRef || null,
+      fxNote:
+        row.originalAmount != null && row.originalCurrency && row.appliedExchangeRate != null
+          ? `Original ${Number(row.originalAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.originalCurrency} @ ${Number(row.appliedExchangeRate)}`
+          : null,
+      details,
     };
   });
 
-  const totalItemsCount = formattedRows.length;
-  const totalQtySum = formattedRows.reduce((sum, r) => {
-    const q = parseFloat(r.qtyDisplay);
-    return !isNaN(q) ? sum + q : sum + 1;
-  }, 0);
-  const totalQtyDisplay =
-    totalQtySum % 1 === 0 ? `${totalQtySum}.000` : totalQtySum.toFixed(3);
+  const timeRows = formattedRows.filter((r) => r.kind === "TIME");
+  const expenseRows = formattedRows.filter((r) => r.kind === "EXPENSE");
+  const otherRows = formattedRows.filter((r) => r.kind === "OTHER");
+  // The reference column exists only when XMS supplied an expense report number for at least one expense.
+  const showExpenseRef = expenseRows.some((r) => r.expenseReportRef);
+  // Section subtotals: use backend-supplied field if available, falling back to line sums
+  const sumLineAmounts = (rows) => rows.reduce((sum, r) => sum + (r.amountNumber ?? 0), 0);
+  const timeSubtotal =
+    invoice?.timeMaterialSubtotal !== undefined && invoice?.timeMaterialSubtotal !== null
+      ? Number(invoice.timeMaterialSubtotal)
+      : invoice?.timeAndMaterialSubtotal !== undefined && invoice?.timeAndMaterialSubtotal !== null
+        ? Number(invoice.timeAndMaterialSubtotal)
+        : invoice?.tmSubtotal !== undefined && invoice?.tmSubtotal !== null
+          ? Number(invoice.tmSubtotal)
+          : sumLineAmounts(timeRows);
+
+  const expenseSubtotal =
+    invoice?.expenseSubtotal !== undefined && invoice?.expenseSubtotal !== null
+      ? Number(invoice.expenseSubtotal)
+      : invoice?.expensesSubtotal !== undefined && invoice?.expensesSubtotal !== null
+        ? Number(invoice.expensesSubtotal)
+        : expenseRows.length > 0
+          ? sumLineAmounts(expenseRows)
+          : expenses;
+
+  const showSectionSubtotals = timeRows.length > 0 && (expenseRows.length > 0 || expenses > 0 || expenseSubtotal > 0);
 
   const isGenerated = Boolean(
     invoice?.generated ||
@@ -805,128 +941,120 @@ export default function InvoicePreviewDocument({
   // For ungenerated draft previews: use invoice-level values if present, else active companyProfile defaults.
   const notes = isGenerated
     ? (invoice?.invoiceNotes !== undefined && invoice?.invoiceNotes !== null && String(invoice?.invoiceNotes).trim()
-        ? String(invoice.invoiceNotes).trim()
-        : invoice?.notes !== undefined && invoice?.notes !== null && String(invoice?.notes).trim()
+      ? String(invoice.invoiceNotes).trim()
+      : invoice?.notes !== undefined && invoice?.notes !== null && String(invoice?.notes).trim()
         ? String(invoice.notes).trim()
         : invoice?.additionalNotes !== undefined && invoice?.additionalNotes !== null && String(invoice?.additionalNotes).trim()
-        ? String(invoice.additionalNotes).trim()
-        : null)
+          ? String(invoice.additionalNotes).trim()
+          : null)
     : (invoice?.invoiceNotes !== undefined && invoice?.invoiceNotes !== null && String(invoice?.invoiceNotes).trim()
-        ? String(invoice.invoiceNotes).trim()
-        : invoice?.notes !== undefined && invoice?.notes !== null && String(invoice?.notes).trim()
+      ? String(invoice.invoiceNotes).trim()
+      : invoice?.notes !== undefined && invoice?.notes !== null && String(invoice?.notes).trim()
         ? String(invoice.notes).trim()
         : invoice?.additionalNotes !== undefined && invoice?.additionalNotes !== null && String(invoice?.additionalNotes).trim()
-        ? String(invoice.additionalNotes).trim()
-        : companyProfile?.defaultInvoiceNotes && String(companyProfile.defaultInvoiceNotes).trim()
-        ? String(companyProfile.defaultInvoiceNotes).trim()
-        : companyProfile?.invoiceNotes && String(companyProfile.invoiceNotes).trim()
-        ? String(companyProfile.invoiceNotes).trim()
-        : companyProfile?.notes && String(companyProfile.notes).trim()
-        ? String(companyProfile.notes).trim()
-        : companyProfile?.additionalNotes && String(companyProfile.additionalNotes).trim()
-        ? String(companyProfile.additionalNotes).trim()
-        : null);
+          ? String(invoice.additionalNotes).trim()
+          : companyProfile?.defaultInvoiceNotes && String(companyProfile.defaultInvoiceNotes).trim()
+            ? String(companyProfile.defaultInvoiceNotes).trim()
+            : companyProfile?.invoiceNotes && String(companyProfile.invoiceNotes).trim()
+              ? String(companyProfile.invoiceNotes).trim()
+              : companyProfile?.notes && String(companyProfile.notes).trim()
+                ? String(companyProfile.notes).trim()
+                : companyProfile?.additionalNotes && String(companyProfile.additionalNotes).trim()
+                  ? String(companyProfile.additionalNotes).trim()
+                  : null);
 
   const termsAndConditions = isGenerated
     ? (invoice?.termsAndConditions !== undefined && invoice?.termsAndConditions !== null && String(invoice?.termsAndConditions).trim()
-        ? String(invoice.termsAndConditions).trim()
-        : invoice?.terms !== undefined && invoice?.terms !== null && String(invoice?.terms).trim()
+      ? String(invoice.termsAndConditions).trim()
+      : invoice?.terms !== undefined && invoice?.terms !== null && String(invoice?.terms).trim()
         ? String(invoice.terms).trim()
         : null)
     : (invoice?.termsAndConditions !== undefined && invoice?.termsAndConditions !== null && String(invoice?.termsAndConditions).trim()
-        ? String(invoice.termsAndConditions).trim()
-        : invoice?.terms !== undefined && invoice?.terms !== null && String(invoice?.terms).trim()
+      ? String(invoice.termsAndConditions).trim()
+      : invoice?.terms !== undefined && invoice?.terms !== null && String(invoice?.terms).trim()
         ? String(invoice.terms).trim()
         : companyProfile?.defaultTermsAndConditions && String(companyProfile.defaultTermsAndConditions).trim()
-        ? String(companyProfile.defaultTermsAndConditions).trim()
-        : companyProfile?.termsAndConditions && String(companyProfile.termsAndConditions).trim()
-        ? String(companyProfile.termsAndConditions).trim()
-        : companyProfile?.terms && String(companyProfile.terms).trim()
-        ? String(companyProfile.terms).trim()
-        : null);
+          ? String(companyProfile.defaultTermsAndConditions).trim()
+          : companyProfile?.termsAndConditions && String(companyProfile.termsAndConditions).trim()
+            ? String(companyProfile.termsAndConditions).trim()
+            : companyProfile?.terms && String(companyProfile.terms).trim()
+              ? String(companyProfile.terms).trim()
+              : null);
 
   const paymentInstructions = isGenerated
     ? (invoice?.paymentInstructions !== undefined && invoice?.paymentInstructions !== null && String(invoice?.paymentInstructions).trim()
-        ? String(invoice.paymentInstructions).trim()
-        : invoice?.paymentInstruction !== undefined && invoice?.paymentInstruction !== null && String(invoice?.paymentInstruction).trim()
+      ? String(invoice.paymentInstructions).trim()
+      : invoice?.paymentInstruction !== undefined && invoice?.paymentInstruction !== null && String(invoice?.paymentInstruction).trim()
         ? String(invoice.paymentInstruction).trim()
         : null)
     : (invoice?.paymentInstructions !== undefined && invoice?.paymentInstructions !== null && String(invoice?.paymentInstructions).trim()
-        ? String(invoice.paymentInstructions).trim()
-        : invoice?.paymentInstruction !== undefined && invoice?.paymentInstruction !== null && String(invoice?.paymentInstruction).trim()
+      ? String(invoice.paymentInstructions).trim()
+      : invoice?.paymentInstruction !== undefined && invoice?.paymentInstruction !== null && String(invoice?.paymentInstruction).trim()
         ? String(invoice.paymentInstruction).trim()
         : companyProfile?.defaultPaymentInstructions && String(companyProfile.defaultPaymentInstructions).trim()
-        ? String(companyProfile.defaultPaymentInstructions).trim()
-        : companyProfile?.paymentInstructions && String(companyProfile.paymentInstructions).trim()
-        ? String(companyProfile.paymentInstructions).trim()
-        : companyProfile?.paymentInstruction && String(companyProfile.paymentInstruction).trim()
-        ? String(companyProfile.paymentInstruction).trim()
-        : null);
+          ? String(companyProfile.defaultPaymentInstructions).trim()
+          : companyProfile?.paymentInstructions && String(companyProfile.paymentInstructions).trim()
+            ? String(companyProfile.paymentInstructions).trim()
+            : companyProfile?.paymentInstruction && String(companyProfile.paymentInstruction).trim()
+              ? String(companyProfile.paymentInstruction).trim()
+              : null);
 
   const amountInWords = formatAmountInWords(grandTotal, currency);
 
   // The Inner Document Sheet
-  const documentContent = (
-    <div className="bg-white text-slate-800 w-full font-sans">
-      {/* ========================================================================= */}
-      {/* 1. DOCUMENT LETTERHEAD & CORPORATE HEADER                                 */}
-      {/* ========================================================================= */}
-      <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pb-6 border-b border-slate-200">
-        {/* Left: Corporate Identity & Registered Office */}
-        <div className="space-y-1.5 max-w-lg">
-          <div className="flex items-center gap-3">
-            <img
-              src={logoSrc}
-              alt={sellerName}
-              className="h-11 sm:h-12 w-auto object-contain max-w-[170px]"
-            />
-          </div>
+  const documentSubtitle = invoice?.documentSubtitle || "";
 
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug pt-1">
+  const documentContent = (
+    <div className="invoice-print-area bg-white text-slate-800 w-full font-sans">
+      <style>{INVOICE_PRINT_CSS}</style>
+      {/* ========================================================================= */}
+      {/* 1. LETTERHEAD: seller identity (left) and document title (right)          */}
+      {/* ========================================================================= */}
+      <header className="flex flex-col gap-6 border-b border-slate-200 pb-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="max-w-lg space-y-2">
+          <img src={logoSrc} alt={sellerName} className="h-12 w-auto max-w-[180px] object-contain" />
+
+          <h2 className="text-xl font-bold leading-snug tracking-tight text-slate-900 sm:text-2xl">
             {sellerName}
           </h2>
 
-          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line pt-0.5">
-            {sellerAddress}
-          </p>
+          {sellerAddress && (
+            <p className="max-w-md whitespace-pre-line break-words text-xs sm:text-sm leading-relaxed text-slate-600">{sellerAddress}</p>
+          )}
 
           {sellerGstin && (
-            <div className="pt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="font-bold text-slate-900">GSTIN:</span>
-                <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
-                  {sellerGstin}
-                </span>
-              </span>
-
+            <dl className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <div className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 border border-slate-200/90 px-2.5 py-1 shadow-2xs">
+                <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">GSTIN:</dt>
+                <dd className="font-mono font-semibold text-slate-900">{sellerGstin}</dd>
+              </div>
               {sellerPan && (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="font-bold text-slate-900">PAN:</span>
-                  <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
-                    {sellerPan}
-                  </span>
-                </span>
+                <div className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 border border-slate-200/90 px-2.5 py-1 shadow-2xs">
+                  <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">PAN:</dt>
+                  <dd className="font-mono font-semibold text-slate-900">{sellerPan}</dd>
+                </div>
               )}
-
               {sellerStateCode && (
-                <span className="text-slate-600">
-                  <span className="font-semibold text-slate-800">State:</span>{" "}
-                  {companyProfile?.state || invoice?.sellerState || "Telangana"} ({sellerStateCode})
-                </span>
+                <div className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 border border-slate-200/90 px-2.5 py-1 shadow-2xs">
+                  <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">State:</dt>
+                  <dd className="font-medium text-slate-800">
+                    {[companyProfile?.state || invoice?.sellerState, `(${sellerStateCode})`].filter(Boolean).join(" ")}
+                  </dd>
+                </div>
               )}
-            </div>
+            </dl>
           )}
 
           {(sellerPhone || sellerEmail) && (
-            <div className="pt-1 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-600">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-0.5 text-xs text-slate-600">
               {sellerPhone && (
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 font-medium">
                   <Phone className="h-3.5 w-3.5 text-slate-400" />
                   <span>{sellerPhone}</span>
                 </span>
               )}
               {sellerEmail && (
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 font-medium">
                   <Mail className="h-3.5 w-3.5 text-slate-400" />
                   <span>{sellerEmail}</span>
                 </span>
@@ -935,568 +1063,615 @@ export default function InvoicePreviewDocument({
           )}
         </div>
 
-        {/* Right: Authoritative Document Classification */}
-        <div className="flex flex-col items-start sm:items-end sm:text-right shrink-0">
-          <h1 className="text-2xl sm:text-3xl font-black text-[#0A0082] tracking-tight uppercase">
-            {isDocumentGenerated ? "TAX INVOICE" : "DRAFT INVOICE"}
+        <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end sm:text-right">
+          {invoice?.recipientBadge && (
+            <span className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              {invoice.recipientBadge}
+            </span>
+          )}
+
+          <h1 className="text-2xl font-bold uppercase tracking-tight text-[#0A0082] sm:text-3xl">
+            INVOICE
           </h1>
-          <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-            {isDocumentGenerated
-              ? (isZeroRatedOrExport
-                  ? "(Supply of services for export under Letter of Undertaking / Zero-rated)"
-                  : hasDomesticTaxes
-                  ? "(Issued under Section 31 of CGST Act, 2017)"
-                  : "")
-              : "(Pre-generation draft preview)"}
-          </p>
-
-          <div className="mt-3 sm:text-right text-xs space-y-0.5 bg-slate-50 border border-slate-200/90 rounded-lg p-2.5 shadow-2xs w-full sm:w-auto">
-            <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
-              Supply Classification
-            </div>
-            <div className="font-bold text-slate-800">
-              {supplyClassification}
-            </div>
-          </div>
+          {documentSubtitle && <p className="text-xs text-slate-500">{documentSubtitle}</p>}
         </div>
-      </div>
+      </header>
 
       {/* ========================================================================= */}
-      {/* 2. INVOICE PARTICULARS & COORDINATES GRID                                 */}
+      {/* 2. INVOICE DETAILS                                                        */}
       {/* ========================================================================= */}
-      <div className={`my-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 grid grid-cols-2 sm:grid-cols-3 ${hasReverseChargeData ? "lg:grid-cols-6" : "lg:grid-cols-5"} gap-4 text-xs shadow-2xs`}>
-        <div>
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Invoice Number
-          </span>
+      <dl
+        className={`my-5 grid grid-cols-2 gap-px rounded-xl border border-slate-200 bg-slate-200 overflow-hidden text-sm sm:grid-cols-3 ${hasReverseChargeData ? "lg:grid-cols-7" : "lg:grid-cols-6"
+          }`}
+      >
+        <InvoiceMeta label="Invoice Number">
           {displayInvoiceNumber === "Not Yet Generated" ? (
-            <span className="inline-block mt-1 tabular-nums font-bold text-[11px] text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded shadow-2xs">
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 shadow-2xs">
               Pending Generation
             </span>
           ) : (
-            <span className="mt-0.5 block font-mono font-bold text-slate-900 text-sm">
-              {displayInvoiceNumber}
-            </span>
+            <span className="font-mono">{displayInvoiceNumber}</span>
           )}
-        </div>
+        </InvoiceMeta>
 
-        <div>
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Invoice Date
-          </span>
-          <span className="mt-0.5 block font-bold text-slate-900 text-xs sm:text-sm">
-            {displayInvoiceDate}
-          </span>
-        </div>
-
-        <div>
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Payment Due
-          </span>
-          <span className="mt-0.5 block font-bold text-slate-900 text-xs sm:text-sm">
-            {displayDueDate}
-          </span>
-        </div>
-
-        <div>
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Payment Terms
-          </span>
-          <span className="mt-0.5 block font-semibold text-slate-900 text-xs sm:text-sm">
-            {paymentTermsDisplay}
-          </span>
-        </div>
-
-        <div>
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Place of Supply
-          </span>
-          <span className="mt-0.5 block font-bold text-slate-900 text-xs sm:text-sm truncate" title={placeOfSupplyDisplay}>
+        <InvoiceMeta label="Invoice Date">{displayInvoiceDate}</InvoiceMeta>
+        <InvoiceMeta label="Due Date">{displayDueDate}</InvoiceMeta>
+        <InvoiceMeta label="Payment Terms">{paymentTermsDisplay}</InvoiceMeta>
+        <InvoiceMeta label="Currency">
+          <span className="font-semibold text-slate-900">{currency}</span>
+        </InvoiceMeta>
+        <InvoiceMeta label="Place of Supply">
+          <span className="block truncate" title={placeOfSupplyDisplay}>
             {placeOfSupplyDisplay}
           </span>
-        </div>
+        </InvoiceMeta>
+        {hasReverseChargeData && <InvoiceMeta label="Reverse Charge">{isReverseCharge ? "Yes" : "No"}</InvoiceMeta>}
+      </dl>
 
-        {hasReverseChargeData && (
-          <div>
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Reverse Charge
-            </span>
-            <span className="mt-0.5 block font-semibold text-slate-800 text-xs sm:text-sm">
-              {isReverseCharge ? "Yes" : "No"}
-            </span>
+      {/* ========================================================================= */}
+      {/* 3. BILLED TO and PROJECT PARTICULARS                                      */}
+      {/* ========================================================================= */}
+      <div className="mb-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+        <section aria-label="Billed to" className="rounded-xl border border-slate-200/90 bg-white shadow-2xs overflow-hidden flex flex-col">
+          <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-4 py-2.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#0A0082]/10 text-[#0A0082]">
+              <Building2 className="h-3.5 w-3.5" />
+            </div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              Billed To
+            </h3>
           </div>
+          <div className="p-4 sm:p-5 space-y-4">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Client Name</div>
+              <div className="mt-0.5 text-base font-bold leading-snug text-slate-900">{clientName}</div>
+              {clientAddress && (
+                <div className="mt-1.5 whitespace-pre-line text-xs sm:text-sm leading-relaxed text-slate-600">
+                  {clientAddress}
+                </div>
+              )}
+            </div>
+
+            <dl className="space-y-2 border-t border-slate-100 pt-3 text-xs sm:text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <dt className="text-slate-500 font-medium">GSTIN / Tax ID:</dt>
+                <dd className="font-mono font-semibold text-slate-900">{clientGstin || "—"}</dd>
+              </div>
+              {clientPan && (
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <dt className="text-slate-500 font-medium">PAN:</dt>
+                  <dd className="font-mono font-semibold text-slate-900">{clientPan}</dd>
+                </div>
+              )}
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <dt className="text-slate-500 font-medium">State / Jurisdiction:</dt>
+                <dd className="text-slate-900 font-medium">
+                  {clientLocationDisplay}
+                  {clientStateCode ? ` (State Code: ${clientStateCode})` : ""}
+                </dd>
+              </div>
+              {(clientEmail || clientPhone) && (
+                <div className="flex flex-wrap gap-x-4 pt-1 text-slate-600">
+                  {clientPhone && <span>Ph: {clientPhone}</span>}
+                  {clientEmail && <span className="break-all">Email: {clientEmail}</span>}
+                </div>
+              )}
+            </dl>
+          </div>
+        </section>
+
+        <section aria-label="Project particulars" className="rounded-xl border border-slate-200/90 bg-white shadow-2xs overflow-hidden flex flex-col">
+          <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-4 py-2.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#0A0082]/10 text-[#0A0082]">
+              <Briefcase className="h-3.5 w-3.5" />
+            </div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              Project &amp; Service
+            </h3>
+          </div>
+          <div className="p-4 sm:p-5 space-y-4">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Project Name</div>
+              <div className="mt-0.5 text-base font-bold leading-snug text-slate-900">{projectName}</div>
+            </div>
+
+            <dl className="space-y-3 border-t border-slate-100 pt-3 text-xs sm:text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-slate-50/70 p-2.5 border border-slate-100">
+                  <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Billing Period</dt>
+                  <dd className="mt-0.5 font-semibold text-slate-900">{billingPeriod}</dd>
+                </div>
+                <div className="rounded-lg bg-slate-50/70 p-2.5 border border-slate-100">
+                  <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Project Duration</dt>
+                  <dd className="mt-0.5 font-semibold text-slate-900">{projectDuration}</dd>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-2 pt-1">
+                <dt className="text-slate-500 font-medium">Billing Model:</dt>
+                <dd className="font-semibold text-slate-900">
+                  {(() => {
+                    const baseLabel = INVOICE_BILLING_TYPE_LABELS[billingType] || billingType || "Professional Services";
+                    if (billingType === "TIME_MATERIAL" || billingType === "TIME_AND_MATERIALS") {
+                      const rateModel =
+                        invoice?.rateModel ||
+                        invoice?.pricingModel ||
+                        snapshotData?.rateModel ||
+                        snapshotData?.pricingModel ||
+                        snapshotData?.billingConfig?.rateModel ||
+                        snapshotData?.billingConfig?.pricingModel ||
+                        null;
+                      if (rateModel === "ROLE_BASED") return `${baseLabel} (Role-Based Rate)`;
+                      if (rateModel === "STANDARD") return `${baseLabel} (Standard Rate)`;
+                    }
+                    return baseLabel;
+                  })()}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 4. LINE ITEMS (time & material, expenses and other charges kept apart)     */}
+      {/* ========================================================================= */}
+      <div className="space-y-5 print:space-y-3">
+        {formattedRows.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+            <p className="text-sm font-semibold text-slate-700">
+              {isDocumentGenerated
+                ? "No billable line items on this invoice."
+                : "No line items available for this draft invoice."}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Work excluded from invoicing is kept for audit but does not appear here or in the totals.
+            </p>
+          </div>
+        )}
+
+        {timeRows.length > 0 && (
+          <section aria-label="Time and material charges" className="print:break-inside-avoid">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#0A0082] text-white">
+                  <Clock className="h-3 w-3" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">Professional Services (Time &amp; Material)</h3>
+              </div>
+              <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                {timeRows.length} {timeRows.length === 1 ? "entry" : "entries"}
+              </span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-200/90 shadow-2xs bg-white">
+              <table className="w-full min-w-[680px] border-collapse text-sm table-fixed">
+                <colgroup>
+                  <col className="w-[14%]" />
+                  <col className="w-[31%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                    <th scope="col" className="px-3.5 py-2.5 text-left">Date</th>
+                    <th scope="col" className="px-3.5 py-2.5 text-left">Description / Role</th>
+                    <th scope="col" className="px-3.5 py-2.5 text-right">Hours</th>
+                    <th scope="col" className="px-3.5 py-2.5 text-right">Base Rate</th>
+                    <th scope="col" className="px-3.5 py-2.5 text-center">Discount</th>
+                    <th scope="col" className="px-3.5 py-2.5 text-right">Net Rate</th>
+                    <th scope="col" className="px-3.5 py-2.5 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {timeRows.map((row) => (
+                    <tr key={row.index} className="align-top hover:bg-slate-50/40 transition-colors">
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-xs font-medium text-slate-600">{row.dateDisplay}</td>
+                      <td className="px-3.5 py-2.5">
+                        <div className="font-semibold text-slate-900 break-words">{row.title}</div>
+                        {row.role && (
+                          <div className="mt-0.5 inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                            {row.role}
+                          </div>
+                        )}
+                        {row.details.map((detail, dIdx) => (
+                          <div key={dIdx} className="text-xs text-slate-500 break-words mt-0.5">{detail}</div>
+                        ))}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-800 font-medium whitespace-nowrap">{row.qtyDisplay}</td>
+                      <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-600 font-medium whitespace-nowrap">{row.baseRateDisplay}</td>
+                      <td className="px-3.5 py-2.5 text-center whitespace-nowrap">
+                        {row.discountDisplay ? (
+                          <div className="inline-flex flex-col items-center gap-0.5">
+                            {row.isFixedDiscount ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-800 border border-sky-200/90 shadow-2xs">
+                                <span className="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                                {row.discountDisplay}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200/90 shadow-2xs">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                {row.discountDisplay}
+                              </span>
+                            )}
+                            {row.discountPeriod && (
+                              <span className="text-[10px] text-slate-500 font-medium">{row.discountPeriod}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-800 font-semibold whitespace-nowrap">{row.rateDisplay}</td>
+                      <td className="px-3.5 py-2.5 text-right font-bold tabular-nums text-slate-900 whitespace-nowrap">{row.amountDisplay}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {expenseRows.length > 0 && (
+          <section aria-label="Expenses" className="print:break-inside-avoid">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-700 text-white">
+                  <CreditCard className="h-3 w-3" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">Expenses</h3>
+              </div>
+              <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                {expenseRows.length} {expenseRows.length === 1 ? "item" : "items"}
+              </span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-200/90 shadow-2xs bg-white">
+              <table className="w-full min-w-[540px] border-collapse text-sm table-fixed">
+                <colgroup>
+                  <col className={showExpenseRef ? "w-[14%]" : "w-[18%]"} />
+                  <col className={showExpenseRef ? "w-[38%]" : "w-[52%]"} />
+                  {showExpenseRef && <col className="w-[16%]" />}
+                  <col className={showExpenseRef ? "w-[10%]" : "w-[15%]"} />
+                  <col className={showExpenseRef ? "w-[22%]" : "w-[15%]"} />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                    <th scope="col" className="px-3.5 py-2.5 text-left">Date</th>
+                    <th scope="col" className="px-3.5 py-2.5 text-left">Expense Description</th>
+                    {showExpenseRef && <th scope="col" className="px-3.5 py-2.5 text-left">Expense Report Ref.</th>}
+                    <th scope="col" className="px-3.5 py-2.5 text-right">Quantity</th>
+                    <th scope="col" className="px-3.5 py-2.5 text-right">Billable Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {expenseRows.map((row) => (
+                    <tr key={row.index} className="align-top hover:bg-slate-50/40 transition-colors">
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-xs font-medium text-slate-600">{row.dateDisplay}</td>
+                      <td className="px-3.5 py-2.5">
+                        <div className="font-semibold text-slate-900 break-words">{row.title}</div>
+                        {row.category && row.category.toLowerCase() !== String(row.title).toLowerCase() && (
+                          <span className="mt-0.5 inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                            {row.category}
+                          </span>
+                        )}
+                        {row.expenseMerchant && (
+                          <div className="text-xs text-slate-500 break-words mt-0.5">{row.expenseMerchant}</div>
+                        )}
+                        {row.fxNote && (
+                          <div className="text-[11px] text-slate-500 mt-0.5 tabular-nums">{row.fxNote}</div>
+                        )}
+                        {row.receiptReference && (
+                          <div className="text-[11px] text-slate-500 mt-0.5">Ref: {row.receiptReference}</div>
+                        )}
+                        {row.details.map((detail, dIdx) => (
+                          <div key={dIdx} className="text-xs text-slate-500 break-words mt-0.5">{detail}</div>
+                        ))}
+                      </td>
+                      {showExpenseRef && (
+                        <td className="px-3.5 py-2.5 text-xs text-slate-700 break-words">{row.expenseReportRef || ""}</td>
+                      )}
+                      <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-800 font-medium whitespace-nowrap">{row.qtyDisplay}</td>
+                      <td className="px-3.5 py-2.5 text-right font-bold tabular-nums text-slate-900 whitespace-nowrap">{row.amountDisplay}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {otherRows.length > 0 && (
+          <section aria-label="Invoice items" className="print:break-inside-avoid">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#0A0082] text-white">
+                  <Receipt className="h-3 w-3" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">Line Items</h3>
+              </div>
+              <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                {otherRows.length} {otherRows.length === 1 ? "item" : "items"}
+              </span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-200/90 shadow-2xs bg-white">
+              <table className="w-full min-w-[480px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                    <th scope="col" className="px-4 py-3 text-left">Description</th>
+                    <th scope="col" className="px-4 py-3 text-right">Qty</th>
+                    <th scope="col" className="px-4 py-3 text-right">Rate</th>
+                    <th scope="col" className="px-4 py-3 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {otherRows.map((row) => (
+                    <tr key={row.index} className="align-top hover:bg-slate-50/40 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-900 break-words">{row.title}</div>
+                        {row.details.map((detail, dIdx) => (
+                          <div key={dIdx} className="text-xs text-slate-500 break-words mt-0.5">{detail}</div>
+                        ))}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-800 font-medium">{row.qtyDisplay}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-800 font-medium">{row.rateDisplay}</td>
+                      <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">{row.amountDisplay}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         )}
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. BILLED TO (CUSTOMER) & SERVICE PARTICULARS CARDS                       */}
+      {/* 5. FINANCIAL SUMMARY (TAX & INVOICE SUMMARY)                              */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {/* Card 1: Billed To / Recipient Details */}
-        <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-2xs">
-          <div className="bg-slate-100/90 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5 text-[#0A0082]" />
-              Billed To (Customer Details)
+      <section
+        aria-label="Tax and invoice summary"
+        className="mt-5 print:mt-4 print:break-inside-avoid"
+      >
+        {/* Section Heading Row matching Professional Services and Expenses */}
+        <div className="flex items-center justify-between mb-2.5">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#0A0082] text-white">
+              <Receipt className="h-3 w-3" />
             </span>
-            <span className="text-[10px] font-semibold text-slate-500 uppercase">Recipient</span>
-          </div>
+            <span>Tax &amp; Invoice Summary</span>
+          </h3>
+          <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 font-mono">
+            Currency: {currency}
+          </span>
+        </div>
 
-          <div className="p-4 space-y-2 text-xs">
-            <div className="text-sm font-bold text-slate-900 leading-snug">
-              {clientName}
-            </div>
-
-            <div className="text-slate-600 leading-relaxed whitespace-pre-line">
-              {clientAddress || "—"}
-            </div>
-
-            <div className="pt-1.5 border-t border-slate-100 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 font-medium">GSTIN / Tax ID:</span>
-                <span className="font-mono font-bold text-slate-900 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-[11px]">
-                  {clientGstin || "—"}
-                </span>
-              </div>
-
-              {clientPan && (
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-500 font-medium">PAN:</span>
-                  <span className="font-mono font-bold text-slate-900">
-                    {clientPan}
+        {/* Summary Content Container */}
+        <div className="rounded-xl border border-slate-200/90 bg-white shadow-2xs overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+            {/* Left Panel: Amount in Words and Supply Classification */}
+            <div className="p-5 sm:p-6 bg-slate-50/20 flex flex-col justify-between gap-4">
+              <div className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs">
+                <div className="flex items-center justify-between gap-2 pb-2 mb-2.5 border-b border-slate-100">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Amount Chargeable (in words):
+                  </span>
+                  <span className="text-[10px] font-medium text-slate-400 italic">
+                    E. &amp; O.E.
                   </span>
                 </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 font-medium">State / Jurisdiction:</span>
-                <span className="font-semibold text-slate-800">
-                  {clientLocationDisplay}
-                  {clientStateCode ? ` (State Code: ${clientStateCode})` : ""}
-                </span>
-              </div>
-
-              {(clientEmail || clientPhone) && (
-                <div className="pt-1 flex flex-wrap gap-x-3 text-slate-600">
-                  {clientPhone && <span><strong className="text-slate-700">Ph:</strong> {clientPhone}</span>}
-                  {clientEmail && <span><strong className="text-slate-700">Email:</strong> {clientEmail}</span>}
+                <div className="font-bold leading-relaxed text-slate-900 text-sm sm:text-base break-words">
+                  {amountInWords}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Service & Project Particulars */}
-        <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-2xs">
-          <div className="bg-slate-100/90 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-              <Briefcase className="h-3.5 w-3.5 text-[#0A0082]" />
-              Project & Service Particulars
-            </span>
-            <span className="text-[10px] font-semibold text-slate-500 uppercase">Contract</span>
-          </div>
-
-          <div className="p-4 space-y-2 text-xs">
-            <div>
-              <span className="text-slate-500 text-[11px] block">Project Name:</span>
-              <span className="text-sm font-bold text-slate-900 leading-snug">
-                {projectName}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
-              <div>
-                <span className="text-slate-500 text-[11px] block">Billing Period:</span>
-                <span className="font-bold text-slate-900">{billingPeriod}</span>
               </div>
 
-              <div>
-                <span className="text-slate-500 text-[11px] block">Project Duration:</span>
-                <span className="font-medium text-slate-800">{projectDuration}</span>
-              </div>
-            </div>
-
-            <div className="pt-1">
-              <span className="text-slate-500 text-[11px] block">Billing Model:</span>
-              <span className="font-semibold text-slate-800">
-                {INVOICE_BILLING_TYPE_LABELS[billingType] || billingType || "Professional Services"}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 4. CORPORATE LINE ITEMS TABLE                                             */}
-      {/* ========================================================================= */}
-      <div className="overflow-x-auto rounded-xl border border-slate-300 shadow-2xs">
-        <table className="w-full text-xs border-collapse">
-          <thead>
-            <tr className="bg-[#0A0082] text-white">
-              <th className="py-3 px-3 text-left w-10 font-bold uppercase tracking-wider text-[11px]">#</th>
-              <th className="py-3 px-3 text-left font-bold uppercase tracking-wider text-[11px]">
-                Description of Services / Deliverables
-              </th>
-              <th className="py-3 px-3 text-left w-24 font-bold uppercase tracking-wider text-[11px]">
-                HSN/SAC
-              </th>
-              <th className="py-3 px-3 text-left w-16 font-bold uppercase tracking-wider text-[11px]">
-                Qty
-              </th>
-              <th className="py-3 px-3 text-left w-28 font-bold uppercase tracking-wider text-[11px]">
-                Rate
-              </th>
-              <th className="py-3 px-3 text-left w-28 font-bold uppercase tracking-wider text-[11px]">
-                Taxable Value
-              </th>
-              <th className="py-3 px-3 text-left w-24 font-bold uppercase tracking-wider text-[11px]">
-                Tax ({effectiveTaxRatePct}%)
-              </th>
-              <th className="py-3 pr-4 pl-3 text-left w-32 font-bold uppercase tracking-wider text-[11px]">
-                Total Amount
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {formattedRows.map((row) => (
-              <tr key={row.index} className="align-top hover:bg-slate-50/80 transition-colors">
-                <td className="py-3.5 px-3 text-center text-slate-500 font-semibold">
-                  {row.index}
-                </td>
-                <td className="py-3.5 px-3 text-left">
-                  <div className="font-bold text-slate-900 text-xs sm:text-sm leading-snug">
-                    {row.title}
+              <div className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs text-xs space-y-1.5">
+                <span className="font-bold text-slate-500 block text-[11px] uppercase tracking-wider">
+                  Supply Classification
+                </span>
+                <div className="font-semibold text-slate-900 text-xs sm:text-[13px]">
+                  Nature of Supply: {supplyClassification}
+                </div>
+                {isZeroRatedOrExport && (
+                  <div className="text-slate-500 text-[11px] pt-0.5">
+                    Non-taxable export supply — 0.0% tax applicable.
                   </div>
-                  {row.subDetails.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {row.subDetails.map((detail, dIdx) => (
-                        <span
-                          key={dIdx}
-                          className="bg-slate-100 text-slate-700 text-[10px] font-medium px-2 py-0.5 rounded border border-slate-200/80 shadow-2xs"
-                        >
-                          {detail}
-                        </span>
-                      ))}
+                )}
+              </div>
+            </div>
+
+            {/* Right Panel: Subtotals and Tax Breakdown */}
+            <div className="p-5 sm:p-6 bg-slate-50/40 flex flex-col justify-center">
+              <dl className="space-y-2.5 text-sm">
+                {showSectionSubtotals && (
+                  <>
+                    <div className="flex justify-between gap-4 text-slate-600">
+                      <dt>Time &amp; Material Subtotal</dt>
+                      <dd className="tabular-nums font-semibold text-slate-800">{formatCurrency(timeSubtotal, currency)}</dd>
                     </div>
-                  )}
-                </td>
-                <td className="py-3.5 px-3 text-center font-mono font-semibold text-slate-700 bg-slate-50/50">
-                  {row.hsnOrSac}
-                </td>
-                <td className="py-3.5 px-3 text-center font-mono font-semibold text-slate-800">
-                  {row.qtyDisplay}
-                </td>
-                <td className="py-3.5 px-3 text-right font-mono text-slate-900 font-medium">
-                  {row.rateDisplay}
-                </td>
-                <td className="py-3.5 px-3 text-right font-mono font-medium text-slate-900">
-                  {formatCurrency(row.taxableAmount, currency)}
-                </td>
-                <td className="py-3.5 px-3 text-right font-mono text-slate-800 whitespace-nowrap">
-                  {formatCurrency(row.taxAmount, currency)}
-                </td>
-                <td className="py-3.5 pr-4 pl-3 text-right font-mono font-bold text-slate-950">
-                  {formatCurrency(row.totalAmount, currency)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="bg-slate-100/90 border-t-2 border-slate-300 font-bold text-slate-900">
-              <td colSpan={3} className="py-2.5 px-3 text-left">
-                Total Items: <span className="font-black text-[#0A0082]">{totalItemsCount}</span>
-              </td>
-              <td className="py-2.5 px-3 text-left tabular-nums">
-                {totalQtyDisplay}
-              </td>
-              <td className="py-2.5 px-3 text-left text-slate-500">—</td>
-              <td className="py-2.5 px-3 text-left tabular-nums">
-                {formatCurrency(subtotal, currency)}
-              </td>
-              <td className="py-2.5 px-3 text-left tabular-nums">
-                {formatCurrency(totalTax, currency)}
-              </td>
-              <td className="py-2.5 pr-4 pl-3 text-left tabular-nums font-black text-slate-950">
-                {formatCurrency(grandTotal, currency)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+                    <div className="flex justify-between gap-4 text-slate-600">
+                      <dt>Expenses Subtotal</dt>
+                      <dd className="tabular-nums font-semibold text-slate-800">{formatCurrency(expenseSubtotal, currency)}</dd>
+                    </div>
+                  </>
+                )}
 
-      {/* ========================================================================= */}
-      {/* 5. TAX & INVOICE SUMMARY                                                  */}
-      {/* ========================================================================= */}
-      <div className="pt-5 space-y-5">
-        {/* Tax & Invoice Summary Card */}
-        <div className="rounded-xl border border-slate-300 bg-white overflow-hidden shadow-2xs text-xs w-full">
-          {/* Header */}
-          <div className="bg-slate-100/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Receipt className="h-4 w-4 text-[#0A0082]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
-                Tax & Invoice Summary
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-1.5 italic">
-              E. & O.E. (Errors and Omissions Excepted)
-            </div>
-          </div>
+                <div className="flex justify-between gap-4 border-t border-slate-200/90 pt-2.5 font-bold text-slate-900">
+                  <dt>Taxable Subtotal</dt>
+                  <dd className="tabular-nums font-bold text-slate-900">{formatCurrency(subtotal, currency)}</dd>
+                </div>
 
-          {/* Statutory Tax Breakdown Schedule */}
-          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-2xs">
-            <div className="bg-slate-100/80 px-3.5 py-1.5 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
-              <span>Statutory Tax Breakdown Schedule</span>
-              <span className="text-[10px] text-slate-500">SAC 998314</span>
-            </div>
-
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-50/70">
-                  <th className="py-2 px-3 text-left">Tax Component</th>
-                  <th className="py-2 px-3 text-right">Taxable Amount</th>
-                  <th className="py-2 px-3 text-right">Rate</th>
-                  <th className="py-2 pr-3 pl-2 text-right">Tax Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
                 {effectiveTaxBreakdown.length > 0 ? (
                   effectiveTaxBreakdown.map((comp) => (
-                    <tr key={comp.id}>
-                      <td className="py-2 px-3 font-semibold text-slate-800">
-                        {comp.taxTypeCode || comp.taxComponent}
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-800">
-                        {formatCurrency(comp.taxableAmount ?? subtotal, currency)}
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-800">
-                        {comp.rate ? `${Number(comp.rate).toFixed(1)}%` : `${effectiveTaxRatePct}%`}
-                      </td>
-                      <td className="py-2 pr-3 pl-2 text-right font-mono font-bold text-slate-900">
-                        {formatCurrency(comp.amount, currency)}
-                      </td>
-                    </tr>
+                    <div key={comp.id} className="flex justify-between gap-4 text-slate-600">
+                      <dt className="flex items-center gap-2">
+                        <span>{comp.taxTypeCode || comp.taxComponent}</span>
+                        {comp.rate !== null && comp.rate !== undefined && (
+                          <span className="rounded bg-slate-100 border border-slate-200/60 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                            {Number(comp.rate).toFixed(1)}%
+                          </span>
+                        )}
+                      </dt>
+                      <dd className="tabular-nums font-semibold text-slate-800">{formatCurrency(comp.amount, currency)}</dd>
+                    </div>
                   ))
-                ) : (
-                  <tr>
-                    <td className="py-2 px-3 font-semibold text-slate-800">
-                      Integrated Tax (IGST / GST)
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-800">
-                      {formatCurrency(subtotal, currency)}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-800">
-                      {effectiveTaxRatePct}%
-                    </td>
-                    <td className="py-2 pr-3 pl-2 text-right font-mono font-bold text-slate-900">
-                      {formatCurrency(totalTax, currency)}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Payment Remittance / Settlement Instruction (Rendered only when provided by backend) */}
-          {paymentInstructions && (
-            <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-1 text-xs shadow-2xs">
-              <span className="font-bold text-slate-900 text-[11px] uppercase tracking-wider block">
-                Payment Instructions
-              </span>
-              <div className="text-slate-600 whitespace-pre-line leading-relaxed text-xs">
-                {paymentInstructions}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right 5 Columns: Financial Ledger Box */}
-        <div className="lg:col-span-5">
-          <div className="rounded-xl border border-slate-300 bg-slate-50/80 p-4 space-y-3 text-xs shadow-xs">
-            <div className="text-[11px] font-black uppercase tracking-wider text-slate-600 border-b border-slate-200 pb-2">
-              Financial Summary Ledger
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-slate-700">
-                <span className="font-bold text-slate-900">Taxable Amount (Subtotal)</span>
-                <span className="font-bold text-slate-900 font-mono text-xs">
-                  {formatCurrency(subtotal, currency)}
-                </span>
-              </div>
-
-            {/* Dynamic Applicable Tax Components */}
-            {effectiveTaxBreakdown.length > 0 ? (
-              <div className="space-y-1.5 pt-0.5">
-                {effectiveTaxBreakdown.map((comp) => (
-                  <div
-                    key={comp.id}
-                    className="flex justify-between items-center text-slate-700 pl-3 pr-2.5 py-1.5 rounded-lg bg-slate-50/70 border border-slate-200/70"
-                  >
-                    <span className="font-medium text-slate-800">
-                      {comp.taxTypeCode || comp.taxComponent}
-                      {comp.rate ? ` (${Number(comp.rate).toFixed(1)}%)` : ""}
-                    </span>
-                    <span className="font-mono font-semibold text-slate-900">
-                      {formatCurrency(comp.amount, currency)}
-                    </span>
+                ) : totalTax > 0 ? (
+                  <div className="flex justify-between gap-4 text-slate-600">
+                    <dt>Total Tax</dt>
+                    <dd className="tabular-nums font-semibold text-slate-800">{formatCurrency(totalTax, currency)}</dd>
                   </div>
-                ))}
-              </div>
-            ) : totalTax > 0 ? (
-              <div className="flex justify-between items-center text-slate-700 pl-3 pr-2.5 py-1.5 rounded-lg bg-slate-50/70 border border-slate-200/70">
-                <div className="flex items-center gap-2">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#0A0082]" />
-                  <span className="font-semibold text-slate-800">
-                    Applicable Tax ({effectiveTaxRatePct}%)
-                  </span>
-                </div>
-                <span className="font-mono font-semibold text-slate-900">
-                  {formatCurrency(totalTax, currency)}
-                </span>
-              </div>
-            ) : null}
-
-              {expenses > 0 && (
-                <div className="flex justify-between items-center text-slate-700">
-                  <span className="font-bold text-slate-900">Reimbursable Expenses</span>
-                  <span className="font-bold text-slate-900 font-mono">
-                    {formatCurrency(expenses, currency)}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Total Invoice Amount */}
-            <div className="rounded-xl bg-gradient-to-r from-[#0A0082] via-[#100094] to-[#0A0082] text-white p-4 shadow-sm border border-indigo-950 mt-2">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="block text-xs uppercase tracking-wider font-black text-indigo-100">
-                    Total Invoice Amount
-                  </span>
-                  <span className="text-[10px] text-indigo-200 font-medium">
-                    Inclusive of all applicable taxes
-                  </span>
-                </div>
-                <span className="font-mono text-base sm:text-xl font-black">
-                  {formatCurrency(grandTotal, currency)}
-                </span>
-              </div>
-            </div>
-
-            {/* Amount Payable */}
-            <div className="flex justify-between items-center pt-2 border-t border-slate-200 px-1">
-              <span className="font-bold text-slate-800 text-xs">Total Amount Payable:</span>
-              <span className="font-mono text-sm sm:text-base font-black text-[#0A0082]">
-                {formatCurrency(grandTotal, currency)}
-              </span>
-            </div>
-            <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug pl-3 border-l-2 border-[#0A0082]/40 py-0.5">
-              {amountInWords}
-            </div>
-            <div className="text-[10px] text-slate-500 mt-2 italic flex items-center justify-between">
-              <span>E. & O.E. (Errors and Omissions Excepted)</span>
-              <span className="font-mono font-medium text-slate-400">{currency} Settlement</span>
+                ) : isZeroRatedOrExport ? (
+                  <div className="rounded-lg bg-slate-100/80 p-2.5 text-xs text-slate-600 italic">
+                    Zero-rated or exempt supply — no tax charged.
+                  </div>
+                ) : null}
+              </dl>
             </div>
           </div>
-        </div>
 
-        {/* Payment Instructions Box (Rendered below Tax & Invoice Summary) */}
-        {paymentInstructions ? (
-          <div className="rounded-xl border border-slate-300 bg-white overflow-hidden shadow-2xs text-xs w-full">
-            {/* Header */}
-            <div className="bg-slate-100/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Landmark className="h-4 w-4 text-[#0A0082]" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
-                  Payment Instructions
-                </span>
-              </div>
-            </div>
-
-            {/* Instructions Body */}
-            <div className="p-4 space-y-2.5">
-              <div className="text-xs text-slate-800 whitespace-pre-line leading-relaxed font-mono bg-slate-50/80 p-3 rounded-lg border border-slate-200/80">
-                {paymentInstructions}
-              </div>
-
-              {/* Remittance Reconciliation Footer Note */}
-              <div className="flex items-start gap-2 text-[11px] text-slate-500 pt-1">
-                <ShieldCheck className="h-3.5 w-3.5 text-[#0A0082] shrink-0 mt-0.5" />
-                <span className="leading-snug">
-                  Please quote the invoice number as the payment reference to ensure prompt settlement and reconciliation.
-                </span>
-              </div>
-            </div>
+          {/* Prominent Full-Width Total Invoice Amount Banner */}
+          <div className="flex items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-[#0A0082] px-6 py-4 text-white shadow-inner">
+            <span className="text-xs sm:text-sm font-bold tracking-wider uppercase text-indigo-100">Total Invoice Amount</span>
+            <span className="text-2xl sm:text-3xl font-extrabold tabular-nums tracking-tight">{formatCurrency(grandTotal, currency)}</span>
           </div>
-        ) : null}
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 6. TERMS AND CONDITIONS & AUTHORIZED SIGNATORY                            */}
-      {/* ========================================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-6 items-start border-t border-slate-200 mt-6">
-        {/* Left: Notes & Legal Terms (Rendered only when provided by backend) */}
-        <div className="md:col-span-8 space-y-3 text-xs">
-          {notes && (
-            <div>
-              <span className="font-bold text-slate-900 block mb-0.5">Notes:</span>
-              <p className="text-slate-600 whitespace-pre-line leading-relaxed text-xs">
-                {notes}
-              </p>
-            </div>
-          )}
-
-          {termsAndConditions && (
-            <div className="space-y-1">
-              <span className="font-bold text-slate-900 block">Terms & Conditions:</span>
-              <p className="text-slate-600 whitespace-pre-line leading-relaxed text-[11px]">
-                {termsAndConditions}
-              </p>
-            </div>
-          )}
         </div>
+      </section>
 
-        {/* Right: Authorized Corporate Signatory Box */}
-        <div className="md:col-span-4 flex flex-col items-center text-center p-4 rounded-xl border border-slate-200 bg-white shadow-2xs">
-          <span className="text-xs font-bold text-slate-800">
-            For {sellerName}
-          </span>
+      {/* ========================================================================= */}
+      {/* 6. BOTTOM PARTICULARS: Payment, Notes, Terms & Corporate Signatory        */}
+      {/* ========================================================================= */}
+      {paymentInstructions || notes || termsAndConditions ? (
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5 print:mt-4 print:break-inside-avoid">
+          {/* Left Column: Payment Instructions & Terms */}
+          <div className="space-y-4">
+            {paymentInstructions && (
+              <section
+                aria-label="Payment instructions"
+                className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 text-sm shadow-2xs"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex h-5 w-5 items-center justify-center rounded bg-[#0A0082]/10 text-[#0A0082]">
+                    <Landmark className="h-3.5 w-3.5" />
+                  </div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Payment Instructions</h3>
+                </div>
+                <div className="whitespace-pre-line leading-relaxed text-slate-700 text-xs sm:text-sm bg-slate-50/80 p-3 rounded-lg border border-slate-200/70 font-mono">
+                  {paymentInstructions}
+                </div>
+                <p className="mt-2.5 flex items-start gap-1.5 text-xs text-slate-500">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#0A0082]" />
+                  Please quote the invoice number as the payment reference to ensure prompt reconciliation.
+                </p>
+              </section>
+            )}
 
-          <div className="h-16 w-full flex items-center justify-center text-slate-400 text-xs italic select-none py-1">
-            {signatureSrc ? (
-              <img
-                src={signatureSrc}
-                alt="Authorized Signatory Signature"
-                className="max-h-full max-w-[150px] object-contain"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                }}
-              />
-            ) : (
-              <span>
-                {isDocumentGenerated ? "(Authorized Signatory)" : "(Draft Preview — Pending Generation)"}
-              </span>
+            {termsAndConditions && (
+              <section
+                aria-label="Terms and conditions"
+                className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 text-sm shadow-2xs"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldCheck className="h-4 w-4 text-[#0A0082]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Terms &amp; Conditions</h3>
+                </div>
+                <p className="whitespace-pre-line text-xs leading-relaxed text-slate-600 break-words">
+                  {termsAndConditions}
+                </p>
+              </section>
             )}
           </div>
 
-          <div className="w-36 border-b border-slate-400 mt-1 mb-1" />
-          <div className="text-xs font-bold text-slate-900">
-            Authorized Signatory
+          {/* Right Column: Notes & Authorized Signatory */}
+          <div className="space-y-4 flex flex-col justify-between">
+            {notes && (
+              <section
+                aria-label="Invoice notes"
+                className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 text-sm shadow-2xs"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4 text-[#0A0082]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Notes</h3>
+                </div>
+                <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed text-slate-600 break-words">
+                  {notes}
+                </p>
+              </section>
+            )}
+
+            {/* Authorized Signatory */}
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/40 p-5 shadow-2xs text-center flex flex-col items-center justify-center">
+              <span className="text-xs font-bold text-slate-800">
+                For {sellerName}
+              </span>
+
+              <div className="h-16 w-full flex items-center justify-center text-slate-400 text-xs italic select-none py-1">
+                {signatureSrc ? (
+                  <img
+                    src={signatureSrc}
+                    alt="Authorized Signatory Signature"
+                    className="max-h-full max-w-[150px] object-contain"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <span>
+                    {isDocumentGenerated ? "(Authorized Signatory)" : "(Draft Preview — Pending Generation)"}
+                  </span>
+                )}
+              </div>
+
+              <div className="w-40 border-b border-slate-300 mt-1 mb-1.5" />
+              <div className="text-xs font-bold text-slate-900">
+                Authorized Signatory
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="mt-5 flex justify-end print:mt-4 print:break-inside-avoid">
+          <div className="w-full sm:w-64 flex flex-col items-center text-center p-5 rounded-xl border border-slate-200/90 bg-slate-50/30 shadow-2xs">
+            <span className="text-xs font-bold text-slate-800">
+              For {sellerName}
+            </span>
+
+            <div className="h-16 w-full flex items-center justify-center text-slate-400 text-xs italic select-none py-1">
+              {signatureSrc ? (
+                <img
+                  src={signatureSrc}
+                  alt="Authorized Signatory Signature"
+                  className="max-h-full max-w-[150px] object-contain"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                  }}
+                />
+              ) : (
+                <span>
+                  {isDocumentGenerated ? "(Authorized Signatory)" : "(Draft Preview — Pending Generation)"}
+                </span>
+              )}
+            </div>
+
+            <div className="w-36 border-b border-slate-300 mt-1 mb-1.5" />
+            <div className="text-xs font-bold text-slate-900">
+              Authorized Signatory
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
-      {/* 7. STATUTORY FOOTER                                                       */}
+      {/* 9. STATUTORY FOOTER                                                       */}
       {/* ========================================================================= */}
-      <div className="pt-6 mt-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-500 gap-2">
+      <div className="pt-4 mt-5 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-500 gap-2 print:mt-4 print:pt-4">
         <span>
           {isDocumentGenerated
             ? "This is an official computer-generated invoice."
             : "Invoice Generation Draft Preview • Not an official tax invoice until generated."}
         </span>
-        <span>Page 1 of 1 • {isDocumentGenerated ? "Official Document" : "Draft Preview"}</span>
+        <span className="rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+          {isDocumentGenerated ? "Official Document" : "Draft Preview"}
+        </span>
       </div>
     </div>
   );
@@ -1504,10 +1679,10 @@ export default function InvoicePreviewDocument({
   // When presentation === "card", wrap inside realistic A4 document sheet elevation
   if (!isPlain) {
     return (
-      <div className="w-full bg-slate-100/70 p-2 sm:p-6 rounded-2xl border border-slate-200/80">
+      <div className="w-full bg-slate-100/70 p-3 sm:p-6 lg:p-8 rounded-2xl border border-slate-200/80">
         <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-[0_4px_25px_-5px_rgba(0,0,0,0.08),0_10px_20px_-6px_rgba(0,0,0,0.04)] border border-slate-200/90 overflow-hidden text-slate-800 print:shadow-none print:border-none print:p-0 font-sans">
           {/* Top Brand Accent Bar */}
-          <div className="h-2 w-full bg-gradient-to-r from-[#0A0082] via-[#1e1b4b] to-[#0A0082]" />
+          <div className="h-1.5 w-full bg-[#0A0082] print:hidden" />
 
           {/* Paper Content */}
           <div className="p-6 sm:p-10 md:p-12">

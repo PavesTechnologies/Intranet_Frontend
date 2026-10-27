@@ -71,7 +71,9 @@ describe("PaymentReadyPage", () => {
     useApPermissions.mockReturnValue({ canRecordPayment: true });
     useReadyForPayment.mockReturnValue(listState([]));
     renderPage();
-    expect(screen.getByText("No invoices are currently ready for payment.")).toBeInTheDocument();
+    expect(screen.getByText("No invoices are ready for payment right now.")).toBeInTheDocument();
+    expect(screen.getByText(/once they are approved, their TDS is verified/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See approved invoices" })).toHaveAttribute("href", "/accounts-payable/invoices?queue=approved");
   });
 
   it("shows a friendly error instead of the raw API error", () => {

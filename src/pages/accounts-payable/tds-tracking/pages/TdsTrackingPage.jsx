@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import PageGuide from "../../guide/components/PageGuide";
+import { Link, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import EmptyState from "../../procurement/components/EmptyState";
-import { useTdsTrackingList, useTdsTrackingMetadata } from "../hooks/useTdsTracking";
+import { SegmentedTabs } from "../../dashboard/components/insights";
+import { useTdsTrackingList } from "../hooks/useTdsTracking";
 import { useDebouncedValue } from "../../payment/hooks/useDebouncedValue";
 import { sectionLabel } from "../utils/tdsTrackingFormat";
 import { AP_ROUTES } from "../../constants/routes";
@@ -24,6 +26,18 @@ const COLUMNS = [
   "rate", "tdsAmount", "netPayable", "invoiceStatus", "tdsStatus", "view",
 ];
 
+// TDS is deducted when the vendor is paid, so TDS work starts at payment: the default view is the paid
+// invoices; unpaid ones (TDS still to verify, coming up) are one tab away.
+const VIEWS = [
+  { value: "paid", label: "Paid", statuses: "TDS_DEDUCTED,TDS_DEPOSITED,TDS_FILED",
+    hint: "Invoices paid to the vendor - TDS withheld, then deposited by the 7th of the next month and filed in the quarterly 26Q." },
+  { value: "deposit", label: "To deposit", statuses: "TDS_DEDUCTED", hint: "TDS withheld from the vendor, not yet paid to the government with a challan." },
+  { value: "file", label: "To file", statuses: "TDS_DEPOSITED", hint: "Deposited with a challan, not yet in a quarterly statement." },
+  { value: "filed", label: "Filed", statuses: "TDS_FILED", hint: "Included in a filed quarterly statement." },
+  { value: "unpaid", label: "Not yet paid", statuses: "TDS_PENDING",
+    hint: "Approved or still in progress - TDS is deducted when the vendor is paid. Finance verifies the TDS before payment." },
+];
+
 const DETERMINATION_OPTIONS = [
   { value: "", label: "Any determination" },
   { value: "VERIFIED", label: "Verified" },
@@ -36,9 +50,10 @@ const DETERMINATION_OPTIONS = [
  * status and TDS status are shown side by side because they are independent.
  */
 export default function TdsTrackingPage() {
-  const { data: metadata } = useTdsTrackingMetadata();
+  const [params, setParams] = useSearchParams();
+  const view = VIEWS.find((v) => v.value === params.get("view")) || VIEWS[0];
+  const tdsStatus = view.statuses;
   const [search, setSearch] = useState("");
-  const [tdsStatus, setTdsStatus] = useState("");
   const [determinationStatus, setDeterminationStatus] = useState("");
   const debouncedSearch = useDebouncedValue(search.trim());
 
@@ -48,10 +63,10 @@ export default function TdsTrackingPage() {
     determinationStatus,
   });
 
-  const statusOptions = [
-    { value: "", label: "All TDS statuses" },
-    ...(metadata?.tracking_statuses ?? []).map((s) => ({ value: s.value, label: s.label })),
-  ];
+  const setView = (value) => {
+    setPage(1);
+    setParams(value === VIEWS[0].value ? {} : { view: value }, { replace: true });
+  };
 
   const rows = items.map((row) => {
     const link = AP_ROUTES.TDS_TRACKING_DETAIL(row.invoiceId);
@@ -69,14 +84,14 @@ export default function TdsTrackingPage() {
       rate: row.tdsRate != null ? `${row.tdsRate}%` : "—",
       tdsAmount: formatCurrency(row.tdsAmount, row.currencySymbol),
       netPayable: formatCurrency(row.netPayable, row.currencySymbol),
-      invoiceStatus: <StatusBadge label={row.invoiceStatusName || row.invoiceStatusCode || "—"} size="sm" />,
+      invoiceStatus: <ApStatusBadge status={row.invoiceStatusName || row.invoiceStatusCode} />,
       tdsStatus: (
-        <div>
-          <StatusBadge label={row.trackingStatusLabel} size="sm" />
-          {row.determinationStatus !== "VERIFIED" && (
-            <div className="mt-1 text-xs text-amber-600">Awaiting TDS verification</div>
-          )}
-        </div>
+        <ApStatusBadge
+          type="tds"
+          status={row.trackingStatus}
+          label={row.trackingStatusLabel}
+          determinationStatus={row.determinationStatus}
+        />
       ),
       view: (
         <Link to={link} className="text-sm font-medium text-[#0A0082] hover:underline">
@@ -86,7 +101,7 @@ export default function TdsTrackingPage() {
     };
   });
 
-  const filtered = Boolean(debouncedSearch || tdsStatus || determinationStatus);
+  const filtered = Boolean(debouncedSearch || determinationStatus);
 
   return (
     <div className="p-6">
@@ -99,8 +114,14 @@ export default function TdsTrackingPage() {
           </Link>
         }
       />
+      <PageGuide page="tdsTracking" />
 
-      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <SegmentedTabs value={view.value} onChange={setView} tabs={VIEWS.map(({ value, label }) => ({ value, label }))} />
+        <p className="text-xs text-gray-500">{view.hint}</p>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3 md:items-end">
         <FormInput
           label="Search"
           name="search"
@@ -109,7 +130,6 @@ export default function TdsTrackingPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="md:col-span-2"
         />
-        <FormSelect label="TDS Status" name="tdsStatus" options={statusOptions} value={tdsStatus} onChange={(e) => setTdsStatus(e.target.value)} />
         <FormSelect
           label="Determination"
           name="determinationStatus"
@@ -124,7 +144,7 @@ export default function TdsTrackingPage() {
           {getApiErrorMessage(error, "Unable to load TDS invoices right now.")}
         </div>
       ) : !isLoading && items.length === 0 ? (
-        <EmptyState title="No TDS-applicable invoices found." description={filtered ? "Try clearing the filters." : undefined} />
+        <EmptyState title={`No invoices in "${view.label}".`} description={filtered ? "Try clearing the filters." : undefined} />
       ) : (
         <>
           <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={isLoading} />

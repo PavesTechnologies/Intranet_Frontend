@@ -29,12 +29,11 @@ export const BILLING_TYPES = [
   },
 ];
 
-// Milestone Plan payment structure (backend: PaymentStructure). Only FULL_PAYMENT
-// and INSTALLMENTS are offered today — MILESTONES (project-milestone-driven,
-// sourced from PMS) is a future addition and must never be shown in the UI yet.
+// Milestone Plan payment structure (backend: PaymentStructure).
 export const PAYMENT_STRUCTURE_OPTIONS = [
   { value: "FULL_PAYMENT", label: "Full Payment", description: "Bill the entire contract value in a single payment." },
   { value: "INSTALLMENTS", label: "Installments", description: "Split the contract value across multiple percentage-based installments." },
+  { value: "MILESTONES", label: "Milestones", description: "Milestone-based billing synchronized directly from PMS." },
 ];
 
 export const BILLING_TYPE_LABELS = BILLING_TYPES.reduce((acc, type) => {

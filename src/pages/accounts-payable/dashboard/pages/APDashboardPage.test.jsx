@@ -56,12 +56,27 @@ const DATA = {
   },
   management: {
     as_of: "2026-10-09", base_currency: "INR",
-    kpis: [kpi("liability", "Total AP liability", 2310865, { format: "money", currency_code: "INR" }), kpi("on_time", "Paid on time", 72.2, { format: "percent" })],
+    highlights: [
+      { tone: "bad", text: "₹2.6 L on 1 approved invoice is past its due date - pay it now.", link: "/accounts-payable/reports?report=ageing" },
+      { tone: "good", text: "91.7% of invoices were paid on time in the last 90 days.", link: null },
+    ],
+    kpis: [kpi("liability", "Total AP liability", 2310865, { format: "money", currency_code: "INR", help: "Everything recorded and not yet paid." }), kpi("on_time", "Paid on time", 72.2, { format: "percent" })],
     outflow: [{ key: "d30", label: "Next 30 days", approved: 100, pipeline: 50, count: 2 }], spend_trend: [], by_department: [],
-    vendor_exposure: [{ key: "1", label: "Vertex", amount: 1285610, count: 3 }], top5_share: 64.3,
+    vendor_exposure: [{ key: "1", label: "Vertex", amount: 1285610, count: 3 }], top5_share: 64.3, vendor_count: 12,
+    controls: [
+      { key: "paid_after_bank_change", severity: "high", label: "Payments made within 7 days of a vendor bank change", count: 1, why: "Confirm each with the vendor by phone.", link: "/accounts-payable/payments/history" },
+      { key: "duplicates", severity: "medium", label: "Open invoices that look like duplicates", count: 0, why: "Check before paying twice.", link: null },
+    ],
+    accruals: { as_of: "2026-10-31", total: 1839546.4, groups: [
+      { key: "not_approved", label: "Invoices received, not yet approved", why: "Still in approval.", count: 7, amount: 1754586.4 },
+    ] },
     efficiency: { median_days_to_approve: 3.5, median_days_approval_to_payment: 12, median_days_end_to_end: 18, sample: 9, pending_approvals: 4,
                   bottlenecks: [{ department: "IT", level: 2, count: 3, amount: 900, avg_wait_days: 4, max_wait_days: 7.5 }] },
-    compliance: [{ key: "term_exceptions", label: "Payment-term exceptions", count: 4, amount: 221360 }],
+    compliance: [
+      { key: "term_exceptions", label: "Payment-term exceptions", count: 4, amount: 221360 },
+      { key: "gst_claim", label: "GST input credit to claim (Sep 2026, due 20 Oct)", count: 12, amount: 247120.2, tone: "good" },
+      { key: "gst_at_risk", label: "GST credit at risk (180-day rule / IRN / GSTR-2B)", count: 1, amount: 11430 },
+    ],
     high_value_exceptions: [], high_value_threshold: 100000, note: "Read-only management view.",
   },
 };
@@ -160,11 +175,21 @@ describe("role view content", () => {
     expect(screen.getByText("Hi Jagadish, here's where AP stands")).toBeInTheDocument();
     expect(screen.getByText("₹23,10,865")).toBeInTheDocument();
     expect(screen.getByText("72.2%")).toBeInTheDocument();
-    expect(screen.getByText("Top 5 vendors hold 64.3% of what we owe")).toBeInTheDocument();
+    expect(screen.getByText("The 5 largest of 12 vendors hold 64.3% of what we owe")).toBeInTheDocument();
+    const glance = screen.getByRole("region", { name: "AP at a glance" });
+    expect(within(glance).getByRole("link", { name: /past its due date - pay it now/ })).toHaveAttribute("href", "/accounts-payable/reports?report=ageing");
+    expect(within(glance).getByText(/91.7% of invoices were paid on time/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What does Total AP liability mean?" })).toBeInTheDocument();
+    expect(screen.getByText("Controls - last 30 days")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Payments made within 7 days of a vendor bank change" })).toHaveAttribute("href", "/accounts-payable/payments/history");
+    expect(screen.getByText("Month-end accruals - 31 Oct")).toBeInTheDocument();
+    expect(screen.getByText("Invoices received, not yet approved")).toBeInTheDocument();
     expect(screen.getByText("18 d")).toBeInTheDocument();
     expect(screen.getByText("oldest 7.5 d")).toBeInTheDocument();
-    const compliance = screen.getByText("Compliance exceptions").closest("section");
+    const compliance = screen.getByText("Compliance & tax").closest("section");
     expect(within(compliance).getByText("Payment-term exceptions")).toBeInTheDocument();
+    expect(within(compliance).getByText(/GST input credit to claim/)).toBeInTheDocument();
+    expect(within(compliance).getByText(/GST credit at risk/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Record payment|Approve/i })).not.toBeInTheDocument();
   });
 

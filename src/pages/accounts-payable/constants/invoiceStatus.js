@@ -34,9 +34,26 @@ export const INVOICE_STATUS = {
   DISPUTED: "Disputed",
 };
 
+/**
+ * What a person sees for a status. The INVOICE_STATUS values stay as they are (filters and code
+ * compare them, and they match status_master); only the OCR stages read as plain words here.
+ */
+export const INVOICE_STATUS_DISPLAY = {
+  [INVOICE_STATUS.OCR_REVIEW_PENDING]: "To review",
+  [INVOICE_STATUS.OCR_REVIEWED]: "Reviewed",
+  [INVOICE_STATUS.OCR_FAILED]: "Couldn't read document",
+};
+
+/** Plain label for a status name ("OCR Review Pending") or code ("OCR_REVIEW_PENDING"). */
+export function invoiceStatusLabel(status) {
+  if (!status) return status;
+  const name = INVOICE_STATUS[String(status).toUpperCase()] ?? status;
+  return INVOICE_STATUS_DISPLAY[name] ?? name;
+}
+
 export const INVOICE_STATUS_OPTIONS = Object.values(INVOICE_STATUS).map((value) => ({
   value,
-  label: value,
+  label: invoiceStatusLabel(value),
 }));
 
 /** Ordered stops for InvoicePipelineStepper — deliberately excludes the exception/branch

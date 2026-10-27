@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, Eye, DollarSign, Calendar, RefreshCw, Send, AlertCircle } from "lucide-react";
 import Button from "@/components/Button/Button";
@@ -8,6 +8,7 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { lookupService } from "@/pages/expense-management/api/expenseReportsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
+import { useApprovalWebSocket } from "@/pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
 
 const formatMoney = (amount, currencyCode = "INR") => {
   const num = Number(amount) || 0;
@@ -302,6 +303,7 @@ const canApproveAdvance = (adv, user, hasRole) => {
  */
 export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", stage = "MANAGER" }) {
   const { user, hasRole } = useAuth();
+  const ws = useApprovalWebSocket();
   const [advances, setAdvances] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -359,6 +361,27 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
   useEffect(() => {
     fetchAdvances();
   }, [activeTab]);
+
+  // Keep the pending list current while the approver is on the page: reload on any approval queue
+  // or notification push, and poll as a fallback in case a push is missed.
+  const latestFetch = useRef(fetchAdvances);
+  latestFetch.current = fetchAdvances;
+
+  useEffect(() => {
+    if (!ws) return undefined;
+    const refresh = () => latestFetch.current();
+    const unsubscribeQueue = ws.subscribe("queue-update", refresh);
+    const unsubscribeNotification = ws.subscribe("notification", refresh);
+    return () => {
+      unsubscribeQueue();
+      unsubscribeNotification();
+    };
+  }, [ws]);
+
+  useEffect(() => {
+    const timer = setInterval(() => latestFetch.current(), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const filteredAdvances = useMemo(() => {
     return advances.filter((adv) => {

@@ -126,8 +126,8 @@ export default function BulkImportJobPage() {
         subtitle={`${job.file_name} · ${job.source === "SHAREPOINT" ? `picked up automatically - ${job.created_by_name || "SharePoint"}` : `uploaded by ${job.created_by_name || "—"}`} · ${fmtDateTime(job.created_at)}`}
         actions={
           <>
-            <Link to={`${AP_ROUTES.BULK_IMPORT}?type=${type}`}>
-              <Button variant="outline"><ArrowLeft className="h-4 w-4" /> Bulk import</Button>
+            <Link to={type === "payments" ? AP_ROUTES.BULK_IMPORT : `${AP_ROUTES.TDS_HISTORY_IMPORT}?type=${type}`}>
+              <Button variant="outline"><ArrowLeft className="h-4 w-4" /> {type === "payments" ? "Upload receipts" : "Import past TDS records"}</Button>
             </Link>
             <Button variant="outline" onClick={downloadResults} disabled={running}><Download className="h-4 w-4" /> Results sheet</Button>
             {ready > 0 && (

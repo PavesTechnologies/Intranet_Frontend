@@ -82,3 +82,27 @@ describe("filterMenuByRole", () => {
     });
   });
 });
+
+describe("AP sidebar — Internal Requests entry", () => {
+  const findLabels = (items) =>
+    items.flatMap((item) => [item.label, ...(item.children ? findLabels(item.children) : [])]);
+
+  const visibleFor = async (permissions) => {
+    const { AP_SUBMENU } = await import("../config/sidebarConfig");
+    const held = new Set(permissions);
+    return findLabels(
+      filterMenuByRole(AP_SUBMENU, () => true, (list = []) => list.some((p) => held.has(p))),
+    );
+  };
+
+  it("is shown to a Vendor Intake user next to Vendor Management", async () => {
+    const labels = await visibleFor(["VENDOR_VIEW", "VENDOR_MANAGE"]);
+    expect(labels).toContain("Vendor Management");
+    expect(labels).toContain("Internal Requests");
+  });
+
+  it("is hidden from a user with no vendor, onboarding or quotation permission", async () => {
+    const labels = await visibleFor(["INVOICE_VIEW"]);
+    expect(labels).not.toContain("Internal Requests");
+  });
+});

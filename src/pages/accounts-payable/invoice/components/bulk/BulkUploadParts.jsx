@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, Copy, Loader2, MinusCircle, XCircle, Clock
 export const ITEM_STATUS = {
   QUEUED: { label: "Waiting", tone: "slate", icon: Clock },
   PROCESSING: { label: "Reading", tone: "blue", icon: Loader2, spin: true },
-  CREATED: { label: "Sent to OCR review", tone: "emerald", icon: CheckCircle2 },
+  CREATED: { label: "Ready to review", tone: "emerald", icon: CheckCircle2 },
   VENDOR_NOT_FOUND: { label: "Vendor not found", tone: "amber", icon: AlertTriangle },
   DUPLICATE: { label: "Duplicate", tone: "slate", icon: Copy },
   FAILED: { label: "Failed", tone: "rose", icon: XCircle },

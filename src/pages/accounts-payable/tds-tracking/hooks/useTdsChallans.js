@@ -11,6 +11,7 @@ export const useChallanDetail = (id) =>
 export const useFilingDetail = (id) =>
   useQuery({ queryKey: [...KEY, "filing", id], queryFn: () => tdsChallanService.getFiling(id), enabled: Boolean(id) });
 
+export const usePendingTds = () => useQuery({ queryKey: [...KEY, "pending"], queryFn: tdsChallanService.pending, staleTime: 30_000 });
 export const useChallanCandidates = (filters) =>
   useQuery({ queryKey: [...KEY, "challanCandidates", filters], queryFn: () => tdsChallanService.challanCandidates(filters) });
 export const useFilingCandidates = (filters, enabled = true) =>

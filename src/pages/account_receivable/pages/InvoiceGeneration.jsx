@@ -34,25 +34,13 @@ import {
   submitInvoiceForApproval,
   sendInvoiceToClient,
 } from "../services/invoiceService";
-import { DEMO_DELIVERY_STATUS } from "../utils/invoiceDemoData";
-import { getOutstandingReceivables } from "../services/receivableService";
-
-// The backend creates a receivable only after an invoice is successfully sent
-// to the client, so the receivables list is the sent-invoice set — one request
-// instead of a delivery-history call per row.
-const loadSentDeliveryMap = async () => {
-  try {
-    const receivables = await getOutstandingReceivables();
-    return Object.fromEntries(
-      receivables
-        .filter((r) => r.invoiceId)
-        .map((r) => [r.invoiceId, { deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT }])
-    );
-  } catch (err) {
-    console.error("[InvoiceGeneration] Error loading receivables:", err);
-    return {};
-  }
-};
+import {
+  loadDemoDeliveryMap,
+  saveDemoDelivery,
+  DEMO_DELIVERY_STATUS,
+  DEMO_SENT_BY,
+} from "../utils/invoiceDemoData";
+import { interpretSendResult, describeDelivery, DELIVERY_OUTCOME } from "../utils/invoiceDelivery";
 
 const PAGE_SIZE = 6;
 const RECEIVABLES_PATH = "/account-receivable/receivables";
@@ -477,10 +465,20 @@ export default function InvoiceGeneration() {
         sendTarget.clientEmail ||
         null;
 
-      setDeliveryMap((prev) => ({
-        ...prev,
-        [invId]: { deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT },
-      }));
+      // The backend answers 200 for every attempt; only a SENT result may be shown as sent.
+      const outcome = interpretSendResult(backendResult, { recipientEmail: clientEmail, sentBy: DEMO_SENT_BY });
+      if (outcome.kind !== DELIVERY_OUTCOME.SENT) {
+        if (outcome.entry) {
+          saveDemoDelivery(invId, outcome.entry);
+          setDemoDeliveryMap(loadDemoDeliveryMap());
+        }
+        showStatusToast(outcome.message, outcome.toastType);
+        setSendTarget(null);
+        return;
+      }
+
+      saveDemoDelivery(invId, outcome.entry);
+      setDemoDeliveryMap(loadDemoDeliveryMap());
       showStatusToast(
         `Invoice ${sendTarget.invoiceNumber || invId} sent${clientEmail ? ` to ${clientEmail}` : ""} successfully.`,
         "success"
@@ -575,9 +573,7 @@ export default function InvoiceGeneration() {
         deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
       };
 
-    const isSent =
-      delivery.deliveryStatus ===
-      DEMO_DELIVERY_STATUS.SENT_TO_CLIENT;
+    const sendActionLabel = describeDelivery(delivery).rowActionLabel;
 
     return {
       onRowClick: () => (isReady ? handleGenerateInvoice(item) : handleViewInvoice(item)),
@@ -705,7 +701,7 @@ export default function InvoiceGeneration() {
                 onClick: () => setSubmitTarget(item),
               },
               {
-                label: isSent ? "Resend to Client" : "Send to Client",
+                label: sendActionLabel,
                 icon: <MailCheck className="h-4 w-4 text-emerald-600" />,
                 hidden: st !== "APPROVED",
                 onClick: () => setSendTarget(item),

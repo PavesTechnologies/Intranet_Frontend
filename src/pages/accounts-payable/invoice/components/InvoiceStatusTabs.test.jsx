@@ -33,7 +33,7 @@ describe("InvoiceStatusTabs — permission-driven visibility", () => {
   it("AP Executive: All, OCR Review, Approval, Approved — not Ready for Payment/Paid", () => {
     renderTabs({ canUploadInvoice: true, canReviewOcr: true, canSendForApproval: true });
     expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "OCR Review" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "To review" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approval" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approved" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ready for Payment" })).not.toBeInTheDocument();
@@ -43,7 +43,7 @@ describe("InvoiceStatusTabs — permission-driven visibility", () => {
   it("Approver: Approval, Approved only — not All/OCR Review/Ready for Payment/Paid", () => {
     renderTabs({ canViewInvoiceApproval: true, canApproveInvoice: true, canRejectInvoice: true, canSendBackInvoice: true });
     expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "OCR Review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "To review" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approval" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approved" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ready for Payment" })).not.toBeInTheDocument();
@@ -53,7 +53,7 @@ describe("InvoiceStatusTabs — permission-driven visibility", () => {
   it("Finance Executive: Approved, Ready for Payment, Paid only", () => {
     renderTabs({ canMarkPaid: true, canViewPayment: true });
     expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "OCR Review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "To review" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approval" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approved" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ready for Payment" })).toBeInTheDocument();
@@ -78,7 +78,7 @@ describe("InvoiceStatusTabs — permission-driven visibility", () => {
       canMarkPaid: true,
       canViewPayment: true,
     });
-    ["All", "OCR Review", "Approval", "Approved", "Ready for Payment", "Paid"].forEach((label) => {
+    ["All", "To review", "Approval", "Approved", "Ready for Payment", "Paid"].forEach((label) => {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     });
   });

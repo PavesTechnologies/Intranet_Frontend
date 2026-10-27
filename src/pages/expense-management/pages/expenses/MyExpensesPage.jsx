@@ -10,6 +10,7 @@ import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "@/components/status/statusbadge";
+import PaymentStatusBadge from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +22,7 @@ import {
   REPORT_DELETABLE_STATUSES,
 } from "@/pages/expense-management/api/expenseReportsApi";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import { getSubmissionDeadlineInfo, validateReportingPeriod, validateTripDates } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SavedFiltersControl from "@/pages/expense-management/components/common/SavedFiltersControl";
 import Pagination from "@/components/Pagination/pagination";
  
@@ -47,6 +49,10 @@ const emptyReportForm = {
   businessPurpose: "",
   costCenterId: "",
   currencyId: "",
+  tripStartDate: "",
+  tripEndDate: "",
+  reportingPeriodStart: "",
+  reportingPeriodEnd: "",
 };
  
 export default function MyExpensesPage() {
@@ -219,6 +225,10 @@ export default function MyExpensesPage() {
     if (!formData.currencyId) errors.currencyId = "Report currency is required.";
     const businessPurposeError = validateBusinessPurpose(formData.businessPurpose);
     if (businessPurposeError) errors.businessPurpose = businessPurposeError;
+    const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
+    if (tripDateError) errors[formData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
+    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
+    if (periodError) errors.reportingPeriodEnd = periodError;
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -239,6 +249,10 @@ export default function MyExpensesPage() {
       businessPurpose: report.businessPurpose || "",
       costCenterId: report.costCenterId || "",
       currencyId: report.currencyId || "",
+      tripStartDate: (report.tripStartDate || "").slice(0, 10),
+      tripEndDate: (report.tripEndDate || "").slice(0, 10),
+      reportingPeriodStart: (report.reportingPeriodStart || "").slice(0, 10),
+      reportingPeriodEnd: (report.reportingPeriodEnd || "").slice(0, 10),
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -253,8 +267,12 @@ export default function MyExpensesPage() {
       businessPurpose: formData.businessPurpose ? formData.businessPurpose.trim() : "",
       costCenterId: formData.costCenterId,
       currencyId: formData.currencyId,
+      tripStartDate: formData.tripStartDate,
+      tripEndDate: formData.tripEndDate,
+      reportingPeriodStart: formData.reportingPeriodStart || null,
+      reportingPeriodEnd: formData.reportingPeriodEnd || null,
     };
- 
+
     try {
       setSubmitting(true);
       if (drawerMode === "create") {
@@ -327,7 +345,15 @@ export default function MyExpensesPage() {
     costCenter: <span className="text-xs">{r.costCenterName || "—"}</span>,
     currency: <span className="font-semibold text-xs text-gray-600">{r.currencyCode || "—"}</span>,
     totalAmount: <span className="font-mono font-semibold text-xs text-gray-900">{formatAmount(r.totalAmount)}</span>,
-    status: <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />,
+    status: (
+      <div className="flex flex-col items-start gap-1">
+        <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />
+        <PaymentStatusBadge report={r} />
+        {getSubmissionDeadlineInfo(r)?.isOverdue && (
+          <span className="text-[11px] font-medium text-red-700">Overdue submission</span>
+        )}
+      </div>
+    ),
     created: <span className="text-xs">{formatDate(r.createdAt)}</span>,
     actions: (
       <div className="flex items-center gap-1 justify-center">
@@ -389,8 +415,6 @@ export default function MyExpensesPage() {
     { label: "Rejected", value: "REJECTED" },
     { label: "Cancelled", value: "CANCELLED" },
     { label: "Policy Rejected", value: "POLICY_REJECTED" },
-    { label: "Reimbursed", value: "REIMBURSED" },
-    { label: "Closed", value: "CLOSED" },
   ];
  
   return (

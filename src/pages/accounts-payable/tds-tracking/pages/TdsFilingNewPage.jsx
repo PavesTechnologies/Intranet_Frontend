@@ -3,7 +3,7 @@
 // deposited invoices at once: upload the acknowledgement -> check -> confirm. Confirming records the
 // filing on every selected invoice through the existing per-invoice service, all or nothing.
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import clsx from "clsx";
 import { ArrowLeft } from "lucide-react";
@@ -26,7 +26,11 @@ export function lastQuarter(today = new Date()) {
 
 export default function TdsFilingNewPage() {
   const navigate = useNavigate();
-  const initial = lastQuarter();
+  const [params] = useSearchParams();
+  // ?fy=2026-27&quarter=2 opens that quarter (the "To file" link); otherwise the quarter that just ended
+  const linked = /^20\d{2}-\d{2}$/.test(params.get("fy") || "") && /^[1-4]$/.test(params.get("quarter") || "")
+    ? { financialYear: params.get("fy"), quarter: Number(params.get("quarter")) } : null;
+  const initial = linked || lastQuarter();
   const [header, setHeader] = useState({
     form_type: "26Q", financial_year: initial.financialYear, quarter: initial.quarter, acknowledgement_no: "",
     filing_date: "", tan: "", is_revision: false, remarks: "",
