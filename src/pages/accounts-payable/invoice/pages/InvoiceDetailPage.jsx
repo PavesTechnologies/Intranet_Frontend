@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Breadcrumb from "../../../../components/Breadcrumb/Breadcrumb";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
@@ -21,7 +21,7 @@ import InvoiceAuditHistory from "../components/InvoiceAuditHistory";
 import { useInvoiceDetail } from "../hooks/useInvoiceDetail";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { AP_ROUTES } from "../../constants/routes";
-import { INVOICE_STATUS, invoiceStatusLabel } from "../../constants/invoiceStatus";
+import { INVOICE_STATUS } from "../../constants/invoiceStatus";
 import { formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -105,7 +105,7 @@ export default function InvoiceDetailPage() {
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Status</p>
               <div className="mt-1">
-                <StatusBadge label={invoiceStatusLabel(invoice.status)} size="sm" />
+                <ApStatusBadge status={invoice.status} />
               </div>
             </div>
           </div>

@@ -5,7 +5,7 @@ import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import EmptyState from "../../procurement/components/EmptyState";
@@ -14,7 +14,6 @@ import { useTdsTrackingList } from "../hooks/useTdsTracking";
 import { useDebouncedValue } from "../../payment/hooks/useDebouncedValue";
 import { sectionLabel } from "../utils/tdsTrackingFormat";
 import { AP_ROUTES } from "../../constants/routes";
-import { invoiceStatusLabel } from "../../constants/invoiceStatus";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -85,14 +84,14 @@ export default function TdsTrackingPage() {
       rate: row.tdsRate != null ? `${row.tdsRate}%` : "—",
       tdsAmount: formatCurrency(row.tdsAmount, row.currencySymbol),
       netPayable: formatCurrency(row.netPayable, row.currencySymbol),
-      invoiceStatus: <StatusBadge label={invoiceStatusLabel(row.invoiceStatusName || row.invoiceStatusCode) || "—"} size="sm" />,
+      invoiceStatus: <ApStatusBadge status={row.invoiceStatusName || row.invoiceStatusCode} />,
       tdsStatus: (
-        <div>
-          <StatusBadge label={row.trackingStatusLabel} size="sm" />
-          {row.determinationStatus !== "VERIFIED" && (
-            <div className="mt-1 text-xs text-amber-600">Awaiting TDS verification</div>
-          )}
-        </div>
+        <ApStatusBadge
+          type="tds"
+          status={row.trackingStatus}
+          label={row.trackingStatusLabel}
+          determinationStatus={row.determinationStatus}
+        />
       ),
       view: (
         <Link to={link} className="text-sm font-medium text-[#0A0082] hover:underline">

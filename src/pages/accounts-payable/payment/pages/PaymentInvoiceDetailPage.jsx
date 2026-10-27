@@ -6,6 +6,7 @@ import Breadcrumb from "../../../../components/Breadcrumb/Breadcrumb";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import EmptyState from "../../procurement/components/EmptyState";
 import RecordPaymentModal from "../components/RecordPaymentModal";
@@ -19,13 +20,6 @@ import { useApPermissions } from "../../hooks/useApPermissions";
 import { AP_ROUTES } from "../../constants/routes";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
-
-const TDS_TRACKING_LABELS = {
-  TDS_PENDING: "TDS Pending",
-  TDS_DEDUCTED: "TDS Deducted",
-  TDS_DEPOSITED: "TDS Deposited",
-  TDS_FILED: "TDS Return Filed",
-};
 
 function Row({ label, children, strong = false }) {
   return (
@@ -97,7 +91,7 @@ export default function PaymentInvoiceDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <StatusBadge label={invoice.statusName || invoice.statusCode} />
+          <ApStatusBadge status={invoice.statusName || invoice.statusCode} />
           {canRecordPayment && invoice.canRecordPayment && (
             <Button variant="primary" onClick={() => setRecordOpen(true)}>
               Record Payment
@@ -130,7 +124,7 @@ export default function PaymentInvoiceDetailPage() {
               {invoice.pendingAmount > 0 && <Row label="Scheduled (not cleared)">{formatCurrency(invoice.pendingAmount, symbol)}</Row>}
               <Row label="Remaining" strong>{formatCurrency(invoice.remainingAmount, symbol)}</Row>
               <Row label="Payment Status">
-                <StatusBadge label={invoice.statusName || invoice.statusCode} size="sm" />
+                <ApStatusBadge status={invoice.statusName || invoice.statusCode} />
               </Row>
             </dl>
           </PageCardContent>
@@ -144,7 +138,11 @@ export default function PaymentInvoiceDetailPage() {
                 <Row label="TDS Amount">{formatCurrency(invoice.tdsAmount, symbol)}</Row>
                 <Row label="Determination">{invoice.tdsDeterminationStatus || "—"}</Row>
                 <Row label="TDS Status">
-                  <StatusBadge label={TDS_TRACKING_LABELS[invoice.tdsTrackingStatus] || invoice.tdsTrackingStatus || "—"} size="sm" />
+                  <ApStatusBadge
+                    type="tds"
+                    status={invoice.tdsTrackingStatus}
+                    determinationStatus={invoice.tdsDeterminationStatus}
+                  />
                 </Row>
                 {canViewTdsTracking && (
                   <Link to={AP_ROUTES.TDS_TRACKING_DETAIL(invoice.invoiceId)} className="mt-1 block text-sm text-[#0A0082] hover:underline">

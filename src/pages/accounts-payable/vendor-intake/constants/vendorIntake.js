@@ -112,6 +112,48 @@ export const DUPLICATE_ENGAGEMENT_MESSAGE =
   "The same vendor can be onboarded again under a different department or category.";
 
 /**
+ * Outcome of a failed POST /apm/vendor-intake that carried `onboarding_request_id`
+ * (vendor_intake_route.create_intake):
+ *  - 404 — the internal vendor request does not exist;
+ *  - 409 — the request already has its intake (or is no longer eligible), UNLESS the detail
+ *    is the duplicate-engagement conflict the normal intake also raises;
+ *  - 422 — validation / business-rule failure, shown with the backend's own detail.
+ */
+export const ONBOARDING_INTAKE_ERROR = {
+  REQUEST_NOT_FOUND: "REQUEST_NOT_FOUND",
+  REQUEST_NOT_ELIGIBLE: "REQUEST_NOT_ELIGIBLE",
+  DUPLICATE_ENGAGEMENT: "DUPLICATE_ENGAGEMENT",
+  OTHER: "OTHER",
+};
+
+export const ONBOARDING_REQUEST_NOT_FOUND_MESSAGE =
+  "This internal vendor request could not be found. It may have been removed.";
+
+export const ONBOARDING_REQUEST_NOT_ELIGIBLE_MESSAGE =
+  "This internal vendor request has already been processed or is no longer eligible for " +
+  "vendor intake. The request details have been refreshed.";
+
+/** @returns {keyof typeof ONBOARDING_INTAKE_ERROR} */
+export const classifyOnboardingIntakeError = (error) => {
+  const status = error?.response?.status;
+
+  if (status === 404) return ONBOARDING_INTAKE_ERROR.REQUEST_NOT_FOUND;
+
+  if (status === 409) {
+    const detail = error?.response?.data?.detail;
+    const isDuplicate =
+      typeof detail === "string" && detail.toLowerCase().includes("engagement already exists");
+    return isDuplicate
+      ? ONBOARDING_INTAKE_ERROR.DUPLICATE_ENGAGEMENT
+      : ONBOARDING_INTAKE_ERROR.REQUEST_NOT_ELIGIBLE;
+  }
+
+  if (isDuplicateEngagementError(error)) return ONBOARDING_INTAKE_ERROR.DUPLICATE_ENGAGEMENT;
+
+  return ONBOARDING_INTAKE_ERROR.OTHER;
+};
+
+/**
  * Builds the body for PUT /apm/vendor-intake/{engagement_id} from the Edit Engagement form.
  *
  * The endpoint is a PARTIAL update keyed off which fields are PRESENT in the body, so:

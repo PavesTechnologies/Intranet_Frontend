@@ -10,6 +10,7 @@ export const ROW_STATUS = {
   SKIPPED: { label: "Skipped", tone: "slate" },
 };
 
+
 export const JOB_STATUS = {
   VALIDATING: { label: "Checking documents", tone: "blue" },
   VALIDATED: { label: "Ready to record", tone: "emerald" },

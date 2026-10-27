@@ -6,7 +6,7 @@ import { AP_MANAGEMENT_ANY, AP_MANAGEMENT_PERMISSIONS } from "../pages/accounts-
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/tdsTrackingPermissions";
 import { VENDOR_ANY_PERMISSIONS } from "../pages/accounts-payable/constants/vendorPermissions";
 import { AP_AUTOMATION_PERMISSIONS } from "../pages/accounts-payable/constants/apAutomation";
-import { PROCUREMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/procurementPermissions";
+import { PROCUREMENT_ANY_VIEW_PERMISSIONS, ONBOARDING_ANY } from "../pages/accounts-payable/constants/procurementPermissions";
 import { RECURRING_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/recurring";
 import { GST_ITC_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/gstItc";
 import { ACCOUNTING_EXPORT_PERMISSIONS } from "../pages/accounts-payable/constants/accountingExport";
@@ -356,6 +356,8 @@ export const AP_SUBMENU = [
       { label: "Credit & Debit Notes", to: AP_ROUTES.VENDOR_NOTES, requiredPermissions: VENDOR_NOTE_VIEW_PERMISSIONS },
       // VENDOR_VIEW / VENDOR_MANAGE / VENDOR_BANK_MANAGE (vendor_permissions.py).
       { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES, requiredPermissions: VENDOR_ANY_PERMISSIONS },
+      // Internal vendor requests raised from approved PRs — same any-of gate as GET /vendor-onboarding-requests.
+      { label: "Internal Requests", to: AP_ROUTES.VENDOR_INTERNAL_REQUESTS, allowedRoles: AP_ALL_ROLES, requiredPermissions: ONBOARDING_ANY.VIEW },
       // Same gate as the Procurement route: an AP role plus any Procurement view permission.
       { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES, requiredPermissions: PROCUREMENT_ANY_VIEW_PERMISSIONS },
     ],

@@ -16,7 +16,7 @@ import { VENDOR_DETAIL_KEY } from "../../vendor/hooks/useVendorDetail";
  * transition has to refresh the PR, its timeline, the availability answer, the engagement
  * behind the intake and every RFQ-eligibility verdict — not just the request row.
  */
-const invalidateOnboardingGraph = (qc, { prId, requestId, engagementId, vendorId } = {}) => {
+export const invalidateOnboardingGraph = (qc, { prId, requestId, engagementId, vendorId } = {}) => {
   qc.invalidateQueries({ queryKey: ONBOARDING_REQUESTS_KEY });
 
   if (requestId) qc.invalidateQueries({ queryKey: ONBOARDING_REQUEST_KEY(requestId) });

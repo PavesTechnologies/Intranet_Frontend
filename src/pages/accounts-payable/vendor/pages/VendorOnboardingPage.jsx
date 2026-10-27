@@ -28,7 +28,6 @@ import VendorIntakeStepper from "../../vendor-intake/components/VendorIntakeStep
 import PreScreenPanel from "../../vendor-intake/components/PreScreenPanel";
 import VendorOnboardingProcessPanel from "../../procurement/components/VendorOnboardingProcessPanel";
 import { useOnboardingRequest } from "../../procurement/hooks/useVendorOnboarding";
-import { useStartOnboarding } from "../../procurement/hooks/useVendorOnboardingMutations";
 import {
   ONBOARDING_STATUS_LABEL,
   ONBOARDING_STATUS_TONE,
@@ -38,6 +37,10 @@ import { useCreateVendorIntake } from "../../vendor-intake/hooks/useVendorIntake
 import { useVendorEngagement } from "../../vendor-intake/hooks/useVendorIntake";
 import {
   DUPLICATE_ENGAGEMENT_MESSAGE,
+  ONBOARDING_INTAKE_ERROR,
+  ONBOARDING_REQUEST_NOT_ELIGIBLE_MESSAGE,
+  ONBOARDING_REQUEST_NOT_FOUND_MESSAGE,
+  classifyOnboardingIntakeError,
   isDuplicateEngagementError,
 } from "../../vendor-intake/constants/vendorIntake";
 import {
@@ -103,11 +106,12 @@ export default function VendorOnboardingPage() {
   const [searchParams] = useSearchParams();
   const { countryOptions, currencyOptions } = useApLookups();
 
-  // Onboarding-request mode: the Vendor Intaker opens this same page from a Vendor Onboarding
-  // Request, so the intake form is reused rather than duplicated. The difference is only where
-  // it submits (POST /vendor-onboarding-requests/{id}/start instead of POST /apm/vendor-intake)
-  // and that the PR context is displayed read-only, because the backend reads department,
-  // category, business requirement and purpose from the request itself.
+  // Onboarding-request mode: the Vendor Intaker opens this same page from an internal vendor
+  // request, so the intake form is reused rather than duplicated. It still submits to
+  // POST /apm/vendor-intake — the only payload difference is `onboarding_request_id`, which
+  // makes the backend run the intake against that request. The form is prefilled from the
+  // request's `intake_defaults`; department and category are locked to the request because
+  // the backend rejects any other pair.
   const onboardingRequestId = searchParams.get("onboardingRequestId");
   const isOnboardingRequestMode = Boolean(onboardingRequestId);
 
@@ -143,13 +147,37 @@ export default function VendorOnboardingPage() {
   const [cpfCnpjStatus, setCpfCnpjStatus] = useState("idle"); // idle | verifying | verified | error
   const [cpfCnpjError, setCpfCnpjError] = useState("");
 
-  const createIntakeMutation = useCreateVendorIntake();
-  const startOnboardingMutation = useStartOnboarding(onboardingRequestId, onboardingRequest?.pr_id);
+  const createIntakeMutation = useCreateVendorIntake({ prId: onboardingRequest?.pr_id });
 
-  // One submit handler, two endpoints — whichever mode the page is in.
-  const activeSubmitMutation = isOnboardingRequestMode
-    ? startOnboardingMutation
-    : createIntakeMutation;
+  // Whether the backend will still accept an intake for this request — never inferred from
+  // the status code here.
+  const awaitingIntake = Boolean(onboardingRequest?.awaiting_intake);
+  const intakeDefaults = onboardingRequest?.intake_defaults || null;
+
+  // Prefill once per request, so a background refetch never overwrites what the intaker typed.
+  const prefilledRequestIdRef = useRef(null);
+  useEffect(() => {
+    if (!isOnboardingRequestMode || !onboardingRequest || !awaitingIntake) return;
+    if (prefilledRequestIdRef.current === onboardingRequest.id) return;
+    prefilledRequestIdRef.current = onboardingRequest.id;
+
+    // Department/category must match the request; when intake_defaults is absent they still
+    // come from the request itself, and everything else is entered by hand.
+    setOnboarding({
+      department_id: intakeDefaults?.department_id ?? onboardingRequest.department_id ?? "",
+      category_id: intakeDefaults?.category_id ?? onboardingRequest.purchase_category_id ?? "",
+      business_requirement: intakeDefaults?.business_requirement || "",
+      purpose_of_onboarding: intakeDefaults?.purpose_of_onboarding || "",
+    });
+
+    if (intakeDefaults) {
+      setFormData((prev) => ({
+        ...prev,
+        vendor_name: prev.vendor_name?.trim() ? prev.vendor_name : intakeDefaults.vendor_name || "",
+        email: prev.email?.trim() ? prev.email : intakeDefaults.email || "",
+      }));
+    }
+  }, [isOnboardingRequestMode, onboardingRequest, awaitingIntake, intakeDefaults]);
 
   const {
     data: departments = [],
@@ -397,38 +425,32 @@ export default function VendorOnboardingPage() {
     city: isGstRegistered ? null : addressData.city?.trim() || null,
     state: isGstRegistered ? null : addressData.state?.trim() || null,
     postal_code: isGstRegistered ? null : addressData.postal_code?.trim() || null,
+
+    // Present only for an internal vendor request; the normal intake never carries the key.
+    ...(isOnboardingRequestMode
+      ? { onboarding_request_id: intakeDefaults?.onboarding_request_id ?? onboardingRequest.id }
+      : {}),
   });
-
-  /**
-   * Exactly VendorOnboardingStartRequest — vendor identity only. Department, category,
-   * business requirement and purpose are deliberately absent: the backend takes them from the
-   * onboarding request so the onboarding context can never drift from the PR it belongs to.
-   */
-  const buildOnboardingStartPayload = () => {
-    const payload = buildIntakePayload();
-
-    delete payload.department_id;
-    delete payload.category_id;
-    delete payload.business_requirement;
-    delete payload.purpose_of_onboarding;
-
-    return payload;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (savedRef.current || activeSubmitMutation.isPending) return;
+    if (savedRef.current || createIntakeMutation.isPending) return;
+    if (isOnboardingRequestMode && !awaitingIntake) return;
 
-    // In onboarding-request mode the department/category come from the request, so they are
-    // not part of this form's validation.
-    const nextErrors = validateForm(
-      formData,
-      isOnboardingRequestMode
-        ? { department_id: "skip", category_id: "skip" }
-        : onboarding,
-    );
+    const nextErrors = validateForm(formData, onboarding);
     setErrors(nextErrors);
+
+    // Department/category are read-only in request mode, so a missing value can't be fixed on
+    // the form — say so instead of flagging a field the intaker can't see.
+    if (isOnboardingRequestMode && (nextErrors.department_id || nextErrors.category_id)) {
+      setSubmitError({
+        message:
+          "This request has no department or purchase category on file, so the intake cannot be submitted.",
+        isDuplicate: false,
+      });
+      return;
+    }
 
     const nextCountryFieldErrors = validateCountryFields(countryKind, countryFields);
     setCountryFieldErrors(nextCountryFieldErrors);
@@ -443,9 +465,7 @@ export default function VendorOnboardingPage() {
     setSubmitError(null);
 
     try {
-      const result = isOnboardingRequestMode
-        ? await startOnboardingMutation.mutateAsync(buildOnboardingStartPayload())
-        : await createIntakeMutation.mutateAsync(buildIntakePayload());
+      const result = await createIntakeMutation.mutateAsync(buildIntakePayload());
 
       savedRef.current = true;
       setIntakeResult(result);
@@ -454,20 +474,44 @@ export default function VendorOnboardingPage() {
       if (isOnboardingRequestMode) {
         // The request row now carries vendor_id/engagement_id and has moved on a status.
         refetchOnboardingRequest();
-        toast.success(result?.message || "Vendor intake completed for this onboarding request.");
+        const statusLabel = result?.onboarding_status_code
+          ? ONBOARDING_STATUS_LABEL[result.onboarding_status_code] || result.onboarding_status_code
+          : null;
+        toast.success(
+          statusLabel
+            ? `Vendor intake saved. Request status: ${statusLabel}.`
+            : result?.message || "Vendor intake saved for this internal request.",
+        );
       } else {
         toast.success(result?.message || "Vendor registered. Running Pre-Screen checks.");
       }
     } catch (error) {
+      // Form state is left untouched on every failure so the intaker can correct and retry.
+      if (isOnboardingRequestMode) {
+        const kind = classifyOnboardingIntakeError(error);
+        const duplicate = kind === ONBOARDING_INTAKE_ERROR.DUPLICATE_ENGAGEMENT;
+        const message =
+          kind === ONBOARDING_INTAKE_ERROR.REQUEST_NOT_FOUND
+            ? ONBOARDING_REQUEST_NOT_FOUND_MESSAGE
+            : kind === ONBOARDING_INTAKE_ERROR.REQUEST_NOT_ELIGIBLE
+              ? ONBOARDING_REQUEST_NOT_ELIGIBLE_MESSAGE
+              : duplicate
+                ? DUPLICATE_ENGAGEMENT_MESSAGE
+                : getApiErrorMessage(error, "Failed to save the vendor intake for this request.");
+
+        setSubmitError({ message, isDuplicate: duplicate });
+        toast.error(duplicate ? "Duplicate engagement." : message);
+
+        // Someone else may have already taken this request forward — re-read it so the page
+        // shows where it actually stands.
+        if (kind === ONBOARDING_INTAKE_ERROR.REQUEST_NOT_ELIGIBLE) refetchOnboardingRequest();
+        return;
+      }
+
       const duplicate = isDuplicateEngagementError(error);
       const message = duplicate
         ? DUPLICATE_ENGAGEMENT_MESSAGE
-        : getApiErrorMessage(
-            error,
-            isOnboardingRequestMode
-              ? "Failed to complete the vendor intake for this request."
-              : "Failed to register vendor.",
-          );
+        : getApiErrorMessage(error, "Failed to register vendor.");
 
       setSubmitError({ message, isDuplicate: duplicate });
       toast.error(duplicate ? "Duplicate engagement." : message);
@@ -477,6 +521,32 @@ export default function VendorOnboardingPage() {
   // In onboarding-request mode the request itself says whether intake already ran (a previous
   // visit may have completed it), so the step doesn't depend on this session's state alone.
   const isPreScreenStep = Boolean(engagementId) || Boolean(onboardingRequest?.engagement_id);
+
+  // Until the refetch after a successful intake lands, the saved ids/status from the intake
+  // response stand in, so the workspace never renders against the pre-intake request.
+  const processRequest = onboardingRequest
+    ? {
+        ...onboardingRequest,
+        engagement_id: onboardingRequest.engagement_id ?? intakeResult?.engagement_id ?? null,
+        vendor_id: onboardingRequest.vendor_id ?? intakeResult?.vendor_id ?? null,
+        status_code:
+          onboardingRequest.engagement_id || !intakeResult?.onboarding_status_code
+            ? onboardingRequest.status_code
+            : intakeResult.onboarding_status_code,
+      }
+    : null;
+
+  const requestDepartmentName =
+    onboardingRequest?.department_name ||
+    departments.find((d) => d.id === onboardingRequest?.department_id)?.name ||
+    (onboardingRequest?.department_id ? `#${onboardingRequest.department_id}` : "—");
+  const requestCategoryName =
+    onboardingRequest?.purchase_category_name ||
+    (onboardingRequest?.purchase_category_id ? `#${onboardingRequest.purchase_category_id}` : "—");
+  const requestPrLabel =
+    onboardingRequest?.pr_number || (onboardingRequest?.pr_id ? `#${onboardingRequest.pr_id}` : "—");
+  const backToRequest = () =>
+    navigate(AP_ROUTES.VENDOR_INTERNAL_REQUEST_DETAIL(onboardingRequest?.id ?? onboardingRequestId));
 
   // ── Onboarding-request mode: request must load before the form is meaningful ──
   if (isOnboardingRequestMode && onboardingRequestLoading) {
@@ -509,47 +579,43 @@ export default function VendorOnboardingPage() {
   return (
     <div className="space-y-6 p-4 pb-24 sm:p-6">
       <PageHeader
-        title={isOnboardingRequestMode ? "Vendor Onboarding" : "Register Vendor"}
+        title={isOnboardingRequestMode ? "Onboard Vendor — Internal Request" : "Register Vendor"}
         subtitle={
           isOnboardingRequestMode
-            ? `Onboarding request #${onboardingRequest?.id} for purchase requisition #${onboardingRequest?.pr_id} — complete the intake, Pre-Screen and any NDA.`
+            ? `Internal vendor request #${onboardingRequest?.id} for purchase requisition ${requestPrLabel} — complete the intake, Pre-Screen and any NDA.`
             : "Capture the vendor and onboarding details, then run the Pre-Screen checks."
         }
       />
 
       <VendorIntakeStepper currentStep={isPreScreenStep ? 1 : 0} />
 
-      {/* PR context carried by the onboarding request — read-only, since the backend reads
-          department, category, requirement and purpose from the request itself. */}
-      {isOnboardingRequestMode && onboardingRequest && (
+      {/* PR context carried by the internal vendor request — read-only. */}
+      {isOnboardingRequestMode && processRequest && (
         <PageCard>
           <PageCardContent className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className={Fonts.subheading}>Onboarding Request Context</h2>
+              <h2 className={Fonts.subheading}>Internal Request Context</h2>
               <StatusPill
                 label={
-                  ONBOARDING_STATUS_LABEL[onboardingRequest.status_code] ||
-                  onboardingRequest.status_code ||
+                  ONBOARDING_STATUS_LABEL[processRequest.status_code] ||
+                  processRequest.status_code ||
                   "—"
                 }
-                tone={ONBOARDING_STATUS_TONE[onboardingRequest.status_code] || "neutral"}
+                tone={ONBOARDING_STATUS_TONE[processRequest.status_code] || "neutral"}
                 size="md"
               />
             </div>
 
+            <p className="rounded-md border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+              This intake is linked to internal vendor request #{onboardingRequest.id}. Department
+              and purchase category are set by the request and cannot be changed here.
+            </p>
+
             <dl className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
               {[
-                { label: "Purchase Requisition", value: `#${onboardingRequest.pr_id}` },
-                {
-                  label: "Department",
-                  value:
-                    departments.find((d) => d.id === onboardingRequest.department_id)?.name ||
-                    `#${onboardingRequest.department_id}`,
-                },
-                {
-                  label: "Purchase Category",
-                  value: `#${onboardingRequest.purchase_category_id}`,
-                },
+                { label: "PR Number", value: requestPrLabel },
+                { label: "Department", value: requestDepartmentName },
+                { label: "Purchase Category", value: requestCategoryName },
                 { label: "Assigned To", value: onboardingRequest.assigned_to || "Unassigned" },
                 {
                   label: "Requested Vendor",
@@ -586,12 +652,25 @@ export default function VendorOnboardingPage() {
       {/* ── Step 2: onboarding workspace (Pre-Screen -> NDA -> Complete) ── */}
       {isOnboardingRequestMode && isPreScreenStep ? (
         <VendorOnboardingProcessPanel
-          request={onboardingRequest}
+          request={processRequest}
           onCompleted={() => {
             refetchOnboardingRequest();
             navigate(AP_ROUTES.PROCUREMENT_PR_DETAIL(onboardingRequest.pr_id));
           }}
         />
+      ) : isOnboardingRequestMode && !awaitingIntake ? (
+        /* The backend no longer accepts an intake for this request (already taken forward,
+           closed, or not in a startable status) — the form is not offered at all. */
+        <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">This request is not awaiting vendor intake</p>
+          <p>
+            Vendor intake can no longer be started for internal vendor request #
+            {onboardingRequest?.id}. It may already have been processed or closed.
+          </p>
+          <Button type="button" variant="outline" size="small" onClick={backToRequest}>
+            Back to request
+          </Button>
+        </div>
       ) : isPreScreenStep ? (
         <>
           {engagementLoading && <LoadingSpinner text="Loading the saved vendor intake..." />}
@@ -853,13 +932,28 @@ export default function VendorOnboardingPage() {
             </PageCard>
           )}
 
-          {/* Editable only when raising a fresh registration — in onboarding-request mode
-              these come from the request and are shown read-only above. */}
-          {!isOnboardingRequestMode && (
+          {/* In onboarding-request mode department/category are locked to the request (the
+              backend rejects any other pair); requirement and purpose stay editable and are
+              prefilled from the request's intake_defaults. */}
           <PageCard>
             <PageCardContent className="space-y-4">
               <h2 className={Fonts.subheading}>Onboarding Details</h2>
 
+              {isOnboardingRequestMode ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {[
+                    { label: "Department", value: requestDepartmentName },
+                    { label: "Purchase Category", value: requestCategoryName },
+                  ].map((field) => (
+                    <div key={field.label}>
+                      <p className="mb-1 text-sm font-medium text-gray-700">{field.label}</p>
+                      <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">
+                        {field.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <FormSelect
@@ -893,6 +987,7 @@ export default function VendorOnboardingPage() {
                   )}
                 </div>
               </div>
+              )}
 
               <FormTextArea
                 label="Business Requirement"
@@ -913,7 +1008,6 @@ export default function VendorOnboardingPage() {
               />
             </PageCardContent>
           </PageCard>
-          )}
 
           {submitError && (
             <div
@@ -942,11 +1036,7 @@ export default function VendorOnboardingPage() {
               type="button"
               variant="outline"
               onClick={() =>
-                navigate(
-                  isOnboardingRequestMode && onboardingRequest?.pr_id
-                    ? AP_ROUTES.PROCUREMENT_PR_DETAIL(onboardingRequest.pr_id)
-                    : AP_ROUTES.VENDOR_LIST,
-                )
+                isOnboardingRequestMode ? backToRequest() : navigate(AP_ROUTES.VENDOR_LIST)
               }
               className="w-full sm:w-auto"
             >
@@ -954,12 +1044,12 @@ export default function VendorOnboardingPage() {
             </Button>
             <Button
               type="submit"
-              loading={activeSubmitMutation.isPending}
-              loadingText={isOnboardingRequestMode ? "Saving intake..." : "Registering..."}
-              disabled={isGstGateBlocking || savedRef.current}
+              loading={createIntakeMutation.isPending}
+              loadingText={isOnboardingRequestMode ? "Onboarding..." : "Registering..."}
+              disabled={isGstGateBlocking || savedRef.current || createIntakeMutation.isPending}
               className="w-full sm:w-auto"
             >
-              {isOnboardingRequestMode ? "Save Vendor Intake" : "Register Vendor"}
+              {isOnboardingRequestMode ? "Onboard Vendor" : "Register Vendor"}
             </Button>
           </div>
         </form>
