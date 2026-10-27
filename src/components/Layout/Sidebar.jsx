@@ -105,20 +105,34 @@ const accountReceivableSubmenu = [
     to: "/account-receivable/invoice-approval",
   },
   {
+    // Everything after an invoice is sent to the client.
+    label: "Receivables",
+    to: "/account-receivable/receivables",
+    children: [
+      { label: "Outstanding Receivables", to: "/account-receivable/receivables" },
+      { label: "Payments", to: "/account-receivable/payments" },
+      { label: "Customer Ledger & Aging", to: "/account-receivable/customer-ledger" },
+      { label: "Credit & Debit Notes", to: "/account-receivable/adjustment-notes" },
+      { label: "Reminders & Collections", to: "/account-receivable/collections" },
+    ],
+  },
+  {
     label: "Configuration",
     to: "/account-receivable/master-data",
   },
 ];
 
 // Maker-Checker split of the AR submenu above.
-// Finance Manager (Checker) only gets Billing Approvals and Invoice Approval.
+// Finance Manager (Checker) only gets Billing Approvals, Invoice Approval and the shared items.
 // Maker roles (Finance Executive / Super Admin / Admin) only get create/draft/workflow items with NO approvals.
 const CHECKER_ONLY_LABELS = ["Billing Approvals", "Invoice Approval"];
+// Post-invoice receivables work both roles need.
+const AR_SHARED_LABELS = ["Receivables"];
 const accountReceivableMakerSubmenu = accountReceivableSubmenu.filter(
   (item) => !CHECKER_ONLY_LABELS.includes(item.label),
 );
 const accountReceivableCheckerSubmenu = accountReceivableSubmenu.filter(
-  (item) => CHECKER_ONLY_LABELS.includes(item.label),
+  (item) => CHECKER_ONLY_LABELS.includes(item.label) || AR_SHARED_LABELS.includes(item.label),
 );
 
 const airsSubmenu = [
@@ -358,8 +372,8 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     if (item.children) {
       const rect = e.currentTarget.getBoundingClientRect();
       setChildTop(computeSubmenuTop(rect, item.children.length) + 4);
-      // AP sections: open right beside the hovered row (the AP flyout's width follows its labels).
-      setChildLeft(owner === "ap" ? rect.right + 4 : null);
+      // Open right beside the hovered row so the pointer never crosses a gap between the two flyouts.
+      setChildLeft(rect.right + 4);
       setChildMenu(item.children);
       setChildMenuOwner(owner);
     } else {
@@ -692,12 +706,13 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     <li
                       key={item.label}
                       onMouseEnter={(e) => handleParentHover(item, e)}
-                      onMouseDown={(e) => handleParentLeave()}
+                      onMouseDown={(e) => { if (!item.children) handleParentLeave(); }}
                       // onMouseLeave={handleParentLeave}
                       className="relative group"
                     >
                       <NavLink
                         to={item.to}
+                        onClick={(e) => { if (item.children) e.preventDefault(); }}
                         className={({ isActive }) =>
                           `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                             ? "bg-blue-100 text-[#0a174e] font-semibold"
@@ -918,7 +933,6 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     }}
                     onMouseLeave={() => {
                       parentHoverRef.current = false;
-                      setChildMenuOwner(null);
                       scheduleClose();
                     }}
                   >
@@ -926,11 +940,12 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                       <li
                         key={item.label}
                         onMouseEnter={(e) => handleParentHover(item, e, "xms")}
-                        onMouseDown={(e) => handleParentLeave()}
+                        onMouseDown={(e) => { if (!item.children) handleParentLeave(); }}
                         className="relative group"
                       >
                         <NavLink
                           to={item.to}
+                          onClick={(e) => { if (item.children) e.preventDefault(); }}
                           className={({ isActive }) =>
                             `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                               ? "bg-blue-100 text-[#0a174e] font-semibold"

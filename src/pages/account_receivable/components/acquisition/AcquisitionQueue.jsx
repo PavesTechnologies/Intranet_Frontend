@@ -305,9 +305,6 @@ export default function AcquisitionQueue({
                     : `No projects currently in status "${getStatusLabelText(activeStatusFilter)}".`}
               </p>
             </div>
-            {isFilterActive && (
-              <ARClearFiltersButton onClick={handleResetFilters} label="Clear to show all projects" />
-            )}
           </div>
         ) : (
           <>

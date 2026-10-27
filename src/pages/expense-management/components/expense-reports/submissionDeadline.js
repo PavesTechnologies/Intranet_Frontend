@@ -62,18 +62,15 @@ export const formatDeadlineDate = (date) =>
   date ? date.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" }) : "—";
 
 /**
- * Reporting period (the actual period the expenses cover). The end date may not be in the future; past periods
- * stay allowed. Returns an error message, or "" when valid. Mirrors the backend rule in SubmissionDeadlinePolicy.
+ * UI guard for submit: the message to show when the deadline has passed, or null when submit may proceed.
+ * The backend enforces the same rule on the submit call; this only spares the user a round trip.
  */
-export const validateReportingPeriod = (reportingPeriodStart, reportingPeriodEnd, now = new Date()) => {
-  const end = toDateOnly(reportingPeriodEnd);
-  const start = toDateOnly(reportingPeriodStart);
-  if (end && end > toDateOnly(now)) return "The reporting period cannot end in the future.";
-  if (start && end && end < start) return "The reporting period end date cannot be before its start date.";
-  return "";
-};
+export const getOverdueSubmitBlockMessage = (deadlineInfo) =>
+  deadlineInfo?.isOverdue
+    ? `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`
+    : null;
 
-/** Latest date a reporting period may end on (today), as YYYY-MM-DD for date inputs. */
+/** Today as YYYY-MM-DD for date inputs. Used to stop an override date from being set in the past. */
 export const todayIsoDate = (now = new Date()) => {
   const d = toDateOnly(now);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

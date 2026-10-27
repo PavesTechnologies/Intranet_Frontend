@@ -274,6 +274,9 @@ export default function TaxCalculationConsole() {
       ].sort(comparePipelineRecords),
     [snapshots, occurrences]
   );
+  const handleClearFilters = () => {
+    setStage(ALL);
+  };
 
   const stageCounts = useMemo(() => countPipelineStages(records), [records]);
 
@@ -354,8 +357,8 @@ export default function TaxCalculationConsole() {
         stage={stage}
         onStageChange={setStage}
         getRowAction={getRowAction}
+        onClearFilters={handleClearFilters}
       />
     </div>
   );
 }
-

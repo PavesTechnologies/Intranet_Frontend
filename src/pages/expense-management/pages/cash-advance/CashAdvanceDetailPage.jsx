@@ -9,6 +9,7 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 import { useAuth } from "@/contexts/AuthContext";
 import SettleBalancePanel from "@/pages/expense-management/pages/cash-advance/components/SettleBalancePanel";
+import MoneyMovements from "@/pages/expense-management/pages/cash-advance/components/MoneyMovements";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import {
@@ -372,6 +373,13 @@ export default function CashAdvanceDetailPage() {
             <p className="font-medium text-gray-800 mt-0.5">{formatDate(advance.settlementDueDate)}</p>
           </div>
         </div>
+
+        {isSettlementView && settlement && (
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#0a174e]">Money movement</h4>
+            <MoneyMovements settlement={settlement} currencyCode={currencyCode} advanceId={advance.advanceId || advance.id || advanceId} />
+          </section>
+        )}
 
         {canRepay && (
           <SettleBalancePanel

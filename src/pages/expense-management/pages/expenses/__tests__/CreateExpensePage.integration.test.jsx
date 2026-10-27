@@ -12,7 +12,7 @@ import { MemoryRouter } from 'react-router-dom';
  * EP04-S4 Test Suite: Expense-Advance Integration
  *
  * Covers the create-report form: the cash advance link (react-select), the report-level
- * validation (trip dates, reporting period, required fields) and the create call payload.
+ * validation (trip dates, required fields) and the create call payload.
  */
 
 vi.mock('../../../api/expenseReportsApi');
@@ -224,21 +224,7 @@ describe('CreateExpensePage - EP04-S4: Expense-Advance Integration', () => {
     });
   });
 
-  describe('Reporting period and trip date validation', () => {
-    it('should reject a reporting period that ends in the future', async () => {
-      renderWithProviders(<CreateExpensePage />);
-      const future = new Date();
-      future.setDate(future.getDate() + 10);
-      const futureIso = future.toISOString().split('T')[0];
-
-      fireEvent.change(screen.getByLabelText(/reporting period end/i), { target: { value: futureIso } });
-      await fillReport();
-      fireEvent.click(screen.getByRole('button', { name: /create expense report/i }));
-
-      expect(await screen.findByText('The reporting period cannot end in the future.')).toBeInTheDocument();
-      expect(expenseReportService.create).not.toHaveBeenCalled();
-    });
-
+  describe('Trip date validation', () => {
     it('should reject an estimated end date before the trip start date', async () => {
       renderWithProviders(<CreateExpensePage />);
       await fillReport();

@@ -14,6 +14,8 @@ const ARTable = ({
   columns = [],
   loading = false,
   emptyMessage = "No records found.",
+  // bare: no outer border/rounding — for a table sitting flush inside a card.
+  bare = false,
 }) => {
   const hasData = rows.length > 0;
 
@@ -32,7 +34,7 @@ const ARTable = ({
   };
 
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div className={`w-full overflow-hidden bg-white ${bare ? "" : "rounded-xl border border-slate-200"}`}>
       {loading ? (
         <LoadingSpinner text="Loading data..." />
       ) : !hasData ? (

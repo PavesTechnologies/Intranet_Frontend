@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
+import BackIconButton from "../components/common/BackIconButton";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
@@ -40,6 +41,8 @@ import {
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   sendInvoiceToClient,
+  getInvoiceDeliveries,
+  toDeliveryState,
 } from "../services/invoiceService";
 import { formatBillingPeriod } from "../services/billingDataAcquisitionService";
 import {
@@ -49,10 +52,8 @@ import {
   DEMO_TAX_CONTEXT,
   DEMO_TERMS,
   DEMO_DELIVERY_STATUS,
-  DEMO_SENT_BY,
-  getDemoDelivery,
-  saveDemoDelivery,
 } from "../utils/invoiceDemoData";
+import { interpretSendResult, describeDelivery, DELIVERY_OUTCOME } from "../utils/invoiceDelivery";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
 import { getTaxCalculation } from "../services/taxCalculationService";
 import { getBillingOccurrence } from "../services/billingOccurrenceService";
@@ -61,6 +62,7 @@ import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLock
 import useRecordLock from "../hooks/useRecordLock";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
+const RECEIVABLES_PATH = "/account-receivable/receivables";
 const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
 const INVOICE_APPROVAL_PATH = "/account-receivable/invoice-approval";
 
@@ -131,7 +133,10 @@ export default function InvoiceDetail() {
   const isFromTaxCalculation = source === "tax-calculation";
 
   const [invoice, setInvoice] = useState(null);
-  const [taxCalc, setTaxCalc] = useState(null);
+  const [taxCalc, setTaxCalc] = useState(location.state?.taxCalculation || null);
+  const [snapshotData, setSnapshotData] = useState(
+    location.state?.config || location.state?.snapshotData || null
+  );
   const [occurrence, setOccurrence] = useState(null);
   const [companyProfile, setCompanyProfile] = useState(null);
   const [approvalHistory, setApprovalHistory] = useState([]);
@@ -228,14 +233,11 @@ export default function InvoiceDetail() {
   const [isReacquireModalOpen, setIsReacquireModalOpen] = useState(false);
   const [reacquiring, setReacquiring] = useState(false);
 
-  // Demo: Send to Client delivery state (separate from invoice approval status)
+  // Send to Client delivery state (separate from invoice approval status),
+  // read from the backend delivery history.
   const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
-  const [deliveryState, setDeliveryState] = useState({
-    deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
-    sentAt: null,
-    sentBy: null,
-  });
+  const [deliveryState, setDeliveryState] = useState(() => toDeliveryState([]));
 
   const latestRejectionReason = useMemo(() => {
     if (invoice?.rejectionReason) return invoice.rejectionReason;
@@ -285,21 +287,22 @@ export default function InvoiceDetail() {
       if (data) {
         setInvoice(data);
 
-        // Fallback: If tax components or tax region not directly on invoice, attempt fallback to completed tax calculation
+        // Load tax calculation / snapshot context to ensure identical presentation to preview
         const targetSnapshotId =
           data.billingSnapshotId ||
           (snapshotId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(snapshotId)
             ? snapshotId
             : null);
 
-        if (targetSnapshotId && (!data.taxBreakdown || data.taxBreakdown.length === 0 || !data.taxRegion)) {
+        if (targetSnapshotId) {
           try {
             const calc = await getTaxCalculation(targetSnapshotId);
             if (calc) {
               setTaxCalc(calc);
+              setSnapshotData((prev) => prev || calc);
             }
           } catch (calcErr) {
-            console.warn("[InvoiceDetail] Non-blocking tax calculation fallback notice:", calcErr?.message);
+            console.warn("[InvoiceDetail] Non-blocking tax calculation notice:", calcErr?.message);
           }
         }
 
@@ -307,9 +310,15 @@ export default function InvoiceDetail() {
         // occurrence carries the billing type and the occurrence-based line
         // item (Invoice -> Billing Occurrence -> Billing Configuration).
         const occurrenceRef = data.billingScheduleId || paramOccurrenceId;
-        if (occurrenceRef && !data.billingSnapshotId) {
+        if (occurrenceRef) {
           try {
-            setOccurrence(await getBillingOccurrence(occurrenceRef));
+            const occ = await getBillingOccurrence(occurrenceRef);
+            if (occ) {
+              setOccurrence(occ);
+              if (!targetSnapshotId) {
+                setSnapshotData((prev) => prev || occ);
+              }
+            }
           } catch (occErr) {
             console.warn("[InvoiceDetail] Non-blocking billing occurrence notice:", occErr?.message);
           }
@@ -597,13 +606,22 @@ export default function InvoiceDetail() {
     }
   };
 
-  // Load demo delivery state from localStorage once invoice (and invoiceId) is known
-  useEffect(() => {
-    if (invoice?.invoiceId) {
-      const stored = getDemoDelivery(invoice.invoiceId);
-      setDeliveryState(stored);
+  const loadDeliveryState = async (invoiceId) => {
+    try {
+      const deliveries = await getInvoiceDeliveries(invoiceId);
+      setDeliveryState(toDeliveryState(deliveries));
+    } catch (err) {
+      console.error("[InvoiceDetail] Error loading delivery history:", err);
     }
-  }, [invoice?.invoiceId]);
+  };
+
+  // Delivery history is the source of truth for "sent" — load it once the invoice is known.
+  useEffect(() => {
+    if (invoice?.invoiceId && invoice?.invoiceStatus === "APPROVED") {
+      loadDeliveryState(invoice.invoiceId);
+    }
+  }, [invoice?.invoiceId, invoice?.invoiceStatus]);
+
 
   /**
    * Send to Client action.
@@ -623,29 +641,36 @@ export default function InvoiceDetail() {
         const msg = getInvoiceErrorMessage(apiErr, "Failed to send invoice to client.");
         showStatusToast(msg, "error");
         setSendingToClient(false);
+        loadDeliveryState(invoice.invoiceId);
         return;
       }
 
-      const resolvedEmail =
-        backendResult?.recipientEmail ||
-        backendResult?.email ||
-        invoice.email ||
-        null;
+      const resolvedEmail = backendResult?.recipientEmail || invoice.email || null;
 
-      const entry = {
-        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
-        sentAt: new Date().toISOString(),
-        sentBy: DEMO_SENT_BY,
-        recipientEmail: resolvedEmail,
-      };
+      // The backend answers 200 for every attempt; only a SENT result may be shown as sent.
+      const outcome = interpretSendResult(backendResult, { recipientEmail: resolvedEmail, sentBy: DEMO_SENT_BY });
+      if (outcome.kind !== DELIVERY_OUTCOME.SENT) {
+        if (outcome.entry) {
+          saveDemoDelivery(invoice.invoiceId, outcome.entry);
+          setDeliveryState(outcome.entry);
+          setIsSendToClientOpen(false);
+        }
+        showStatusToast(outcome.message, outcome.toastType);
+        return;
+      }
+
+      const entry = outcome.entry;
       saveDemoDelivery(invoice.invoiceId, entry);
       setDeliveryState(entry);
       setIsSendToClientOpen(false);
       showStatusToast(
-        backendResult?.message ||
-        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent${resolvedEmail ? ` to ${resolvedEmail}` : " to client"}.`,
+        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} sent${resolvedEmail ? ` to ${resolvedEmail}` : " to client"}.`,
         "success"
       );
+      // Sending creates the receivable — continue the workflow there.
+      navigate(RECEIVABLES_PATH, {
+        state: { sentInvoiceId: invoice.invoiceId, from: "invoice-detail" },
+      });
     } catch (err) {
       const msg = getInvoiceErrorMessage(err, "Failed to send invoice to client.");
       showStatusToast(msg, "error");
@@ -740,31 +765,73 @@ export default function InvoiceDetail() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       {/* Header */}
-      <PageHeader
-        title="Invoice Generated"
-        subtitle={
-          <>
-            Invoice Number:{" "}
-            <span className="ml-1 font-mono font-bold text-indigo-700">
-              {invoice?.invoiceNumber || "—"}
-            </span>
-          </>
-        }
-      />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <BackIconButton
+            onClick={() => navigate(isFromTaxCalculation ? TAX_WORKSPACE_PATH : INVOICE_WORKSPACE_PATH)}
+            label="Back to Invoices"
+          />
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                Invoice Generated
+              </h1>
+              {invoice?.invoiceStatus && (
+                <StatusBadge label={invoice.invoiceStatus} size="sm" />
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Invoice Number:{" "}
+              <span className="font-mono font-bold text-indigo-700 ml-1">
+                {invoice?.invoiceNumber || "—"}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 self-end sm:self-auto">
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-50 shadow-2xs"
+          >
+            <FileText className="h-3.5 w-3.5 text-slate-500" />
+            <span>Print / PDF</span>
+          </Button>
+
+          {(invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus) && (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleSubmitForApproval}
+              disabled={submitting || refreshing}
+              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-xs"
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>{submitting ? "Submitting..." : "Submit for Approval"}</span>
+            </Button>
+          )}
+        </div>
+      </div>
 
       {/* Delivery Status Banner — APPROVED invoices only */}
       {invoice?.invoiceStatus === "APPROVED" && (
         <div
           className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
               ? "border-teal-200 bg-teal-50/70"
-              : "border-amber-200 bg-amber-50/60"
+              : deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SIMULATED
+                ? "border-violet-200 bg-violet-50/60"
+                : "border-amber-200 bg-amber-50/60"
             }`}
         >
           <div className="flex items-start gap-3">
             <div
               className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
                   ? "bg-teal-100 text-teal-700"
-                  : "bg-amber-100 text-amber-700"
+                  : deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SIMULATED
+                    ? "bg-violet-100 text-violet-700"
+                    : "bg-amber-100 text-amber-700"
                 }`}
             >
               <MailCheck className="h-5 w-5" />
@@ -775,6 +842,10 @@ export default function InvoiceDetail() {
                 {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT ? (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
                     Sent to Client
+                  </span>
+                ) : deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SIMULATED ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-violet-100 text-violet-800 border border-violet-200">
+                    {describeDelivery(deliveryState).badge}
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
@@ -800,8 +871,9 @@ export default function InvoiceDetail() {
                     <span className="font-semibold text-slate-700">Sent By: </span>
                     {deliveryState.sentBy || DEMO_SENT_BY}
                   </p>
-                  <p className="text-[11px] text-teal-600 italic">Demo delivery — no actual email was sent.</p>
                 </div>
+              ) : deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SIMULATED ? (
+                <p className="text-xs text-violet-700">{describeDelivery(deliveryState).caption}</p>
               ) : (
                 <p className="text-xs text-slate-600">
                   Invoice is approved and ready to be sent to the client.
@@ -809,6 +881,7 @@ export default function InvoiceDetail() {
               )}
             </div>
           </div>
+
         </div>
       )}
 
@@ -1239,10 +1312,11 @@ export default function InvoiceDetail() {
         invoice={invoice}
         snapshotId={snapshotId || invoice?.billingSnapshotId}
         taxCalc={taxCalc}
+        snapshotData={snapshotData || taxCalc || occurrence}
         occurrence={occurrence}
         companyProfile={companyProfile}
         deliveryState={deliveryState}
-        presentation="plain"
+        presentation="card"
         showStatus={false}
       />
 
@@ -1292,9 +1366,7 @@ export default function InvoiceDetail() {
               className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold"
             >
               <MailCheck className="h-3.5 w-3.5" />
-              {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                ? "Sent to Client"
-                : "Send to Client"}
+              {describeDelivery(deliveryState).buttonLabel}
             </Button>
           )}
         </div>
@@ -1693,3 +1765,4 @@ export default function InvoiceDetail() {
     </div>
   );
 }
+

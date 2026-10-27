@@ -43,10 +43,23 @@ export function normalizeInvoiceBillingType(value) {
   return null;
 }
 
+export const TIME_ENTRY_ITEM_TYPES = new Set(["TIME_ENTRY", "TIMESHEET", "TIMESHEET_ENTRY"]);
+
+export const isExpenseLine = (it) =>
+  String(it?.itemType || "").toUpperCase() === "EXPENSE" || String(it?.sourceSystem || "").toUpperCase() === "XMS";
+
 const explicitBillingType = (record) =>
   record
     ? normalizeInvoiceBillingType(
-        record.billingTypeCode || record.billingType || record.billingTypeName || record.billingTypeLabel
+        record.billingTypeCode ||
+        record.billingType ||
+        record.billingTypeName ||
+        record.billingTypeLabel ||
+        record.pricingModel ||
+        record.billingModel ||
+        record.billingScheduleType ||
+        record.contractType ||
+        record.scheduleType
       )
     : null;
 
@@ -59,9 +72,10 @@ const explicitBillingType = (record) =>
  *      Recurring configuration; a billingConfigurationId schedule is a
  *      Milestone Plan (legacy FIXED scheduleType -> Fixed Price);
  *   4. the billing configuration/snapshot context the page was opened with;
- *   5. backend item classification (itemType TIME_ENTRY -> T&M).
- * Never inferred from line-item names, roles, quantities, amounts or a bare
- * billingSnapshotId. Returns null when unknown.
+ *   5. time & material subtotal indicators;
+ *   6. backend item classification (itemType TIME_ENTRY or expenses -> T&M);
+ *   7. billing snapshot identifier (Time & Material acquisition).
+ * Returns null when unknown.
  */
 export function resolveInvoiceBillingType({ invoice, occurrence, context } = {}) {
   const fromInvoice = explicitBillingType(invoice);
@@ -82,17 +96,36 @@ export function resolveInvoiceBillingType({ invoice, occurrence, context } = {})
   const fromContext = explicitBillingType(context);
   if (fromContext) return fromContext;
 
+  if (
+    (invoice?.timeMaterialSubtotal !== undefined && invoice?.timeMaterialSubtotal !== null) ||
+    (invoice?.timeAndMaterialSubtotal !== undefined && invoice?.timeAndMaterialSubtotal !== null) ||
+    (invoice?.tmSubtotal !== undefined && invoice?.tmSubtotal !== null) ||
+    (context?.timeMaterialSubtotal !== undefined && context?.timeMaterialSubtotal !== null)
+  ) {
+    return INVOICE_BILLING_TYPES.TIME_MATERIAL;
+  }
+
   // The backend classifies timesheet lines as itemType TIME_ENTRY — a typed
-  // field on the invoice items (not their name) that only T&M invoices carry.
+  // field on the invoice items that only T&M invoices carry.
+  // In T&M invoices, items can include timesheet entries and/or reimbursable expenses.
   const items = Array.isArray(invoice?.items) ? invoice.items : [];
-  if (items.length > 0 && items.every((it) => TIME_ENTRY_ITEM_TYPES.has(String(it?.itemType || "").toUpperCase()))) {
+  if (items.length > 0) {
+    const hasTimeEntry = items.some((it) => TIME_ENTRY_ITEM_TYPES.has(String(it?.itemType || "").toUpperCase()));
+    const allTimeOrExpense = items.every(
+      (it) => TIME_ENTRY_ITEM_TYPES.has(String(it?.itemType || "").toUpperCase()) || isExpenseLine(it)
+    );
+    if (hasTimeEntry || allTimeOrExpense) {
+      return INVOICE_BILLING_TYPES.TIME_MATERIAL;
+    }
+  }
+
+  // Billing snapshots in AR are specifically produced by Timesheet & Expense Billing Data Acquisition
+  if (invoice?.billingSnapshotId || context?.billingSnapshotId) {
     return INVOICE_BILLING_TYPES.TIME_MATERIAL;
   }
 
   return null;
 }
-
-const TIME_ENTRY_ITEM_TYPES = new Set(["TIME_ENTRY", "TIMESHEET", "TIMESHEET_ENTRY"]);
 
 /**
  * Payment terms label. The backend's payment term name wins; otherwise a
@@ -151,14 +184,21 @@ const formatPercent = (value) => (value === null ? "—" : `${Number(value).toFi
 
 const column = (key, label, align = "left") => ({ key, label, align });
 
-// --- Time & Material: resource-based lines (existing behaviour) -----------
+// "PERCENTAGE" / "FIXED" (backend) or "FIXED_AMOUNT" (UI) -> a short customer-facing label.
+export function formatLineDiscount(discountType, discountValue, currency) {
+  const value = firstNumber(discountValue);
+  if (value === null || value <= 0) return null;
+  return String(discountType || "").toUpperCase() === "PERCENTAGE"
+    ? `${Number(value.toFixed(2))}%`
+    : `${formatCurrency(value, currency)} off`;
+}
 
 function buildTimeMaterialLines(items, currency) {
   // Excluded entries (internal audit / non-billable / excluded from invoice) must not be presented as payable invoice lines
   const payableItems = items.filter(
     (it) => it.includeInInvoice !== false && it.isBillable !== false && it.excludedFromInvoice !== true
   );
-  const targetItems = payableItems.length > 0 || items.length === 0 ? payableItems : items;
+  const targetItems = payableItems;
   const hasWorkDate = targetItems.some((it) => Boolean(it.workDate || it.date));
   const hasHours = targetItems.some((it) => it.hours !== undefined && it.hours !== null);
   const columns = [
@@ -170,21 +210,87 @@ function buildTimeMaterialLines(items, currency) {
     column("amount", "Amount"),
   ];
   const rows = targetItems.map((it, idx) => {
+    const expense = isExpenseLine(it);
     const quantity = firstNumber(it.hours, it.quantity);
-    const hasDiscount = Boolean(
-      it.discountApplied ||
-      it.hasDiscount ||
-      (it.standardRate && Number(it.standardRate) > Number(it.rate))
-    );
+    const rate = firstNumber(it.rate);
+    // A T&M discount belongs to timesheet work only: an expense is billed at its approved amount, so none of the
+    // rate/discount fields are read for it, whatever the payload carries.
+    const baseRate = expense ? null : firstNumber(it.baseRate, it.standardRate);
+    const discountValue = expense ? null : firstNumber(it.discountValue);
+    const hasDiscount =
+      !expense &&
+      Boolean(
+        it.discountApplied ||
+          it.hasDiscount ||
+          (discountValue !== null && discountValue > 0) ||
+          (baseRate !== null && rate !== null && baseRate > rate)
+      );
+
+    const totalAmt = firstNumber(it.amount, it.totalAmount);
+    const rateUnit = it.ratePeriod && String(it.ratePeriod).toUpperCase() === "DAILY" ? "day" : "hour";
+    const unitLabel = quantity === 1 ? rateUnit : `${rateUnit}s`;
+    const formattedQty = quantity !== null ? (quantity % 1 === 0 ? String(quantity) : quantity.toFixed(2)) : null;
+    const calcBreakdown =
+      !expense && formattedQty !== null && rate !== null && totalAmt !== null
+        ? `${formattedQty} ${unitLabel} × ${money(rate, currency)}/${rateUnit} = ${money(totalAmt, currency)}`
+        : null;
+
+    const perUnitDiscount = expense
+      ? null
+      : firstNumber(
+          it.perUnitDiscount,
+          it.discountPerUnit,
+          it.unitDiscount,
+          baseRate !== null && rate !== null && baseRate > rate ? baseRate - rate : null
+        );
+
+    const rawDiscountType = expense ? null : String(it.discountType || "").toUpperCase();
+    const isPercentageDiscount = hasDiscount && rawDiscountType === "PERCENTAGE";
+    const isFixedDiscount =
+      hasDiscount &&
+      (rawDiscountType === "FIXED" || rawDiscountType === "FIXED_AMOUNT" || (!isPercentageDiscount && discountValue !== null));
+
     return {
-      id: it.id || `item-${idx}`,
-      item: firstText(it.resourceName, it.itemName, it.employee, it.description) || "Line Item",
-      role: firstText(it.role) || "—",
+      id: it.id || it.invoiceItemId || `item-${idx}`,
+      lineType: expense ? "EXPENSE" : "TIME",
+      // An expense leads with the real XMS description (itemName stays the category for older invoices).
+      item:
+        (expense
+          ? firstText(it.expenseDescription, it.itemName, it.description)
+          : firstText(it.resourceName, it.itemName, it.employee, it.description)) || "Line Item",
+      role: expense ? "—" : firstText(it.role) || "—",
       workDate: formatDateOrDash(it.workDate || it.date),
+      rawWorkDate: it.workDate || it.date || "",
       quantity: quantity === null ? "—" : quantity.toFixed(2),
-      rate: money(firstNumber(it.rate), currency),
+      rawQuantity: quantity,
+      rate: money(rate, currency),
+      rawRate: rate,
+      standardRate: baseRate,
+      baseRate,
+      discountValue: expense ? null : it.discountValue,
+      discountType: expense ? null : it.discountType,
+      discountLabel: hasDiscount ? formatLineDiscount(it.discountType, discountValue, currency) : null,
+      periodName: expense ? null : firstText(it.discountPeriodName, it.periodName),
+      includeInInvoice: it.includeInInvoice,
+      includeBaseRateInInvoice: it.includeBaseRateInInvoice,
       discountApplied: hasDiscount,
-      amount: money(firstNumber(it.amount, it.totalAmount), currency),
+      amount: money(totalAmt, currency),
+      rawAmount: totalAmt,
+      calcBreakdown,
+      perUnitDiscount,
+      perUnitDiscountDisplay: perUnitDiscount !== null && perUnitDiscount > 0 ? `-${money(perUnitDiscount, currency)}` : null,
+      isPercentageDiscount,
+      isFixedDiscount,
+      category: expense ? firstText(it.expenseCategory, it.category, it.expense_category) : null,
+      // Customer-disclosable XMS details frozen on the invoice item; absent values stay null (never a placeholder).
+      expenseMerchant: expense ? firstText(it.expenseMerchant) : null,
+      expenseReportRef: expense ? firstText(it.expenseReportNumber) : null,
+      originalAmount: expense && it.exchangeRate != null ? firstNumber(it.originalAmount) : null,
+      originalCurrency: expense && it.exchangeRate != null ? firstText(it.originalCurrency) : null,
+      appliedExchangeRate: expense ? firstNumber(it.exchangeRate) : null,
+      approvedAmount: expense ? firstNumber(it.approvedAmount, it.approvedBillableAmount, it.rate, totalAmt) : null,
+      receiptReference: expense ? firstText(it.receiptNumber, it.receiptReference, it.claimId, it.expenseReference) : null,
+      raw: it,
     };
   });
   return { columns, rows };
@@ -304,7 +410,15 @@ function buildGenericLines(items, currency) {
  * Billing-type-specific invoice line items.
  * Returns { billingType, columns: [{ key, label, align }], rows: [{ id, [key]: displayValue }] }.
  */
-export function buildInvoiceLineItems({ billingType, items, occurrence, invoice, currency } = {}) {
+export function buildInvoiceLineItems(arg1 = {}, arg2, arg3) {
+  let billingType, items, occurrence, invoice, currency;
+  if (typeof arg1 === "string") {
+    billingType = arg1;
+    items = arg2;
+    currency = arg3;
+  } else {
+    ({ billingType, items, occurrence, invoice, currency } = arg1 || {});
+  }
   const list = Array.isArray(items) ? items.filter(Boolean) : [];
   let result;
   switch (billingType) {

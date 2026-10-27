@@ -7,11 +7,11 @@ import DashboardCard from "./DashboardCard";
  * The six AR lifecycle stages as an ordered list of links — one per
  * workspace — so order is announced and each stage opens with Cmd/Ctrl+click.
  */
-export default function PipelineStages({ stages, formatMoney }) {
+export default function PipelineStages({ stages }) {
   return (
     <DashboardCard
       title="AR Operational Pipeline"
-      description="Items at each stage, from contract setup to invoice sign-off. Select a stage to open its workspace."
+      description="Items waiting at each stage, from contract setup to invoice sign-off. Select a stage to open its workspace."
       icon={Activity}
     >
       <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
@@ -41,10 +41,24 @@ export default function PipelineStages({ stages, formatMoney }) {
                 <div className="mt-auto flex items-end justify-between gap-2 border-t border-slate-200/80 pt-2.5">
                   <div className="min-w-0">
                     <p className="text-lg font-bold leading-none tabular-nums text-slate-900">{stage.count}</p>
-                    <p className="mt-1 truncate text-[11px] text-slate-500">{stage.countLabel}</p>
+                    <p className="mt-1 truncate text-[11px] text-slate-500" title={stage.countLabel}>
+                      {stage.countLabel}
+                    </p>
+                    {/* Always reserve the wait line so counts line up across a row. */}
+                    <p
+                      aria-hidden={stage.waitLabel ? undefined : "true"}
+                      className={`mt-0.5 truncate text-[11px] font-medium ${
+                        stage.waitLabel ? (stage.waitTone === "warning" ? "text-amber-700" : "text-slate-500") : "invisible"
+                      }`}
+                    >
+                      {stage.waitLabel || " "}
+                    </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-0.5 text-xs font-semibold tabular-nums text-slate-700">
-                    {stage.amount != null ? formatMoney(stage.amount) : null}
+                  <div
+                    className="flex min-w-0 shrink items-center gap-0.5 text-xs font-semibold tabular-nums text-slate-700"
+                    title={stage.amountTitle}
+                  >
+                    {stage.amountText ? <span className="truncate">{stage.amountText}</span> : null}
                     <ChevronRight
                       className="h-3.5 w-3.5 text-slate-400 transition-transform duration-150 group-hover:text-indigo-600 motion-safe:group-hover:translate-x-0.5"
                       aria-hidden="true"

@@ -63,11 +63,27 @@ import {
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import {
   formatDeadlineDate,
+  getOverdueSubmitBlockMessage,
   getSubmissionDeadlineInfo,
-  validateReportingPeriod,
   validateTripDates,
 } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
+import {
+  LineItemAllocationDetails,
+  LineItemTaxDetails,
+} from "@/pages/expense-management/components/expense-reports/LineItemDetailSections";
+import {
+  SplitAllocationSection,
+  crossDepartmentCostCenterLabels,
+  useSplitAllocation,
+} from "@/pages/expense-management/components/expense-reports/SplitAllocation";
+import {
+  BillableClientFields,
+  projectIdForClient,
+  projectOptionsForClient,
+  useActiveClients,
+} from "@/pages/expense-management/components/expense-reports/BillableClientFields";
+import DeadlineOverridePanel from "@/pages/expense-management/components/expense-reports/DeadlineOverridePanel";
 import ReportHistoryTimeline from "@/pages/expense-management/components/expense-reports/ReportHistoryTimeline";
 import api from "@/api/axiosInstance";
 import Select from "react-select";
@@ -180,6 +196,8 @@ export default function ExpenseReportDetailPage() {
   // (ExpenseReportController/ExpenseLineItemController allow only ADMIN/GENERAL)
   // — don't show write actions (Edit/Delete/Add Line Item/Submit) to Manager.
   const canManage = hasRole(["General"]);
+  // Finance and Admin may extend or reopen a draft's submission deadline. The server enforces this as well.
+  const canOverrideDeadline = hasRole(["Finance", "FINANCE", "FINANCE_EXECUTIVE", "Admin", "ADMIN"]);
 
   useApprovalLiveSync();
   const { data: approvalStatus } = useApprovalStatus(reportId);
@@ -271,12 +289,19 @@ export default function ExpenseReportDetailPage() {
     tax: emptyTaxValue,
     costCenterId: "",
     clientBillable: false,
+    clientId: "",
+    allocationReason: "",
     projectId: "",
     ocrReceiptId: null,
     confidenceScore: null,
   });
   const [ocrReviewErrors, setOcrReviewErrors] = useState({});
   const [ocrSubmitting, setOcrSubmitting] = useState(false);
+  // Same client / project / split / cross-department rules as the Manual Entry drawer. The split's
+  // reference is the entered amount: the line's base amount only exists once it is created.
+  const ocrClients = useActiveClients();
+  const ocrSplit = useSplitAllocation(Number(ocrReviewData.amount) || 0, formatAmount);
+  const [ocrHomeDepartmentUuid, setOcrHomeDepartmentUuid] = useState(null);
 
   const [lineItemToView, setLineItemToView] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -290,6 +315,15 @@ export default function ExpenseReportDetailPage() {
 
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+
+  const reloadOcrClients = ocrClients.reload;
+  useEffect(() => {
+    if (!isOcrReviewOpen) return;
+    reloadOcrClients();
+    lookupService.getAllocationContext()
+      .then((ctx) => setOcrHomeDepartmentUuid(ctx?.homeDepartmentUuid || null))
+      .catch(() => setOcrHomeDepartmentUuid(null)); // unknown department: the server decides at submit
+  }, [isOcrReviewOpen, reloadOcrClients]);
 
   useEffect(() => {
     if (!isOcrReviewOpen) {
@@ -317,7 +351,7 @@ export default function ExpenseReportDetailPage() {
   };
 
   const [isEditReportOpen, setIsEditReportOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "", tripStartDate: "", tripEndDate: "", reportingPeriodStart: "", reportingPeriodEnd: "" });
+  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "", tripStartDate: "", tripEndDate: "" });
   const [editFormErrors, setEditFormErrors] = useState({});
   const [savingReport, setSavingReport] = useState(false);
   const [isDeleteReportOpen, setIsDeleteReportOpen] = useState(false);
@@ -550,7 +584,8 @@ export default function ExpenseReportDetailPage() {
             const foundNothing = scanFoundNothing(responsePayload);
 
             // Clean/validate Merchant Name
-            let merchantVal = isLowConfidence ? "" : (responsePayload.merchantName || "").trim();
+            // Low-confidence scans still fill the fields with what was read; the review notice asks for a check.
+            let merchantVal = (responsePayload.merchantName || "").trim();
 
             // Clean/validate GST
             let taxVal = responsePayload.taxAmount;
@@ -606,16 +641,18 @@ export default function ExpenseReportDetailPage() {
 
             const reviewData = {
               categoryId: categoryIdVal,
-              expenseDate: isLowConfidence ? "" : (responsePayload.receiptDate || new Date().toISOString().split("T")[0]),
+              expenseDate: responsePayload.receiptDate || new Date().toISOString().split("T")[0],
               merchantName: merchantVal,
               description: "",
-              amount: (isLowConfidence || amountNum <= 0) ? "" : amountNum.toFixed(2),
+              amount: amountNum <= 0 ? "" : amountNum.toFixed(2),
               currencyId: currencyIdVal,
               // The receipt's GST is the entered side; the server compares it with the tax code.
               tax: taxValueFromOcr(taxNum > 0 ? taxNum.toFixed(2) : null),
               ocrTaxAmount: taxNum > 0 ? taxNum : null,
               costCenterId: report?.costCenterId || "",
               clientBillable: false,
+              clientId: "",
+              allocationReason: "",
               projectId: "",
               ocrReceiptId: receiptId,
               confidenceScore: confidence,
@@ -630,7 +667,7 @@ export default function ExpenseReportDetailPage() {
               foundNothing
                 ? "No merchant, date or total could be read from this file. Check it's a clear photo or PDF of the receipt, or enter the details yourself."
                 : isLowConfidence
-                  ? "Parts of this scan couldn't be read reliably. Enter the merchant, date and amount from the receipt."
+                  ? "Parts of this scan couldn't be read reliably. The fields are filled from the scan: check the merchant, date, amount and GST against the receipt."
                   : ""
             );
             setOcrDuplicate(duplicateNotice(responsePayload));
@@ -638,6 +675,7 @@ export default function ExpenseReportDetailPage() {
             setOcrTaxPreview(null);
             setOcrReviewData(reviewData);
             setOcrReviewErrors({});
+            ocrSplit.reset();
             setIsOcrReviewOpen(true);
 
             setTimeout(() => {
@@ -800,8 +838,6 @@ export default function ExpenseReportDetailPage() {
       currencyId: report.currencyId || "",
       tripStartDate: (report.tripStartDate || "").slice(0, 10),
       tripEndDate: (report.tripEndDate || "").slice(0, 10),
-      reportingPeriodStart: (report.reportingPeriodStart || "").slice(0, 10),
-      reportingPeriodEnd: (report.reportingPeriodEnd || "").slice(0, 10),
     });
     setEditFormErrors({});
     setIsEditReportOpen(true);
@@ -827,8 +863,6 @@ export default function ExpenseReportDetailPage() {
     if (businessPurposeError) errors.businessPurpose = businessPurposeError;
     const tripDateError = validateTripDates(editFormData.tripStartDate, editFormData.tripEndDate);
     if (tripDateError) errors[editFormData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
-    const periodError = validateReportingPeriod(editFormData.reportingPeriodStart, editFormData.reportingPeriodEnd);
-    if (periodError) errors.reportingPeriodEnd = periodError;
     setEditFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -844,8 +878,6 @@ export default function ExpenseReportDetailPage() {
       currencyId: editFormData.currencyId,
       tripStartDate: editFormData.tripStartDate,
       tripEndDate: editFormData.tripEndDate,
-      reportingPeriodStart: editFormData.reportingPeriodStart || null,
-      reportingPeriodEnd: editFormData.reportingPeriodEnd || null,
     };
 
     try {
@@ -879,12 +911,9 @@ export default function ExpenseReportDetailPage() {
 
   const submitNow = () => {
     // UI guard only: the backend enforces the same deadline on the submit call.
-    if (deadlineInfo?.isOverdue) {
-      showStatusToast(
-        `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`,
-        "error",
-        4000,
-      );
+    const blockMessage = getOverdueSubmitBlockMessage(deadlineInfo);
+    if (blockMessage) {
+      showStatusToast(blockMessage, "error", 4000);
       return;
     }
     submitReport.mutate(reportId, {
@@ -1100,6 +1129,22 @@ export default function ExpenseReportDetailPage() {
     if (ocrReviewErrors[name]) setOcrReviewErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
+  const handleOcrClientChange = (clientId) => {
+    setOcrReviewData((prev) => ({ ...prev, clientId, projectId: projectIdForClient(projects, prev.projectId, clientId) }));
+    if (ocrReviewErrors.clientId) setOcrReviewErrors((prev) => ({ ...prev, clientId: "" }));
+  };
+
+  const ocrClientOptions = ocrClients.clients
+    .filter((c) => c.clientId)
+    .map((c) => ({ value: c.clientId, label: c.clientName || c.clientId }));
+  const ocrProjectOptions = projectOptionsForClient(projects, ocrReviewData.clientId);
+  const ocrCrossDepartmentCostCenters = crossDepartmentCostCenterLabels({
+    split: ocrSplit,
+    costCenterId: ocrReviewData.costCenterId,
+    costCenterOptions,
+    homeDepartmentUuid: ocrHomeDepartmentUuid,
+  });
+
   const validateOcrForm = () => {
     const errors = {};
     const amountNum = Number(ocrReviewData.amount);
@@ -1121,8 +1166,11 @@ export default function ExpenseReportDetailPage() {
     } else if (ocrReviewData.expenseDate > todayStr) {
       errors.expenseDate = "Expense date cannot be in the future.";
     }
-    if (ocrReviewData.clientBillable && !ocrReviewData.projectId) {
-      errors.projectId = "Project is required when billable.";
+    if (ocrReviewData.clientBillable && !ocrReviewData.clientId) {
+      errors.clientId = "Client is required when billable.";
+    }
+    if (ocrCrossDepartmentCostCenters.length > 0 && !(ocrReviewData.allocationReason || "").trim()) {
+      errors.allocationReason = "Explain why this expense is charged to another department.";
     }
 
     setOcrReviewErrors(errors);
@@ -1132,6 +1180,7 @@ export default function ExpenseReportDetailPage() {
   const handleOcrSubmit = async (e) => {
     e.preventDefault();
     if (!validateOcrForm()) return;
+    if (!ocrSplit.validate()) return;
 
     const payload = {
       categoryId: ocrReviewData.categoryId,
@@ -1142,13 +1191,16 @@ export default function ExpenseReportDetailPage() {
       currencyId: ocrReviewData.currencyId,
       ...taxRequestFieldsForConfirm(ocrReviewData.tax, ocrTaxPreview),
       costCenterId: ocrReviewData.costCenterId,
+      // Project is optional for a billable expense; the client is what AR bills.
+      clientId: ocrReviewData.clientBillable ? (ocrReviewData.clientId || null) : null,
       projectId: ocrReviewData.clientBillable ? (ocrReviewData.projectId || null) : null,
       clientBillable: !!ocrReviewData.clientBillable,
+      allocationReason: ocrCrossDepartmentCostCenters.length > 0 ? (ocrReviewData.allocationReason || "").trim() || null : null,
     };
 
     try {
       setOcrSubmitting(true);
-      await api.post(`/xms/employee/receipts/${ocrReviewData.ocrReceiptId}/confirm`, {
+      const res = await api.post(`/xms/employee/receipts/${ocrReviewData.ocrReceiptId}/confirm`, {
         ...payload,
         lineItemId: null
       }, {
@@ -1158,7 +1210,14 @@ export default function ExpenseReportDetailPage() {
         }
       });
 
-      showStatusToast("Line item created and receipt confirmed successfully!", "success");
+      const lineItemId = res.data?.data?.lineItemId;
+      const splitResult = lineItemId ? await ocrSplit.save(lineItemId) : { ok: true };
+      if (splitResult.ok) {
+        showStatusToast("Line item created and receipt confirmed successfully!", "success");
+      } else {
+        // The line item exists either way - only the split needs redoing, from the line's Edit drawer.
+        showStatusToast(`Line item created, but the split allocation could not be saved: ${splitResult.message}`, "error");
+      }
       fetchLineItems();
       fetchReport();
       setIsOcrReviewOpen(false);
@@ -1239,6 +1298,13 @@ export default function ExpenseReportDetailPage() {
                       ? `Overdue: submission was due ${formatDeadlineDate(deadlineInfo.deadline)}`
                       : `Submit by ${formatDeadlineDate(deadlineInfo.deadline)} (${deadlineInfo.daysRemaining} day${deadlineInfo.daysRemaining === 1 ? "" : "s"} left)`}
                   </p>
+                )}
+                {canOverrideDeadline && report.reportStatus === "DRAFT" && (
+                  <DeadlineOverridePanel
+                    reportId={reportId}
+                    currentDeadline={deadlineInfo?.deadline ?? null}
+                    onApplied={fetchReport}
+                  />
                 )}
               </div>
 
@@ -1873,6 +1939,7 @@ export default function ExpenseReportDetailPage() {
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 {lineItemToView && (
                   <>
+                    <PolicyResultBanner lineStatus={lineItemToView.lineStatus} policyWarnings={lineItemToView.policyWarnings} />
                     <div className="grid grid-cols-2 gap-3">
                       <DetailField icon={<Layers size={15} />} label="Category" value={lineItemToView.categoryName || "—"} />
                       <DetailField icon={<Calendar size={15} />} label="Expense Date" value={formatDate(lineItemToView.expenseDate)} />
@@ -1912,7 +1979,20 @@ export default function ExpenseReportDetailPage() {
                         </div>
                       </div>
 
-                      <DetailField icon={<Landmark size={15} />} label="Base Amount" value={`${formatAmount(lineItemToView.baseAmount)} ${lineItemToView.baseCurrencyCode}`} />
+                      <DetailField
+                        icon={<Landmark size={15} />}
+                        label="Base Amount"
+                        value={
+                          <>
+                            {`${formatAmount(lineItemToView.baseAmount)} ${lineItemToView.baseCurrencyCode}`}
+                            {lineItemToView.currencyCode && lineItemToView.currencyCode !== lineItemToView.baseCurrencyCode && lineItemToView.exchangeRate != null && (
+                              <span className="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                1 {lineItemToView.currencyCode} = {Number(lineItemToView.exchangeRate)} {lineItemToView.baseCurrencyCode}
+                              </span>
+                            )}
+                          </>
+                        }
+                      />
                       <DetailField icon={<Briefcase size={15} />} label="Client Billable?" value={lineItemToView.clientBillable ? "Yes" : "No"} />
                       {lineItemToView.clientBillable && (
                         <div className="col-span-2">
@@ -1928,6 +2008,13 @@ export default function ExpenseReportDetailPage() {
                         <DetailField icon={<FileText size={15} />} label="Description" value={lineItemToView.description || "—"} />
                       </div>
                     </div>
+
+                    <LineItemTaxDetails lineItem={lineItemToView} formatAmount={formatAmount} />
+                    <LineItemAllocationDetails
+                      lineItem={lineItemToView}
+                      splits={lineItemSplitsMap[lineItemToView.lineItemId] || []}
+                      formatAmount={formatAmount}
+                    />
 
                     {/* Attached Receipts list */}
                     <div className="border-t border-gray-100 pt-4 space-y-2">
@@ -2211,6 +2298,45 @@ export default function ExpenseReportDetailPage() {
                       )}
                     </div>
 
+                    <div className="col-span-2">
+                      <SplitAllocationSection
+                        split={ocrSplit}
+                        costCenterOptions={costCenterOptions}
+                        selectStyles={compactSelectStyles}
+                        disabled={ocrSubmitting}
+                        formatAmount={formatAmount}
+                        currencyLabel={currencyOptions.find((o) => o.value === ocrReviewData.currencyId)?.code || ""}
+                      />
+                    </div>
+
+                    {ocrCrossDepartmentCostCenters.length > 0 && (
+                      <div className="col-span-2 space-y-0.5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                        <label htmlFor="ocrAllocationReason" className="block text-xs font-semibold text-amber-900">
+                          Reason for charging another department <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-[11px] text-amber-800">
+                          {ocrHomeDepartmentUuid
+                            ? `${ocrCrossDepartmentCostCenters.join(", ")} ${ocrCrossDepartmentCostCenters.length === 1 ? "is" : "are"} outside your department.`
+                            : `${ocrCrossDepartmentCostCenters.join(", ")} belong to different departments.`}{" "}
+                          Charge the cost center of the event or purpose this expense was for, and say why.
+                        </p>
+                        <textarea
+                          id="ocrAllocationReason"
+                          name="allocationReason"
+                          value={ocrReviewData.allocationReason}
+                          onChange={handleOcrInputChange}
+                          placeholder="e.g. Joint Engineering–HR campus hiring event"
+                          rows={2}
+                          maxLength={500}
+                          disabled={ocrSubmitting}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs shadow-sm outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
+                        />
+                        {ocrReviewErrors.allocationReason && (
+                          <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.allocationReason}</span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Amount, Currency, and GST in a 3-column sub-grid */}
                     <div className="col-span-2 grid grid-cols-2 gap-3">
                       {/* Amount */}
@@ -2284,41 +2410,23 @@ export default function ExpenseReportDetailPage() {
                       )}
                     </div>
 
-                    {/* Client Billable & Project */}
-                    <div className="space-y-1">
-                      <label className="block text-xs font-semibold text-gray-600">Client Billable?</label>
-                      <select
-                        name="clientBillable"
-                        value={ocrReviewData.clientBillable.toString()}
-                        onChange={(e) => handleOcrSelectChange("clientBillable", e.target.value === "true")}
-                        disabled={ocrSubmitting}
-                        className="w-full px-2.5 py-1.5 h-[32px] rounded-md border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white animate-none"
-                      >
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-xs font-semibold text-gray-600">
-                        Project {ocrReviewData.clientBillable && <span className="text-red-500">*</span>}
-                      </label>
-                      <Select
-                        options={projects
-                          .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))}
-                        value={projects
-                          .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))
-                          .find((o) => o.value === ocrReviewData.projectId) || null}
-                        onChange={(opt) => handleOcrSelectChange("projectId", opt ? opt.value : "")}
-                        placeholder="Select project..."
-                        isSearchable
-                        styles={compactSelectStyles}
-                        isDisabled={ocrSubmitting || !ocrReviewData.clientBillable}
-                      />
-                      {ocrReviewErrors.projectId && (
-                        <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.projectId}</span>
-                      )}
-                    </div>
+                    {/* Client Billable, Client & Project - same rules as Manual Entry */}
+                    <BillableClientFields
+                      clientBillable={ocrReviewData.clientBillable}
+                      clientId={ocrReviewData.clientId}
+                      projectId={ocrReviewData.projectId}
+                      onBillableChange={(value) => handleOcrSelectChange("clientBillable", value)}
+                      onClientChange={handleOcrClientChange}
+                      onProjectChange={(value) => handleOcrSelectChange("projectId", value)}
+                      clientOptions={ocrClientOptions}
+                      projectOptions={ocrProjectOptions}
+                      clientsLoading={ocrClients.loading}
+                      clientsError={ocrClients.error}
+                      onRetryClients={ocrClients.reload}
+                      errors={ocrReviewErrors}
+                      selectStyles={compactSelectStyles}
+                      disabled={ocrSubmitting}
+                    />
 
                     {/* Description */}
                     <div className="col-span-2 space-y-1">
@@ -2479,26 +2587,15 @@ export function LineItemDrawer({
   const [ocrReceiptId, setOcrReceiptId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
-  const [clients, setClients] = useState([]);
-  const [loadingClients, setLoadingClients] = useState(false);
-  const [clientsError, setClientsError] = useState("");
+  const { clients, loading: loadingClients, error: clientsError, reload: loadClients } = useActiveClients();
   // The caller's home department, to tell when a chosen cost center needs a cross-department reason.
   const [homeDepartmentUuid, setHomeDepartmentUuid] = useState(null);
   // Latest server tax preview for the form (drives validation and the request's tax fields).
   const [taxPreview, setTaxPreview] = useState(null);
 
-  // Split Allocation (ExpenseSplitController) — layered on top of the line item's own
-  // costCenterId above, not a replacement for it. Whole-set replace, so `splitRows` always
-  // holds the complete intended set; saving sends every row (or an empty list to revert).
-  const [splitEnabled, setSplitEnabled] = useState(false);
-  const [splitMode, setSplitMode] = useState("PERCENTAGE"); // mirrors enums/SplitType.java
-  const [splitRows, setSplitRows] = useState([]); // [{ key, costCenterId, percentage, allocatedAmount }]
-  const [splitErrors, setSplitErrors] = useState({});
-  const [loadingSplits, setLoadingSplits] = useState(false);
-  // Tracks whether the line item had an active split set as of the last load, so an unchecked
-  // "Split this expense" on an item that previously had one still sends the [] revert-to-normal
-  // PUT — while a line item that never had splits skips the splits call entirely.
-  const [hadExistingSplits, setHadExistingSplits] = useState(false);
+  // Before the line item is first created its baseAmount isn't known (computed server-side from the
+  // exchange rate), so the entered amount is the split's reference until a save returns baseAmount.
+  const split = useSplitAllocation(Number(savedLineItem?.baseAmount ?? formData.amount) || 0, formatAmount);
 
   const [editActiveReceiptUrl, setEditActiveReceiptUrl] = useState("");
   const [editActiveReceiptFile, setEditActiveReceiptFile] = useState(null);
@@ -2536,39 +2633,13 @@ export function LineItemDrawer({
     }
   }, [isOpen, lineItem?.lineItemId, savedLineItem?.lineItemId, fetchReceipts]);
 
-  // Active RMS clients via XMS (GET /xms/clients). A failure is shown inline under the Client
-  // field with a retry, rather than only as a toast, since it blocks saving a billable expense.
-  const loadClients = useCallback(async () => {
-    try {
-      setLoadingClients(true);
-      setClientsError("");
-      const list = await lookupService.getActiveClients();
-      setClients(Array.isArray(list) ? list : []);
-    } catch (err) {
-      console.error("Failed to load clients:", err);
-      // XMS forwards the user's own token to RMS, which only lets Admin / Resource Manager /
-      // Project Manager list clients — a 403 here is a role issue, not an outage.
-      setClientsError(
-        err.response?.status === 403
-          ? "Your role doesn't have access to the client list in RMS."
-          : err.response?.data?.message || "Could not load clients."
-      );
-    } finally {
-      setLoadingClients(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (!isOpen) {
       setSavedLineItem(null);
       setPendingFiles([]);
       setReceipts([]);
       setOcrReceiptId(null);
-      setSplitEnabled(false);
-      setSplitMode("PERCENTAGE");
-      setSplitRows([]);
-      setSplitErrors({});
-      setHadExistingSplits(false);
+      split.reset();
       return;
     }
 
@@ -2632,13 +2703,9 @@ export function LineItemDrawer({
       setTaxPreview(null);
       setSavedLineItem(null);
       setOcrReceiptId(null);
-      setSplitEnabled(false);
-      setSplitMode("PERCENTAGE");
-      setSplitRows([]);
-      setHadExistingSplits(false);
+      split.reset();
     }
     setFormErrors({});
-    setSplitErrors({});
   }, [isOpen, lineItem, defaultCostCenterId, loadClients]);
 
   // Load existing splits only for a line item that actually exists yet (never call the splits
@@ -2651,33 +2718,16 @@ export function LineItemDrawer({
     let cancelled = false;
     (async () => {
       try {
-        setLoadingSplits(true);
+        split.setLoading(true);
         const res = await splitService.getAll(idToLoad);
         if (cancelled) return;
         const payload = res.data?.data;
-        const list = Array.isArray(payload) ? payload : Array.isArray(res.data) ? res.data : [];
-        if (list.length > 0) {
-          setSplitEnabled(true);
-          setSplitMode(list[0].splitType || "PERCENTAGE");
-          setSplitRows(
-            list.map((s) => ({
-              key: s.splitId || Math.random().toString(36).slice(2),
-              costCenterId: s.costCenterId,
-              percentage: s.percentage != null ? String(s.percentage) : "",
-              allocatedAmount: s.allocatedAmount != null ? String(s.allocatedAmount) : "",
-            }))
-          );
-          setHadExistingSplits(true);
-        } else {
-          setSplitEnabled(false);
-          setSplitRows([]);
-          setHadExistingSplits(false);
-        }
+        split.loadFrom(Array.isArray(payload) ? payload : Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Failed to load existing split allocation:", err);
         showStatusToast("Failed to load this line item's existing split allocation.", "error");
       } finally {
-        if (!cancelled) setLoadingSplits(false);
+        if (!cancelled) split.setLoading(false);
       }
     })();
     return () => {
@@ -2772,164 +2822,10 @@ export function LineItemDrawer({
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const emptySplitRow = () => ({ key: Math.random().toString(36).slice(2), costCenterId: "", percentage: "", allocatedAmount: "" });
-
-  const handleToggleSplit = (checked) => {
-    setSplitEnabled(checked);
-    setSplitErrors({});
-    if (checked && splitRows.length < 2) {
-      setSplitRows([emptySplitRow(), emptySplitRow()]);
-    }
-  };
-
-  // Switching mode clears the now-irrelevant values instead of trying to convert them (e.g. a
-  // percentage doesn't map onto a fixed amount without knowing the total) — cost center selections
-  // are kept since they're independent of mode.
-  const handleSplitModeChange = (mode) => {
-    setSplitMode(mode);
-    setSplitRows((prev) => prev.map((row) => ({ ...row, percentage: "", allocatedAmount: "" })));
-    setSplitErrors({});
-  };
-
-  const handleSplitRowChange = (idx, field, value) => {
-    setSplitRows((prev) => prev.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
-    setSplitErrors((prev) => {
-      if (!prev.rows?.[idx]?.[field]) return prev;
-      const rows = { ...prev.rows, [idx]: { ...prev.rows[idx], [field]: "" } };
-      return { ...prev, rows };
-    });
-  };
-
-  const handleAddSplitRow = () => setSplitRows((prev) => [...prev, emptySplitRow()]);
-
-  // A split allocation is only meaningful with 2+ rows (backend rejects exactly 1); dropping to
-  // 1 or 0 reverts the line item to a normal, single-cost-center expense rather than blocking removal.
-  const handleRemoveSplitRow = (idx) => {
-    setSplitRows((prev) => {
-      const next = prev.filter((_, i) => i !== idx);
-      if (next.length < 2) {
-        setSplitEnabled(false);
-        setSplitErrors({});
-        return [];
-      }
-      return next;
-    });
-  };
-
-  // Backend validates against the line item's BASE-currency amount (ExpenseSplitServiceImpl uses
-  // lineItem.getBaseAmount(), not the display `amount`), since CostCenterBudget/BudgetEncumbrance
-  // are both base-currency pools. Before the line item is first created, baseAmount isn't known yet
-  // (it's computed server-side from the exchange rate), so the entered display amount is the best
-  // available reference until the first save returns the authoritative baseAmount.
-  const splitTotalBasis = Number(savedLineItem?.baseAmount ?? formData.amount) || 0;
   const splitTotalCurrencyLabel =
     savedLineItem?.baseCurrencyCode ||
     currencyOptions.find((o) => o.value === formData.currencyId)?.label?.split(" - ")[0] ||
     "";
-
-  // Mirrors ExpenseSplitServiceImpl.buildPercentageSplits exactly: every row but the last is
-  // rounded to 4 decimals, and the last absorbs whatever remainder is left so the displayed total
-  // always reconciles to splitTotalBasis, matching what the backend will actually store.
-  const computedSplitAmounts = useMemo(() => {
-    if (!splitEnabled || splitMode !== "PERCENTAGE") return {};
-    const amounts = {};
-    let running = 0;
-    splitRows.forEach((row, i) => {
-      const isLast = i === splitRows.length - 1;
-      if (isLast) {
-        amounts[i] = Math.max(splitTotalBasis - running, 0);
-      } else {
-        const amt = Math.round(((splitTotalBasis * (Number(row.percentage) || 0)) / 100) * 10000) / 10000;
-        amounts[i] = amt;
-        running += amt;
-      }
-    });
-    return amounts;
-  }, [splitEnabled, splitMode, splitRows, splitTotalBasis]);
-
-  const splitTotalPercentage = splitRows.reduce((sum, r) => sum + (Number(r.percentage) || 0), 0);
-  const splitTotalAllocated =
-    splitMode === "PERCENTAGE"
-      ? Object.values(computedSplitAmounts).reduce((sum, v) => sum + v, 0)
-      : splitRows.reduce((sum, r) => sum + (Number(r.allocatedAmount) || 0), 0);
-
-  const validateSplitRows = () => {
-    if (!splitEnabled) return {};
-    const errors = { rows: {} };
-    if (splitRows.length < 2) {
-      errors.general = "A split allocation needs at least 2 cost centers — add another row or turn off splitting.";
-      return errors;
-    }
-
-    const seen = new Set();
-    splitRows.forEach((row, i) => {
-      const rowErr = {};
-      if (!row.costCenterId) {
-        rowErr.costCenterId = "Select a cost center.";
-      } else if (seen.has(row.costCenterId)) {
-        rowErr.costCenterId = "Already used in another row.";
-      } else {
-        seen.add(row.costCenterId);
-      }
-
-      if (splitMode === "PERCENTAGE") {
-        const pct = Number(row.percentage);
-        if (row.percentage === "" || Number.isNaN(pct)) rowErr.percentage = "Required.";
-        else if (pct <= 0) rowErr.percentage = "Must be > 0.";
-      } else {
-        const amt = Number(row.allocatedAmount);
-        if (row.allocatedAmount === "" || Number.isNaN(amt)) rowErr.allocatedAmount = "Required.";
-        else if (amt <= 0) rowErr.allocatedAmount = "Must be > 0.";
-      }
-      if (Object.keys(rowErr).length > 0) errors.rows[i] = rowErr;
-    });
-
-    if (Object.keys(errors.rows).length === 0) {
-      if (splitMode === "PERCENTAGE") {
-        if (Math.abs(splitTotalPercentage - 100) > 0.01) {
-          errors.general = `Percentages must add up to 100% — currently ${splitTotalPercentage.toFixed(2)}%.`;
-        }
-      } else if (Math.abs(splitTotalAllocated - splitTotalBasis) > 0.01) {
-        errors.general = `Allocated amounts must add up to the line item total (${formatAmount(splitTotalBasis)}) — currently ${formatAmount(
-          splitTotalAllocated
-        )}.`;
-      }
-    }
-    return errors;
-  };
-
-  // Whole-set replace: builds the complete intended split list (or [] to revert to normal).
-  // Returns null when there's nothing to do at all (never split, still not split).
-  const buildSplitPayload = () => {
-    if (!splitEnabled) {
-      return hadExistingSplits ? { splits: [] } : null;
-    }
-    return {
-      splits: splitRows.map((row) => ({
-        costCenterId: row.costCenterId,
-        splitType: splitMode,
-        percentage: splitMode === "PERCENTAGE" ? Number(row.percentage) : null,
-        allocatedAmount: splitMode === "FIXED_AMOUNT" ? Number(row.allocatedAmount) : null,
-      })),
-    };
-  };
-
-  // Saves (or reverts) the split allocation once the line item itself is known to exist. Never
-  // throws — callers decide how to present a failure, since "line item saved, split failed" needs
-  // different handling than a normal save error (the line item must not be reported as lost).
-  const trySaveSplits = async (lineItemId) => {
-    const payload = buildSplitPayload();
-    if (!payload) return { ok: true };
-    try {
-      const res = await splitService.replace(lineItemId, payload);
-      const saved = res.data?.data || res.data || [];
-      setHadExistingSplits(Array.isArray(saved) && saved.length > 0);
-      return { ok: true };
-    } catch (err) {
-      const message = err.response?.data?.message || err.response?.data?.detail || "Failed to save the split allocation.";
-      return { ok: false, message };
-    }
-  };
 
   const handleFileChange = (files) => {
     if (!files?.length) return;
@@ -3090,12 +2986,7 @@ export function LineItemDrawer({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-    const splitValidation = validateSplitRows();
-    if (splitValidation.general || Object.keys(splitValidation.rows || {}).length > 0) {
-      setSplitErrors(splitValidation);
-      return;
-    }
-    setSplitErrors({});
+    if (!split.validate()) return;
 
     const payload = {
       categoryId: formData.categoryId,
@@ -3143,7 +3034,7 @@ export function LineItemDrawer({
         const updatedItem = res.data?.data || res.data || { ...payload, lineItemId };
         fetchReceipts();
 
-        const splitResult = await trySaveSplits(lineItemId);
+        const splitResult = await split.save(lineItemId);
         if (!splitResult.ok) {
           setSavedLineItem(updatedItem);
           showStatusToast(`Line item updated, but the split allocation could not be saved: ${splitResult.message}`, "error");
@@ -3165,7 +3056,7 @@ export function LineItemDrawer({
         const createdItem = res.data?.data || res.data;
         const lineItemId = createdItem?.lineItemId;
 
-        const splitResult = lineItemId ? await trySaveSplits(lineItemId) : { ok: true };
+        const splitResult = lineItemId ? await split.save(lineItemId) : { ok: true };
         if (!splitResult.ok) {
           setSavedLineItem(createdItem);
           showStatusToast(`Line item created, but the split allocation could not be saved: ${splitResult.message}`, "error");
@@ -3193,7 +3084,7 @@ export function LineItemDrawer({
           }
         }
 
-        const splitResult = lineItemId ? await trySaveSplits(lineItemId) : { ok: true };
+        const splitResult = lineItemId ? await split.save(lineItemId) : { ok: true };
         if (!splitResult.ok) {
           setSavedLineItem(createdItem);
           showStatusToast(`Line item added, but the split allocation could not be saved: ${splitResult.message}`, "error");
@@ -3218,51 +3109,20 @@ export function LineItemDrawer({
     return [{ value: lineItem.categoryId, label: lineItem.categoryName || lineItem.categoryId }, ...categoryOptions];
   }, [categoryOptions, lineItem]);
 
-  const projectOptions = useMemo(() => {
-    // No client-side status filter: /xms/employee/projects/assigned (PMS /api/my-work under
-    // the hood) already restricts to the employee's ACTIVE/PLANNING projects server-side, and
-    // does not even return a status field per project — filtering here would just empty the list.
-    // Only the selected client's projects: p.clientId is the project's RMS client as PMS reports it.
-    if (!formData.clientId) return [];
-    return projects
-      .filter((p) => p.clientId === formData.clientId)
-      .map((p) => ({
-        value: p.projectId,
-        label: `${p.projectCode} - ${p.projectName}`,
-      }));
-  }, [projects, formData.clientId]);
+  const projectOptions = useMemo(() => projectOptionsForClient(projects, formData.clientId), [projects, formData.clientId]);
 
   // Switching client drops a picked project that doesn't belong to the new client.
-  const handleClientChange = (opt) => {
-    const clientId = opt ? opt.value : "";
-    setFormData((prev) => {
-      const project = projects.find((p) => p.projectId === prev.projectId);
-      const keepProject = !!project && !!clientId && project.clientId === clientId;
-      return { ...prev, clientId, projectId: keepProject ? prev.projectId : "" };
-    });
+  const handleClientChange = (clientId) => {
+    setFormData((prev) => ({ ...prev, clientId, projectId: projectIdForClient(projects, prev.projectId, clientId) }));
     if (formErrors.clientId) setFormErrors((prev) => ({ ...prev, clientId: "" }));
   };
 
-  // Cost centers this line is charged to that sit outside the caller's home department: the split
-  // rows when splitting, otherwise the line's own cost center. Each needs a reason (server re-checks
-  // at submit). A cost center with no department is never cross-department. With the home department
-  // unknown, a line split across two or more departments still needs one - every share is listed.
-  const crossDepartmentCostCenters = useMemo(() => {
-    const ids = splitEnabled
-      ? splitRows.map((row) => row.costCenterId).filter(Boolean)
-      : [formData.costCenterId].filter(Boolean);
-    const options = [...new Set(ids)]
-      .map((id) => costCenterOptions.find((o) => o.value === id))
-      .filter((o) => o?.departmentUuid);
-    if (!homeDepartmentUuid) {
-      const departments = new Set(options.map((o) => String(o.departmentUuid).toLowerCase()));
-      return departments.size > 1 ? options.map((o) => o.label) : [];
-    }
-    const home = String(homeDepartmentUuid).toLowerCase();
-    return options
-      .filter((o) => String(o.departmentUuid).toLowerCase() !== home)
-      .map((o) => o.label);
-  }, [homeDepartmentUuid, splitEnabled, splitRows, formData.costCenterId, costCenterOptions]);
+  const crossDepartmentCostCenters = crossDepartmentCostCenterLabels({
+    split,
+    costCenterId: formData.costCenterId,
+    costCenterOptions,
+    homeDepartmentUuid,
+  });
 
   const clientOptions = useMemo(() => {
     const options = clients
@@ -3349,128 +3209,14 @@ export function LineItemDrawer({
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 space-y-2">
-          <label className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-            <input
-              type="checkbox"
-              checked={splitEnabled}
-              onChange={(e) => handleToggleSplit(e.target.checked)}
-              disabled={submitting || loadingSplits}
-              className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            Split this expense across multiple cost centers
-          </label>
-
-          {loadingSplits && (
-            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-              <Loader2 className="animate-spin" size={12} /> Loading existing split allocation...
-            </div>
-          )}
-
-          {splitEnabled && !loadingSplits && (
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Split Allocation</span>
-                <select
-                  value={splitMode}
-                  onChange={(e) => handleSplitModeChange(e.target.value)}
-                  disabled={submitting}
-                  className="text-[11px] px-2 py-1 border border-gray-300 bg-white rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="PERCENTAGE">By Percentage</option>
-                  <option value="FIXED_AMOUNT">By Fixed Amount</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                {splitRows.map((row, idx) => {
-                  const rowError = splitErrors.rows?.[idx] || {};
-                  const rowCostCenterOptions = costCenterOptions.filter(
-                    (o) => o.value === row.costCenterId || !splitRows.some((r, j) => j !== idx && r.costCenterId === o.value)
-                  );
-                  return (
-                    <div key={row.key} className="flex items-start gap-2">
-                      <div className="flex-1 min-w-0">
-                        <Select
-                          options={rowCostCenterOptions}
-                          value={costCenterOptions.find((o) => o.value === row.costCenterId) || null}
-                          onChange={(opt) => handleSplitRowChange(idx, "costCenterId", opt ? opt.value : "")}
-                          placeholder="Select cost center..."
-                          isSearchable
-                          styles={compactSelectStyles}
-                          isDisabled={submitting}
-                        />
-                        {rowError.costCenterId && <span className="text-[11px] text-red-600 block mt-0.5">{rowError.costCenterId}</span>}
-                      </div>
-                      <div className="w-24 shrink-0">
-                        <FormInput
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder={splitMode === "PERCENTAGE" ? "%" : "Amount"}
-                          value={splitMode === "PERCENTAGE" ? row.percentage : row.allocatedAmount}
-                          onChange={(e) =>
-                            handleSplitRowChange(idx, splitMode === "PERCENTAGE" ? "percentage" : "allocatedAmount", e.target.value)
-                          }
-                          disabled={submitting}
-                          inputClassName="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
-                          error={splitMode === "PERCENTAGE" ? rowError.percentage : rowError.allocatedAmount}
-                        />
-                      </div>
-                      {splitMode === "PERCENTAGE" && (
-                        <div className="w-20 shrink-0 pt-1.5 text-right text-xs font-mono text-gray-500">
-                          {formatAmount(computedSplitAmounts[idx] ?? 0)}
-                        </div>
-                      )}
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="icon"
-                        title="Remove row"
-                        className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 shrink-0"
-                        onClick={() => handleRemoveSplitRow(idx)}
-                        disabled={submitting}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="small"
-                onClick={handleAddSplitRow}
-                disabled={submitting || splitRows.length >= costCenterOptions.length}
-              >
-                <Plus size={12} />
-                Add Cost Center
-              </Button>
-
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold">
-                <span
-                  className={
-                    (splitMode === "PERCENTAGE"
-                      ? Math.abs(splitTotalPercentage - 100) <= 0.01
-                      : Math.abs(splitTotalAllocated - splitTotalBasis) <= 0.01)
-                      ? "text-emerald-600"
-                      : "text-red-600"
-                  }
-                >
-                  Total: {splitMode === "PERCENTAGE" ? `${splitTotalPercentage.toFixed(2)}%` : formatAmount(splitTotalAllocated)}
-                  {splitMode === "PERCENTAGE" && ` / ${formatAmount(splitTotalAllocated)}`}
-                </span>
-                <span className="text-gray-400">
-                  Line Item Amount: {formatAmount(splitTotalBasis)} {splitTotalCurrencyLabel}
-                </span>
-              </div>
-
-              {splitErrors.general && <p className="text-[11px] text-red-600">{splitErrors.general}</p>}
-            </div>
-          )}
-        </div>
+        <SplitAllocationSection
+          split={split}
+          costCenterOptions={costCenterOptions}
+          selectStyles={compactSelectStyles}
+          disabled={submitting}
+          formatAmount={formatAmount}
+          currencyLabel={splitTotalCurrencyLabel}
+        />
 
         {crossDepartmentCostCenters.length > 0 && (
           <div className="space-y-0.5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
@@ -3575,92 +3321,23 @@ export function LineItemDrawer({
           savedTaxAmount={savedLineItem?.taxAmount}
         />
 
-        <div className="space-y-0.5">
-          <label className="block text-xs font-semibold text-gray-600">
-            Client Billable?
-          </label>
-          <select
-            name="clientBillable"
-            value={formData.clientBillable.toString()}
-            onChange={(e) => handleSelectChange("clientBillable", e.target.value === "true")}
-            className="w-full text-xs px-2.5 py-1.5 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
-            disabled={submitting}
-          >
-            <option value="true">Yes</option>
-            <option value="false">No</option>
-          </select>
-        </div>
-
-        {formData.clientBillable && (
-          <div className="space-y-0.5">
-            <label className="block text-xs font-semibold text-gray-600">
-              Client <span className="text-red-500">*</span>
-            </label>
-            <Select
-              options={clientOptions}
-              value={clientOptions.find((o) => o.value === formData.clientId) || null}
-              onChange={handleClientChange}
-              placeholder={
-                loadingClients
-                  ? "Loading clients..."
-                  : clientsError
-                    ? "Clients unavailable"
-                    : "Select client..."
-              }
-              isSearchable
-              isLoading={loadingClients}
-              noOptionsMessage={() => (loadingClients ? "Loading..." : "No active clients found.")}
-              styles={compactSelectStyles}
-              isDisabled={submitting || loadingClients || !!clientsError}
-            />
-            {clientsError ? (
-              <span className="text-[11px] text-red-600 block mt-0.5">
-                {clientsError}{" "}
-                <button
-                  type="button"
-                  onClick={loadClients}
-                  className="font-semibold text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  Retry
-                </button>
-              </span>
-            ) : !loadingClients && clientOptions.length === 0 ? (
-              <span className="text-[11px] text-gray-500 block mt-0.5">
-                No active clients are available, so this expense can't be marked billable yet.
-              </span>
-            ) : null}
-            {formErrors.clientId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.clientId}</span>}
-          </div>
-        )}
-
-        {formData.clientBillable && (
-          <div className="space-y-0.5">
-            <label className="block text-xs font-semibold text-gray-600">
-              Project <span className="font-normal text-gray-400">(optional)</span>
-            </label>
-            <Select
-              options={projectOptions}
-              value={projectOptions.find((o) => o.value === formData.projectId) || null}
-              onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
-              placeholder={
-                loadingProjects
-                  ? "Loading your assigned projects..."
-                  : !formData.clientId
-                    ? "Select a client first"
-                    : "Select project..."
-              }
-              isSearchable
-              isClearable
-              isLoading={loadingProjects}
-              noOptionsMessage={() =>
-                loadingProjects ? "Loading..." : "You have no assigned projects for this client."
-              }
-              styles={compactSelectStyles}
-              isDisabled={submitting || loadingProjects || !formData.clientId}
-            />
-            {formErrors.projectId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.projectId}</span>}
-          </div>
-        )}
+        <BillableClientFields
+          clientBillable={formData.clientBillable}
+          clientId={formData.clientId}
+          projectId={formData.projectId}
+          onBillableChange={(value) => handleSelectChange("clientBillable", value)}
+          onClientChange={handleClientChange}
+          onProjectChange={(value) => handleSelectChange("projectId", value)}
+          clientOptions={clientOptions}
+          projectOptions={projectOptions}
+          clientsLoading={loadingClients}
+          clientsError={clientsError}
+          onRetryClients={loadClients}
+          projectsLoading={loadingProjects}
+          errors={formErrors}
+          selectStyles={compactSelectStyles}
+          disabled={submitting}
+        />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <CurrencyConversionCard

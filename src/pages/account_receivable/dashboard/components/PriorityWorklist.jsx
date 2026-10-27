@@ -49,13 +49,22 @@ export default function PriorityWorklist({ items, className = "" }) {
         </>
       }
     >
+      {items.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+          </span>
+          <p className="text-sm font-medium text-slate-700">All clear</p>
+          <p className="text-xs text-slate-500">No queue needs attention right now.</p>
+        </div>
+      ) : (
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((item) => {
           const Icon = TONE_ICON[item.tone] || FileClock;
           return (
             <li key={item.id} className="min-w-0">
               <Link
-                to={AR_ROUTES[item.route]}
+                to={item.to ?? AR_ROUTES[item.route]}
                 className={`group flex h-full flex-col rounded-lg border border-l-4 border-slate-200 p-3.5 transition-[border-color,background-color,box-shadow] duration-150 hover:bg-slate-50 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${TONE_ACCENT[item.tone] || TONE_ACCENT.neutral}`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -78,6 +87,7 @@ export default function PriorityWorklist({ items, className = "" }) {
           );
         })}
       </ul>
+      )}
     </DashboardCard>
   );
 }

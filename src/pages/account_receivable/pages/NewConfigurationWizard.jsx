@@ -226,7 +226,7 @@ function getMissingFields(step, data) {
                 missing.push(`Valid positive discount value for ${pLabel}`);
               } else if (p.discountType === "PERCENTAGE" && dv >= 100) {
                 missing.push(`Discount percentage must be less than 100% for ${pLabel}`);
-              } else if (p.discountType === "FIXED_AMOUNT" && tm.rate && dv >= Number(tm.rate)) {
+              } else if ((p.discountType === "FIXED_AMOUNT" || p.discountType === "FIXED") && tm.rate && dv >= Number(tm.rate)) {
                 missing.push(`Fixed discount must be less than standard rate for ${pLabel}`);
               }
               if (!p.effectiveFrom) missing.push(`Start date for ${pLabel}`);
@@ -253,7 +253,7 @@ function getMissingFields(step, data) {
               missing.push("Valid positive discount value");
             } else if (tm.discountType === "PERCENTAGE" && dv >= 100) {
               missing.push("Discount percentage must be less than 100%");
-            } else if (tm.discountType === "FIXED_AMOUNT" && dv >= Number(tm.rate)) {
+            } else if ((tm.discountType === "FIXED_AMOUNT" || tm.discountType === "FIXED") && dv >= Number(tm.rate)) {
               missing.push("Fixed discount must be less than standard rate");
             }
             if (tm.discountStartDate && tm.discountEndDate && tm.discountStartDate > tm.discountEndDate) {
@@ -264,24 +264,62 @@ function getMissingFields(step, data) {
           const roles = config.timeAndMaterial?.roles || [];
           if (roles.length === 0) missing.push("At least one role-based rate");
           else {
-            if (!roles.every((r) => Boolean(r.role && r.rate && r.ratePeriod))) {
+            if (!roles.every((r) => Boolean((r.role || r.roleName) && r.rate && r.ratePeriod))) {
               missing.push("Role, Rate, and Rate Period for every role row");
             }
             const invalidRate = roles.some((r) => Number(r.rate) <= 0);
             if (invalidRate) missing.push("Rate must be greater than 0 for all roles");
 
+            const roleNames = roles.map((r) => String(r.roleName || r.role || "").trim().toLowerCase()).filter(Boolean);
+            if (new Set(roleNames).size !== roleNames.length) {
+              missing.push("Role names must be unique for all roles");
+            }
+
             for (const r of roles) {
-              if (r.hasDiscount || (r.discountType && r.discountType !== "NONE" && r.discountValue)) {
+              const roleTitle = r.roleName || r.role || "role";
+              const periods = Array.isArray(r.discountPeriods) ? r.discountPeriods : [];
+              if (periods.length > 0) {
+                for (let pi = 0; pi < periods.length; pi++) {
+                  const p = periods[pi];
+                  if (!p.periodName?.trim()) {
+                    missing.push(`Period name for ${roleTitle} period #${pi + 1}`);
+                  }
+                  const dv = Number(p.discountValue);
+                  if (p.discountValue === "" || p.discountValue === null || Number.isNaN(dv) || dv <= 0) {
+                    missing.push(`Valid positive discount value for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  } else if (p.discountType === "PERCENTAGE" && dv >= 100) {
+                    missing.push(`Discount percentage must be less than 100% for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  } else if ((p.discountType === "FIXED_AMOUNT" || p.discountType === "FIXED") && dv >= Number(r.rate)) {
+                    missing.push(`Fixed discount must be less than base rate for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  }
+                  if (!p.effectiveFrom || !p.effectiveTo) {
+                    missing.push(`Start and End dates for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  } else if (p.effectiveFrom > p.effectiveTo) {
+                    missing.push(`Start date cannot be after end date for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  }
+                }
+                for (let i = 0; i < periods.length; i++) {
+                  for (let j = i + 1; j < periods.length; j++) {
+                    const a = periods[i];
+                    const b = periods[j];
+                    if (a.effectiveFrom && a.effectiveTo && b.effectiveFrom && b.effectiveTo) {
+                      if (a.effectiveFrom <= b.effectiveTo && a.effectiveTo >= b.effectiveFrom) {
+                        missing.push(`Discount periods overlap for ${roleTitle} ("${a.periodName || `#${i + 1}`}" and "${b.periodName || `#${j + 1}`}")`);
+                      }
+                    }
+                  }
+                }
+              } else if (r.hasDiscount || (r.discountType && r.discountType !== "NONE" && r.discountValue)) {
                 const dv = Number(r.discountValue);
                 if (Number.isNaN(dv) || dv <= 0) {
-                  missing.push(`Valid discount value for role ${r.role || "entry"}`);
+                  missing.push(`Valid discount value for role ${roleTitle}`);
                 } else if (r.discountType === "PERCENTAGE" && dv >= 100) {
-                  missing.push(`Discount percentage must be less than 100% for role ${r.role || "entry"}`);
-                } else if (r.discountType === "FIXED_AMOUNT" && dv >= Number(r.rate)) {
-                  missing.push(`Fixed discount must be less than rate for role ${r.role || "entry"}`);
+                  missing.push(`Discount percentage must be less than 100% for role ${roleTitle}`);
+                } else if ((r.discountType === "FIXED_AMOUNT" || r.discountType === "FIXED") && dv >= Number(r.rate)) {
+                  missing.push(`Fixed discount must be less than rate for role ${roleTitle}`);
                 }
                 if (r.discountStartDate && r.discountEndDate && r.discountStartDate > r.discountEndDate) {
-                  missing.push(`Discount Start Date cannot be after End Date for role ${r.role || "entry"}`);
+                  missing.push(`Discount Start Date cannot be after End Date for role ${roleTitle}`);
                 }
               }
             }
@@ -407,6 +445,37 @@ function getMissingFields(step, data) {
 
         if (paymentStructure === "FULL_PAYMENT") {
           if (!entries[0]?.billingDate) missing.push("Billing Date");
+        } else if (paymentStructure === "MILESTONES") {
+          if (entries.length === 0) {
+            missing.push("At least one Milestone");
+          } else {
+            const hasInvalidPercentage = entries.some((entry) => {
+              const percentNum = Number(entry.percentage);
+              const decimalPlaces = (entry.percentage?.toString().split(".")[1] || "").length;
+              return (
+                entry.percentage === "" ||
+                entry.percentage === null ||
+                entry.percentage === undefined ||
+                Number.isNaN(percentNum) ||
+                percentNum <= 0 ||
+                percentNum > 100 ||
+                decimalPlaces > 2
+              );
+            });
+            if (hasInvalidPercentage) missing.push("Percentage (greater than 0 and up to 100 with at most 2 decimal places) for every milestone");
+
+            const hasMissingDate = entries.some((entry) => !entry.billingDate);
+            if (hasMissingDate) missing.push("Billing Date for every milestone");
+
+            const dates = entries.map((e) => e.billingDate).filter(Boolean);
+            const hasDuplicateDates = new Set(dates).size !== dates.length;
+            if (hasDuplicateDates) missing.push("Each milestone must have a unique billing date");
+
+            const totalPercentage = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
+            if (!hasInvalidPercentage && totalPercentage > 100.001) {
+              missing.push("Total milestone percentage cannot exceed 100%");
+            }
+          }
         } else if (entries.length === 0) {
           missing.push("At least one Installment");
         } else {
@@ -1088,19 +1157,6 @@ export default function NewConfigurationWizard() {
           // Backend-reported changes awaiting approval (empty unless pending).
           pendingChanges={wizardData.changes}
           leading={<BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Overview" />}
-          headerActions={
-            <Button
-              variant="primary"
-              size="small"
-              onClick={handleStartEdit}
-              loading={recordLock.acquiring}
-              loadingText="Acquiring lock..."
-              disabled={recordLock.isLockedByOther(configId)}
-              title={recordLock.isLockedByOther(configId) ? "This configuration is currently under review." : ""}
-            >
-              <Pencil className="h-3.5 w-3.5" /> Edit Configuration
-            </Button>
-          }
         />
       </div>
     );

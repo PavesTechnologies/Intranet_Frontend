@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Plus, Pencil, Trash2, Loader2, Landmark, Wallet, Layers, Lock, AlertCircle, Tag, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, Plus, Pencil, Trash2, Loader2, Landmark, Wallet, Layers, Lock, AlertCircle, Tag, ChevronDown, ChevronUp, Search, Target } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -14,6 +14,9 @@ import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import RadioCardGroup from "../common/RadioCardGroup";
 import ToggleSwitch from "../common/ToggleSwitch";
+import PmsMilestoneSelectionPanel from "./PmsMilestoneSelectionPanel";
+import { useProjectMilestones } from "./useProjectMilestones";
+import { isMilestoneEntryLocked, toPmsProjectId } from "../../services/projectMilestoneService";
 import {
   MILESTONE_STATUS_OPTIONS,
   CURRENCY_OPTIONS,
@@ -33,10 +36,14 @@ import {
   getActiveBillingTypes,
   getActiveBillingFrequencies,
   getTmRateCardsByBillingConfiguration,
+  createTmRateCard,
+  updateTmRateCard,
   saveTmRateCard,
   deleteTmRateCard,
   getApiErrorMessage,
   calculateDiscountedRate,
+  mapUiDiscountTypeToApi,
+  mapApiDiscountTypeToUi,
   getTmRateDiscounts,
   createTmRateDiscount,
   updateTmRateDiscount,
@@ -283,7 +290,9 @@ const EMPTY_RATE_CARD = {
   discountedRate: "",
   discountStartDate: "",
   discountEndDate: "",
+  includeBaseRateInInvoice: true,
   includeInInvoice: true,
+  discountPeriods: [],
 };
 
 // TM rate card dates come back from the backend as Java LocalDate arrays
@@ -334,7 +343,11 @@ const mapRateCard = (card = {}, includeRole = true) => {
         ]
       : []);
 
+  const rateCardId = card.id || card.rateCardId || card.tmRateCardId || null;
+  const uid = card._uid || (rateCardId ? `role-${rateCardId}` : `role-new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+
   return {
+    _uid: uid,
     ...(includeRole
       ? { role: card.roleName || card.role || card.name || "" }
       : {}),
@@ -352,7 +365,8 @@ const mapRateCard = (card = {}, includeRole = true) => {
     discountedRate: hasDiscount ? discountedRate : (rate || ""),
     discountStartDate: normalizeRateCardDate(card.discountStartDate),
     discountEndDate: normalizeRateCardDate(card.discountEndDate),
-    includeInInvoice: card.includeInInvoice !== false,
+    includeBaseRateInInvoice: card.includeBaseRateInInvoice !== undefined ? card.includeBaseRateInInvoice !== false : card.includeInInvoice !== false,
+    includeInInvoice: card.includeBaseRateInInvoice !== undefined ? card.includeBaseRateInInvoice !== false : card.includeInInvoice !== false,
     discountPeriods,
   };
 };
@@ -508,7 +522,7 @@ function TimeAndMaterialForm({
       ? [
           {
             periodName: "Discount Period 1",
-            discountType: value.discountType || "PERCENTAGE",
+            discountType: value.discountType ? mapApiDiscountTypeToUi(value.discountType) : "PERCENTAGE",
             discountValue: value.discountValue,
             effectiveFrom: value.discountStartDate || value.effectiveFrom || "",
             effectiveTo: value.discountEndDate || value.effectiveTo || "",
@@ -524,8 +538,8 @@ function TimeAndMaterialForm({
   const discountPeriods = rawPeriods.map((p, idx) => ({
     ...p,
     _uid: p._uid || (p.discountId ? `period-${p.discountId}` : `period-uid-${idx}`),
-    periodName: p.periodName || `Period ${idx + 1}`,
-    discountType: p.discountType || "PERCENTAGE",
+    periodName: p.periodName !== undefined && p.periodName !== null ? p.periodName : `Period ${idx + 1}`,
+    discountType: p.discountType ? mapApiDiscountTypeToUi(p.discountType) : "PERCENTAGE",
     includeInInvoice: p.includeInInvoice !== false,
   }));
 
@@ -553,12 +567,16 @@ function TimeAndMaterialForm({
     isSaved: Boolean(value.rateCardId),
     remarks: value.remarks || value.notes || "",
     hasDiscount: Boolean(value.hasDiscount || discountPeriods.length > 0),
-    discountType: value.discountType || "PERCENTAGE",
+    discountType: value.discountType ? mapApiDiscountTypeToUi(value.discountType) : "PERCENTAGE",
     discountValue: value.discountValue !== undefined && value.discountValue !== null ? value.discountValue : "",
     discountedRate: value.discountedRate || "",
     discountStartDate: value.discountStartDate || "",
     discountEndDate: value.discountEndDate || "",
     includeInInvoice: value.includeInInvoice !== false,
+    // EMPTY_RATE_CARD defaults this to true, and the payload builder prefers it over includeInInvoice.
+    includeBaseRateInInvoice: value.includeBaseRateInInvoice !== undefined
+      ? value.includeBaseRateInInvoice !== false
+      : value.includeInInvoice !== false,
     discountPeriods,
   };
 
@@ -584,6 +602,9 @@ function TimeAndMaterialForm({
       effectiveTo: "",
       overlap: "",
     };
+    if (standardRate?.ratePeriod && standardRate.ratePeriod !== "HOURLY") {
+      errors.periodName = "Discount schedules are only permitted for hourly rate cards.";
+    }
     if (!period.periodName?.trim()) {
       errors.periodName = "Period name is required.";
     }
@@ -594,7 +615,7 @@ function TimeAndMaterialForm({
       errors.discountValue = "Discount value must be greater than 0.";
     } else if (period.discountType === "PERCENTAGE" && dv >= 100) {
       errors.discountValue = "Percentage discount must be less than 100%.";
-    } else if (period.discountType === "FIXED_AMOUNT" && standardRate.rate && dv >= Number(standardRate.rate)) {
+    } else if ((period.discountType === "FIXED_AMOUNT" || period.discountType === "FIXED") && standardRate.rate && dv >= Number(standardRate.rate)) {
       errors.discountValue = `Fixed discount must be less than base rate (${formatCurrency(standardRate.rate, currency)}).`;
     }
 
@@ -621,6 +642,10 @@ function TimeAndMaterialForm({
   };
 
   const addDiscountPeriod = () => {
+    if (standardRate?.ratePeriod && standardRate.ratePeriod !== "HOURLY") {
+      showStatusToast("Commercial discount schedules are currently supported only for hourly rate cards.", "warning");
+      return;
+    }
     if (!standardRate.rate || Number(standardRate.rate) <= 0) {
       showStatusToast("Please enter a valid standard base rate before adding discount periods.", "warning");
       return;
@@ -732,6 +757,10 @@ function TimeAndMaterialForm({
   useEffect(() => {
     if (value?._validateTrigger) {
       const periods = standardRate.discountPeriods || [];
+    if (periods.length > 0 && standardRate.ratePeriod && standardRate.ratePeriod !== "HOURLY") {
+      showStatusToast("Commercial discount schedules are only permitted for hourly rate cards. Remove discounts or change rate frequency to Hourly.", "error");
+      return;
+    }
       const invalidKeys = new Set();
       periods.forEach((p, i) => {
         const pErrors = getPeriodValidationErrors(p, i, periods);
@@ -776,19 +805,154 @@ function TimeAndMaterialForm({
     (value.roles || []).map((r) => mapRateCard(r)),
   );
   const [loadingRows, setLoadingRows] = useState(false);
-  const [expandedRowIndices, setExpandedRowIndices] = useState(() => new Set());
+  const [expandedRoleKeys, setExpandedRoleKeys] = useState(() => {
+    const initial = new Set();
+    const list = value.roles || [];
+    list.forEach((r, idx) => {
+      initial.add(String(r._uid || (r.rateCardId ? `role-${r.rateCardId}` : `role-idx-${idx}`)));
+    });
+    return initial;
+  });
+  const [expandedRolePeriodKeys, setExpandedRolePeriodKeys] = useState(() => new Set());
+  const [roleSearchTerm, setRoleSearchTerm] = useState("");
   // Tracks which pricing modes have already been hydrated from the server for this
   // billing configuration, so a later Save Draft (which assigns billingConfigurationId
   // for the first time) doesn't re-fetch and clobber rows the user is mid-editing.
   const loadedModesRef = useRef(new Set());
 
-  const toggleExpandRow = (idx) => {
-    setExpandedRowIndices((prev) => {
+  const getRoleStableKey = (row, idx) =>
+    String(row?._uid || (row?.rateCardId ? `role-${row.rateCardId}` : `role-idx-${idx}`));
+
+  const getRolePeriodStableKey = (row, roleIdx, period, periodIdx) =>
+    `${getRoleStableKey(row, roleIdx)}:${getPeriodStableKey(period, periodIdx)}`;
+
+  const toggleExpandRole = (roleKey) => {
+    setExpandedRoleKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
+      if (next.has(roleKey)) next.delete(roleKey);
+      else next.add(roleKey);
       return next;
     });
+  };
+
+  const isAllRolesExpanded =
+    rows.length > 0 &&
+    rows.every((r, idx) => expandedRoleKeys.has(getRoleStableKey(r, idx)));
+
+  const toggleExpandCollapseAllRoles = () => {
+    if (isAllRolesExpanded) {
+      setExpandedRoleKeys(new Set());
+    } else {
+      const allKeys = new Set(rows.map((r, idx) => getRoleStableKey(r, idx)));
+      setExpandedRoleKeys(allKeys);
+    }
+  };
+
+  const toggleExpandRolePeriod = (compositeKey) => {
+    setExpandedRolePeriodKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(compositeKey)) next.delete(compositeKey);
+      else next.add(compositeKey);
+      return next;
+    });
+  };
+
+  const getRolePeriodOverlapError = (period, idx, periods) => {
+    if (!period.effectiveFrom || !period.effectiveTo) return null;
+    for (let i = 0; i < periods.length; i++) {
+      if (i === idx) continue;
+      const other = periods[i];
+      if (other.effectiveFrom && other.effectiveTo) {
+        if (period.effectiveFrom <= other.effectiveTo && period.effectiveTo >= other.effectiveFrom) {
+          return `Overlaps with "${other.periodName || `Period ${i + 1}`}" (${other.effectiveFrom} to ${other.effectiveTo}). Periods must not overlap.`;
+        }
+      }
+    }
+    return null;
+  };
+
+  const getRolePeriodValidationErrors = (period, idx, periods, roleRow) => {
+    const errors = {
+      periodName: "",
+      discountValue: "",
+      effectiveFrom: "",
+      effectiveTo: "",
+      overlap: "",
+    };
+    if (!period.periodName?.trim()) {
+      errors.periodName = "Period name is required.";
+    }
+    const dv = Number(period.discountValue);
+    if (period.discountValue === "" || period.discountValue === null || period.discountValue === undefined) {
+      errors.discountValue = "Discount value is required.";
+    } else if (Number.isNaN(dv) || dv <= 0) {
+      errors.discountValue = "Discount value must be greater than 0.";
+    } else if (period.discountType === "PERCENTAGE" && dv >= 100) {
+      errors.discountValue = "Percentage discount must be less than 100%.";
+    } else if ((period.discountType === "FIXED_AMOUNT" || period.discountType === "FIXED") && roleRow?.rate && dv >= Number(roleRow.rate)) {
+      errors.discountValue = `Fixed discount must be less than base rate (${formatCurrency(roleRow.rate, currency)}).`;
+    }
+
+    if (!period.effectiveFrom) {
+      errors.effectiveFrom = "Start date is required.";
+    } else if (projectStartDateOnly && period.effectiveFrom < projectStartDateOnly) {
+      errors.effectiveFrom = `Cannot precede project start date (${projectStartDateOnly}).`;
+    } else if (roleRow?.effectiveFrom && period.effectiveFrom < roleRow.effectiveFrom) {
+      errors.effectiveFrom = `Cannot precede role start date (${roleRow.effectiveFrom}).`;
+    }
+
+    if (!period.effectiveTo) {
+      errors.effectiveTo = "End date is required.";
+    } else if (period.effectiveFrom && period.effectiveTo < period.effectiveFrom) {
+      errors.effectiveTo = "End date must be on or after start date.";
+    } else if (projectEndDateOnly && period.effectiveTo > projectEndDateOnly) {
+      errors.effectiveTo = `Cannot exceed project end date (${projectEndDateOnly}).`;
+    } else if (roleRow?.effectiveTo && period.effectiveTo > roleRow.effectiveTo) {
+      errors.effectiveTo = `Cannot exceed role end date (${roleRow.effectiveTo}).`;
+    }
+
+    errors.overlap = getRolePeriodOverlapError(period, idx, periods) || "";
+    return errors;
+  };
+
+  const getRoleValidationErrors = (row, index, allRows) => {
+    const roleName = String(row.roleName || row.role || "").trim();
+    let nameError = "";
+    if (!roleName) {
+      nameError = "Role name is required.";
+    } else {
+      const isDuplicate = allRows.some(
+        (other, otherIdx) =>
+          otherIdx !== index &&
+          String(other.roleName || other.role || "").trim().toLowerCase() === roleName.toLowerCase(),
+      );
+      if (isDuplicate) {
+        nameError = "Role name must be unique.";
+      }
+    }
+
+    let rateError = "";
+    const numRate = Number(row.rate);
+    if (row.rate === "" || row.rate === null || row.rate === undefined) {
+      rateError = "Base rate is required.";
+    } else if (Number.isNaN(numRate) || numRate <= 0) {
+      rateError = "Rate must be greater than 0.";
+    }
+
+    const dateErrors = isOneTime
+      ? { effectiveFrom: "", effectiveTo: "" }
+      : getEffectiveDateErrors({
+          effectiveFrom: row.effectiveFrom,
+          effectiveTo: row.effectiveTo,
+          projectStartDate: projectStartDateOnly,
+          projectEndDate: projectEndDateOnly,
+        });
+
+    return {
+      roleName: nameError,
+      rate: rateError,
+      ...dateErrors,
+    };
   };
 
   const syncParent = (nextRows) => {
@@ -797,6 +961,7 @@ function TimeAndMaterialForm({
       ...value,
       roles: nextRows.map(
         ({
+          _uid,
           role,
           roleName,
           rate,
@@ -805,6 +970,7 @@ function TimeAndMaterialForm({
           effectiveTo,
           rateCardId,
           remarks,
+          notes,
           hasDiscount,
           discountType,
           discountValue,
@@ -812,40 +978,138 @@ function TimeAndMaterialForm({
           discountStartDate,
           discountEndDate,
           includeInInvoice,
-        }) => ({
-          role,
-          roleName: roleName || role,
-          rate,
-          ratePeriod,
-          effectiveFrom,
-          effectiveTo,
-          rateCardId,
-          remarks: remarks || "",
-          hasDiscount: Boolean(hasDiscount),
-          discountType: discountType || "PERCENTAGE",
-          discountValue: discountValue ?? "",
-          discountedRate: discountedRate ?? "",
-          discountStartDate: discountStartDate || "",
-          discountEndDate: discountEndDate || "",
-          includeInInvoice: includeInInvoice !== false,
-        }),
+          includeBaseRateInInvoice,
+          discountPeriods,
+        }) => {
+          const baseInc = includeBaseRateInInvoice !== undefined
+            ? includeBaseRateInInvoice !== false
+            : includeInInvoice !== false;
+          const periods = Array.isArray(discountPeriods) ? discountPeriods : [];
+          return {
+            _uid,
+            role: roleName || role,
+            roleName: roleName || role,
+            rate,
+            ratePeriod: ratePeriod || "HOURLY",
+            effectiveFrom: effectiveFrom || "",
+            effectiveTo: effectiveTo || "",
+            rateCardId: rateCardId || null,
+            remarks: remarks || notes || "",
+            hasDiscount: Boolean(hasDiscount || periods.length > 0),
+            discountType: discountType ? mapApiDiscountTypeToUi(discountType) : "PERCENTAGE",
+            discountValue: discountValue ?? "",
+            discountedRate: discountedRate ?? "",
+            discountStartDate: discountStartDate || "",
+            discountEndDate: discountEndDate || "",
+            includeInInvoice: baseInc,
+            includeBaseRateInInvoice: baseInc,
+            discountPeriods: periods,
+          };
+        },
       ),
     });
   };
 
   const handleRoleChange = (index, field, val) => {
     const updated = [...rows];
+    const current = updated[index];
+    const patch = { [field]: val };
+    if (field === "role") patch.roleName = val;
+    if (field === "roleName") patch.role = val;
+    if (field === "includeBaseRateInInvoice") {
+      patch.includeInInvoice = val;
+    }
     updated[index] = {
-      ...updated[index],
-      [field]: val,
-      ...(field === "role" ? { roleName: val } : {}),
+      ...current,
+      ...patch,
     };
     syncParent(updated);
   };
 
+  useEffect(() => {
+    if (value?._validateTrigger) {
+      const invalidRoles = new Set();
+      const invalidRolePeriods = new Set();
+      rows.forEach((r, rIdx) => {
+        const rKey = getRoleStableKey(r, rIdx);
+        const rErrors = getRoleValidationErrors(r, rIdx, rows);
+        if (Object.values(rErrors).some(Boolean)) {
+          invalidRoles.add(rKey);
+        }
+        const rPeriods = Array.isArray(r.discountPeriods) ? r.discountPeriods : [];
+        rPeriods.forEach((p, pIdx) => {
+          const pErrors = getRolePeriodValidationErrors(p, pIdx, rPeriods, r);
+          if (Object.values(pErrors).some(Boolean)) {
+            invalidRoles.add(rKey);
+            invalidRolePeriods.add(getRolePeriodStableKey(r, rIdx, p, pIdx));
+          }
+        });
+      });
+      if (invalidRoles.size > 0) {
+        setExpandedRoleKeys((prev) => new Set([...prev, ...invalidRoles]));
+      }
+      if (invalidRolePeriods.size > 0) {
+        setExpandedRolePeriodKeys((prev) => new Set([...prev, ...invalidRolePeriods]));
+      }
+    }
+  }, [value?._validateTrigger]);
+
   const addRole = () => {
-    const updated = [...rows, { ...EMPTY_RATE_CARD }];
+    if (rows.length > 0) {
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const rErrors = getRoleValidationErrors(r, i, rows);
+        const rErrorList = Object.values(rErrors).filter(Boolean);
+        if (rErrorList.length > 0) {
+          const roleKey = getRoleStableKey(r, i);
+          setExpandedRoleKeys((prev) => new Set([...prev, roleKey]));
+          showStatusToast(
+            `Please complete "${r.roleName || r.role || `Role #${i + 1}`}" (${rErrorList[0]}) before adding another role.`,
+            "warning",
+          );
+          return;
+        }
+
+        const periods = Array.isArray(r.discountPeriods) ? r.discountPeriods : [];
+        for (let pi = 0; pi < periods.length; pi++) {
+          const p = periods[pi];
+          const pErrors = getRolePeriodValidationErrors(p, pi, periods, r);
+          const pErrorList = Object.values(pErrors).filter(Boolean);
+          if (pErrorList.length > 0) {
+            const roleKey = getRoleStableKey(r, i);
+            const periodKey = getRolePeriodStableKey(r, i, p, pi);
+            setExpandedRoleKeys((prev) => new Set([...prev, roleKey]));
+            setExpandedRolePeriodKeys((prev) => new Set([...prev, periodKey]));
+            showStatusToast(
+              `Please fix discount period "${p.periodName || `#${pi + 1}`}" for "${r.roleName || r.role || `Role #${i + 1}`}" (${pErrorList[0]}).`,
+              "warning",
+            );
+            return;
+          }
+        }
+      }
+    }
+
+    const uid = `role-new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const newRole = {
+      ...EMPTY_RATE_CARD,
+      _uid: uid,
+      role: "",
+      roleName: "",
+      rate: "",
+      ratePeriod: "HOURLY",
+      effectiveFrom: "",
+      effectiveTo: "",
+      remarks: "",
+      includeBaseRateInInvoice: true,
+      includeInInvoice: true,
+      discountPeriods: [],
+      hasDiscount: false,
+    };
+    const updated = [...rows, newRole];
     syncParent(updated);
+    // Collapse other roles and expand the newly created role to reduce screen clutter
+    setExpandedRoleKeys(new Set([uid]));
   };
 
   const removeRole = async (index) => {
@@ -876,6 +1140,147 @@ function TimeAndMaterialForm({
         prev.map((r, i) => (i === index ? { ...r, deleting: false } : r)),
       );
     }
+  };
+
+  const addRoleDiscountPeriod = (roleIndex) => {
+    const row = rows[roleIndex];
+    if (!row) return;
+
+    if (row.ratePeriod && row.ratePeriod !== "HOURLY") {
+      showStatusToast("Commercial discount schedules are currently supported only for hourly rate cards.", "warning");
+      return;
+    }
+
+    if (!row.rate || Number(row.rate) <= 0) {
+      showStatusToast(
+        `Please enter a valid base rate for "${row.roleName || row.role || `Role #${roleIndex + 1}`}" before adding discount periods.`,
+        "warning",
+      );
+      return;
+    }
+
+    const existingPeriods = Array.isArray(row.discountPeriods) ? row.discountPeriods : [];
+    if (existingPeriods.length > 0) {
+      for (let i = 0; i < existingPeriods.length; i++) {
+        const p = existingPeriods[i];
+        const pErrors = getRolePeriodValidationErrors(p, i, existingPeriods, row);
+        const errorList = Object.values(pErrors).filter(Boolean);
+        if (errorList.length > 0) {
+          const roleKey = getRoleStableKey(row, roleIndex);
+          const pKey = getRolePeriodStableKey(row, roleIndex, p, i);
+          setExpandedRoleKeys((prev) => new Set([...prev, roleKey]));
+          setExpandedRolePeriodKeys((prev) => new Set([...prev, pKey]));
+          showStatusToast(
+            `Please complete "${p.periodName || `Period ${i + 1}`}" (${errorList[0]}) before adding another discount period.`,
+            "warning",
+          );
+          return;
+        }
+      }
+    }
+
+    let defaultStart = "";
+    let defaultEnd = "";
+    if (existingPeriods.length === 0) {
+      defaultStart = row.effectiveFrom || projectStartDateOnly || "";
+      defaultEnd = row.effectiveTo || projectEndDateOnly || "";
+    } else {
+      const lastPeriod = existingPeriods[existingPeriods.length - 1];
+      if (lastPeriod.effectiveTo) {
+        const lastEndDate = new Date(lastPeriod.effectiveTo);
+        if (!Number.isNaN(lastEndDate.getTime())) {
+          const nextDay = new Date(lastEndDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          const nextDayStr = nextDay.toISOString().slice(0, 10);
+          if (!projectEndDateOnly || nextDayStr <= projectEndDateOnly) {
+            defaultStart = nextDayStr;
+            defaultEnd = row.effectiveTo || projectEndDateOnly || nextDayStr;
+          }
+        }
+      }
+      if (!defaultStart) {
+        defaultStart = row.effectiveFrom || projectStartDateOnly || "";
+        defaultEnd = row.effectiveTo || projectEndDateOnly || "";
+      }
+    }
+
+    const nextIdx = existingPeriods.length + 1;
+    const uid = `period-new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const newPeriod = {
+      _uid: uid,
+      periodName: `Period ${nextIdx}`,
+      discountType: "PERCENTAGE",
+      discountValue: "",
+      effectiveFrom: defaultStart,
+      effectiveTo: defaultEnd,
+      notes: "",
+      includeInInvoice: true,
+      discountAmount: null,
+      netRate: null,
+    };
+    const nextPeriods = [...existingPeriods, newPeriod];
+    const updated = [...rows];
+    updated[roleIndex] = {
+      ...updated[roleIndex],
+      discountPeriods: nextPeriods,
+      hasDiscount: true,
+    };
+    syncParent(updated);
+    const roleKey = getRoleStableKey(row, roleIndex);
+    const pKey = `${roleKey}:${uid}`;
+    setExpandedRolePeriodKeys((prev) => new Set([...prev, pKey]));
+  };
+
+  const updateRoleDiscountPeriod = (roleIndex, periodIndex, patch) => {
+    const updated = [...rows];
+    const row = updated[roleIndex];
+    if (!row) return;
+    const nextPeriods = (row.discountPeriods || []).map((p, i) =>
+      i === periodIndex ? { ...p, ...patch } : p
+    );
+    updated[roleIndex] = {
+      ...row,
+      discountPeriods: nextPeriods,
+      hasDiscount: nextPeriods.length > 0,
+    };
+    syncParent(updated);
+  };
+
+  const removeRoleDiscountPeriod = async (roleIndex, periodIndex) => {
+    const row = rows[roleIndex];
+    if (!row) return;
+    const p = (row.discountPeriods || [])[periodIndex];
+    const roleKey = getRoleStableKey(row, roleIndex);
+    const pKey = getRolePeriodStableKey(row, roleIndex, p, periodIndex);
+
+    if (p?.discountId) {
+      const confirmed = window.confirm(
+        `Remove discount period "${p.periodName || `Period ${periodIndex + 1}`}"? This cannot be undone.`
+      );
+      if (!confirmed) return;
+      try {
+        await deleteTmRateDiscount(p.discountId);
+        showStatusToast("Discount period removed", "success");
+      } catch (err) {
+        showStatusToast(getApiErrorMessage(err, "Failed to remove discount period"), "error");
+        return;
+      }
+    }
+
+    setExpandedRolePeriodKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(pKey);
+      return next;
+    });
+
+    const nextPeriods = (row.discountPeriods || []).filter((_, i) => i !== periodIndex);
+    const updated = [...rows];
+    updated[roleIndex] = {
+      ...row,
+      discountPeriods: nextPeriods,
+      hasDiscount: nextPeriods.length > 0,
+    };
+    syncParent(updated);
   };
 
   // A One-Time frequency has no schedule, so any previously entered effective
@@ -962,7 +1367,36 @@ function TimeAndMaterialForm({
         }
 
         const roleRates = mapped.filter((card) => card.role);
-        syncParent(roleRates.length > 0 ? roleRates : rows);
+        const roleRatesWithDiscounts = await Promise.all(
+          roleRates.map(async (roleCard) => {
+            let discountPeriods = roleCard.discountPeriods || [];
+            if ((!discountPeriods || discountPeriods.length === 0) && roleCard.rateCardId) {
+              try {
+                const discounts = await getTmRateDiscounts(roleCard.rateCardId);
+                if (Array.isArray(discounts) && discounts.length > 0) {
+                  discountPeriods = discounts.map(normalizeTmRateDiscount);
+                }
+              } catch (e) {
+                console.warn(`Failed to load rate discounts for role ${roleCard.role}:`, e);
+              }
+            }
+            return {
+              ...roleCard,
+              discountPeriods,
+              hasDiscount: discountPeriods.length > 0 || roleCard.hasDiscount,
+              includeBaseRateInInvoice: roleCard.includeBaseRateInInvoice !== undefined
+                ? roleCard.includeBaseRateInInvoice !== false
+                : roleCard.includeInInvoice !== false,
+            };
+          })
+        );
+        setRows((currentRows) => {
+          const unsaved = (currentRows || []).filter((r) => !r.rateCardId && (r.role || r.rate));
+          const merged = [...roleRatesWithDiscounts, ...unsaved];
+          const result = merged.length > 0 ? merged : currentRows;
+          syncParent(result);
+          return result;
+        });
       } catch (error) {
         showStatusToast(
           getApiErrorMessage(error, "Unable to load rate cards."),
@@ -981,6 +1415,18 @@ function TimeAndMaterialForm({
 
   const buildTmRateCardPayload = (row, billingConfigurationId) => {
     const periods = Array.isArray(row.discountPeriods) ? row.discountPeriods : [];
+    if (periods.length > 0 && row.ratePeriod && row.ratePeriod !== "HOURLY") {
+      showStatusToast("Commercial discount schedules are only permitted for hourly rate cards. Remove discounts or change rate frequency to Hourly.", "error");
+      const rKey = getRoleStableKey(row, index);
+      setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
+      return;
+    }
+    if (periods.length > 0 && row.ratePeriod && row.ratePeriod !== "HOURLY") {
+      showStatusToast("Commercial discount schedules are only permitted for hourly rate cards. Remove discounts or change rate frequency to Hourly.", "error");
+      const rKey = getRoleStableKey(row, index);
+      setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
+      return;
+    }
     const hasDiscount = Boolean(
       periods.length > 0 ||
       row.hasDiscount ||
@@ -988,7 +1434,7 @@ function TimeAndMaterialForm({
     );
     const firstPeriod = periods[0] || {};
     const discountType = hasDiscount
-      ? (firstPeriod.discountType || row.discountType || "PERCENTAGE")
+      ? mapApiDiscountTypeToUi(firstPeriod.discountType || row.discountType || "PERCENTAGE")
       : null;
     const discountValue = hasDiscount
       ? (firstPeriod.discountValue !== undefined && firstPeriod.discountValue !== null && firstPeriod.discountValue !== ""
@@ -999,6 +1445,10 @@ function TimeAndMaterialForm({
     const discountedRate = hasDiscount && numRate > 0 && discountValue !== null
       ? calculateDiscountedRate(numRate, discountType, discountValue)
       : null;
+
+    const includeBase = row.includeBaseRateInInvoice !== undefined
+      ? row.includeBaseRateInInvoice !== false
+      : row.includeInInvoice !== false;
 
     const payload = {
       rateCardId: row.rateCardId || null,
@@ -1018,7 +1468,8 @@ function TimeAndMaterialForm({
       discountedRate,
       discountStartDate: hasDiscount ? (firstPeriod.effectiveFrom || row.discountStartDate || "") : null,
       discountEndDate: hasDiscount ? (firstPeriod.effectiveTo || row.discountEndDate || "") : null,
-      includeInInvoice: row.includeInInvoice !== false,
+      includeInInvoice: includeBase,
+      includeBaseRateInInvoice: includeBase,
       discountPeriods: periods,
     };
     return payload;
@@ -1071,7 +1522,7 @@ function TimeAndMaterialForm({
         showStatusToast(`Discount percentage must be less than 100% for "${pName}".`, "error");
         return;
       }
-      if (p.discountType === "FIXED_AMOUNT" && dv >= Number(standardRate.rate)) {
+      if ((p.discountType === "FIXED_AMOUNT" || p.discountType === "FIXED") && dv >= Number(standardRate.rate)) {
         showStatusToast(`Fixed discount must be less than base rate for "${pName}".`, "error");
         return;
       }
@@ -1133,33 +1584,65 @@ function TimeAndMaterialForm({
       }
 
       const payload = buildTmRateCardPayload(standardRate, resolvedConfigId);
-      const saved = await saveTmRateCard(resolvedConfigId, payload);
-      const targetRateCardId = saved.rateCardId || saved.id || standardRate.rateCardId;
+      let saved = null;
+      if (standardRate.rateCardId) {
+        saved = await updateTmRateCard(standardRate.rateCardId, payload);
+      } else {
+        saved = await createTmRateCard(resolvedConfigId, payload);
+      }
+      const targetRateCardId = saved?.rateCardId || saved?.id || standardRate.rateCardId;
+
+      const mappedSaved = mapRateCard(saved || {}, false);
+      const intermediateRate = {
+        ...standardRate,
+        ...mappedSaved,
+        rateCardId: targetRateCardId,
+        id: targetRateCardId,
+        isSaved: Boolean(targetRateCardId),
+        effectiveFrom: mappedSaved.effectiveFrom || standardRate.effectiveFrom,
+        effectiveTo: mappedSaved.effectiveTo || standardRate.effectiveTo,
+        remarks: mappedSaved.remarks || standardRate.remarks,
+        includeBaseRateInInvoice: standardRate.includeBaseRateInInvoice !== undefined ? standardRate.includeBaseRateInInvoice !== false : standardRate.includeInInvoice !== false,
+        includeInInvoice: standardRate.includeBaseRateInInvoice !== undefined ? standardRate.includeBaseRateInInvoice !== false : standardRate.includeInInvoice !== false,
+      };
 
       let syncedPeriods = periods;
-      if (targetRateCardId) {
+      if (targetRateCardId && periods.length > 0) {
         try {
           syncedPeriods = await syncStandardRateDiscounts(
             targetRateCardId,
             periods,
             currency,
-            Number(standardRate.rate),
-            standardRate.ratePeriod || "HOURLY",
+            { roleName: "Standard Rate" },
           );
         } catch (syncErr) {
-          console.warn("Failed to sync some discount periods:", syncErr);
+          const successfullySaved = syncErr.savedPeriods || [];
+          const mergedPeriods = periods.map((p, pIdx) => {
+            if (pIdx < successfullySaved.length) {
+              return { ...p, ...successfullySaved[pIdx] };
+            }
+            return p;
+          });
+          update({
+            ...intermediateRate,
+            discountPeriods: mergedPeriods,
+            saving: false,
+            isSaved: false,
+          });
+          const errorDetail = getApiErrorMessage(syncErr.cause || syncErr, "Discount period save failed.");
+          showStatusToast(
+            `Standard Rate: Rate card saved, but discount period "${syncErr.periodName || 'item'}" failed (${errorDetail}). Please retry.`,
+            "error",
+          );
+          return;
         }
       }
 
-      const mappedSaved = mapRateCard(saved, false);
       update({
-        ...mappedSaved,
-        effectiveFrom: mappedSaved.effectiveFrom || standardRate.effectiveFrom,
-        effectiveTo: mappedSaved.effectiveTo || standardRate.effectiveTo,
-        remarks: mappedSaved.remarks || standardRate.remarks,
-        includeInInvoice: standardRate.includeInInvoice !== false,
+        ...intermediateRate,
         discountPeriods: syncedPeriods,
         saving: false,
+        isSaved: true,
       });
       showStatusToast("Rate card and rate schedule saved", "success");
     } catch (error) {
@@ -1177,24 +1660,26 @@ function TimeAndMaterialForm({
 
     const roleName = String(row.roleName || row.role || "").trim();
     if (!roleName) {
-      showStatusToast(
-        "Role name is required for role-based rate cards.",
-        "error",
-      );
+      showStatusToast("Role name is required for role-based rate cards.", "error");
+      const rKey = getRoleStableKey(row, index);
+      setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
       return;
     }
     const duplicateRole = rows.some(
       (item, itemIndex) =>
         itemIndex !== index &&
-        String(item.roleName || item.role || "")
-          .trim()
-          .toLowerCase() === roleName.toLowerCase(),
+        String(item.roleName || item.role || "").trim().toLowerCase() === roleName.toLowerCase(),
     );
     if (duplicateRole) {
-      showStatusToast(
-        "Role names must be unique for role-based rate cards.",
-        "error",
-      );
+      showStatusToast("Role names must be unique for role-based rate cards.", "error");
+      const rKey = getRoleStableKey(row, index);
+      setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
+      return;
+    }
+    if (!row.rate || Number(row.rate) <= 0) {
+      showStatusToast("Please enter a valid base rate greater than 0.", "error");
+      const rKey = getRoleStableKey(row, index);
+      setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
       return;
     }
     if (
@@ -1203,38 +1688,87 @@ function TimeAndMaterialForm({
         getEffectiveDateErrors({
           effectiveFrom: row.effectiveFrom,
           effectiveTo: row.effectiveTo,
+          projectStartDate: projectStartDateOnly,
+          projectEndDate: projectEndDateOnly,
         }),
       )
     ) {
       showStatusToast("Please fix the highlighted Effective From/To errors before saving.", "error");
+      const rKey = getRoleStableKey(row, index);
+      setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
       return;
     }
 
-    if (row.hasDiscount) {
-      const dv = Number(row.discountValue);
-      if (!row.discountValue || Number.isNaN(dv) || dv <= 0) {
-        showStatusToast("Please enter a valid positive discount value for this role.", "error");
+    const periods = Array.isArray(row.discountPeriods) ? row.discountPeriods : [];
+    const invalidPeriodKeys = new Set();
+    periods.forEach((p, i) => {
+      const pErrors = getRolePeriodValidationErrors(p, i, periods, row);
+      if (Object.values(pErrors).some(Boolean)) {
+        invalidPeriodKeys.add(getRolePeriodStableKey(row, index, p, i));
+      }
+    });
+    if (invalidPeriodKeys.size > 0) {
+      const rKey = getRoleStableKey(row, index);
+      setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
+      setExpandedRolePeriodKeys((prev) => new Set([...prev, ...invalidPeriodKeys]));
+    }
+
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i];
+      const pName = p.periodName?.trim();
+      if (!pName) {
+        showStatusToast(`Period name is required for period #${i + 1}.`, "error");
         return;
       }
-      if (row.discountType === "PERCENTAGE" && dv >= 100) {
-        showStatusToast("Discount percentage must be less than 100%.", "error");
+      const dv = Number(p.discountValue);
+      if (p.discountValue === "" || p.discountValue === null || Number.isNaN(dv) || dv <= 0) {
+        showStatusToast(`Please enter a valid positive discount value for "${pName}".`, "error");
         return;
       }
-      if (row.discountType === "FIXED_AMOUNT" && dv >= Number(row.rate)) {
-        showStatusToast("Fixed discount amount must be less than role rate.", "error");
+      if (p.discountType === "PERCENTAGE" && dv >= 100) {
+        showStatusToast(`Discount percentage must be less than 100% for "${pName}".`, "error");
         return;
       }
-      const discErrors = getDiscountDateErrors({
-        discountStartDate: row.discountStartDate,
-        discountEndDate: row.discountEndDate,
-        effectiveFrom: row.effectiveFrom,
-        effectiveTo: row.effectiveTo,
-        projectStartDate: projectStartDateOnly,
-        projectEndDate: projectEndDateOnly,
-      });
-      if (hasEffectiveDateErrors(discErrors)) {
-        showStatusToast("Please fix the highlighted Discount Date errors before saving.", "error");
+      if ((p.discountType === "FIXED_AMOUNT" || p.discountType === "FIXED") && dv >= Number(row.rate)) {
+        showStatusToast(`Fixed discount must be less than base rate for "${pName}".`, "error");
         return;
+      }
+      if (!p.effectiveFrom || !p.effectiveTo) {
+        showStatusToast(`Start and End dates are required for "${pName}".`, "error");
+        return;
+      }
+      if (p.effectiveFrom > p.effectiveTo) {
+        showStatusToast(`Start date cannot be after end date for "${pName}".`, "error");
+        return;
+      }
+      if (projectStartDateOnly && p.effectiveFrom < projectStartDateOnly) {
+        showStatusToast(`Period "${pName}" start date cannot precede project start date (${projectStartDateOnly}).`, "error");
+        return;
+      }
+      if (projectEndDateOnly && p.effectiveTo > projectEndDateOnly) {
+        showStatusToast(`Period "${pName}" end date cannot exceed project end date (${projectEndDateOnly}).`, "error");
+        return;
+      }
+      if (row.effectiveFrom && p.effectiveFrom < row.effectiveFrom) {
+        showStatusToast(`Period "${pName}" start date cannot precede role effective from date (${row.effectiveFrom}).`, "error");
+        return;
+      }
+      if (row.effectiveTo && p.effectiveTo > row.effectiveTo) {
+        showStatusToast(`Period "${pName}" end date cannot exceed role effective to date (${row.effectiveTo}).`, "error");
+        return;
+      }
+    }
+
+    for (let i = 0; i < periods.length; i++) {
+      for (let j = i + 1; j < periods.length; j++) {
+        const a = periods[i];
+        const b = periods[j];
+        if (a.effectiveFrom && a.effectiveTo && b.effectiveFrom && b.effectiveTo) {
+          if (a.effectiveFrom <= b.effectiveTo && a.effectiveTo >= b.effectiveFrom) {
+            showStatusToast(`Discount periods "${a.periodName || `#${i + 1}`}" and "${b.periodName || `#${j + 1}`}" overlap. Periods must not overlap.`, "error");
+            return;
+          }
+        }
       }
     }
 
@@ -1243,12 +1777,13 @@ function TimeAndMaterialForm({
     setRows(updating);
 
     try {
+      // The draft is created before Role-Based pricing is chosen, so always re-push the
+      // wizard selection; otherwise the backend rejects a role card against Standard pricing.
       let resolvedConfigId = billingConfigurationId;
-      if (!resolvedConfigId) {
-        resolvedConfigId = await ensureBillingConfigurationId?.(
-          billingConfigurationPayload,
-        );
-      }
+      const syncedConfigId = await ensureBillingConfigurationId?.(
+        billingConfigurationPayload,
+      );
+      if (syncedConfigId) resolvedConfigId = syncedConfigId;
       if (!resolvedConfigId) {
         showStatusToast(
           "Unable to save rate card: billing configuration id is missing.",
@@ -1264,18 +1799,82 @@ function TimeAndMaterialForm({
         { ...row, roleName },
         resolvedConfigId,
       );
-      const saved = await saveTmRateCard(resolvedConfigId, payload);
+      let saved = null;
+      if (row.rateCardId) {
+        saved = await updateTmRateCard(row.rateCardId, payload);
+      } else {
+        saved = await createTmRateCard(resolvedConfigId, payload);
+      }
+      const targetRateCardId = saved?.rateCardId || saved?.id || row.rateCardId;
+
+      const mappedSaved = mapRateCard(saved || {}, true);
+      const intermediateRow = {
+        ...row,
+        ...mappedSaved,
+        role: saved?.roleName || saved?.role || saved?.name || roleName,
+        roleName,
+        rate: saved?.rate !== undefined && saved?.rate !== null && saved?.rate !== "" ? saved.rate : row.rate,
+        ratePeriod: saved?.ratePeriod || row.ratePeriod || "HOURLY",
+        effectiveFrom: mappedSaved.effectiveFrom || row.effectiveFrom,
+        effectiveTo: mappedSaved.effectiveTo || row.effectiveTo,
+        remarks: mappedSaved.remarks || row.remarks,
+        includeBaseRateInInvoice: row.includeBaseRateInInvoice !== undefined ? row.includeBaseRateInInvoice !== false : row.includeInInvoice !== false,
+        includeInInvoice: row.includeBaseRateInInvoice !== undefined ? row.includeBaseRateInInvoice !== false : row.includeInInvoice !== false,
+        rateCardId: targetRateCardId,
+        id: targetRateCardId,
+        isSaved: Boolean(targetRateCardId),
+      };
+
+      let syncedPeriods = periods;
+      if (targetRateCardId && periods.length > 0) {
+        try {
+          syncedPeriods = await syncStandardRateDiscounts(
+            targetRateCardId,
+            periods,
+            currency,
+            { roleName },
+          );
+        } catch (syncErr) {
+          const successfullySaved = syncErr.savedPeriods || [];
+          const mergedPeriods = periods.map((p, pIdx) => {
+            if (pIdx < successfullySaved.length) {
+              return { ...p, ...successfullySaved[pIdx] };
+            }
+            return p;
+          });
+
+          const partialRow = {
+            ...intermediateRow,
+            discountPeriods: mergedPeriods,
+            saving: false,
+            isSaved: false,
+          };
+          const updatedRows = [...rows];
+          updatedRows[index] = partialRow;
+          setRows(updatedRows);
+          syncParent(updatedRows);
+
+          const errorDetail = getApiErrorMessage(syncErr.cause || syncErr, "Discount period save failed.");
+          showStatusToast(
+            `Role "${roleName}": Rate card saved, but discount period "${syncErr.periodName || 'item'}" failed (${errorDetail}). Please retry.`,
+            "error",
+          );
+          return;
+        }
+      }
 
       const mapped = {
-        ...mapRateCard(saved),
-        role: saved.roleName || saved.role || saved.name || row.role,
-        roleName,
+        ...intermediateRow,
+        discountPeriods: syncedPeriods,
+        saving: false,
+        isSaved: true,
       };
 
       const newRows = [...rows];
       newRows[index] = mapped;
+      setRows(newRows);
       syncParent(newRows);
-      showStatusToast("Rate card saved", "success");
+      showStatusToast(`Role rate card and schedule saved for "${roleName}"`, "success");
     } catch (error) {
       showStatusToast(
         getApiErrorMessage(error, "Unable to save rate card."),
@@ -1286,6 +1885,15 @@ function TimeAndMaterialForm({
       );
     }
   };
+
+  const filteredRows = useMemo(() => {
+    const list = rows.map((r, i) => ({ ...r, _originalIndex: i }));
+    if (!roleSearchTerm.trim()) return list;
+    const term = roleSearchTerm.trim().toLowerCase();
+    return list.filter((r) =>
+      String(r.roleName || r.role || "").toLowerCase().includes(term)
+    );
+  }, [rows, roleSearchTerm]);
 
   return (
     <div className="space-y-4">
@@ -1529,7 +2137,7 @@ function TimeAndMaterialForm({
                               <FormInput
                                 label="Period Name *"
                                 name={`periodName-${idx}`}
-                                value={period.periodName || ""}
+                                value={period.periodName ?? ""}
                                 onChange={(e) => updateDiscountPeriod(idx, { periodName: e.target.value })}
                                 placeholder="e.g. Q1 Introductory Client Discount"
                                 error={periodErrors.periodName}
@@ -1687,7 +2295,7 @@ function TimeAndMaterialForm({
                 id="standard-include-invoice"
                 type="checkbox"
                 checked={standardRate.includeInInvoice !== false}
-                onChange={(e) => update({ includeInInvoice: e.target.checked })}
+                onChange={(e) => update({ includeInInvoice: e.target.checked, includeBaseRateInInvoice: e.target.checked })}
                 disabled={isExisting}
                 className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0A0082] focus:ring-[#0A0082]"
               />
@@ -1716,21 +2324,55 @@ function TimeAndMaterialForm({
         )}
 
         {billingMode === "ROLE_BASED" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h4 className="text-sm font-semibold text-slate-900">
                   Role-Based Rates
                 </h4>
                 <p className="text-xs text-slate-500">
-                  Maintain independent standard rates, optional discounts, and invoice inclusion for each role.
+                  Maintain independent base rates, repeatable discount schedules, and invoice inclusion for each role.
                 </p>
               </div>
-              {!isExisting && (
-                <Button variant="outline" size="small" onClick={addRole}>
-                  <Plus className="h-3.5 w-3.5" /> Add Role
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {rows.length > 0 && (
+                  <div className="relative w-48 sm:w-60">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={roleSearchTerm}
+                      onChange={(e) => setRoleSearchTerm(e.target.value)}
+                      placeholder="Search roles..."
+                      className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                )}
+                {rows.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={toggleExpandCollapseAllRoles}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                    title={isAllRolesExpanded ? "Collapse all role cards" : "Expand all role cards"}
+                  >
+                    {isAllRolesExpanded ? (
+                      <>
+                        <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                        <span>Collapse All</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                        <span>Expand All</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {!isExisting && (
+                  <Button variant="outline" size="small" onClick={addRole}>
+                    <Plus className="h-3.5 w-3.5" /> Add Role
+                  </Button>
+                )}
+              </div>
             </div>
 
             {loadingRows ? (
@@ -1738,180 +2380,121 @@ function TimeAndMaterialForm({
             ) : null}
 
             {rows.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500">
-                No roles added yet.
-              </p>
+              <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center space-y-2 bg-slate-50/50">
+                <p className="text-sm text-slate-600">No roles configured for this billing setup.</p>
+                <p className="text-xs text-slate-400">
+                  Add roles to define specific base rates and independent discount schedules per role.
+                </p>
+                {!isExisting && (
+                  <div className="pt-2">
+                    <Button variant="outline" size="small" onClick={addRole}>
+                      <Plus className="h-3.5 w-3.5" /> Add Role
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : filteredRows.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+                No roles matching "{roleSearchTerm}".
+              </div>
             ) : (
-              <div className="w-full overflow-x-auto rounded-xl border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="px-3 py-3 text-center w-12 font-semibold text-slate-600" title="Include in invoice">Inv.</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Role</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Standard Rate ({currency})</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Rate Period</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Discount / Net Rate</th>
-                      {!isOneTime && (
-                        <>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-600">Effective From</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-600">Effective To</th>
-                        </>
-                      )}
-                      {!isExisting && (
-                        <th className="px-4 py-3 text-center w-28 font-semibold text-slate-600">Actions</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {rows.map((item, index) => {
-                      const roleDateErrors = isOneTime
-                        ? { effectiveFrom: "", effectiveTo: "" }
-                        : getEffectiveDateErrors({
-                            effectiveFrom: item.effectiveFrom,
-                            effectiveTo: item.effectiveTo,
-                            projectStartDate: projectStartDateOnly,
-                            projectEndDate: projectEndDateOnly,
-                          });
-                      const roleDiscountDateErrors = item.hasDiscount
-                        ? getDiscountDateErrors({
-                            discountStartDate: item.discountStartDate,
-                            discountEndDate: item.discountEndDate,
-                            effectiveFrom: item.effectiveFrom,
-                            effectiveTo: item.effectiveTo,
-                            projectStartDate: projectStartDateOnly,
-                            projectEndDate: projectEndDateOnly,
-                          })
-                        : { discountStartDate: "", discountEndDate: "" };
+              <div className="space-y-3">
+                {filteredRows.map((item) => {
+                  const index = item._originalIndex;
+                  const roleKey = getRoleStableKey(item, index);
+                  const isExpanded = expandedRoleKeys.has(roleKey);
+                  const roleErrors = getRoleValidationErrors(item, index, rows);
+                  const roleErrorList = Object.values(roleErrors).filter(Boolean);
+                  const hasRoleErrors = roleErrorList.length > 0;
+                  const discountPeriods = Array.isArray(item.discountPeriods) ? item.discountPeriods : [];
+                  const isBaseIncluded = item.includeBaseRateInInvoice !== undefined
+                    ? item.includeBaseRateInInvoice !== false
+                    : item.includeInInvoice !== false;
 
-                      const isExpanded = expandedRowIndices.has(index);
-                      const netRoleRate = item.hasDiscount && item.rate && item.discountValue
-                        ? calculateDiscountedRate(item.rate, item.discountType, item.discountValue)
-                        : item.rate;
+                  return (
+                    <div
+                      key={roleKey}
+                      data-testid={`role-card-${index}`}
+                      className={`rounded-xl border transition-all ${
+                        hasRoleErrors
+                          ? "border-red-300 bg-red-50/20"
+                          : isExpanded
+                          ? "border-indigo-200 bg-white shadow-sm"
+                          : "border-slate-200 bg-slate-50/60 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      {/* Collapsed Role Summary / Header Bar */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleExpandRole(roleKey)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleExpandRole(roleKey);
+                          }
+                        }}
+                        className="flex flex-col gap-2 p-3 sm:p-4 cursor-pointer select-none transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                              {index + 1}
+                            </span>
+                            <h5 className="text-sm font-semibold text-slate-900">
+                              {item.roleName || item.role || `Role #${index + 1}`}
+                            </h5>
 
-                      return (
-                      <React.Fragment key={index}>
-                        <tr
-                          className={`align-top transition-colors hover:bg-slate-50 ${isExpanded ? "bg-slate-50/60" : ""}`}
-                        >
-                          <td className="px-3 py-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={item.includeInInvoice !== false}
-                              onChange={(e) =>
-                                handleRoleChange(index, "includeInInvoice", e.target.checked)
-                              }
-                              disabled={isExisting}
-                              className="h-4 w-4 rounded border-slate-300 text-[#0A0082] focus:ring-[#0A0082]"
-                              title={item.includeInInvoice !== false ? "Included in Invoice" : "Excluded from Invoice"}
-                            />
-                          </td>
-                          <td className="px-4 py-3 min-w-[160px]">
-                            <FormInput
-                              value={item.role}
-                              onChange={(e) =>
-                                handleRoleChange(index, "role", e.target.value)
-                              }
-                              placeholder="e.g. Senior Developer"
-                              disabled={isExisting}
-                            />
-                          </td>
-                          <td className="px-4 py-3 min-w-[130px]">
-                            <FormInput
-                              type="number"
-                              value={item.rate}
-                              onChange={(e) =>
-                                handleRoleChange(index, "rate", e.target.value)
-                              }
-                              placeholder="e.g. 1500"
-                              disabled={isExisting}
-                            />
-                          </td>
-                          <td className="px-4 py-3 min-w-[140px]">
-                            <FormSelect
-                              value={item.ratePeriod || "HOURLY"}
-                              onChange={(e) =>
-                                handleRoleChange(
-                                  index,
-                                  "ratePeriod",
-                                  e.target.value,
-                                )
-                              }
-                              options={RATE_PERIOD_OPTIONS}
-                              anchorOptions
-                            />
-                          </td>
-                          <td className="px-4 py-3 min-w-[160px]">
-                            {item.hasDiscount && item.discountValue ? (
-                              <span className="inline-flex flex-col gap-0.5">
-                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
-                                  {item.discountType === "PERCENTAGE" ? `${item.discountValue}% off` : `-${formatCurrency(item.discountValue, currency)}`}
-                                  {" "}→{" "}{formatCurrency(netRoleRate, currency)} {getRatePeriodSuffix(item.ratePeriod)}
-                                </span>
-                                {item.discountStartDate && item.discountEndDate && (
-                                  <span className="text-[10px] text-slate-500">
-                                    {item.discountStartDate} to {item.discountEndDate}
-                                  </span>
-                                )}
+                            {/* Base Rate Badge */}
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-800">
+                              {formatCurrency(item.rate || 0, currency)} {getRatePeriodSuffix(item.ratePeriod)}
+                            </span>
+
+                            {/* Discount Periods Count Badge */}
+                            {discountPeriods.length > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                                <Tag className="h-3 w-3" />
+                                {discountPeriods.length} {discountPeriods.length === 1 ? "Discount Period" : "Discount Periods"}
                               </span>
                             ) : (
-                              <span className="text-xs text-slate-400 italic">No discount</span>
+                              <span className="text-[11px] text-slate-400 italic">No discounts</span>
                             )}
-                          </td>
-                          {!isOneTime && (
-                            <>
-                              <td className="px-4 py-3 min-w-[150px]">
-                                <FormDatePicker
-                                  value={item.effectiveFrom}
-                                  onChange={(e) =>
-                                    handleRoleChange(
-                                      index,
-                                      "effectiveFrom",
-                                      e.target.value,
-                                    )
-                                  }
-                                  min={projectStartDateOnly || undefined}
-                                  max={projectEndDateOnly || undefined}
-                                  error={roleDateErrors.effectiveFrom}
-                                />
-                              </td>
-                              <td className="px-4 py-3 min-w-[150px]">
-                                <FormDatePicker
-                                  value={item.effectiveTo}
-                                  onChange={(e) =>
-                                    handleRoleChange(
-                                      index,
-                                      "effectiveTo",
-                                      e.target.value,
-                                    )
-                                  }
-                                  min={item.effectiveFrom || projectStartDateOnly || undefined}
-                                  max={projectEndDateOnly || undefined}
-                                  error={roleDateErrors.effectiveTo}
-                                />
-                              </td>
-                            </>
-                          )}
-                          {!isExisting && (
-                            <td className="px-4 py-3 text-center">
-                              <div className="flex items-center justify-center gap-1">
+
+                            {/* Base Rate Inclusion Badge */}
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                isBaseIncluded
+                                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
+                                  : "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200"
+                              }`}
+                            >
+                              Base: {isBaseIncluded ? "Included" : "Excluded"}
+                            </span>
+
+                            {/* Validation Errors Badge */}
+                            {hasRoleErrors && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                                <AlertCircle className="h-3 w-3 text-red-600 shrink-0" />
+                                <span>{roleErrorList[0]}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Action Buttons & Expand/Collapse Chevron on Right */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {!isExisting && (
+                              <>
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => toggleExpandRow(index)}
-                                  title={isExpanded ? "Hide discount & notes" : "Configure discount & notes"}
-                                  className={item.hasDiscount ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100" : "text-slate-500 hover:bg-slate-100"}
-                                >
-                                  <Tag className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => saveRow(index)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveRow(index);
+                                  }}
                                   disabled={item.saving || item.deleting}
                                   className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  title="Save rate"
+                                  title="Save role rate card"
                                 >
                                   {item.saving ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1923,7 +2506,10 @@ function TimeAndMaterialForm({
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => removeRole(index)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeRole(index);
+                                  }}
                                   disabled={item.saving || item.deleting}
                                   className="text-red-500 hover:text-red-700 hover:bg-red-50"
                                   title="Remove role"
@@ -1934,105 +2520,494 @@ function TimeAndMaterialForm({
                                     <Trash2 className="h-4 w-4" />
                                   )}
                                 </Button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
+                              </>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpandRole(roleKey);
+                              }}
+                              className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                              title={isExpanded ? "Collapse role" : "Expand role"}
+                              aria-expanded={isExpanded}
+                              aria-label={isExpanded ? `Collapse ${item.roleName || `Role ${index + 1}`}` : `Expand ${item.roleName || `Role ${index + 1}`}`}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
 
-                        {/* Expandable Discount & Notes Panel */}
-                        {isExpanded && (
-                          <tr className="bg-slate-50/80 border-b border-slate-200">
-                            <td colSpan={isOneTime ? 6 : 8} className="px-6 py-4">
-                              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Tag className="h-4 w-4 text-indigo-600" />
-                                    <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
-                                      Discount & Notes for {item.roleName || item.role || `Role #${index + 1}`}
-                                    </h5>
-                                  </div>
-                                  <ToggleSwitch
-                                    label="Apply Discount"
-                                    checked={Boolean(item.hasDiscount)}
-                                    onChange={(checked) => {
-                                      handleRoleChange(index, "hasDiscount", checked);
-                                      if (!checked) {
-                                        handleRoleChange(index, "discountValue", "");
-                                        handleRoleChange(index, "discountStartDate", "");
-                                        handleRoleChange(index, "discountEndDate", "");
-                                      } else if (!item.discountType) {
-                                        handleRoleChange(index, "discountType", "PERCENTAGE");
-                                      }
-                                    }}
+                        {/* Compact details line when collapsed */}
+                        {!isExpanded && (
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-0.5 pl-8">
+                            {!isOneTime && (item.effectiveFrom || item.effectiveTo) && (
+                              <span>
+                                <strong className="text-slate-600">Validity:</strong> {item.effectiveFrom || "Start"} to {item.effectiveTo || "End"}
+                              </span>
+                            )}
+                            {item.remarks && (
+                              <span className="truncate max-w-xs text-slate-400" title={item.remarks}>
+                                <strong className="text-slate-600">Notes:</strong> {item.remarks}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Expanded Role Content */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-200/80 p-4 space-y-6">
+                          {/* Role Base Rate Configuration */}
+                          <div className="space-y-4">
+                            <h6 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                              Base Commercial Terms
+                            </h6>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                              <FormInput
+                                label="Role Name *"
+                                value={item.roleName || item.role || ""}
+                                onChange={(e) => handleRoleChange(index, "roleName", e.target.value)}
+                                placeholder="e.g. Senior Developer"
+                                error={roleErrors.roleName}
+                                disabled={isExisting}
+                              />
+                              <FormInput
+                                label={`Base Rate (${currency}) *`}
+                                type="number"
+                                value={item.rate}
+                                onChange={(e) => handleRoleChange(index, "rate", e.target.value)}
+                                placeholder="e.g. 1500"
+                                error={roleErrors.rate}
+                                disabled={isExisting}
+                              />
+                              <FormSelect
+                                label="Rate Period *"
+                                value={item.ratePeriod || "HOURLY"}
+                                onChange={(e) => handleRoleChange(index, "ratePeriod", e.target.value)}
+                                options={RATE_PERIOD_OPTIONS}
+                                anchorOptions
+                                disabled={isExisting}
+                              />
+                              {!isOneTime && (
+                                <>
+                                  <FormDatePicker
+                                    label="Effective From"
+                                    value={item.effectiveFrom}
+                                    onChange={(e) => handleRoleChange(index, "effectiveFrom", e.target.value)}
+                                    min={projectStartDateOnly || undefined}
+                                    max={projectEndDateOnly || undefined}
+                                    error={roleErrors.effectiveFrom}
                                     disabled={isExisting}
                                   />
-                                </div>
+                                  <FormDatePicker
+                                    label="Effective To"
+                                    value={item.effectiveTo}
+                                    onChange={(e) => handleRoleChange(index, "effectiveTo", e.target.value)}
+                                    min={item.effectiveFrom || projectStartDateOnly || undefined}
+                                    max={projectEndDateOnly || undefined}
+                                    error={roleErrors.effectiveTo}
+                                    disabled={isExisting}
+                                  />
+                                </>
+                              )}
+                              <div className={isOneTime ? "sm:col-span-2 lg:col-span-3" : "sm:col-span-2 lg:col-span-1"}>
+                                <FormInput
+                                  label="Commercial Remarks"
+                                  value={item.remarks || ""}
+                                  onChange={(e) => handleRoleChange(index, "remarks", e.target.value)}
+                                  placeholder="Commercial notes for this role..."
+                                  disabled={isExisting}
+                                />
+                              </div>
+                            </div>
 
-                                {item.hasDiscount && (
-                                  <div className="space-y-3 pt-2 border-t border-slate-100">
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                      <FormSelect
-                                        label="Discount Type"
-                                        value={item.discountType || "PERCENTAGE"}
-                                        onChange={(e) => handleRoleChange(index, "discountType", e.target.value)}
-                                        options={DISCOUNT_TYPE_OPTIONS}
-                                        disabled={isExisting}
-                                        anchorOptions
-                                      />
-                                      <FormInput
-                                        label={item.discountType === "PERCENTAGE" ? "Discount %" : `Discount (${currency})`}
-                                        type="number"
-                                        value={item.discountValue}
-                                        onChange={(e) => handleRoleChange(index, "discountValue", e.target.value)}
-                                        placeholder="e.g. 10"
-                                        disabled={isExisting}
-                                      />
-                                      <FormDatePicker
-                                        label="Discount Start"
-                                        value={item.discountStartDate}
-                                        onChange={(e) => handleRoleChange(index, "discountStartDate", e.target.value)}
-                                        min={item.effectiveFrom || projectStartDateOnly || undefined}
-                                        max={item.effectiveTo || projectEndDateOnly || undefined}
-                                        error={roleDiscountDateErrors.discountStartDate}
-                                        disabled={isExisting}
-                                      />
-                                      <FormDatePicker
-                                        label="Discount End"
-                                        value={item.discountEndDate}
-                                        onChange={(e) => handleRoleChange(index, "discountEndDate", e.target.value)}
-                                        min={item.discountStartDate || item.effectiveFrom || projectStartDateOnly || undefined}
-                                        max={item.effectiveTo || projectEndDateOnly || undefined}
-                                        error={roleDiscountDateErrors.discountEndDate}
-                                        disabled={isExisting}
-                                      />
-                                    </div>
-                                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-3.5 py-2 text-xs text-indigo-900">
-                                      Calculated Net Rate: <span className="font-bold">{formatCurrency(netRoleRate, currency)} {getRatePeriodSuffix(item.ratePeriod)}</span>
-                                      {item.discountStartDate && item.discountEndDate && (
-                                        <span className="ml-2 text-indigo-600">· Active: {item.discountStartDate} to {item.discountEndDate}</span>
-                                      )}
-                                    </div>
+                            {/* Base-Rate Inclusion Checkbox */}
+                            <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                              <input
+                                id={`role-include-base-${index}`}
+                                type="checkbox"
+                                checked={isBaseIncluded}
+                                onChange={(e) =>
+                                  handleRoleChange(index, "includeBaseRateInInvoice", e.target.checked)
+                                }
+                                disabled={isExisting}
+                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#0A0082] focus:ring-[#0A0082]"
+                              />
+                              <label htmlFor={`role-include-base-${index}`} className="cursor-pointer select-none">
+                                <span className="text-xs font-semibold text-slate-900">
+                                  Include Base Rate in Invoice
+                                </span>
+                                <span className="block text-[11px] text-slate-500">
+                                  When enabled, billable work performed outside active discount periods is included in invoice generation at this role's base rate.
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* Role Repeatable Discount Schedule */}
+                          <div className="space-y-4 pt-4 border-t border-slate-200">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h6 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                                  Discount Schedule for {item.roleName || item.role || `Role #${index + 1}`}
+                                </h6>
+                                <p className="text-xs text-slate-500">
+                                  Configure repeatable discount periods with independent invoice inclusion and live net rates.
+                                </p>
+                              </div>
+                              {!isExisting && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="small"
+                                  onClick={() => addRoleDiscountPeriod(index)}
+                                >
+                                  <Plus className="h-3.5 w-3.5" /> Add Rate Period
+                                </Button>
+                              )}
+                            </div>
+
+                            {discountPeriods.length === 0 ? (
+                              <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center space-y-2 bg-slate-50/50">
+                                <p className="text-sm text-slate-600">No discount periods configured for this role.</p>
+                                <p className="text-xs text-slate-400">
+                                  The base rate of <span className="font-semibold text-slate-700">{formatCurrency(item.rate || 0, currency)} {getRatePeriodSuffix(item.ratePeriod)}</span> will apply throughout the project.
+                                </p>
+                                {!isExisting && (
+                                  <div className="pt-1">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="small"
+                                      onClick={() => addRoleDiscountPeriod(index)}
+                                    >
+                                      <Plus className="h-3.5 w-3.5" /> Add Rate Period
+                                    </Button>
                                   </div>
                                 )}
-
-                                <div>
-                                  <FormInput
-                                    label="Commercial Notes"
-                                    value={item.remarks || ""}
-                                    onChange={(e) => handleRoleChange(index, "remarks", e.target.value)}
-                                    placeholder="Commercial agreement notes for this role..."
-                                    disabled={isExisting}
-                                  />
-                                </div>
                               </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            ) : (
+                              <div className="space-y-3">
+                                {discountPeriods.map((period, pIdx) => {
+                                  const pKey = getRolePeriodStableKey(item, index, period, pIdx);
+                                  const isPeriodExpanded = expandedRolePeriodKeys.has(pKey);
+                                  const periodErrors = getRolePeriodValidationErrors(
+                                    period,
+                                    pIdx,
+                                    discountPeriods,
+                                    item,
+                                  );
+                                  const pErrorList = Object.values(periodErrors).filter(Boolean);
+                                  const hasErrors = pErrorList.length > 0;
+                                  const preview = calculateRateDiscountPreview({
+                                    baseRate: item.rate,
+                                    discountType: period.discountType,
+                                    discountValue: period.discountValue,
+                                    ratePeriod: item.ratePeriod,
+                                  });
+
+                                  return (
+                                    <div
+                                      key={pKey}
+                                      data-testid={`role-discount-period-${index}-${pIdx}`}
+                                      className={`rounded-xl border transition-all ${
+                                        hasErrors
+                                          ? "border-red-300 bg-red-50/20"
+                                          : isPeriodExpanded
+                                          ? "border-indigo-200 bg-white shadow-sm"
+                                          : "border-slate-200 bg-slate-50/60 hover:border-slate-300 hover:bg-slate-50"
+                                      }`}
+                                    >
+                                      {/* Collapsible Period Header */}
+                                      <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => toggleExpandRolePeriod(pKey)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            toggleExpandRolePeriod(pKey);
+                                          }
+                                        }}
+                                        className="flex flex-col gap-2 p-3 sm:p-4 cursor-pointer select-none transition-colors"
+                                      >
+                                        <div className="flex items-center justify-between gap-3">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                                              {pIdx + 1}
+                                            </span>
+                                            <h6 className="text-sm font-semibold text-slate-900">
+                                              {period.periodName || `Discount Period ${pIdx + 1}`}
+                                            </h6>
+
+                                            {/* Include in Invoice Status */}
+                                            {period.includeInInvoice !== false ? (
+                                              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                                Included in Invoice
+                                              </span>
+                                            ) : (
+                                              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                                                Excluded from Invoice
+                                              </span>
+                                            )}
+
+                                            {/* Validation Status */}
+                                            {hasErrors && (
+                                              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                                                <AlertCircle className="h-3 w-3 text-red-600 shrink-0" />
+                                                <span>{pErrorList[0]}</span>
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            {!isExisting && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  removeRoleDiscountPeriod(index, pIdx);
+                                                }}
+                                                className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                                title="Remove discount period"
+                                                aria-label={`Remove ${period.periodName || `Period ${pIdx + 1}`}`}
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </button>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleExpandRolePeriod(pKey);
+                                              }}
+                                              className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                              title={isPeriodExpanded ? "Collapse period" : "Expand period"}
+                                              aria-expanded={isPeriodExpanded}
+                                            >
+                                              {isPeriodExpanded ? (
+                                                <ChevronUp className="h-4 w-4" />
+                                              ) : (
+                                                <ChevronDown className="h-4 w-4" />
+                                              )}
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Compact Summary details */}
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 pt-1">
+                                          <div>
+                                            <span className="text-slate-400">Dates: </span>
+                                            <span className="font-medium text-slate-700">
+                                              {period.effectiveFrom && period.effectiveTo
+                                                ? `${period.effectiveFrom} to ${period.effectiveTo}`
+                                                : (period.effectiveFrom || period.effectiveTo || "Dates not configured")}
+                                            </span>
+                                          </div>
+                                          <div>
+                                            <span className="text-slate-400">Discount: </span>
+                                            <span className="font-semibold text-indigo-700">
+                                              {period.discountType === "PERCENTAGE"
+                                                ? `${period.discountValue !== "" && period.discountValue !== null && period.discountValue !== undefined ? period.discountValue : 0}% (${period.discountType})`
+                                                : `${formatCurrency(period.discountValue || 0, currency)} (${period.discountType})`}
+                                            </span>
+                                          </div>
+                                          <div>
+                                            <span className="text-slate-400">Net Rate: </span>
+                                            <span className="font-bold text-slate-900">
+                                              {preview.isValid && preview.netRate !== null
+                                                ? `${formatCurrency(preview.netRate, currency)} ${getRatePeriodSuffix(item.ratePeriod)}`
+                                                : "—"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Expanded Card Content */}
+                                      {isPeriodExpanded && (
+                                        <div className="border-t border-slate-200/80 p-4 space-y-4">
+                                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <FormInput
+                                              label="Period Name *"
+                                              value={period.periodName ?? ""}
+                                              onChange={(e) => updateRoleDiscountPeriod(index, pIdx, { periodName: e.target.value })}
+                                              placeholder="e.g. Q1 Introductory Rate"
+                                              error={periodErrors.periodName}
+                                              disabled={isExisting}
+                                            />
+                                            <FormSelect
+                                              anchorOptions
+                                              label="Discount Type *"
+                                              value={period.discountType || "PERCENTAGE"}
+                                              onChange={(e) => updateRoleDiscountPeriod(index, pIdx, { discountType: e.target.value })}
+                                              options={DISCOUNT_TYPE_OPTIONS}
+                                              disabled={isExisting}
+                                            />
+                                            <FormInput
+                                              label={
+                                                period.discountType === "PERCENTAGE"
+                                                  ? "Discount Percentage (%) *"
+                                                  : `Discount Amount (${currency}) *`
+                                              }
+                                              type="number"
+                                              value={period.discountValue !== undefined && period.discountValue !== null ? period.discountValue : ""}
+                                              onChange={(e) => updateRoleDiscountPeriod(index, pIdx, { discountValue: e.target.value })}
+                                              placeholder={
+                                                period.discountType === "PERCENTAGE"
+                                                  ? "e.g. 20"
+                                                  : `e.g. 100 (${currency})`
+                                              }
+                                              error={periodErrors.discountValue}
+                                              disabled={isExisting}
+                                            />
+                                            <div className="grid grid-cols-2 gap-2">
+                                              <FormDatePicker
+                                                label="Effective Start Date *"
+                                                value={period.effectiveFrom || ""}
+                                                onChange={(e) => updateRoleDiscountPeriod(index, pIdx, { effectiveFrom: e.target.value })}
+                                                min={item.effectiveFrom || projectStartDateOnly || undefined}
+                                                max={item.effectiveTo || projectEndDateOnly || undefined}
+                                                error={periodErrors.effectiveFrom}
+                                                disabled={isExisting}
+                                              />
+                                              <FormDatePicker
+                                                label="Effective End Date *"
+                                                value={period.effectiveTo || ""}
+                                                onChange={(e) => updateRoleDiscountPeriod(index, pIdx, { effectiveTo: e.target.value })}
+                                                min={period.effectiveFrom || item.effectiveFrom || projectStartDateOnly || undefined}
+                                                max={item.effectiveTo || projectEndDateOnly || undefined}
+                                                error={periodErrors.effectiveTo}
+                                                disabled={isExisting}
+                                              />
+                                            </div>
+                                          </div>
+
+                                          {periodErrors.overlap && (
+                                            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-medium text-red-700">
+                                              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                                              <span>{periodErrors.overlap}</span>
+                                            </div>
+                                          )}
+
+                                          {/* Live Net-Rate Preview for this period */}
+                                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-indigo-50/70 p-3.5">
+                                            <div>
+                                              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">
+                                                Live Net-Rate Preview
+                                              </span>
+                                              {preview.isValid ? (
+                                                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
+                                                  <span>
+                                                    Base: <span className="line-through text-slate-500">{formatCurrency(preview.baseRate, currency)}</span>
+                                                  </span>
+                                                  <span>→</span>
+                                                  <span>
+                                                    Discount:{" "}
+                                                    <span className="font-semibold text-indigo-700">
+                                                      {period.discountType === "PERCENTAGE"
+                                                        ? `${period.discountValue}% (${formatCurrency(preview.discountAmount, currency)} off)`
+                                                        : `-${formatCurrency(preview.discountAmount, currency)} off`}
+                                                    </span>
+                                                  </span>
+                                                  <span>→</span>
+                                                  <span className="rounded bg-white px-2 py-0.5 text-base font-bold text-indigo-900 shadow-sm ring-1 ring-indigo-200">
+                                                    {formatCurrency(preview.netRate, currency)} {getRatePeriodSuffix(item.ratePeriod)}
+                                                  </span>
+                                                </div>
+                                              ) : (
+                                                <div className="mt-1 text-xs text-slate-500 italic">
+                                                  {preview.error || "Enter valid base rate and discount to calculate live net rate."}
+                                                </div>
+                                              )}
+                                            </div>
+                                            {period.effectiveFrom && period.effectiveTo && (
+                                              <div className="text-right text-xs font-medium text-indigo-700">
+                                                Schedule: {period.effectiveFrom} to {period.effectiveTo}
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {/* Commercial Notes */}
+                                          <div>
+                                            <FormTextArea
+                                              label="Commercial Agreement / Discount Notes"
+                                              value={period.notes || ""}
+                                              onChange={(e) => updateRoleDiscountPeriod(index, pIdx, { notes: e.target.value })}
+                                              placeholder="e.g. Agreed discount per project proposal..."
+                                              rows={2}
+                                              disabled={isExisting}
+                                            />
+                                          </div>
+
+                                          {/* Include in Invoice Checkbox */}
+                                          <div className="flex items-start gap-2.5 pt-1">
+                                            <input
+                                              id={`role-period-include-invoice-${index}-${pIdx}`}
+                                              type="checkbox"
+                                              checked={period.includeInInvoice !== false}
+                                              onChange={(e) => updateRoleDiscountPeriod(index, pIdx, { includeInInvoice: e.target.checked })}
+                                              disabled={isExisting}
+                                              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#0A0082] focus:ring-[#0A0082]"
+                                            />
+                                            <label htmlFor={`role-period-include-invoice-${index}-${pIdx}`} className="cursor-pointer select-none">
+                                              <span className="text-xs font-semibold text-slate-900">Include in Invoice</span>
+                                              <span className="block text-[11px] text-slate-500">
+                                                When enabled, billable work covered by this discount period is included in customer invoice generation at the discounted rate.
+                                              </span>
+                                            </label>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Automatic Base-Rate Fallback Notice */}
+                            <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 flex items-start gap-2">
+                              <div className="mt-1 h-2 w-2 rounded-full bg-slate-400 shrink-0" />
+                              <span>
+                                <strong className="text-slate-800">Automatic Base-Rate Fallback:</strong> Outside configured discount periods, billing falls back automatically to this role's base rate of{" "}
+                                <strong className="text-slate-900">
+                                  {formatCurrency(item.rate || 0, currency)} {getRatePeriodSuffix(item.ratePeriod)}
+                                </strong>.
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Save Role Card Button & Collapse Action */}
+                          {!isExisting && (
+                            <div className="pt-2 flex items-center justify-between border-t border-slate-100 mt-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleExpandRole(roleKey)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                              >
+                                <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                                <span>Collapse Role Card</span>
+                              </button>
+                              <Button
+                                variant="outline"
+                                size="small"
+                                onClick={() => saveRow(index)}
+                                loading={Boolean(item.saving)}
+                                loadingText="Saving role..."
+                              >
+                                <Check className="h-4 w-4" /> Save Role & Schedule
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2785,10 +3760,7 @@ function buildEmptyInstallmentEntry(sequence) {
 const formatSequence = (index) => String(index + 1).padStart(2, "0");
 const roundPercent = (value) => Math.round(value * 100) / 100;
 
-// Payment Plan cards shown in the UI — Milestones is a disabled "coming soon"
-// card only (PMS-managed, no lifecycle/name/status owned by AR). The
-// backend's PaymentStructure enum currently supports only FULL_PAYMENT and
-// INSTALLMENTS, so MILESTONES must never be selectable or sent to the API.
+// Payment Plan cards shown in the UI — Full Payment, Installments, or Milestones (Managed by PMS).
 const PAYMENT_PLAN_CARDS = [
   {
     ...PAYMENT_STRUCTURE_OPTIONS.find((option) => option.value === "FULL_PAYMENT"),
@@ -2804,14 +3776,14 @@ const PAYMENT_PLAN_CARDS = [
     value: "MILESTONES",
     label: "Milestones",
     description: "Managed by PMS",
-    icon: Lock,
-    disabled: true,
-    badge: "Coming Soon",
+    icon: Target,
+    disabled: false,
+    badge: "PMS Linked",
   },
 ];
 
 // Enterprise-grade Payment Plan selector — a visually distinct card group
-// (icon, selected-state ring, disabled "coming soon" badge) rather than the
+// (icon, selected-state ring, PMS Linked badge) rather than the
 // generic RadioCardGroup used elsewhere in this wizard.
 function PaymentPlanSelector({ value, onChange }) {
   return (
@@ -2833,15 +3805,26 @@ function PaymentPlanSelector({ value, onChange }) {
                 : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
             } ${card.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
           >
-            {card.badge ? (
-              <span className="absolute right-3 top-3 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-200">
-                {card.badge}
-              </span>
-            ) : isSelected ? (
-              <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[#0A0082] text-white">
-                <Check className="h-3 w-3" />
-              </span>
-            ) : null}
+            <div className="absolute right-3 top-3 flex items-center gap-1.5">
+              {card.badge && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${
+                    isSelected
+                      ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                      : card.disabled
+                      ? "bg-amber-50 text-amber-600 ring-amber-200"
+                      : "bg-indigo-50 text-indigo-700 ring-indigo-200"
+                  }`}
+                >
+                  {card.badge}
+                </span>
+              )}
+              {isSelected && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0A0082] text-white">
+                  <Check className="h-3 w-3" />
+                </span>
+              )}
+            </div>
             <span
               className={`flex h-9 w-9 items-center justify-center rounded-lg ${
                 isSelected ? "bg-[#0A0082] text-white" : "bg-slate-100 text-slate-500"
@@ -2988,16 +3971,30 @@ function PaymentEntryCard({
 // Total Value → Scheduled Amount → Total Allocation → Remaining Amount (last,
 // emphasized). Allocation status is derived from the percentage total so
 // floating-point amount rounding never flips the state.
-function PaymentSummaryPanel({ totalValue, scheduledAmount, totalPercentage, currency }) {
+function PaymentSummaryPanel({
+  totalValue,
+  scheduledAmount,
+  totalPercentage,
+  currency,
+  isMilestones = false,
+  previouslyBilledAmount = null,
+  remainingContractBalance = null,
+}) {
   const percentRemaining = roundPercent(100 - totalPercentage);
   const status = Math.abs(percentRemaining) < 0.01 ? "complete" : percentRemaining > 0 ? "remaining" : "exceeded";
   const remainingAmount = status === "complete" ? 0 : totalValue - scheduledAmount;
 
-  const remainingTone = {
-    complete: { tone: "text-emerald-700", icon: Check, text: "Fully scheduled" },
-    remaining: { tone: "text-amber-700", icon: AlertCircle, text: `${percentRemaining}% remaining to schedule` },
-    exceeded: { tone: "text-red-700", icon: AlertCircle, text: `Allocation exceeds 100% by ${Math.abs(percentRemaining)}%` },
-  }[status];
+  const remainingTone = isMilestones
+    ? {
+        complete: { tone: "text-emerald-700", icon: Check, text: "Fully allocated (100%)" },
+        remaining: { tone: "text-blue-700", icon: Check, text: `Current cycle allocation: ${roundPercent(totalPercentage)}%` },
+        exceeded: { tone: "text-red-700", icon: AlertCircle, text: `Allocation exceeds 100% by ${Math.abs(percentRemaining)}%` },
+      }[status]
+    : {
+        complete: { tone: "text-emerald-700", icon: Check, text: "Fully scheduled" },
+        remaining: { tone: "text-amber-700", icon: AlertCircle, text: `${percentRemaining}% remaining to schedule` },
+        exceeded: { tone: "text-red-700", icon: AlertCircle, text: `Allocation exceeds 100% by ${Math.abs(percentRemaining)}%` },
+      }[status];
   const StatusIcon = remainingTone.icon;
 
   // Compact finance-style statement: labels left, amounts right, one rule
@@ -3013,21 +4010,40 @@ function PaymentSummaryPanel({ totalValue, scheduledAmount, totalPercentage, cur
           <dt className={label}>Total Value</dt>
           <dd className={amount}>{formatCurrency(totalValue, currency)}</dd>
         </div>
+        {previouslyBilledAmount !== null && previouslyBilledAmount !== undefined && (
+          <div className={row}>
+            <dt className={label}>Previously Billed</dt>
+            <dd className={amount}>{formatCurrency(previouslyBilledAmount, currency)}</dd>
+          </div>
+        )}
         <div className={row}>
-          <dt className={label}>Scheduled Amount</dt>
+          <dt className={label}>{isMilestones ? "Amount Scheduled (Current Cycle)" : "Scheduled Amount"}</dt>
           <dd className={amount}>{formatCurrency(scheduledAmount, currency)}</dd>
         </div>
         <div className={row}>
-          <dt className={label}>Total Allocation</dt>
-          <dd className={`${amount} ${status === "complete" ? "" : remainingTone.tone}`}>{roundPercent(totalPercentage)}%</dd>
+          <dt className={label}>{isMilestones ? "Selected Allocation Total" : "Total Allocation"}</dt>
+          <dd className={`${amount} ${status === "complete" || (isMilestones && status === "remaining") ? "" : remainingTone.tone}`}>
+            {roundPercent(totalPercentage)}%
+          </dd>
         </div>
         <div className="mt-1.5 border-t border-slate-200 pt-2" role="status">
-          <div className={row}>
-            <dt className="font-semibold text-slate-800">Remaining Amount</dt>
-            <dd className={`font-semibold tabular-nums ${status === "complete" ? "text-slate-900" : remainingTone.tone}`}>
-              {formatCurrency(remainingAmount, currency)}
-            </dd>
-          </div>
+          {remainingContractBalance !== null && remainingContractBalance !== undefined ? (
+            <div className={row}>
+              <dt className="font-semibold text-slate-800">Remaining Contract Balance</dt>
+              <dd className="font-semibold tabular-nums text-slate-900">
+                {formatCurrency(remainingContractBalance, currency)}
+              </dd>
+            </div>
+          ) : (
+            <div className={row}>
+              <dt className="font-semibold text-slate-800">
+                {isMilestones ? "Unallocated (Current Cycle)" : "Remaining Amount"}
+              </dt>
+              <dd className={`font-semibold tabular-nums ${status === "complete" || (isMilestones && status === "remaining") ? "text-slate-900" : remainingTone.tone}`}>
+                {formatCurrency(remainingAmount, currency)}
+              </dd>
+            </div>
+          )}
           <p className={`flex items-center gap-1 text-xs font-medium ${remainingTone.tone}`}>
             <StatusIcon className="h-3.5 w-3.5 shrink-0" /> {remainingTone.text}
           </p>
@@ -3037,18 +4053,16 @@ function PaymentSummaryPanel({ totalValue, scheduledAmount, totalPercentage, cur
   );
 }
 
-// Milestone Plan billing (PaymentStructure FULL_PAYMENT / INSTALLMENTS today —
-// MILESTONES will follow later via PMS and must not be offered here yet). This
-// is a distinct concept from the legacy MilestoneForm below (bare "MILESTONE"
-// billing type, project milestones) — "Installment" is the correct term for a
-// payment entry here, never "Milestone".
-function MilestonePlanForm({
+// Milestone Plan billing (PaymentStructure FULL_PAYMENT / INSTALLMENTS / MILESTONES).
+// MILESTONES synchronizes directly with PMS project milestones.
+export function MilestonePlanForm({
   value = {},
   onChange,
   currency,
   projectBudget,
   billingConfigurationId,
   ensureBillingConfigurationId,
+  projectInfo = {},
 }) {
   const update = (patch) => onChange({ ...value, ...patch });
   const [loadingConfig, setLoadingConfig] = useState(false);
@@ -3063,7 +4077,14 @@ function MilestonePlanForm({
 
   const paymentStructure = value.paymentStructure || "FULL_PAYMENT";
   const isFullPayment = paymentStructure === "FULL_PAYMENT";
+  const isMilestones = paymentStructure === "MILESTONES";
   const entries = value.entries || [];
+
+  // The PMS project id (a number), carried from the selected project's record.
+  // projectInfo.pmsProjectId is the backend master key of the project (the same id PMS uses); it is read
+  // explicitly rather than inferred from other project fields.
+  const pmsProjectId = toPmsProjectId(projectInfo?.pmsProjectId);
+  const milestonesState = useProjectMilestones(pmsProjectId, { enabled: isMilestones });
 
   // Seeds a sensible default shape the first time this form mounts for a
   // brand-new Milestone Plan (nothing saved/loaded yet) — Full Payment with a
@@ -3128,6 +4149,14 @@ function MilestonePlanForm({
           paymentStructure: record.paymentStructure || "FULL_PAYMENT",
           entries: loadedEntries,
           remarks: record.remarks || "",
+          previouslyBilledAmount:
+            record.previouslyBilledAmount !== undefined && record.previouslyBilledAmount !== null
+              ? record.previouslyBilledAmount
+              : value.previouslyBilledAmount ?? null,
+          remainingContractBalance:
+            record.remainingContractBalance !== undefined && record.remainingContractBalance !== null
+              ? record.remainingContractBalance
+              : value.remainingContractBalance ?? null,
         });
       } catch (error) {
         if (isMilestonePlanNotFoundError(error)) {
@@ -3155,14 +4184,33 @@ function MilestonePlanForm({
   }, [billingConfigurationId]);
 
   // Switching Payment Structure must never leave stale entries from the other
-  // structure behind (e.g. a 60/40 installment split lingering after switching
-  // to Full Payment). The newly selected structure restores its saved entries
-  // when that is what's persisted, otherwise starts fresh: Full Payment as its
-  // single 100% entry, Installments as ONE empty row (never a prefilled split).
+  // structure behind. Milestones synchronizes from PMS records.
   const handlePaymentStructureChange = (next) => {
     if (next === paymentStructure) return;
+    if (isMilestones) {
+      // the entry's own backend state decides, never the milestone list
+      const hasFrozen = entries.some(isMilestoneEntryLocked);
+      if (hasFrozen) {
+        showStatusToast(
+          "The payment structure cannot be changed because billing has already started for one or more milestones.",
+          "error",
+        );
+        return;
+      }
+    }
     const saved = savedPlanRef.current;
     const savedEntries = saved?.paymentStructure === next && saved.entries.length > 0 ? saved.entries : null;
+
+    if (next === "MILESTONES") {
+      // Nothing is pre-selected: the user picks the PMS milestones to bill (or the
+      // plan's saved milestone entries come back when it was saved as MILESTONES).
+      update({
+        paymentStructure: "MILESTONES",
+        entries: savedEntries?.map((entry) => ({ ...entry })) || [],
+      });
+      return;
+    }
+
     update({
       paymentStructure: next,
       entries:
@@ -3224,25 +4272,78 @@ function MilestonePlanForm({
       errors.percentage = "Percentage must be greater than 0.";
     } else if (percentNum > 100) {
       errors.percentage = "Percentage cannot exceed 100%.";
+    } else {
+      const parts = String(entry.percentage).split(".");
+      if (parts[1] && parts[1].length > 2) {
+        errors.percentage = "Percentage can have at most two decimal places.";
+      }
     }
     if (!entry.billingDate) {
       errors.billingDate = "Billing date is required.";
     }
     return errors;
   });
+
+  // Unique billing date rule for MILESTONES (backend creates one occurrence per date)
+  if (isMilestones) {
+    const dateCounts = new Map();
+    entries.forEach((e) => {
+      if (e.billingDate) {
+        dateCounts.set(e.billingDate, (dateCounts.get(e.billingDate) || 0) + 1);
+      }
+    });
+    entries.forEach((entry, idx) => {
+      if (entry.billingDate && dateCounts.get(entry.billingDate) > 1) {
+        if (!entryErrors[idx]) entryErrors[idx] = {};
+        entryErrors[idx].billingDate = "Each milestone must have its own billing date.";
+      }
+    });
+  }
+
   const hasEntryErrors = entryErrors.some((error) => error.percentage || error.billingDate);
 
   const totalPercentage = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
-  const totalPercentageValid = entries.length > 0 && Math.abs(totalPercentage - 100) < 0.01;
+  const totalPercentageValid = isMilestones
+    ? entries.length > 0 && totalPercentage > 0 && totalPercentage <= 100.001
+    : entries.length > 0 && Math.abs(totalPercentage - 100) < 0.01;
   const totalAllocated = entries.reduce(
     (sum, entry) => sum + ((Number(entry.percentage) || 0) / 100) * totalContractValueNum,
     0,
   );
 
+  const parseNumOrNull = (val) => {
+    if (val === null || val === undefined || val === "") return null;
+    const num = Number(val);
+    return Number.isNaN(num) ? null : num;
+  };
+
+  const previouslyBilled = parseNumOrNull(value.previouslyBilledAmount);
+  const maxAllowedAmount = previouslyBilled !== null ? Math.max(0, totalContractValueNum - previouslyBilled) : totalContractValueNum;
+  const exceedsPermittedContractValue = previouslyBilled !== null && totalAllocated > maxAllowedAmount + 0.01;
+
+  // MILESTONES: every entry must reference a PMS milestone the backend actually
+  // listed for this project (a deleted/foreign one would be refused on save anyway).
+  const listedMilestoneIds = new Set(milestonesState.milestones.map((m) => m.pmsMilestoneId));
+  const milestonesLoaded = milestonesState.status === "success";
+  const hasUnlistedMilestoneEntry = isMilestones
+    && milestonesLoaded
+    // A locked entry is kept even when PMS no longer lists its milestone (the backend still freezes it and
+    // requires it to be sent back unchanged); only entries that can be removed block the save.
+    && entries.some((entry) => !listedMilestoneIds.has(entry.pmsMilestoneId) && !isMilestoneEntryLocked(entry));
+
   const contractValueValid = totalContractValueNum > 0;
   const isInstallmentsValid = entries.length > 0 && !hasEntryErrors && totalPercentageValid;
   const isFullPaymentValid = Boolean(entries[0]?.billingDate) && !entryErrors[0]?.billingDate;
-  const isFormValid = contractValueValid && (isFullPayment ? isFullPaymentValid : isInstallmentsValid);
+  const isMilestonesValid =
+    milestonesLoaded &&
+    entries.length > 0 &&
+    !hasEntryErrors &&
+    totalPercentageValid &&
+    !hasUnlistedMilestoneEntry &&
+    !exceedsPermittedContractValue;
+  const isFormValid =
+    contractValueValid &&
+    (isFullPayment ? isFullPaymentValid : isMilestones ? isMilestonesValid : isInstallmentsValid);
 
   // A fresh, still-empty row shouldn't light up red — inline errors show only
   // for a value the user actually entered (e.g. 0 or >100). Anything still
@@ -3258,6 +4359,28 @@ function MilestonePlanForm({
   if (!contractValueValid) saveBlockers.push("Project Budget is not available");
   if (isFullPayment) {
     if (!entries[0]?.billingDate) saveBlockers.push("Select the billing date");
+  } else if (isMilestones) {
+    if (!milestonesLoaded) saveBlockers.push("PMS milestones are not loaded");
+    else if (milestonesState.milestones.length === 0) saveBlockers.push("No milestones found in PMS");
+    else if (entries.length === 0) saveBlockers.push("Select at least one milestone");
+    if (entries.some((entry) => entry.percentage === "" || entry.percentage === null || entry.percentage === undefined)) {
+      saveBlockers.push("Enter a billing percentage for every selected milestone");
+    }
+    const hasDecimalError = entries.some((entry) => {
+      const parts = String(entry.percentage ?? "").split(".");
+      return parts.length > 1 && parts[1].length > 2;
+    });
+    if (hasDecimalError) {
+      saveBlockers.push("Percentage must have at most 2 decimal places");
+    }
+    if (entries.some((entry) => !entry.billingDate)) saveBlockers.push("Select a billing date for every selected milestone");
+    const milestoneDates = entries.map((e) => e.billingDate).filter(Boolean);
+    if (new Set(milestoneDates).size !== milestoneDates.length) {
+      saveBlockers.push("Each milestone must have a unique billing date");
+    }
+    if (hasUnlistedMilestoneEntry) saveBlockers.push("Remove milestones PMS no longer lists");
+    if (totalPercentage > 100) saveBlockers.push("Total allocation cannot exceed 100%");
+    if (exceedsPermittedContractValue) saveBlockers.push("Allocation exceeds remaining contract value");
   } else {
     if (entries.some((entry) => entry.percentage === "" || entry.percentage === null || entry.percentage === undefined)) {
       saveBlockers.push("Enter a percentage for every installment");
@@ -3274,6 +4397,30 @@ function MilestonePlanForm({
     if (isFullPayment) {
       if (!entries[0]?.billingDate) {
         showStatusToast("Billing date is required.", "error");
+        return;
+      }
+    } else if (isMilestones) {
+      if (!milestonesLoaded || entries.length === 0) {
+        showStatusToast("Select at least one PMS milestone to bill.", "error");
+        return;
+      }
+      if (hasEntryErrors) {
+        showStatusToast("Please fix the highlighted milestone errors before saving.", "error");
+        return;
+      }
+      if (hasUnlistedMilestoneEntry) {
+        showStatusToast("Remove the milestones PMS no longer lists before saving.", "error");
+        return;
+      }
+      if (totalPercentage > 100) {
+        showStatusToast("Total milestone percentage cannot exceed 100%.", "error");
+        return;
+      }
+      if (exceedsPermittedContractValue) {
+        showStatusToast(
+          `The selected milestones total ${formatCurrency(totalAllocated, currency)}, which exceeds the remaining contract value of ${formatCurrency(maxAllowedAmount, currency)}.`,
+          "error",
+        );
         return;
       }
     } else {
@@ -3319,10 +4466,16 @@ function MilestonePlanForm({
       // Entry-level remarks are no longer collected in the UI — Plan Notes
       // (plan-level remarks) is the single notes field — so each entry's
       // remarks is sent as "" per the existing API convention.
+      // MILESTONES entries keep their PMS milestone id and its name as remarks.
+      const entriesToSend = isMilestones
+        ? entries.map((entry) => ({ ...entry }))
+        : entries.map((entry) => ({ ...entry, remarks: "" }));
+
       const payload = buildMilestonePlanRequestPayload({
         ...value,
+        paymentStructure: isMilestones ? "MILESTONES" : paymentStructure,
         totalContractValue: totalContractValueNum,
-        entries: entries.map((entry) => ({ ...entry, remarks: "" })),
+        entries: entriesToSend,
       });
 
       // value.milestonePlanId can still be unset here if the wizard's own load
@@ -3361,17 +4514,46 @@ function MilestonePlanForm({
             })
           : entries.map(normalizeMilestonePaymentEntry);
       const savedPaymentStructure = saved?.paymentStructure || value.paymentStructure || "FULL_PAYMENT";
-      savedPlanRef.current = { paymentStructure: savedPaymentStructure, entries: savedEntries };
+
+      // A create response does not carry the entries' frozen state (nothing exists to be frozen yet, but the backend
+      // does not say so). Re-read the plan so every saved entry shows the authoritative state instead of "unknown".
+      let authoritativeEntries = savedEntries;
+      if (savedPaymentStructure === "MILESTONES" && savedEntries.some((entry) => entry.frozen === undefined)) {
+        try {
+          const refreshed = await getMilestonePlanByBillingConfiguration(resolvedConfigId);
+          const refreshedEntries = Array.isArray(refreshed?.entries) ? refreshed.entries.map(normalizeMilestonePaymentEntry) : [];
+          if (refreshedEntries.length === savedEntries.length && refreshedEntries.every((entry) => entry.frozen !== undefined)) {
+            authoritativeEntries = refreshedEntries.map((entry, index) => ({
+              ...entry,
+              sequence: entry.sequence ?? index + 1,
+            }));
+          }
+        } catch {
+          // keep the create/update response; its entries stay "unknown" and therefore locked in the UI
+        }
+      }
+      savedPlanRef.current = { paymentStructure: savedPaymentStructure, entries: authoritativeEntries };
 
       update({
         milestonePlanId: savedMilestonePlanId,
         totalContractValue: saved?.totalContractValue ?? totalContractValueNum,
         paymentStructure: savedPaymentStructure,
         remarks: saved?.remarks ?? value.remarks ?? "",
-        entries: savedEntries,
+        entries: authoritativeEntries,
+        previouslyBilledAmount:
+          saved?.previouslyBilledAmount !== undefined && saved?.previouslyBilledAmount !== null
+            ? saved.previouslyBilledAmount
+            : value.previouslyBilledAmount ?? null,
+        remainingContractBalance:
+          saved?.remainingContractBalance !== undefined && saved?.remainingContractBalance !== null
+            ? saved.remainingContractBalance
+            : value.remainingContractBalance ?? null,
       });
       showStatusToast("Milestone plan configuration saved", "success");
     } catch (error) {
+      if (isMilestones && milestonesState?.reload) {
+        milestonesState.reload();
+      }
       showStatusToast(
         getApiErrorMessage(error, "Unable to save milestone plan configuration."),
         "error",
@@ -3382,6 +4564,17 @@ function MilestonePlanForm({
   };
 
   const requestRemoveMilestonePlanConfig = () => {
+    if (isMilestones) {
+      // the entry's own backend state decides, never the milestone list
+      const hasFrozen = entries.some(isMilestoneEntryLocked);
+      if (hasFrozen) {
+        showStatusToast(
+          "The milestone plan cannot be deleted because billing has already started for one or more milestones.",
+          "error",
+        );
+        return;
+      }
+    }
     if (!value.milestonePlanId) {
       savedPlanRef.current = null;
       update({
@@ -3399,6 +4592,18 @@ function MilestonePlanForm({
     if (!milestonePlanId) {
       setConfirmingDelete(false);
       return;
+    }
+    if (isMilestones) {
+      // the entry's own backend state decides, never the milestone list
+      const hasFrozen = entries.some(isMilestoneEntryLocked);
+      if (hasFrozen) {
+        showStatusToast(
+          "The milestone plan cannot be deleted because billing has already started for one or more milestones.",
+          "error",
+        );
+        setConfirmingDelete(false);
+        return;
+      }
     }
 
     setDeleting(true);
@@ -3439,18 +4644,30 @@ function MilestonePlanForm({
         {/* 2. Schedule — how many payments, how much each, and when */}
         <section className="space-y-3 bg-slate-50/40 p-4 sm:px-6 sm:py-5">
           <PlanSectionHeading
-            title={isFullPayment ? "Payment Schedule" : "Installment Schedule"}
+            title={
+              isFullPayment
+                ? "Payment Schedule"
+                : isMilestones
+                ? "PMS Milestones Schedule"
+                : "Installment Schedule"
+            }
             description={
               isFullPayment
                 ? "The full value is billed in a single payment on the selected date."
+                : isMilestones
+                ? "Select the PMS milestones to bill and enter each one's share of the total value and billing date."
                 : "Enter each installment's share of the total value and its billing date."
             }
             aside={
-              !isFullPayment && (
+              isMilestones ? (
+                <span className="text-xs font-semibold text-[#0A0082]">
+                  {entries.length} {entries.length === 1 ? "milestone" : "milestones"} selected
+                </span>
+              ) : !isFullPayment ? (
                 <span className="text-xs font-medium text-slate-500">
                   {entries.length} {entries.length === 1 ? "installment" : "installments"}
                 </span>
-              )
+              ) : null
             }
           />
 
@@ -3464,6 +4681,16 @@ function MilestonePlanForm({
               billingDate={entries[0]?.billingDate}
               currency={currency}
               onChange={updateFullPaymentEntry}
+            />
+          ) : isMilestones ? (
+            <PmsMilestoneSelectionPanel
+              pmsProjectId={pmsProjectId}
+              milestonesState={milestonesState}
+              onReload={milestonesState.reload}
+              entries={entries}
+              onEntriesChange={(nextEntries) => update({ entries: nextEntries })}
+              totalValue={totalContractValueNum}
+              currency={currency}
             />
           ) : (
             <div className="space-y-3">
@@ -3523,6 +4750,9 @@ function MilestonePlanForm({
             scheduledAmount={isFullPayment ? totalContractValueNum : totalAllocated}
             totalPercentage={isFullPayment ? 100 : totalPercentage}
             currency={currency}
+            isMilestones={isMilestones}
+            previouslyBilledAmount={value.previouslyBilledAmount}
+            remainingContractBalance={value.remainingContractBalance}
           />
         </section>
 
@@ -5119,6 +6349,7 @@ export default function BillingConfigurationStep({
                 projectBudget={projectInfo.projectBudget}
                 billingConfigurationId={value.billingConfigurationId || value.id}
                 ensureBillingConfigurationId={ensureBillingConfigurationId}
+                projectInfo={projectInfo}
               />
             )}
 

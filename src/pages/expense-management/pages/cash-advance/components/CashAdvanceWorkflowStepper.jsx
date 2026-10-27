@@ -82,6 +82,8 @@ export default function CashAdvanceWorkflowStepper({ currentStatus, linkedExpens
   const isRejected = upperStatus === "REJECTED";
   const isCancelled = upperStatus === "CANCELLED";
   const isOverdue = upperStatus === "OVERDUE";
+  // A closed advance has finished stage 7, so it is completed rather than still active.
+  const isClosed = currentStageIndex === 7 && (upperStatus === "CLOSED" || upperStatus === "SETTLED");
 
   return (
     <div className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}>
@@ -108,7 +110,7 @@ export default function CashAdvanceWorkflowStepper({ currentStatus, linkedExpens
           </span>
         ) : (
           <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
-            <Clock size={13} /> Stage {currentStageIndex} of 7
+            <Clock size={13} /> {isClosed ? "Closed" : `Stage ${currentStageIndex} of 7`}
           </span>
         )}
       </div>
@@ -118,8 +120,8 @@ export default function CashAdvanceWorkflowStepper({ currentStatus, linkedExpens
         <ol className="flex min-w-[880px] items-start">
           {STAGES.map((stage, index) => {
             const Icon = stage.icon;
-            const isPassed = !isRejected && !isCancelled && !isOverdue && currentStageIndex > stage.id;
-            const isCurrent = !isRejected && !isCancelled && !isOverdue && currentStageIndex === stage.id;
+            const isPassed = !isRejected && !isCancelled && !isOverdue && (currentStageIndex > stage.id || (isClosed && stage.id === 7));
+            const isCurrent = !isRejected && !isCancelled && !isOverdue && !isClosed && currentStageIndex === stage.id;
             const isLast = index === STAGES.length - 1;
 
             let circleStyle = "bg-gray-100 text-gray-400 border-gray-300";
