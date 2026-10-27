@@ -1157,19 +1157,6 @@ export default function NewConfigurationWizard() {
           // Backend-reported changes awaiting approval (empty unless pending).
           pendingChanges={wizardData.changes}
           leading={<BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Overview" />}
-          headerActions={
-            <Button
-              variant="primary"
-              size="small"
-              onClick={handleStartEdit}
-              loading={recordLock.acquiring}
-              loadingText="Acquiring lock..."
-              disabled={recordLock.isLockedByOther(configId)}
-              title={recordLock.isLockedByOther(configId) ? "This configuration is currently under review." : ""}
-            >
-              <Pencil className="h-3.5 w-3.5" /> Edit Configuration
-            </Button>
-          }
         />
       </div>
     );

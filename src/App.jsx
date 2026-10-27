@@ -333,6 +333,11 @@ import InvoiceGeneration from "./pages/account_receivable/pages/InvoiceGeneratio
 import InvoiceGenerationDetail from "./pages/account_receivable/pages/InvoiceGenerationDetail.jsx";
 import InvoiceApproval from "./pages/account_receivable/pages/InvoiceApproval.jsx";
 import InvoiceDetail from "./pages/account_receivable/pages/InvoiceDetail.jsx";
+import Receivables from "./pages/account_receivable/pages/Receivables.jsx";
+import Payments from "./pages/account_receivable/pages/Payments.jsx";
+import CustomerLedger from "./pages/account_receivable/pages/CustomerLedger.jsx";
+import AdjustmentNotes from "./pages/account_receivable/pages/AdjustmentNotes.jsx";
+import Collections from "./pages/account_receivable/pages/Collections.jsx";
 import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
 import MasterDataOverview from "./pages/account_receivable/pages/master-data/MasterDataOverview.jsx";
 import BillingTypeMasterPage from "./pages/account_receivable/pages/master-data/BillingTypeMasterPage.jsx";
@@ -1025,6 +1030,28 @@ const AppRoutes = () => {
             <Route
               path="invoice-approval"
               element={<ProtectedRoute allowedRoles={AR_CHECKER_ROLES}><InvoiceApproval /></ProtectedRoute>}
+            />
+            {/* Outstanding receivables — read-only monitoring, needed by maker and checker alike. */}
+            <Route
+              path="receivables"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><Receivables /></ProtectedRoute>}
+            />
+            {/* Post-invoice flow — payments, ledger & aging, credit/debit notes, reminders & collections. */}
+            <Route
+              path="payments"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><Payments /></ProtectedRoute>}
+            />
+            <Route
+              path="customer-ledger"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><CustomerLedger /></ProtectedRoute>}
+            />
+            <Route
+              path="adjustment-notes"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><AdjustmentNotes /></ProtectedRoute>}
+            />
+            <Route
+              path="collections"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><Collections /></ProtectedRoute>}
             />
             <Route
               path="invoices/:snapshotId"

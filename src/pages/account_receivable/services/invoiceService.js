@@ -1452,7 +1452,53 @@ export const sendInvoiceToClient = async (invoiceId) => {
   }
   const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/send`;
   const response = await api.post(url);
-  return unwrapData(response);
+  const delivery = unwrapData(response);
+
+  // The backend answers 200 even when the email could not be delivered —
+  // the outcome is in deliveryStatus. A FAILED attempt must never read as sent.
+  if (String(delivery?.deliveryStatus || "").toUpperCase() === "FAILED") {
+    throw new Error(
+      delivery?.failureReason
+        ? `Invoice delivery failed: ${delivery.failureReason}`
+        : response?.data?.message || "Invoice delivery failed."
+    );
+  }
+  return delivery;
+};
+
+/**
+ * GET /api/v1/invoices/{invoiceId}/deliveries
+ * Every "Send to Client" attempt for the invoice, newest first — the first
+ * entry is the current delivery state.
+ */
+export const getInvoiceDeliveries = async (invoiceId) => {
+  if (!invoiceId) return [];
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/deliveries`;
+  const response = await api.get(url);
+  const data = unwrapData(response);
+  return Array.isArray(data) ? data : [];
+};
+
+/**
+ * Collapses a delivery history into the delivery state the invoice screens
+ * render. "Sent" means at least one attempt reached SENT (that is also what
+ * creates the receivable); the latest attempt still decides whether the most
+ * recent send failed.
+ */
+export const toDeliveryState = (deliveries = []) => {
+  const latest = deliveries[0] || null;
+  const lastSent = deliveries.find((d) => String(d?.deliveryStatus).toUpperCase() === "SENT") || null;
+  const latestFailed = String(latest?.deliveryStatus || "").toUpperCase() === "FAILED";
+
+  return {
+    deliveryStatus: lastSent ? "SENT_TO_CLIENT" : "NOT_SENT",
+    sentAt: lastSent?.sentAt || null,
+    recipientEmail: lastSent?.recipientEmail || latest?.recipientEmail || null,
+    lastAttemptFailed: latestFailed,
+    failureReason: latestFailed ? latest?.failureReason || null : null,
+    failedAt: latestFailed ? latest?.failedAt || null : null,
+    attempts: deliveries.length,
+  };
 };
 
 export default {
@@ -1470,6 +1516,7 @@ export default {
   correctNonFinancialInvoice,
   financialCorrectionReacquire,
   sendInvoiceToClient,
+  getInvoiceDeliveries,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   normalizeInvoice,

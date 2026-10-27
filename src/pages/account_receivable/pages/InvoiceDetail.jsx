@@ -41,6 +41,8 @@ import {
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   sendInvoiceToClient,
+  getInvoiceDeliveries,
+  toDeliveryState,
 } from "../services/invoiceService";
 import { formatBillingPeriod } from "../services/billingDataAcquisitionService";
 import {
@@ -50,9 +52,6 @@ import {
   DEMO_TAX_CONTEXT,
   DEMO_TERMS,
   DEMO_DELIVERY_STATUS,
-  DEMO_SENT_BY,
-  getDemoDelivery,
-  saveDemoDelivery,
 } from "../utils/invoiceDemoData";
 import { interpretSendResult, describeDelivery, DELIVERY_OUTCOME } from "../utils/invoiceDelivery";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
@@ -63,6 +62,7 @@ import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLock
 import useRecordLock from "../hooks/useRecordLock";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
+const RECEIVABLES_PATH = "/account-receivable/receivables";
 const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
 const INVOICE_APPROVAL_PATH = "/account-receivable/invoice-approval";
 
@@ -233,14 +233,11 @@ export default function InvoiceDetail() {
   const [isReacquireModalOpen, setIsReacquireModalOpen] = useState(false);
   const [reacquiring, setReacquiring] = useState(false);
 
-  // Demo: Send to Client delivery state (separate from invoice approval status)
+  // Send to Client delivery state (separate from invoice approval status),
+  // read from the backend delivery history.
   const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
-  const [deliveryState, setDeliveryState] = useState({
-    deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
-    sentAt: null,
-    sentBy: null,
-  });
+  const [deliveryState, setDeliveryState] = useState(() => toDeliveryState([]));
 
   const latestRejectionReason = useMemo(() => {
     if (invoice?.rejectionReason) return invoice.rejectionReason;
@@ -609,13 +606,22 @@ export default function InvoiceDetail() {
     }
   };
 
-  // Load demo delivery state from localStorage once invoice (and invoiceId) is known
-  useEffect(() => {
-    if (invoice?.invoiceId) {
-      const stored = getDemoDelivery(invoice.invoiceId);
-      setDeliveryState(stored);
+  const loadDeliveryState = async (invoiceId) => {
+    try {
+      const deliveries = await getInvoiceDeliveries(invoiceId);
+      setDeliveryState(toDeliveryState(deliveries));
+    } catch (err) {
+      console.error("[InvoiceDetail] Error loading delivery history:", err);
     }
-  }, [invoice?.invoiceId]);
+  };
+
+  // Delivery history is the source of truth for "sent" — load it once the invoice is known.
+  useEffect(() => {
+    if (invoice?.invoiceId && invoice?.invoiceStatus === "APPROVED") {
+      loadDeliveryState(invoice.invoiceId);
+    }
+  }, [invoice?.invoiceId, invoice?.invoiceStatus]);
+
 
   /**
    * Send to Client action.
@@ -635,14 +641,11 @@ export default function InvoiceDetail() {
         const msg = getInvoiceErrorMessage(apiErr, "Failed to send invoice to client.");
         showStatusToast(msg, "error");
         setSendingToClient(false);
+        loadDeliveryState(invoice.invoiceId);
         return;
       }
 
-      const resolvedEmail =
-        backendResult?.recipientEmail ||
-        backendResult?.email ||
-        invoice.email ||
-        null;
+      const resolvedEmail = backendResult?.recipientEmail || invoice.email || null;
 
       // The backend answers 200 for every attempt; only a SENT result may be shown as sent.
       const outcome = interpretSendResult(backendResult, { recipientEmail: resolvedEmail, sentBy: DEMO_SENT_BY });
@@ -661,10 +664,13 @@ export default function InvoiceDetail() {
       setDeliveryState(entry);
       setIsSendToClientOpen(false);
       showStatusToast(
-        backendResult?.message ||
-        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent${resolvedEmail ? ` to ${resolvedEmail}` : " to client"}.`,
+        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} sent${resolvedEmail ? ` to ${resolvedEmail}` : " to client"}.`,
         "success"
       );
+      // Sending creates the receivable — continue the workflow there.
+      navigate(RECEIVABLES_PATH, {
+        state: { sentInvoiceId: invoice.invoiceId, from: "invoice-detail" },
+      });
     } catch (err) {
       const msg = getInvoiceErrorMessage(err, "Failed to send invoice to client.");
       showStatusToast(msg, "error");
@@ -875,6 +881,7 @@ export default function InvoiceDetail() {
               )}
             </div>
           </div>
+
         </div>
       )}
 
@@ -1758,3 +1765,4 @@ export default function InvoiceDetail() {
     </div>
   );
 }
+

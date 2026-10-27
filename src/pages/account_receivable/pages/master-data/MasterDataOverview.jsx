@@ -209,6 +209,10 @@ export default function MasterDataOverview() {
   return (
     <div className="w-full space-y-6">
       <div className="flex items-center gap-3">
+        <BackIconButton
+          onClick={() => navigate("/account-receivable/dashboard")}
+          label="Back to Configurations"
+        />
         <div className="flex-1">
           <PageHeader
             title="Configuration"
@@ -216,24 +220,6 @@ export default function MasterDataOverview() {
           />
         </div>
       </div>
-
-      <MasterStatCards
-        items={[
-          { label: "Total Configurations", value: globalStats.totalMasters, icon: <Layers className="h-5 w-5" /> },
-          {
-            label: "Active Configurations",
-            value: globalStats.activeMasters,
-            tone: "success",
-            icon: <CheckCircle2 className="h-5 w-5" />,
-          },
-          {
-            label: "Inactive Configurations",
-            value: globalStats.inactiveMasters,
-            tone: "danger",
-            icon: <XCircle className="h-5 w-5" />,
-          },
-        ]}
-      />
 
       <div>
         <h2 className="mb-3 text-base font-semibold text-slate-900">Configuration Masters</h2>
