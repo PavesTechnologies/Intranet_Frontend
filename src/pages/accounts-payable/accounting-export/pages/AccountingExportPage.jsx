@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import clsx from "clsx";
 import { toast } from "react-toastify";
 import { ChevronDown, ChevronRight, Download, History } from "lucide-react";
@@ -112,6 +113,7 @@ export default function AccountingExportPage() {
     <div className="space-y-4 p-4 sm:p-6">
       <Breadcrumb items={[{ label: "Accounts Payable", to: AP_ROUTES.DASHBOARD }, { label: "Accounting export" }]} />
       <PageHeader title="Accounting export" subtitle="Post AP to Tally or Zoho Books - invoices, payments, notes and TDS deposits as balanced vouchers, without re-typing" />
+      <PageGuide page="accountingExport" />
 
       <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-end gap-3">

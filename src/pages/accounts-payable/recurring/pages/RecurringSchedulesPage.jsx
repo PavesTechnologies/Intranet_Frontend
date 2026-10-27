@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import { toast } from "react-toastify";
@@ -167,6 +168,7 @@ export default function RecurringSchedulesPage() {
           </Button>
         )}
       />
+      <PageGuide page="recurring" />
       {isLoading ? (
         <div className="flex justify-center rounded-xl border border-slate-200 bg-white py-20"><LoadingSpinner text="Loading schedules..." /></div>
       ) : isError ? (

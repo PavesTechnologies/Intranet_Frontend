@@ -8,6 +8,22 @@ const authHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+// For multipart bodies the request must carry no Content-Type. axios would otherwise send
+// application/x-www-form-urlencoded (its POST default), so Spring would read the multipart body as a
+// form and every field and file would be lost. With the header removed, the browser sets the
+// multipart boundary itself.
+const multipartConfig = () => ({
+  baseURL: EXPENSE_API_BASE,
+  headers: authHeaders(),
+  transformRequest: [
+    (data, headers) => {
+      // null (not delete): axios re-adds its form-urlencoded default after the transforms unless the header is set.
+      headers.set("Content-Type", null);
+      return data;
+    },
+  ],
+});
+
 /**
  * Service layer for Cash Advance operations mapping to CashAdvanceController endpoints:
  * - GET/PUT/DELETE /xms/employee/cash-advances/{advanceId}
@@ -84,11 +100,11 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
-  disburse: (advanceId) =>
-    api.post(`/xms/employee/cash-advances/${advanceId}/disburse`, null, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
+  // confirmation: FormData from buildDisbursementFormData (disbursementMode plus cash acknowledgment,
+  // bank transfer details or UPI proof). Sent as multipart; the advance is only recorded as disbursed
+  // once this succeeds.
+  disburse: (advanceId, confirmation) =>
+    api.post(`/xms/employee/cash-advances/${advanceId}/disburse`, confirmation ?? null, multipartConfig()),
 
   cancel: (advanceId) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/cancel`, null, {
@@ -110,11 +126,10 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
-  repay: (advanceId, payload) =>
-    api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, {
-      advanceId,
-      ...payload,
-    }, {
+  // formData: amount plus the payment mode and proof (buildDisbursementFormData). Multipart so the
+  // proof file can be uploaded with the repayment.
+  repay: (advanceId, formData) =>
+    api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, formData, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),

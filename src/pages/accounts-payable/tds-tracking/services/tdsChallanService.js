@@ -23,6 +23,8 @@ async function extract(url, file) {
 }
 
 export const tdsChallanService = {
+  /** TDS deducted but not deposited (by due month) and deposited but not filed (by quarter). */
+  pending: async () => (await api.get(`${CHALLANS()}/pending`)).data,
   listChallans: async (page = 1, pageSize = 20) => (await api.get(CHALLANS(), { params: { page, page_size: pageSize } })).data,
   getChallan: async (id) => (await api.get(`${CHALLANS()}/${Number(id)}`)).data,
   challanCandidates: async ({ period, section } = {}) =>

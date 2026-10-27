@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { AlertTriangle, Inbox, FileCheck2, Receipt, FolderKanban, RotateCcw, Send, Wallet, BadgeCheck } from "lucide-react";
+import { AlertTriangle, Inbox, FileCheck2, Receipt, Building2, RotateCcw, Send, Wallet, BadgeCheck } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PageHeader from "@/components/ui/PageHeader";
 import FilterCard from "@/components/ui/FilterCard";
@@ -17,21 +17,53 @@ import SelectableStatCard from "@/pages/expense-management/components/common/Sel
 import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 import { formatMoney, formatDate, formatDateTime } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
-import { useEligibleExpenses, useHandedOff, useHandoffSummary, useMarkHandedOff } from "./hooks/useInvoiceHandoff";
+import { useEligibleExpenses, useHandedOff, useHandoffSummary, useMarkHandedOff, useRedeliverToAr } from "./hooks/useInvoiceHandoff";
 import Pagination from "@/components/Pagination/pagination";
 
-const unknownProjectKey = "__none__";
+const unknownClientKey = "__none__";
 
-/** Ready expenses grouped by project — invoicing works client/project at a time. */
-function groupByProject(items) {
+const projectLabel = (item) => (item.projectCode ? `${item.projectCode} — ${item.projectName}` : "—");
+
+/** Whether a handoff has reached AR's queue. No status = handed off before XMS sent to AR (AR pulled it). */
+function ArDeliveryStatus({ item }) {
+  const status = item.arDeliveryStatus;
+  if (status === "SENT") {
+    return (
+      <span className="leading-tight">
+        <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Sent to AR</span>
+        {item.arDeliveredAt && <span className="block text-[11px] text-gray-400">{formatDateTime(item.arDeliveredAt)}</span>}
+      </span>
+    );
+  }
+  if (status === "FAILED") {
+    return (
+      <span className="leading-tight">
+        <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">Not delivered</span>
+        <span className="block text-[11px] text-gray-500">
+          {item.arDeliveryAttempts} attempt{item.arDeliveryAttempts === 1 ? "" : "s"} · retried automatically
+        </span>
+        {item.arDeliveryError && (
+          <span className="block max-w-[220px] truncate text-[11px] text-rose-600" title={item.arDeliveryError}>
+            {item.arDeliveryError}
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (status === "PENDING") {
+    return <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">Sending…</span>;
+  }
+  return <span className="text-[11px] text-gray-400">Fetched by AR</span>;
+}
+
+/** Ready expenses grouped by client — AR invoices per client; project is optional per expense. */
+function groupByClient(items) {
   const groups = new Map();
   items.forEach((item) => {
-    const key = item.projectId || unknownProjectKey;
+    const key = item.resolvedClientId || unknownClientKey;
     if (!groups.has(key)) {
       groups.set(key, {
         key,
-        projectCode: item.projectCode,
-        projectName: item.projectName,
         clientName: item.resolvedClientName,
         currency: item.baseCurrencyCode,
         total: 0,
@@ -77,6 +109,24 @@ export default function ClientBillingPage() {
   const readyQuery = useEligibleExpenses(filters, readyPage, readySize);
   const historyQuery = useHandedOff(historyPage, historySize);
   const markHandedOff = useMarkHandedOff();
+  const redeliverToAr = useRedeliverToAr();
+  const [resendingId, setResendingId] = useState(null);
+
+  const resendToAr = async (item) => {
+    setResendingId(item.syncId);
+    try {
+      const result = await redeliverToAr.mutateAsync(item.syncId);
+      if (result?.arDeliveryStatus === "SENT") {
+        showStatusToast(`Sent to AR: ${item.reportNumber}`, "success");
+      } else {
+        showStatusToast(`Still couldn't reach AR: ${result?.arDeliveryError || "unknown error"}`, "error");
+      }
+    } catch (err) {
+      showStatusToast(err.response?.data?.message || err.message || "Failed to resend to AR.", "error");
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const summary = summaryQuery.data;
   const matches = (item) => {
@@ -87,7 +137,7 @@ export default function ClientBillingPage() {
   };
 
   const readyItems = readyQuery.data?.content || [];
-  const readyGroups = groupByProject(readyItems.filter(matches));
+  const readyGroups = groupByClient(readyItems.filter(matches));
   const historyAll = historyQuery.data?.content || [];
   const historyItems = historyAll.filter(matches);
 
@@ -141,6 +191,7 @@ export default function ClientBillingPage() {
   const readyRows = (items) =>
     items.map((item) => ({
       date: formatDate(item.expenseDate),
+      project: <span className="text-xs text-gray-700">{projectLabel(item)}</span>,
       employee: <EmployeeLabel employeeId={item.employeeId} />,
       expense: (
         <div className="leading-tight text-left">
@@ -201,10 +252,10 @@ export default function ClientBillingPage() {
           textColor="text-indigo-700"
         />
         <StatCard
-          title="Projects waiting"
-          value={summary ? summary.readyProjectCount : "—"}
+          title="Clients waiting"
+          value={summary ? summary.readyClientCount : "—"}
           subtitle="With ready expenses"
-          icon={FolderKanban}
+          icon={Building2}
         />
         <SelectableStatCard
           title="Handed off"
@@ -216,6 +267,21 @@ export default function ClientBillingPage() {
           onClick={() => switchTab("history")}
         />
       </div>
+
+      {summary?.arDeliveryFailedCount > 0 && (
+        <div className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 sm:flex-row sm:items-center sm:justify-between">
+          <span className="flex items-start gap-2">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+            {summary.arDeliveryFailedCount} handed-off expense{summary.arDeliveryFailedCount === 1 ? " hasn't" : "s haven't"} reached
+            AR yet. XMS retries automatically every few minutes; you can also resend from the Handed off tab.
+          </span>
+          {tab !== "history" && (
+            <Button size="small" variant="outline" onClick={() => switchTab("history")}>
+              View handoffs
+            </Button>
+          )}
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={switchTab}>
         <TabsList className="h-auto flex-wrap">
@@ -297,11 +363,10 @@ export default function ClientBillingPage() {
                 <section key={g.key}>
                   <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-2">
-                      <FolderKanban size={15} className="shrink-0 text-indigo-500" />
+                      <Building2 size={15} className="shrink-0 text-indigo-500" />
                       <span className="truncate text-sm font-semibold text-slate-800">
-                        {g.key === unknownProjectKey ? "No project" : `${g.projectCode} — ${g.projectName}`}
+                        {g.key === unknownClientKey ? "No client" : g.clientName || "Unnamed client"}
                       </span>
-                      {g.clientName && <span className="text-xs text-slate-500">· {g.clientName}</span>}
                     </div>
                     <span className="text-xs text-slate-500">
                       {g.items.length} expense{g.items.length === 1 ? "" : "s"} ·{" "}
@@ -310,8 +375,8 @@ export default function ClientBillingPage() {
                   </div>
                   <div className="w-full overflow-x-auto">
                     <GenericTable
-                      headers={["Date", "Employee", "Expense", "Report", "Cost basis", "Receipts", "Action"]}
-                      columns={["date", "employee", "expense", "report", "amount", "receipts", "action"]}
+                      headers={["Date", "Project", "Employee", "Expense", "Report", "Cost basis", "Receipts", "Action"]}
+                      columns={["date", "project", "employee", "expense", "report", "amount", "receipts", "action"]}
                       rows={readyRows(g.items)}
                     />
                   </div>
@@ -341,11 +406,12 @@ export default function ClientBillingPage() {
           ) : (
             <div className="w-full overflow-x-auto">
               <GenericTable
-                headers={["Handed off", "Project", "Employee", "Expense", "Report", "Amount", "Invoice ref.", "Action"]}
-                columns={["handedOffAt", "project", "employee", "expense", "report", "amount", "invoiceReference", "action"]}
+                headers={["Handed off", "Client", "Project", "Employee", "Expense", "Report", "Amount", "Invoice ref.", "AR delivery", "Action"]}
+                columns={["handedOffAt", "client", "project", "employee", "expense", "report", "amount", "invoiceReference", "arDelivery", "action"]}
                 rows={historyItems.map((item) => ({
                   handedOffAt: <span className="whitespace-nowrap text-xs text-gray-600">{formatDateTime(item.handedOffAt)}</span>,
-                  project: item.projectCode ? `${item.projectCode} — ${item.projectName}` : "—",
+                  client: item.resolvedClientName || "—",
+                  project: projectLabel(item),
                   employee: <EmployeeLabel employeeId={item.employeeId} />,
                   expense: (
                     <div className="leading-tight">
@@ -361,10 +427,25 @@ export default function ClientBillingPage() {
                   ) : (
                     <span className="text-xs text-gray-400">Not given</span>
                   ),
+                  arDelivery: <ArDeliveryStatus item={item} />,
                   action: (
-                    <Button size="small" variant="outline" onClick={() => openHandoff(item, { again: true })}>
-                      <RotateCcw size={13} className="mr-1" /> Hand off again
-                    </Button>
+                    <div className="flex flex-col items-stretch gap-1.5">
+                      {item.arDeliveryStatus !== "SENT" && (
+                        <Button
+                          size="small"
+                          variant="primary"
+                          onClick={() => resendToAr(item)}
+                          loading={resendingId === item.syncId}
+                          loadingText="Sending..."
+                          disabled={resendingId !== null}
+                        >
+                          <Send size={13} className="mr-1" /> Resend to AR
+                        </Button>
+                      )}
+                      <Button size="small" variant="outline" onClick={() => openHandoff(item, { again: true })}>
+                        <RotateCcw size={13} className="mr-1" /> Hand off again
+                      </Button>
+                    </div>
                   ),
                 }))}
               />
@@ -386,7 +467,7 @@ export default function ClientBillingPage() {
           isOpen={!!target}
           onClose={closeHandoff}
           title={reprocess ? "Hand off again" : "Hand off to invoicing"}
-          subtitle={`${target.reportNumber} · ${target.projectCode ? `${target.projectCode} — ${target.projectName}` : "No project"}`}
+          subtitle={`${target.reportNumber} · ${target.resolvedClientName || "No client"}${target.projectCode ? ` · ${target.projectCode} — ${target.projectName}` : ""}`}
           size="md"
           footer={
             <div className="flex justify-end gap-2">
@@ -412,7 +493,7 @@ export default function ClientBillingPage() {
                 <span className="font-mono font-semibold text-gray-900">{formatMoney(target.baseAmount, target.baseCurrencyCode)}</span>
               </div>
               <p className="mt-1.5 text-[11px] text-gray-500">
-                This records that the invoicing team now has this expense to bill the client. It doesn't pay the employee or send anything to the client.
+                This records that the invoicing team now has this expense to bill the client, and sends it to AR. It doesn't pay the employee or send anything to the client.
               </p>
             </div>
 

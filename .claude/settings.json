@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Lokeshwari.Busam/Desktop/Myfiles/projects/Expense_Management_Service/src/main/java/com/expense_management_service/service/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Lokeshwari.Busam\\Desktop\\Myfiles\\projects\\Expense_Management_Service\\src\\main\\java\\com\\expense_management_service\\entity",
+      "c:\\Users\\Lokeshwari.Busam\\Desktop\\Myfiles\\projects\\Expense_Management_Service\\src\\main\\java\\com\\expense_management_service\\service"
+    ]
+  }
+}

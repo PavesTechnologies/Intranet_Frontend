@@ -3,7 +3,7 @@
 // invoices (live total vs challan tax) -> check -> confirm. Confirming records the deposit on every
 // selected invoice through the existing per-invoice service, all at once or not at all.
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import clsx from "clsx";
 import { ArrowLeft } from "lucide-react";
@@ -32,7 +32,9 @@ export default function TdsChallanNewPage() {
   const [header, setHeader] = useState(EMPTY);
   const [autoFilled, setAutoFilled] = useState({});
   const [file, setFile] = useState(null);
-  const [period, setPeriod] = useState(previousMonth());
+  const [params] = useSearchParams();
+  // ?period=2026-10 opens a given deduction month (the "To deposit" link); otherwise last month, the usual one
+  const [period, setPeriod] = useState(() => (/^\d{4}-\d{2}$/.test(params.get("period") || "") ? params.get("period") : previousMonth()));
   const [sectionFilter, setSectionFilter] = useState("");
   const [selected, setSelected] = useState({}); // invoice_id -> allocated amount (string)
   const [check, setCheck] = useState(null);

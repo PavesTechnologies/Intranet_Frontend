@@ -11,7 +11,6 @@ import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PendingApprovalsPage from "./PendingApprovalsPage";
 import ApprovalHistoryPage from "./ApprovalHistoryPage";
 import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
-import FinancePage from "../../pages/finance/FinancePage";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
@@ -28,8 +27,6 @@ export default function ApprovalsPage() {
   // State
   // -----------------------------
   const [activeTab, setActiveTab] = useState("pending");
-  const [approvalCategory, setApprovalCategory] =
-    useState("EXPENSE_REPORTS");
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -131,38 +128,6 @@ export default function ApprovalsPage() {
   };
 
   // -----------------------------
-  // Category options
-  // -----------------------------
-  const categoryOptions = [
-    {
-      label: "Expense Reports",
-      value: "EXPENSE_REPORTS",
-    },
-    ...(isFinance
-      ? [
-          {
-            label: "Finance",
-            value: "FINANCE",
-          },
-        ]
-      : []),
-    ...(isManager || isFinance
-      ? [
-          {
-            label: "Cash Advances",
-            value: "CASH_ADVANCES",
-          },
-        ]
-      : []),
-  ];
-
-  const activeCategory =
-    approvalCategory === "FINANCE" && !isFinance
-      ? "EXPENSE_REPORTS"
-      : isManager || isFinance
-        ? approvalCategory
-        : "EXPENSE_REPORTS";
-
   // Which cash advance stage this page acts on: managers approve at manager stage; a Finance-only
   // user approves at finance stage. A user with both roles sees the manager stage here and the
   // finance stage on the Finance tab.
@@ -360,21 +325,6 @@ export default function ApprovalsPage() {
             />
           </div>
 
-          {/* Type */}
-          <div className="w-full lg:w-48">
-            <FormSelect
-              label="Type"
-              name="approvalCategory"
-              value={activeCategory}
-              onChange={(e) =>
-                setApprovalCategory(e.target.value)
-              }
-              options={categoryOptions}
-              className="[&>label]:mb-1 [&>label]:text-xs"
-              buttonClassName="!px-3 !py-1.5 !text-xs"
-            />
-          </div>
-
           {/* Status */}
           <div className="w-full lg:w-40">
             <FormSelect
@@ -391,55 +341,48 @@ export default function ApprovalsPage() {
       </div>
 
       {/* Tab Content */}
-      <div className="approvals-tab-container">
-        {/* Finance verification (Finance roles only) */}
-        {activeCategory === "FINANCE" ? (
-          <FinancePage />
-        ) : /* Cash Advances */ activeCategory === "CASH_ADVANCES" ? (
+      {/* No type filter: expense reports and cash advances for the selected status, on the same page. */}
+      <div className="approvals-tab-container space-y-6">
+        {/* Expense Reports */}
+        {activeTab === "pending" && (
+          <PendingApprovalsPage
+            key={`pending-${reloadKey}`}
+            searchTerm={searchTerm}
+            hideHeader
+            noPadding
+          />
+        )}
+        {activeTab === "approved" && (
+          <ApprovalHistoryPage
+            key={`approved-${reloadKey}`}
+            outcome="APPROVED"
+            title="Approved"
+            breadcrumbLabel="Approved"
+            searchTerm={searchTerm}
+            hideHeader
+            noPadding
+          />
+        )}
+        {activeTab === "rejected" && (
+          <ApprovalHistoryPage
+            key={`rejected-${reloadKey}`}
+            outcome="REJECTED"
+            title="Rejected"
+            breadcrumbLabel="Rejected"
+            searchTerm={searchTerm}
+            hideHeader
+            noPadding
+          />
+        )}
+
+        {/* Cash Advances (shown to managers and Finance; the stage decides which items each user acts on) */}
+        {(isManager || isFinance) && (
           <CashAdvanceApprovalsList
             key={`cash-${activeTab}-${reloadKey}`}
             activeTab={activeTab}
             searchTerm={searchTerm}
             stage={cashAdvanceStage}
           />
-        ) : (
-          <>
-            {/* Pending Expense Reports */}
-            {activeTab === "pending" && (
-              <PendingApprovalsPage
-                key={`pending-${reloadKey}`}
-                searchTerm={searchTerm}
-                hideHeader
-                noPadding
-              />
-            )}
-
-            {/* Approved Expense Reports */}
-            {activeTab === "approved" && (
-              <ApprovalHistoryPage
-                key={`approved-${reloadKey}`}
-                outcome="APPROVED"
-                title="Approved"
-                breadcrumbLabel="Approved"
-                searchTerm={searchTerm}
-                hideHeader
-                noPadding
-              />
-            )}
-
-            {/* Rejected Expense Reports */}
-            {activeTab === "rejected" && (
-              <ApprovalHistoryPage
-                key={`rejected-${reloadKey}`}
-                outcome="REJECTED"
-                title="Rejected"
-                breadcrumbLabel="Rejected"
-                searchTerm={searchTerm}
-                hideHeader
-                noPadding
-              />
-            )}
-          </>
         )}
       </div>
     </div>

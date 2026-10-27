@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { AlertTriangle, CalendarRange, ChevronRight, Clock, Landmark, Percent, ShieldAlert, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, BookOpenCheck, CalendarRange, CheckCircle2, ChevronRight, Clock, Hourglass, Info, Landmark, Percent, ShieldAlert, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
 import clsx from "clsx";
 import GenericTable from "../../../../components/Table/table";
 import {
@@ -20,11 +20,111 @@ const KPI_ICONS = {
   overdue: AlertTriangle,
   on_time: Percent,
   days_to_pay: Clock,
+  dpo: Hourglass,
   spend_fy: TrendingUp,
 };
 
 const days = (v) => (v == null ? "—" : `${Number(v).toLocaleString("en-IN", { maximumFractionDigits: 1 })} d`);
 const toSlices = (list) => (list || []).map((s) => ({ ...s, amount: Number(s.amount) }));
+
+const HIGHLIGHT_TONE = {
+  bad: { icon: AlertTriangle, className: "text-rose-600" },
+  warn: { icon: Clock, className: "text-amber-600" },
+  good: { icon: CheckCircle2, className: "text-emerald-600" },
+  info: { icon: Info, className: "text-[#0A0082]" },
+};
+
+/** "AP at a glance": the dashboard in a few plain sentences, worst news first - each opens its detail. */
+function Highlights({ items }) {
+  if (!items?.length) return null;
+  return (
+    <section aria-labelledby="ap-glance" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <h2 id="ap-glance" className="text-sm font-semibold text-slate-800">AP at a glance</h2>
+      <ul className="mt-2 divide-y divide-slate-100">
+        {items.map((h) => {
+          const tone = HIGHLIGHT_TONE[h.tone] || HIGHLIGHT_TONE.info;
+          const Icon = tone.icon;
+          const body = (
+            <>
+              <Icon className={clsx("mt-0.5 h-4 w-4 shrink-0", tone.className)} aria-hidden="true" />
+              <span className="min-w-0 flex-1 text-sm leading-relaxed text-slate-700">{h.text}</span>
+              {h.link && <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />}
+            </>
+          );
+          return (
+            <li key={h.text}>
+              {h.link ? (
+                <Link to={h.link} className="flex items-start gap-3 rounded-md px-1 py-2 hover:bg-slate-50">{body}</Link>
+              ) : (
+                <div className="flex items-start gap-3 px-1 py-2">{body}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+const SEVERITY = { high: "text-rose-700", medium: "text-amber-700", low: "text-slate-700", info: "text-slate-500" };
+
+/** Control exceptions in the last 30 days - what an auditor or CFO would sample-check. */
+function ControlsCard({ items }) {
+  if (!items?.length) return null;
+  const flagged = items.filter((i) => i.count);
+  return (
+    <ChartCard title="Controls - last 30 days" subtitle={flagged.length ? "What to sample-check - a count is not a problem by itself" : "No control exceptions in the last 30 days"}>
+      <ul className="space-y-2 text-sm">
+        {items.map((i) => (
+          <li key={i.key} className="flex items-start gap-3">
+            <span className={clsx("mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg", i.count ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600")}>
+              {i.count ? <ShieldAlert size={13} /> : <ShieldCheck size={13} />}
+            </span>
+            <span className="min-w-0 flex-1">
+              {i.link && i.count ? (
+                <Link to={i.link} className={clsx("hover:underline", SEVERITY[i.severity])}>{i.label}</Link>
+              ) : (
+                <span className={i.count ? SEVERITY[i.severity] : "text-slate-500"}>{i.label}</span>
+              )}
+              {i.count > 0 && <span className="block text-xs text-slate-500">{i.why}</span>}
+            </span>
+            <span className={clsx("w-8 text-right font-semibold tabular-nums", i.count ? "text-slate-900" : "text-slate-300")}>{i.count ?? "—"}</span>
+          </li>
+        ))}
+      </ul>
+      <Link to={`${AP_ROUTES.REPORTS}?report=control_exceptions`} className="mt-3 inline-block text-xs font-medium text-[#0A0082] hover:underline">Control exceptions report →</Link>
+    </ChartCard>
+  );
+}
+
+/** Month-end accruals: costs already incurred that are not yet approved payables. */
+function AccrualsCard({ accruals, currency }) {
+  if (!accruals) return null;
+  return (
+    <ChartCard
+      title={`Month-end accruals - ${new Date(`${accruals.as_of}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}`}
+      subtitle="Costs already incurred but not yet approved payables - what the books should accrue at month-end"
+    >
+      <p className="text-2xl font-bold tabular-nums text-[#0A0082]">{formatMoney(accruals.total, currency)}</p>
+      <ul className="mt-3 space-y-2.5 text-sm">
+        {accruals.groups.map((g) => (
+          <li key={g.key} className="flex items-start gap-3">
+            <BookOpenCheck className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="text-slate-800">{g.label}</span>
+              <span className="block text-xs text-slate-500">{g.why}</span>
+            </span>
+            <span className="shrink-0 text-right">
+              <span className="block font-semibold tabular-nums text-slate-900">{formatMoney(g.amount, currency)}</span>
+              <span className="block text-xs text-slate-500">{g.count} item{g.count === 1 ? "" : "s"}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <Link to={`${AP_ROUTES.REPORTS}?report=month_end_accruals`} className="mt-3 inline-block text-xs font-medium text-[#0A0082] hover:underline">Month-end accruals report →</Link>
+    </ChartCard>
+  );
+}
 
 function EfficiencyCard({ efficiency }) {
   const stages = [
@@ -33,7 +133,7 @@ function EfficiencyCard({ efficiency }) {
     { label: "Received → paid", value: efficiency.median_days_end_to_end, strong: true },
   ];
   return (
-    <ChartCard title="Process efficiency" subtitle={`Median days, invoices received in the last 180 days · ${efficiency.sample} paid`}>
+    <ChartCard title="How fast we pay" subtitle={`Typical days at each stage, for the ${efficiency.sample} invoices paid from the last 180 days`}>
       <div className="grid grid-cols-3 gap-2">
         {stages.map((s) => (
           <div key={s.label} className={clsx("rounded-lg border px-3 py-2.5", s.strong ? "border-[#0A0082]/30 bg-[#0A0082]/5" : "border-slate-200")}>
@@ -51,8 +151,8 @@ function EfficiencyCard({ efficiency }) {
       )}
       <div className="mt-4">
         <p className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
-          Approval bottlenecks
-          <span className="font-normal text-slate-500">{efficiency.pending_approvals} pending approvals</span>
+          Where approvals are waiting
+          <span className="font-normal text-slate-500">{efficiency.pending_approvals} invoices waiting</span>
         </p>
         {efficiency.bottlenecks.length === 0 ? (
           <p className="rounded-lg bg-slate-50 py-4 text-center text-xs text-slate-400">No approvals waiting.</p>
@@ -78,17 +178,17 @@ function EfficiencyCard({ efficiency }) {
 
 function ComplianceCard({ items, currency }) {
   return (
-    <ChartCard title="Compliance exceptions" subtitle="Open items that carry financial or statutory risk">
+    <ChartCard title="Compliance & tax" subtitle="Open items that carry financial or statutory risk, and GST credit to recover">
       <ul className="space-y-2.5">
         {items.map((i) => (
           <li key={i.key} className="flex items-center gap-3 text-sm">
             <span
               className={clsx(
                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-                i.count ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-400",
+                i.tone === "good" ? "bg-emerald-50 text-emerald-600" : i.count ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-400",
               )}
             >
-              {i.key === "tds_overdue" ? <Landmark size={14} /> : <ShieldAlert size={14} />}
+              {i.key === "tds_overdue" || i.key.startsWith("gst") ? <Landmark size={14} /> : <ShieldAlert size={14} />}
             </span>
             <span className="min-w-0 flex-1 truncate text-slate-700">{i.label}</span>
             {i.amount != null && Number(i.amount) > 0 && <span className="text-xs tabular-nums text-slate-500">{formatMoney(i.amount, currency)}</span>}
@@ -142,10 +242,14 @@ function HighValueExceptions({ rows, threshold, currency }) {
  */
 export default function ManagementDashboard({ data }) {
   const currency = data.base_currency || "INR";
-  const outflow = data.outflow.map((o) => ({ ...o, approved: Number(o.approved), pipeline: Number(o.pipeline) }));
+  const outflow = data.outflow.map((o) => ({
+    ...o, approved: Number(o.approved), pipeline: Number(o.pipeline), recurring: Number(o.recurring || 0), tds: Number(o.tds || 0),
+  }));
   const trend = (data.spend_trend || []).map((m) => ({ ...m, invoiced: Number(m.invoiced), paid: Number(m.paid) }));
   return (
     <div className="space-y-4">
+      <Highlights items={data.highlights} />
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {data.kpis.map((kpi) => (
           <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} currency={currency} />
@@ -153,20 +257,24 @@ export default function ManagementDashboard({ data }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <ChartCard title="Expected outflow — 30 / 60 / 90 days" subtitle="Outstanding by due date · approved vs still in review / approval" className="lg:col-span-3">
+        <ChartCard title="Money going out - next 90 days" subtitle="What falls due when. Overdue includes invoices not yet approved, which cannot be paid until they are." className="lg:col-span-3">
           <StackedMoneyBars
             points={outflow}
             currency={currency}
             series={[
-              { key: "approved", label: "Approved / ready", color: SERIES[0] },
-              { key: "pipeline", label: "Still in review / approval", color: SERIES[1] },
+              { key: "approved", label: "Approved - to pay", color: SERIES[0] },
+              { key: "pipeline", label: "Not yet approved", color: SERIES[1] },
+              { key: "recurring", label: "Expected rent & subscriptions (estimate)", color: SERIES[2] },
+              { key: "tds", label: "TDS to deposit", color: SERIES[3] },
             ]}
           />
           <p className="mt-2 text-[11px] text-slate-400">{data.note}</p>
         </ChartCard>
         <ChartCard
-          title="Vendor exposure"
-          subtitle={data.top5_share != null ? `Top 5 vendors hold ${data.top5_share}% of what we owe` : "What we owe, by vendor"}
+          title="Who we owe"
+          subtitle={data.vendor_count > 5 && data.top5_share != null
+            ? `The 5 largest of ${data.vendor_count} vendors hold ${data.top5_share}% of what we owe`
+            : "What we owe each vendor - a high share with one vendor is a dependency risk"}
           className="lg:col-span-2"
         >
           <Ranking slices={toSlices(data.vendor_exposure)} currency={currency} />
@@ -174,7 +282,7 @@ export default function ManagementDashboard({ data }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <ChartCard title="Spend vs payments — last 12 months" subtitle={`Invoiced by invoice date, paid by payment date · ${currency}`} className="lg:col-span-3">
+        <ChartCard title="Invoiced vs paid - last 12 months" subtitle="Invoices received each month against payments made - a widening gap means the backlog is growing" className="lg:col-span-3">
           <MoneyAreaChart
             points={trend}
             currency={currency}
@@ -186,15 +294,20 @@ export default function ManagementDashboard({ data }) {
             countKeys={{ invoices: "Invoices", payments: "Payments" }}
           />
         </ChartCard>
-        <ChartCard title="Spend by department" subtitle="Last 12 months" className="lg:col-span-2">
+        <ChartCard title="Spend by department" subtitle="Invoice value in the last 12 months" className="lg:col-span-2">
           <Ranking slices={toSlices(data.by_department)} currency={currency} />
         </ChartCard>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ControlsCard items={data.controls} />
+        <AccrualsCard accruals={data.accruals} currency={currency} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <EfficiencyCard efficiency={data.efficiency} />
         <ComplianceCard items={data.compliance} currency={currency} />
-        <ChartCard title="Reports" subtitle="Drill into the detail behind these figures">
+        <ChartCard title="Reports" subtitle="The detail behind these figures - every report exports to Excel">
           <ul className="space-y-1.5 text-sm">
             {[
               ["outstanding_payables", "AP liabilities"],
@@ -202,6 +315,10 @@ export default function ManagementDashboard({ data }) {
               ["ageing", "Ageing by vendor"],
               ["payments_made", "Payment performance"],
               ["payment_term_exceptions", "Payment-term exceptions"],
+              ["month_end_accruals", "Month-end accruals"],
+              ["control_exceptions", "Control exceptions"],
+              ["gst_itc_register", "GST input credit register"],
+              ["msme_payments", "MSME payments"],
             ].map(([key, label]) => (
               <li key={key}>
                 <Link to={`${AP_ROUTES.REPORTS}?report=${key}`} className="flex items-center justify-between rounded-md px-2 py-1.5 text-slate-700 hover:bg-slate-50">

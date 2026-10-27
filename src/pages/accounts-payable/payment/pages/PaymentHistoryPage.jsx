@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
@@ -89,7 +89,7 @@ export default function PaymentHistoryPage() {
       ),
       mode: modeLabel[invoice.lastPaymentMode] || invoice.lastPaymentMode || "—",
       reference: invoice.lastPaymentReference || "—",
-      status: <StatusBadge label={invoice.statusName || invoice.statusCode} size="sm" />,
+      status: <ApStatusBadge status={invoice.statusName || invoice.statusCode} />,
       receipts: invoice.receiptCount > 0 ? `${invoice.receiptCount} file${invoice.receiptCount === 1 ? "" : "s"}` : "—",
       view: (
         <Link to={detailLink} className="text-sm font-medium text-[#0A0082] hover:underline">
@@ -132,7 +132,10 @@ export default function PaymentHistoryPage() {
           {getApiErrorMessage(error, "Unable to load payment history right now.")}
         </div>
       ) : !isLoading && items.length === 0 ? (
-        <EmptyState title="No payment records found." description={filtered ? "Try clearing the filters." : undefined} />
+        <EmptyState
+          title="No payments recorded yet."
+          description={filtered ? "Try clearing the filters." : "A payment appears here once it is recorded - on an invoice in Payment Management, or by uploading receipts."}
+        />
       ) : (
         <>
           <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={isLoading} />

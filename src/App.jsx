@@ -62,12 +62,10 @@ import TdsFilingNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsFil
 import BulkImportPage from "./pages/accounts-payable/bulk-import/pages/BulkImportPage.jsx";
 import RecurringSchedulesPage from "./pages/accounts-payable/recurring/pages/RecurringSchedulesPage.jsx";
 import GstItcPage from "./pages/accounts-payable/gst/pages/GstItcPage.jsx";
+import ApGuidePage from "./pages/accounts-payable/guide/pages/ApGuidePage.jsx";
 import AccountingExportPage from "./pages/accounts-payable/accounting-export/pages/AccountingExportPage.jsx";
 import VendorNotesPage from "./pages/accounts-payable/vendor-notes/pages/VendorNotesPage.jsx";
 import WorkAssignmentPage from "./pages/accounts-payable/work-assignment/pages/WorkAssignmentPage.jsx";
-import PaymentRunsPage from "./pages/accounts-payable/payment-runs/pages/PaymentRunsPage.jsx";
-import PaymentRunDetailPage from "./pages/accounts-payable/payment-runs/pages/PaymentRunDetailPage.jsx";
-const PAYMENT_RUN_VIEW_PERMISSIONS = ["PAYMENT_VIEW", "PAYMENT_PROCESS", "PAYMENT_RUN_APPROVE", "AP_AUTOMATION_MANAGE"];
 import { WORK_ASSIGN_LEAD_PERMISSIONS } from "./pages/accounts-payable/constants/workAssignment";
 import { VENDOR_NOTE_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/vendorNotes";
 import { GST_ITC_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/gstItc";
@@ -87,6 +85,7 @@ import { INVOICE_PERMISSIONS } from "./pages/accounts-payable/constants/invoiceP
 import {
   PROCUREMENT_PERMISSIONS,
   PROCUREMENT_ANY_VIEW_PERMISSIONS,
+  ONBOARDING_ANY,
 } from "./pages/accounts-payable/constants/procurementPermissions";
 import ProcurementPage from "./pages/accounts-payable/procurement/pages/ProcurementPage.jsx";
 import PrDetailPage from "./pages/accounts-payable/procurement/pages/PrDetailPage.jsx";
@@ -322,7 +321,7 @@ import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.j
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
 
 import AccountReceivableLayout from "./pages/account_receivable/pages/AccountReceivableLayout.jsx";
-import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboard.jsx";
+import AccountReceivableDashboard from "./pages/account_receivable/dashboard/pages/ARDashboardPage.jsx";
 import Overview from "./pages/account_receivable/pages/Overview.jsx";
 import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
@@ -533,6 +532,14 @@ const AppRoutes = () => {
 
           {/* Accounts Payable — page skeletons only, business logic lands in later phases */}
           <Route
+            path={AP_ROUTES.GUIDE}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
+                <ApGuidePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={AP_ROUTES.DASHBOARD}
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
@@ -567,7 +574,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_INTERNAL_REQUESTS}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} anyPermissions={ONBOARDING_ANY.VIEW}>
                 <InternalRequestsPage />
               </ProtectedRoute>
             }
@@ -575,7 +582,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_INTERNAL_REQUEST_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} anyPermissions={ONBOARDING_ANY.VIEW}>
                 <InternalRequestDetailPage />
               </ProtectedRoute>
             }
@@ -721,8 +728,16 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.BULK_IMPORT}
             element={
-              <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"]}>
+              <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS"]}>
                 <BulkImportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_HISTORY_IMPORT}
+            element={
+              <ProtectedRoute requiredPermissions={["TDS_TRACKING_UPDATE"]}>
+                <BulkImportPage scope="tds-history" />
               </ProtectedRoute>
             }
           />
@@ -731,22 +746,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"]}>
                 <BulkImportJobPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={AP_ROUTES.PAYMENT_RUNS}
-            element={
-              <ProtectedRoute requiredPermissions={PAYMENT_RUN_VIEW_PERMISSIONS}>
-                <PaymentRunsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={AP_ROUTES.PAYMENT_RUN_DETAIL()}
-            element={
-              <ProtectedRoute requiredPermissions={PAYMENT_RUN_VIEW_PERMISSIONS}>
-                <PaymentRunDetailPage />
               </ProtectedRoute>
             }
           />

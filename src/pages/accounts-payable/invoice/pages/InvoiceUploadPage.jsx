@@ -405,7 +405,7 @@ export default function InvoiceUploadPage() {
       {!inReview && (
         <PageHeader
           title="Upload Invoice"
-          subtitle="Upload a vendor invoice document for OCR processing"
+          subtitle="Upload a vendor invoice - its details are read automatically for you to check"
           actions={
             canBulkUploadInvoices ? (
               <Button variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_BULK_UPLOAD)}>

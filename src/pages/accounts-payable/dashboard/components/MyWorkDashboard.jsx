@@ -1,18 +1,21 @@
 import { Link } from "react-router-dom";
-import { CornerUpLeft, FileScan, Landmark, Send, Upload } from "lucide-react";
+import { Clock, CornerUpLeft, FileScan, Send, Upload, UserCheck } from "lucide-react";
 import clsx from "clsx";
 import { Breakdown } from "../../../expense-management/components/dashboard/DashboardWidgets";
 import PaymentTermStatusBadge from "../../invoice/components/PaymentTermStatusBadge";
 import { ChartCard, Empty, KpiTile, MoneyAreaChart, SERIES } from "./insights";
 import { AP_ROUTES } from "../../constants/routes";
 
-const KPI_ICONS = { to_review: FileScan, returned: CornerUpLeft, tds: Landmark, ready_to_send: Send, uploaded: Upload };
+const KPI_ICONS = {
+  assigned_to_me: UserCheck, to_review: FileScan, returned: CornerUpLeft, ready_to_send: Send,
+  awaiting_approval: Clock, uploaded: Upload,
+};
 
 const NEXT_STEP = {
-  OCR_REVIEW_PENDING: "Review OCR",
-  OCR_FAILED: "Fix extraction",
+  OCR_REVIEW_PENDING: "Review invoice",
+  OCR_FAILED: "Enter the details",
   RETURNED_FOR_REVIEW: "Correct & resubmit",
-  OCR_REVIEWED: "Determine TDS / send",
+  OCR_REVIEWED: "Send for approval",
 };
 
 function ageLabel(days) {
@@ -21,15 +24,15 @@ function ageLabel(days) {
 }
 
 /**
- * AP Executive view: the invoice intake work in front of me — what to review, what came back,
- * what needs TDS before it can be sent, and what is ready to send for approval. No payment or
- * management figures; only the intake stage this role owns.
+ * AP Executive view: the invoice work in front of me - what to review, what came back for correction,
+ * what is ready to send, and what is waiting with the approvers. No payment or management figures;
+ * only the stage this role owns, in business words.
  */
 export default function MyWorkDashboard({ data }) {
   const intake = data.intake_trend.map((m) => ({ ...m }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className={clsx("grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3", data.kpis.length >= 6 ? "xl:grid-cols-6" : "xl:grid-cols-5")}>
         {data.kpis.map((kpi) => (
           <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} />
         ))}

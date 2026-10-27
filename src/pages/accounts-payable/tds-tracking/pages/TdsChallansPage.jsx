@@ -1,6 +1,7 @@
 // Route: /accounts-payable/tds/challans  (TDS_TRACKING_VIEW or TDS_TRACKING_UPDATE)
 // Shared TDS challans and quarterly statement filings, each with the invoices it covers.
 import { useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { ArrowLeft, FileText, Plus } from "lucide-react";
@@ -16,6 +17,7 @@ import { openBlobInNewTab } from "../../utils/documentUpload";
 import { tdsChallanService } from "../services/tdsChallanService";
 import { useChallanDetail, useChallanList, useFilingDetail, useFilingList } from "../hooks/useTdsChallans";
 import { fmtDate, money } from "../components/TdsDocumentParts";
+import PendingTdsStrip from "../components/PendingTdsStrip";
 
 const PAGE_SIZE = 20;
 
@@ -122,9 +124,6 @@ export default function TdsChallansPage() {
             </Button>
             {canUpdateTdsTracking && (
               <>
-                <Button variant="outline" onClick={() => navigate(`${AP_ROUTES.BULK_IMPORT}?type=${tab === "filings" ? "tds-filings" : "tds-challans"}`)}>
-                  Bulk import
-                </Button>
                 <Button variant="outline" onClick={() => navigate(AP_ROUTES.TDS_FILING_NEW)}>
                   <Plus className="h-4 w-4" /> Record quarterly filing
                 </Button>
@@ -136,6 +135,9 @@ export default function TdsChallansPage() {
           </>
         }
       />
+      <PageGuide page="tdsChallans" />
+
+      <PendingTdsStrip canUpdate={canUpdateTdsTracking} />
 
       <SegmentedTabs value={tab} onChange={switchTab} tabs={[{ value: "challans", label: "Challans" }, { value: "filings", label: "Quarterly filings" }]} />
 
