@@ -60,15 +60,18 @@ export function formatKpi(kpi, currency = "INR") {
   return Number(kpi.value).toLocaleString("en-IN");
 }
 
-/** StatCard with the Expense dashboard's tone mapping; clickable when the KPI carries a link. */
-export function KpiTile({ kpi, icon, currency }) {
+/**
+ * StatCard with the Expense dashboard's tone mapping; clickable when the KPI carries a link.
+ * `variant` is passed to StatCard ("detailed" = the CFO dashboard's three-level card).
+ */
+export function KpiTile({ kpi, icon, currency, variant }) {
   const navigate = useNavigate();
   const others = kpi.other_currencies?.filter((o) => Number(o.amount) > 0) || [];
   const subtitle = [kpi.subtitle, others.length ? `+ ${others.map((o) => formatMoney(o.amount, o.currency_code)).join(", ")}` : null]
     .filter(Boolean)
     .join(" · ");
   const card = (
-    <StatCard title={kpi.label} value={formatKpi(kpi, currency)} subtitle={subtitle} textColor={TONE_TEXT[kpi.tone] || TONE_TEXT.gray} icon={icon} info={kpi.help} />
+    <StatCard title={kpi.label} value={formatKpi(kpi, currency)} subtitle={subtitle} textColor={TONE_TEXT[kpi.tone] || TONE_TEXT.gray} icon={icon} info={kpi.help} variant={variant} />
   );
   // Equal-height tiles in a row whether or not they are clickable.
   if (!kpi.link) return <div className="h-full [&>div]:h-full">{card}</div>;
