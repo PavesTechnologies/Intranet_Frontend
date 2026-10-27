@@ -17,6 +17,7 @@ const ProjectDemandManagement = lazy(() => import("./ProjectDemandManagement"));
 const ProjectConfigurations = lazy(() => import("./project/ProjectConfigurations"));
 const ProjectRoleOffManagement = lazy(() => import("./ProjectRoleOffManagement"));
 const SprintAnalyticsPage = lazy(() => import("./Analytics/index.jsx"));
+const ProjectMilestones = lazy(() => import("./milestones/ProjectMilestones"));
 
 const SkeletonBlock = ({ className }) => (
   <div className={`animate-pulse bg-slate-100 rounded ${className}`} />
@@ -317,6 +318,14 @@ const ProjectTabs = () => {
       return <BacklogAndSprints projectId={pid} projectName={projectName} />;
     if (selectedTab === "board")
       return <Board projectId={pid} projectName={projectName} />;
+    if (selectedTab === "milestones") {
+      return (
+        <Suspense fallback={<TabSkeleton />}>
+          <ProjectMilestones projectId={pid} projectName={projectName} />
+        </Suspense>
+      );
+    }
+
     if (selectedTab === "risk-management")
       return <RiskRegisterPage projectId={pid} />;
     // if (selectedTab.startsWith("test-management"))
@@ -373,6 +382,7 @@ const ProjectTabs = () => {
     { name: "Summary", tab: "summary" },
     { name: "Backlog", tab: "backlog" },
     { name: "Board", tab: "board" },
+    { name: "Milestones", tab: "milestones" },
     { name: "Risk", tab: "risk-management" },
     // { name: "Test",    tab: "test-management" },
   ];

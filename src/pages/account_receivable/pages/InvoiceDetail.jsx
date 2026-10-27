@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
+import BackIconButton from "../components/common/BackIconButton";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
@@ -132,7 +133,10 @@ export default function InvoiceDetail() {
   const isFromTaxCalculation = source === "tax-calculation";
 
   const [invoice, setInvoice] = useState(null);
-  const [taxCalc, setTaxCalc] = useState(null);
+  const [taxCalc, setTaxCalc] = useState(location.state?.taxCalculation || null);
+  const [snapshotData, setSnapshotData] = useState(
+    location.state?.config || location.state?.snapshotData || null
+  );
   const [occurrence, setOccurrence] = useState(null);
   const [companyProfile, setCompanyProfile] = useState(null);
   const [approvalHistory, setApprovalHistory] = useState([]);
@@ -286,21 +290,22 @@ export default function InvoiceDetail() {
       if (data) {
         setInvoice(data);
 
-        // Fallback: If tax components or tax region not directly on invoice, attempt fallback to completed tax calculation
+        // Load tax calculation / snapshot context to ensure identical presentation to preview
         const targetSnapshotId =
           data.billingSnapshotId ||
           (snapshotId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(snapshotId)
             ? snapshotId
             : null);
 
-        if (targetSnapshotId && (!data.taxBreakdown || data.taxBreakdown.length === 0 || !data.taxRegion)) {
+        if (targetSnapshotId) {
           try {
             const calc = await getTaxCalculation(targetSnapshotId);
             if (calc) {
               setTaxCalc(calc);
+              setSnapshotData((prev) => prev || calc);
             }
           } catch (calcErr) {
-            console.warn("[InvoiceDetail] Non-blocking tax calculation fallback notice:", calcErr?.message);
+            console.warn("[InvoiceDetail] Non-blocking tax calculation notice:", calcErr?.message);
           }
         }
 
@@ -308,9 +313,15 @@ export default function InvoiceDetail() {
         // occurrence carries the billing type and the occurrence-based line
         // item (Invoice -> Billing Occurrence -> Billing Configuration).
         const occurrenceRef = data.billingScheduleId || paramOccurrenceId;
-        if (occurrenceRef && !data.billingSnapshotId) {
+        if (occurrenceRef) {
           try {
-            setOccurrence(await getBillingOccurrence(occurrenceRef));
+            const occ = await getBillingOccurrence(occurrenceRef);
+            if (occ) {
+              setOccurrence(occ);
+              if (!targetSnapshotId) {
+                setSnapshotData((prev) => prev || occ);
+              }
+            }
           } catch (occErr) {
             console.warn("[InvoiceDetail] Non-blocking billing occurrence notice:", occErr?.message);
           }
@@ -748,17 +759,55 @@ export default function InvoiceDetail() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       {/* Header */}
-      <PageHeader
-        title="Invoice Generated"
-        subtitle={
-          <>
-            Invoice Number:{" "}
-            <span className="ml-1 font-mono font-bold text-indigo-700">
-              {invoice?.invoiceNumber || "—"}
-            </span>
-          </>
-        }
-      />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <BackIconButton
+            onClick={() => navigate(isFromTaxCalculation ? TAX_WORKSPACE_PATH : INVOICE_WORKSPACE_PATH)}
+            label="Back to Invoices"
+          />
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                Invoice Generated
+              </h1>
+              {invoice?.invoiceStatus && (
+                <StatusBadge label={invoice.invoiceStatus} size="sm" />
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Invoice Number:{" "}
+              <span className="font-mono font-bold text-indigo-700 ml-1">
+                {invoice?.invoiceNumber || "—"}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 self-end sm:self-auto">
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-50 shadow-2xs"
+          >
+            <FileText className="h-3.5 w-3.5 text-slate-500" />
+            <span>Print / PDF</span>
+          </Button>
+
+          {(invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus) && (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleSubmitForApproval}
+              disabled={submitting || refreshing}
+              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-xs"
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>{submitting ? "Submitting..." : "Submit for Approval"}</span>
+            </Button>
+          )}
+        </div>
+      </div>
 
       {/* Delivery Status Banner — APPROVED invoices only */}
       {invoice?.invoiceStatus === "APPROVED" && (
@@ -1256,10 +1305,11 @@ export default function InvoiceDetail() {
         invoice={invoice}
         snapshotId={snapshotId || invoice?.billingSnapshotId}
         taxCalc={taxCalc}
+        snapshotData={snapshotData || taxCalc || occurrence}
         occurrence={occurrence}
         companyProfile={companyProfile}
         deliveryState={deliveryState}
-        presentation="plain"
+        presentation="card"
         showStatus={false}
       />
 

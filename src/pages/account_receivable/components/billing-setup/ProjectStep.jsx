@@ -47,6 +47,7 @@ function sanitizeProjectCode(code, projectId) {
 
 const EMPTY_PROJECT_FIELDS = {
   projectId: "",
+  pmsProjectId: "",
   projectName: "",
   projectCode: "",
   projectDuration: "",

@@ -153,6 +153,7 @@ export const getInvoiceErrorMessage = (
 export const normalizeInvoiceItem = (item = {}, index = 0) => {
   const source = item && typeof item === "object" ? item : {};
   return {
+    ...source,
     id:
       source.invoiceItemId ||
       source.invoice_item_id ||
@@ -199,6 +200,34 @@ export const normalizeInvoiceItem = (item = {}, index = 0) => {
         : source.total !== undefined && source.total !== null
           ? Number(source.total)
           : 0,
+    standardRate:
+      source.standardRate !== undefined && source.standardRate !== null
+        ? Number(source.standardRate)
+        : source.baseRate !== undefined && source.baseRate !== null
+        ? Number(source.baseRate)
+        : null,
+    baseRate:
+      source.baseRate !== undefined && source.baseRate !== null
+        ? Number(source.baseRate)
+        : source.standardRate !== undefined && source.standardRate !== null
+        ? Number(source.standardRate)
+        : null,
+    discountApplied: Boolean(source.discountApplied || source.hasDiscount),
+    hasDiscount: Boolean(source.discountApplied || source.hasDiscount),
+    discountValue:
+      source.discountValue !== undefined && source.discountValue !== null
+        ? Number(source.discountValue)
+        : null,
+    discountType: source.discountType || null,
+    periodName: source.periodName || source.discountPeriodName || null,
+    includeInInvoice:
+      source.includeInInvoice !== undefined
+        ? Boolean(source.includeInInvoice)
+        : true,
+    includeBaseRateInInvoice:
+      source.includeBaseRateInInvoice !== undefined
+        ? Boolean(source.includeBaseRateInInvoice)
+        : true,
   };
 };
 
@@ -729,6 +758,21 @@ export const normalizeInvoice = (payload = {}) => {
     subtotal,
     totalTax,
     grandTotal,
+
+    // Billing configuration & rate schedule metadata
+    projectId: data.projectId || data.project_id || null,
+    projectCode: data.projectCode || data.project_code || null,
+    projectName: data.projectName || data.project_name || null,
+    billingConfigurationId: data.billingConfigurationId || data.billing_configuration_id || null,
+    billingConfig: data.billingConfig || data.billing_config || null,
+    timeAndMaterial: data.timeAndMaterial || data.time_and_material || null,
+    discountPeriods: data.discountPeriods || data.discount_periods || null,
+    standardRate: data.standardRate || data.standard_rate || null,
+    baseRate: data.baseRate || data.base_rate || null,
+    includeBaseRateInInvoice:
+      data.includeBaseRateInInvoice !== undefined
+        ? data.includeBaseRateInInvoice
+        : data.include_base_rate_in_invoice,
   };
 };
 
