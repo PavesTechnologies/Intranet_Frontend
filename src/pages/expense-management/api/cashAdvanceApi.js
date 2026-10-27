@@ -112,6 +112,14 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // A stored payment proof, as a blob, so the login token is sent. Path comes from the settlement record.
+  getProofFile: (path) =>
+    api.get(path, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+      responseType: "blob",
+    }),
+
   // Settlement / repayment endpoints
   getSettlement: (advanceId) =>
     api.get(`/xms/employee/cash-advances/${advanceId}/settlement`, {
@@ -126,26 +134,16 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
-  // formData: amount plus the payment mode and proof (buildDisbursementFormData). Multipart so the
-  // proof file can be uploaded with the repayment.
+  // formData: amount plus the payment confirmation (buildDisbursementFormData). Canonical contract is
+  // multipart/form-data only; the server rejects a JSON body. The advance is only recorded as repaid
+  // once this succeeds and the server has verified the payment details.
   repay: (advanceId, formData) =>
-    api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, formData, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
+    api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, formData, multipartConfig()),
 
   // EP04-S4: apply verified expense amount against outstanding cash advance
   // REST contract: POST /xms/api/v1/expense-reports/{id}/apply-advance-offset
   applyAdvanceOffset: (expenseReportId, payload = {}) =>
     api.post(`/xms/api/v1/expense-reports/${expenseReportId}/apply-advance-offset`, payload, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
-
-  // EP04-S5: initiate outstanding advance recovery
-  // REST contract: POST /api/v1/cash-advances/{id}/initiate-recovery
-  initiateRecovery: (advanceId, payload = {}) =>
-    api.post(`/api/v1/cash-advances/${advanceId}/initiate-recovery`, payload, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
@@ -164,11 +162,18 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
-  createReimbursementAdjustment: (payload) =>
-    api.post("/xms/finance/reimbursements", payload, {
+  // POST /xms/finance/reimbursements. The server accepts JSON only (CashAdvanceAdjustmentRequest), so the body is
+  // sent as JSON. FormData is refused here: it would be sent as form-urlencoded and rejected with 415.
+  // Build the body with buildAdjustmentRequest (api/adjustmentRequest.js).
+  createReimbursementAdjustment: (payload) => {
+    if (typeof FormData !== "undefined" && payload instanceof FormData) {
+      throw new TypeError("createReimbursementAdjustment takes a JSON body from buildAdjustmentRequest, not FormData.");
+    }
+    return api.post("/xms/finance/reimbursements", payload, {
       baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+    });
+  },
 
   updateReimbursementAdjustment: (adjustmentId, payload) =>
     api.put(`/xms/finance/reimbursements/${adjustmentId}`, payload, {

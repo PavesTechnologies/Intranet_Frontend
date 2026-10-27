@@ -28,6 +28,11 @@ import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
+import {
+  adjustmentErrorMessage,
+  buildAdjustmentRequest,
+  getSettlementBlockReason,
+} from "@/pages/expense-management/api/adjustmentRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
@@ -385,6 +390,13 @@ export default function ReimbursementsPage() {
     setSettlementErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    // The adjustment endpoint cannot record this settlement yet (see getSettlementBlockReason). Stop before sending.
+    const blockReason = getSettlementBlockReason(settlementAction);
+    if (blockReason) {
+      showStatusToast(blockReason, "error", 8000);
+      return;
+    }
+
     setActionLoading(true);
     try {
       await cashAdvanceApi.createReimbursementAdjustment(
@@ -445,19 +457,19 @@ export default function ReimbursementsPage() {
     }
     setActionLoading(true);
     try {
-      const payload = {
-        cashAdvanceId: newAdjForm.cashAdvanceId ? Number(newAdjForm.cashAdvanceId) || newAdjForm.cashAdvanceId : null,
-        expenseReportId: newAdjForm.expenseReportId ? Number(newAdjForm.expenseReportId) || newAdjForm.expenseReportId : null,
-        adjustmentAmount: Number(newAdjForm.adjustmentAmount) || 0,
-        notes: newAdjForm.notes.trim() || "Finance settlement adjustment",
-      };
+      // The server's field names: advanceId, reportId, adjustedAmount. It has no notes field, so the note is not sent.
+      const payload = buildAdjustmentRequest({
+        advanceId: newAdjForm.cashAdvanceId,
+        reportId: newAdjForm.expenseReportId,
+        adjustedAmount: newAdjForm.adjustmentAmount,
+      });
       await cashAdvanceApi.createReimbursementAdjustment(payload);
       showStatusToast("Reimbursement adjustment created successfully!", "success");
       setCreatingAdjustment(false);
       setNewAdjForm({ cashAdvanceId: "", expenseReportId: "", adjustmentAmount: "", notes: "" });
       fetchAdvances();
     } catch (err) {
-      showStatusToast(err.response?.data?.message || "Failed to create reimbursement adjustment", "error");
+      showStatusToast(adjustmentErrorMessage(err, "Failed to create reimbursement adjustment"), "error");
     } finally {
       setActionLoading(false);
     }

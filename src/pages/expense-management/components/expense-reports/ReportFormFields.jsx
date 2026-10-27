@@ -3,7 +3,6 @@ import Select from "react-select";
 import { Briefcase, Landmark } from "lucide-react";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
-import { todayIsoDate } from "./submissionDeadline";
 
 const customSelectStyles = {
   control: (base, state) => ({
@@ -99,29 +98,6 @@ export default function ReportFormFields({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormInput
-          label="Reporting Period Start"
-          name="reportingPeriodStart"
-          type="date"
-          value={formData.reportingPeriodStart || ""}
-          onChange={onInputChange}
-          max={todayIsoDate()}
-          disabled={disabled}
-          error={formErrors.reportingPeriodStart}
-        />
-        <FormInput
-          label="Reporting Period End"
-          name="reportingPeriodEnd"
-          type="date"
-          value={formData.reportingPeriodEnd || ""}
-          onChange={onInputChange}
-          min={formData.reportingPeriodStart || undefined}
-          max={todayIsoDate()}
-          disabled={disabled}
-          error={formErrors.reportingPeriodEnd}
-        />
-      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1">
