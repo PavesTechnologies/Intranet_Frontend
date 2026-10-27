@@ -52,18 +52,6 @@ export const useMarkHandedOff = () => {
   });
 };
 
-/** Resends one handoff to AR; resolves with the attempt's outcome (arDeliveryStatus SENT or FAILED). */
-export const useRedeliverToAr = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (syncId) => invoiceHandoffService.redeliverToAr(syncId).then(unwrap),
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["invoiceHandedOff"] });
-      qc.invalidateQueries({ queryKey: ["invoiceHandoffSummary"] });
-    },
-  });
-};
-
 export const useHandoffHistory = (lineItemId) =>
   useQuery({
     queryKey: ["invoiceHandoffHistory", lineItemId],
