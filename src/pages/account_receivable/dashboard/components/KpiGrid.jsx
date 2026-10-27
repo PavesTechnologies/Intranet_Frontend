@@ -37,12 +37,20 @@ function KpiCard({ kpi }) {
 
       <dd className="mt-2 min-w-0">
         <p
-          className={`truncate text-2xl font-bold tracking-tight tabular-nums ${alert ? "text-rose-800" : "text-slate-900"}`}
+          className={`truncate text-2xl font-bold tracking-tight tabular-nums ${
+            kpi.empty ? "text-slate-300" : alert ? "text-rose-800" : "text-slate-900"
+          }`}
           title={String(kpi.value)}
         >
           {kpi.value}
           {kpi.unit ? <span className="ml-1 text-sm font-medium text-slate-500">{kpi.unit}</span> : null}
         </p>
+
+        {kpi.secondary?.length ? (
+          <p className="mt-0.5 truncate text-xs font-medium tabular-nums text-slate-600" title={kpi.secondary.join(" · ")}>
+            + {kpi.secondary.join(" · ")}
+          </p>
+        ) : null}
 
         {kpi.signal ? (
           <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${SIGNAL_TONE[kpi.signal.tone] || SIGNAL_TONE.neutral}`}>
@@ -67,7 +75,7 @@ export default function KpiGrid({ kpis, label = "Key receivable metrics" }) {
   return (
     <dl
       aria-label={label}
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
     >
       {kpis.map((kpi) => (
         <KpiCard key={kpi.key} kpi={kpi} />
