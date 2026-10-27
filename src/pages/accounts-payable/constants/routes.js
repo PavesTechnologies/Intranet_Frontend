@@ -8,6 +8,9 @@ export const AP_ROUTES = {
   // The single vendor onboarding entry point: Register Vendor (intake) followed by
   // Pre-Screen, both steps on this one route.
   VENDOR_ONBOARD: `${BASE}/vendors/onboard`,
+  // Same intake page, opened for an internal vendor request.
+  VENDOR_ONBOARD_FOR_REQUEST: (requestId) =>
+    `${BASE}/vendors/onboard?onboardingRequestId=${encodeURIComponent(requestId)}`,
 
   VENDOR_LIST: `${BASE}/vendors`,
 

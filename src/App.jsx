@@ -85,6 +85,7 @@ import { INVOICE_PERMISSIONS } from "./pages/accounts-payable/constants/invoiceP
 import {
   PROCUREMENT_PERMISSIONS,
   PROCUREMENT_ANY_VIEW_PERMISSIONS,
+  ONBOARDING_ANY,
 } from "./pages/accounts-payable/constants/procurementPermissions";
 import ProcurementPage from "./pages/accounts-payable/procurement/pages/ProcurementPage.jsx";
 import PrDetailPage from "./pages/accounts-payable/procurement/pages/PrDetailPage.jsx";
@@ -573,7 +574,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_INTERNAL_REQUESTS}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} anyPermissions={ONBOARDING_ANY.VIEW}>
                 <InternalRequestsPage />
               </ProtectedRoute>
             }
@@ -581,7 +582,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_INTERNAL_REQUEST_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} anyPermissions={ONBOARDING_ANY.VIEW}>
                 <InternalRequestDetailPage />
               </ProtectedRoute>
             }

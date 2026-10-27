@@ -22,7 +22,8 @@ describe("AP sidebar sections", () => {
       "Dashboard",
       "Notifications",
       "How It Works",
-      { "Invoices & Vendors": ["Invoice Management", "Recurring Invoices", "Credit & Debit Notes", "Vendor Management"] },
+      // VENDOR_VIEW also opens Internal Requests (read-only), as GET /vendor-onboarding-requests allows.
+      { "Invoices & Vendors": ["Invoice Management", "Recurring Invoices", "Credit & Debit Notes", "Vendor Management", "Internal Requests"] },
       { "Payments & Tax": ["Payment Management", "TDS Tracking", "GST Input Credit", "Upload Receipts"] },
       { "Reports & Accounting": ["Reports", "Accounting Export"] },
       "Settings",

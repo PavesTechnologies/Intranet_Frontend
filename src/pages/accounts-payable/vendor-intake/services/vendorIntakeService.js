@@ -17,9 +17,15 @@ const authHeaders = () => ({
 export const vendorIntakeService = {
   /**
    * POST /apm/vendor-intake — saves the intake and creates (or reuses) the vendor master.
+   *
+   * With `onboarding_request_id` in the payload the backend runs the intake against that
+   * internal vendor request (linking it and moving its status) and echoes the request id and
+   * its new `onboarding_status_code`. Without it, this is the normal intake, unchanged.
+   *
    * @param {object} payload VendorIntakeCreateRequest
    * @returns {Promise<{engagement_id:number, vendor_id:number, vendor_created:boolean,
-   *   pre_screen_status:string, gst_status?:string, message:string}>}
+   *   pre_screen_status:string, gst_status?:string, message:string,
+   *   onboarding_request_id?:number|null, onboarding_status_code?:string|null}>}
    */
   createVendorIntake: async (payload) => {
     const res = await api.post(`${BASE}/vendor-intake`, payload, { headers: authHeaders() });

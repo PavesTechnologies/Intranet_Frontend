@@ -43,6 +43,21 @@ describe("TdsTrackingPage", () => {
     expect(screen.getByRole("button", { name: "What is 26Q?" })).toBeInTheDocument();
   });
 
+  it("shows one badge per status column, with no note under the TDS badge", () => {
+    const row = {
+      invoiceId: 1, invoiceNumber: "INV-1", vendorName: "Acme", invoiceDate: "2026-09-01",
+      currencySymbol: "₹", invoiceStatusCode: "APPROVED", invoiceStatusName: "Approved",
+      determinationStatus: "DETERMINED", trackingStatus: "TDS_PENDING", trackingStatusLabel: "TDS Pending",
+    };
+    useTdsTrackingList.mockReturnValue({ ...list, items: [row], total: 1 });
+    renderAt("/accounts-payable/tds/tracking?view=unpaid");
+
+    const badges = screen.getAllByTestId("ap-status-badge");
+    expect(badges.map((b) => b.textContent)).toEqual(["Approved", "Awaiting Verification"]);
+    expect(badges[0].className).toBe(badges[1].className);
+    expect(screen.queryByText("Awaiting TDS verification")).not.toBeInTheDocument();
+  });
+
   it("opens the tab named in the link", () => {
     renderAt("/accounts-payable/tds/tracking?view=filed");
     expect(screen.getByRole("tab", { name: "Filed" })).toHaveAttribute("aria-selected", "true");

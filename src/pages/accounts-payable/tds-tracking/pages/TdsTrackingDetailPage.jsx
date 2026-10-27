@@ -5,7 +5,7 @@ import { Upload } from "lucide-react";
 import Breadcrumb from "../../../../components/Breadcrumb/Breadcrumb";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import DocumentUploadModal from "../../payment/components/DocumentUploadModal";
 import DocumentViewButton from "../../payment/components/DocumentViewButton";
@@ -140,7 +140,12 @@ export default function TdsTrackingDetailPage() {
           <PageCardContent>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-700">TDS Tracking</h3>
-              <StatusBadge label={detail.trackingStatusLabel} size="sm" />
+              <ApStatusBadge
+                type="tds"
+                status={detail.trackingStatus}
+                label={detail.trackingStatusLabel}
+                determinationStatus={detail.determinationStatus}
+              />
             </div>
             <dl>
               <Row label="Deduction Date">{formatDate(tracking.deduction_date, null)}</Row>
@@ -159,7 +164,7 @@ export default function TdsTrackingDetailPage() {
             <h3 className="mb-2 text-sm font-semibold text-gray-700">Invoice Payment Status</h3>
             <dl>
               <Row label="Status">
-                <StatusBadge label={detail.payment.statusName || detail.payment.statusCode || "—"} size="sm" />
+                <ApStatusBadge status={detail.payment.statusName || detail.payment.statusCode} />
               </Row>
               <Row label="Invoice Amount">{formatCurrency(detail.invoiceAmount, symbol)}</Row>
               <Row label="Net Payable">{formatCurrency(detail.payment.netPayable, symbol)}</Row>

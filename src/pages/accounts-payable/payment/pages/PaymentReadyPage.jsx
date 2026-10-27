@@ -5,7 +5,7 @@ import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import EmptyState from "../../procurement/components/EmptyState";
@@ -85,7 +85,7 @@ export default function PaymentReadyPage() {
       netPayable: formatCurrency(invoice.netPayable, symbol),
       paid: formatCurrency(invoice.amountPaid, symbol),
       remaining: <span className="font-semibold">{formatCurrency(invoice.remainingAmount, symbol)}</span>,
-      status: <StatusBadge label={invoice.statusName || invoice.statusCode} size="sm" />,
+      status: <ApStatusBadge status={invoice.statusName || invoice.statusCode} />,
       terms: <PaymentTermStatusBadge status={invoice.paymentTermStatus} />,
       action:
         canRecordPayment && invoice.remainingAmount > 0 ? (

@@ -4,7 +4,7 @@ import { CheckCircle2, CircleDashed, CreditCard, ChevronDown, ChevronUp } from "
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import { useMarkReadyForPaymentMutation } from "../../payment/hooks/usePaymentMutations";
 import { useInvoiceTds } from "../hooks/useInvoiceTds";
 import { useInvoicePaymentTerms } from "../hooks/useInvoicePaymentTerms";
@@ -190,7 +190,7 @@ export default function InvoicePaymentPanel({ invoice }) {
           </Link>
         )}
 
-        {invoice.status === INVOICE_STATUS.PAID && <StatusBadge label="Paid" size="sm" />}
+        {invoice.status === INVOICE_STATUS.PAID && <ApStatusBadge status={INVOICE_STATUS.PAID} />}
 
         {/* Every recorded payment (with receipts) and the separate TDS tracking lifecycle live
             on their own pages — linked here rather than duplicated. */}
