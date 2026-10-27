@@ -280,6 +280,7 @@ export const XMS_SUBMENU = [
       { label: "Assignments",         to: "/expense-management/policy-engine/assignments" },
       { label: "Rules",               to: "/expense-management/policy-engine/rules" },
       { label: "Severity Thresholds", to: "/expense-management/policy-engine/severity-thresholds" },
+      { label: "Carry Forward",        to: "/expense-management/policy-engine/carry-forward" },
       { label: "Version History",     to: "/expense-management/policy-engine/versions" },
     ],
   },
