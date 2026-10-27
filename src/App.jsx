@@ -259,6 +259,7 @@ import XmsTaxConfigurationPage from "./pages/expense-management/pages/masters/Ta
 import XmsPolicyDashboardPage from "./pages/expense-management/pages/PolicyDashboard.jsx";
 import XmsPolicyBundlesPage from "./pages/expense-management/pages/PolicyBundles.jsx";
 import XmsPolicyRulesPage from "./pages/expense-management/pages/PolicyRules.jsx";
+import XmsPolicyCarryForwardPage from "./pages/expense-management/pages/PolicyCarryForward.jsx";
 import XmsPolicyGroupsPage from "./pages/expense-management/pages/PolicyGroups.jsx";
 import XmsPolicyAssignmentsPage from "./pages/expense-management/pages/PolicyAssignments.jsx";
 import XmsSeverityThresholdPage from "./pages/expense-management/pages/SeverityThreshold.jsx";
@@ -1936,6 +1937,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/policy-engine/dashboard" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyDashboardPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/bundles" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyBundlesPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/rules" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyRulesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/carry-forward" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyCarryForwardPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/groups" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyGroupsPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/assignments" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyAssignmentsPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/severity-thresholds" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsSeverityThresholdPage /></ProtectedRoute>} />

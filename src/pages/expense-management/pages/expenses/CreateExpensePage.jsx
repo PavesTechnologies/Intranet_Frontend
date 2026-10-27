@@ -40,10 +40,8 @@ import {
   validateBusinessPurpose,
 } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import {
-  formatDeadlineDate,
+  getOverdueSubmitBlockMessage,
   getSubmissionDeadlineInfo,
-  todayIsoDate,
-  validateReportingPeriod,
   validateTripDates,
 } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 
@@ -296,8 +294,6 @@ export default function CreateExpensePage() {
     businessPurpose: "",
     tripStartDate: "",
     tripEndDate: "",
-    reportingPeriodStart: "",
-    reportingPeriodEnd: "",
     costCenterId: "",
     currencyId: "",
     cashAdvanceId: "",
@@ -824,10 +820,6 @@ export default function CreateExpensePage() {
     if (tripDateError) {
       errors[formData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
     }
-    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
-    if (periodError) {
-      errors.reportingPeriodEnd = periodError;
-    }
 
 
     const title =
@@ -1062,12 +1054,6 @@ export default function CreateExpensePage() {
     // TRIP DATES (drive the submission deadline)
     // ----------------------------------------------------------
 
-    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
-    if (periodError) {
-      setFormErrors((prev) => ({ ...prev, reportingPeriodEnd: periodError }));
-      showStatusToast(periodError, "error", 6000);
-      return;
-    }
 
     const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
     if (tripDateError) {
@@ -1085,8 +1071,6 @@ export default function CreateExpensePage() {
       businessPurpose,
       tripStartDate: formData.tripStartDate,
       tripEndDate: formData.tripEndDate,
-      reportingPeriodStart: formData.reportingPeriodStart || null,
-      reportingPeriodEnd: formData.reportingPeriodEnd || null,
       costCenterId:
         formData.costCenterId,
       currencyId:
@@ -1756,12 +1740,9 @@ export default function CreateExpensePage() {
   const submitNow = () => {
     // UI guard only: the backend enforces the same deadline on the submit call.
     const deadlineInfo = getSubmissionDeadlineInfo({ reportStatus: "DRAFT", tripEndDate: formData.tripEndDate });
-    if (deadlineInfo?.isOverdue) {
-      showStatusToast(
-        `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`,
-        "error",
-        4000,
-      );
+    const blockMessage = getOverdueSubmitBlockMessage(deadlineInfo);
+    if (blockMessage) {
+      showStatusToast(blockMessage, "error", 4000);
       return;
     }
     submitMutation.mutate(reportId, {
@@ -2051,29 +2032,6 @@ export default function CreateExpensePage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormInput
-                label="Reporting Period Start"
-                name="reportingPeriodStart"
-                type="date"
-                value={formData.reportingPeriodStart}
-                onChange={handleInputChange}
-                max={todayIsoDate()}
-                disabled={submitting}
-                error={formErrors.reportingPeriodStart}
-              />
-              <FormInput
-                label="Reporting Period End"
-                name="reportingPeriodEnd"
-                type="date"
-                value={formData.reportingPeriodEnd}
-                onChange={handleInputChange}
-                min={formData.reportingPeriodStart || undefined}
-                max={todayIsoDate()}
-                disabled={submitting}
-                error={formErrors.reportingPeriodEnd}
-              />
-            </div>
 
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

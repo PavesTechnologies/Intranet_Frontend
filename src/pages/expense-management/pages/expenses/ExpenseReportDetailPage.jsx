@@ -63,11 +63,12 @@ import {
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import {
   formatDeadlineDate,
+  getOverdueSubmitBlockMessage,
   getSubmissionDeadlineInfo,
-  validateReportingPeriod,
   validateTripDates,
 } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
+import DeadlineOverridePanel from "@/pages/expense-management/components/expense-reports/DeadlineOverridePanel";
 import ReportHistoryTimeline from "@/pages/expense-management/components/expense-reports/ReportHistoryTimeline";
 import api from "@/api/axiosInstance";
 import Select from "react-select";
@@ -180,6 +181,8 @@ export default function ExpenseReportDetailPage() {
   // (ExpenseReportController/ExpenseLineItemController allow only ADMIN/GENERAL)
   // — don't show write actions (Edit/Delete/Add Line Item/Submit) to Manager.
   const canManage = hasRole(["General"]);
+  // Finance and Admin may extend or reopen a draft's submission deadline. The server enforces this as well.
+  const canOverrideDeadline = hasRole(["Finance", "FINANCE", "FINANCE_EXECUTIVE", "Admin", "ADMIN"]);
 
   useApprovalLiveSync();
   const { data: approvalStatus } = useApprovalStatus(reportId);
@@ -317,7 +320,7 @@ export default function ExpenseReportDetailPage() {
   };
 
   const [isEditReportOpen, setIsEditReportOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "", tripStartDate: "", tripEndDate: "", reportingPeriodStart: "", reportingPeriodEnd: "" });
+  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "", tripStartDate: "", tripEndDate: "" });
   const [editFormErrors, setEditFormErrors] = useState({});
   const [savingReport, setSavingReport] = useState(false);
   const [isDeleteReportOpen, setIsDeleteReportOpen] = useState(false);
@@ -550,7 +553,8 @@ export default function ExpenseReportDetailPage() {
             const foundNothing = scanFoundNothing(responsePayload);
 
             // Clean/validate Merchant Name
-            let merchantVal = isLowConfidence ? "" : (responsePayload.merchantName || "").trim();
+            // Low-confidence scans still fill the fields with what was read; the review notice asks for a check.
+            let merchantVal = (responsePayload.merchantName || "").trim();
 
             // Clean/validate GST
             let taxVal = responsePayload.taxAmount;
@@ -606,10 +610,10 @@ export default function ExpenseReportDetailPage() {
 
             const reviewData = {
               categoryId: categoryIdVal,
-              expenseDate: isLowConfidence ? "" : (responsePayload.receiptDate || new Date().toISOString().split("T")[0]),
+              expenseDate: responsePayload.receiptDate || new Date().toISOString().split("T")[0],
               merchantName: merchantVal,
               description: "",
-              amount: (isLowConfidence || amountNum <= 0) ? "" : amountNum.toFixed(2),
+              amount: amountNum <= 0 ? "" : amountNum.toFixed(2),
               currencyId: currencyIdVal,
               // The receipt's GST is the entered side; the server compares it with the tax code.
               tax: taxValueFromOcr(taxNum > 0 ? taxNum.toFixed(2) : null),
@@ -630,7 +634,7 @@ export default function ExpenseReportDetailPage() {
               foundNothing
                 ? "No merchant, date or total could be read from this file. Check it's a clear photo or PDF of the receipt, or enter the details yourself."
                 : isLowConfidence
-                  ? "Parts of this scan couldn't be read reliably. Enter the merchant, date and amount from the receipt."
+                  ? "Parts of this scan couldn't be read reliably. The fields are filled from the scan: check the merchant, date, amount and GST against the receipt."
                   : ""
             );
             setOcrDuplicate(duplicateNotice(responsePayload));
@@ -800,8 +804,6 @@ export default function ExpenseReportDetailPage() {
       currencyId: report.currencyId || "",
       tripStartDate: (report.tripStartDate || "").slice(0, 10),
       tripEndDate: (report.tripEndDate || "").slice(0, 10),
-      reportingPeriodStart: (report.reportingPeriodStart || "").slice(0, 10),
-      reportingPeriodEnd: (report.reportingPeriodEnd || "").slice(0, 10),
     });
     setEditFormErrors({});
     setIsEditReportOpen(true);
@@ -827,8 +829,6 @@ export default function ExpenseReportDetailPage() {
     if (businessPurposeError) errors.businessPurpose = businessPurposeError;
     const tripDateError = validateTripDates(editFormData.tripStartDate, editFormData.tripEndDate);
     if (tripDateError) errors[editFormData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
-    const periodError = validateReportingPeriod(editFormData.reportingPeriodStart, editFormData.reportingPeriodEnd);
-    if (periodError) errors.reportingPeriodEnd = periodError;
     setEditFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -844,8 +844,6 @@ export default function ExpenseReportDetailPage() {
       currencyId: editFormData.currencyId,
       tripStartDate: editFormData.tripStartDate,
       tripEndDate: editFormData.tripEndDate,
-      reportingPeriodStart: editFormData.reportingPeriodStart || null,
-      reportingPeriodEnd: editFormData.reportingPeriodEnd || null,
     };
 
     try {
@@ -879,12 +877,9 @@ export default function ExpenseReportDetailPage() {
 
   const submitNow = () => {
     // UI guard only: the backend enforces the same deadline on the submit call.
-    if (deadlineInfo?.isOverdue) {
-      showStatusToast(
-        `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`,
-        "error",
-        4000,
-      );
+    const blockMessage = getOverdueSubmitBlockMessage(deadlineInfo);
+    if (blockMessage) {
+      showStatusToast(blockMessage, "error", 4000);
       return;
     }
     submitReport.mutate(reportId, {
@@ -1239,6 +1234,13 @@ export default function ExpenseReportDetailPage() {
                       ? `Overdue: submission was due ${formatDeadlineDate(deadlineInfo.deadline)}`
                       : `Submit by ${formatDeadlineDate(deadlineInfo.deadline)} (${deadlineInfo.daysRemaining} day${deadlineInfo.daysRemaining === 1 ? "" : "s"} left)`}
                   </p>
+                )}
+                {canOverrideDeadline && report.reportStatus === "DRAFT" && (
+                  <DeadlineOverridePanel
+                    reportId={reportId}
+                    currentDeadline={deadlineInfo?.deadline ?? null}
+                    onApplied={fetchReport}
+                  />
                 )}
               </div>
 

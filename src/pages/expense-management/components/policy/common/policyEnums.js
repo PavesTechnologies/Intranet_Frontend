@@ -55,4 +55,5 @@ export const RULE_TYPE_META = {
 // Engine resource — a documented, temporary backend inconsistency).
 export const POLICY_ADMIN_ROLES = ["Admin", "Super_Admin"];
 export const POLICY_MANAGE_ROLES = ["Admin", "Super_Admin", "Finance"];
-export const POLICY_VIEW_ROLES = ["Admin", "Super_Admin", "Finance", "Manager"];
+// Finance_Executive already sees the Policy & Compliance menu (sidebarConfig XMS_REPORT_VIEWERS), so it must also reach the pages.
+export const POLICY_VIEW_ROLES = ["Admin", "Super_Admin", "Finance", "Finance_Executive", "Manager"];
