@@ -102,6 +102,8 @@ const TAB_LABELS = {
   payments_made: "Payments made",
   tds_register: "TDS register",
   payment_term_exceptions: "Term exceptions",
+  control_exceptions: "Controls",
+  month_end_accruals: "Month-end accruals",
   gst_itc_register: "GST ITC register",
   msme_payments: "MSME payments",
   msme_43bh: "MSME 43B(h)",
@@ -247,6 +249,41 @@ function DetailedReports({ reports, reportKey, onSelect, filters, isRange, month
  * reports, each previewed and exportable to Excel/PDF with exactly the same rows. Layout and tokens
  * follow the Expense Management Reports page. Every figure is computed by the backend.
  */
+// Today's position (ignores the dates) and what happened between the dates, as two labelled rows -
+// mixing them made "Outstanding" look like a figure for the period.
+function KpiGroups({ summary }) {
+  const kpis = summary?.kpis;
+  const tile = (kpi) => <KpiTile key={kpi.key} kpi={{ ...kpi, currency_code: summary?.currency }} icon={KPI_ICONS[kpi.key]} currency={CURRENCY} />;
+  if (!kpis) {
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 8 }, (_, i) => tile({ key: `s${i}`, label: "…", value: null }))}
+      </div>
+    );
+  }
+  const now = kpis.filter((k) => k.group === "now");
+  const period = kpis.filter((k) => k.group !== "now");
+  const { as_of: asOfIso, from_date: fromIso, to_date: toIso } = summary.period || {};
+  const asOf = asOfIso ? fmtShortDate(asOfIso) : "today";
+  const range = fromIso && toIso ? `${fmtShortDate(fromIso)} – ${fmtShortDate(toIso)}` : "the selected period";
+  return (
+    <div className="space-y-4">
+      {now.length > 0 && (
+        <section aria-label="Right now">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Right now <span className="font-normal normal-case tracking-normal">· as of {asOf}, whatever dates you choose</span></h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{now.map(tile)}</div>
+        </section>
+      )}
+      <section aria-label="In the selected period">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">In the selected period <span className="font-normal normal-case tracking-normal">· {range}</span></h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{period.map(tile)}</div>
+      </section>
+    </div>
+  );
+}
+
+const fmtShortDate = (iso) => new Date(`${String(iso).slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
 export default function APReportsPage() {
   const [searchParams] = useSearchParams();
   const [preset, setPreset] = useState("3m");
@@ -351,11 +388,7 @@ export default function APReportsPage() {
               {getApiErrorMessage(summaryQuery.error, "Could not load the summary.")}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {(summary?.kpis || Array.from({ length: 8 }, (_, i) => ({ key: `s${i}`, label: "…", value: null }))).map((kpi) => (
-                <KpiTile key={kpi.key} kpi={{ ...kpi, currency_code: summary?.currency }} icon={KPI_ICONS[kpi.key]} currency={CURRENCY} />
-              ))}
-            </div>
+            <KpiGroups summary={summary} />
           )}
 
           {/* Monthly trend */}

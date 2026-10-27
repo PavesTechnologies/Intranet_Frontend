@@ -68,7 +68,7 @@ export function KpiTile({ kpi, icon, currency }) {
     .filter(Boolean)
     .join(" · ");
   const card = (
-    <StatCard title={kpi.label} value={formatKpi(kpi, currency)} subtitle={subtitle} textColor={TONE_TEXT[kpi.tone] || TONE_TEXT.gray} icon={icon} />
+    <StatCard title={kpi.label} value={formatKpi(kpi, currency)} subtitle={subtitle} textColor={TONE_TEXT[kpi.tone] || TONE_TEXT.gray} icon={icon} info={kpi.help} />
   );
   // Equal-height tiles in a row whether or not they are clickable.
   if (!kpi.link) return <div className="h-full [&>div]:h-full">{card}</div>;

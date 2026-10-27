@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -16,8 +16,10 @@ vi.mock("../../vendor/services/vendorService", () => ({
 
 const SUMMARY = {
   currency: "INR",
-  period: { from_date: "2026-08-01", to_date: "2026-10-09" },
+  period: { from_date: "2026-08-01", to_date: "2026-10-09", as_of: "2026-10-09" },
   kpis: [
+    { key: "outstanding", group: "now", label: "Still to pay", format: "money", value: 3064211, subtitle: "11 unpaid invoices · after TDS",
+      tone: "amber", help: "Everything received from vendors and not yet paid, as of today." },
     { key: "invoiced", label: "Invoiced", format: "money", value: 180605.75, subtitle: "2 invoices in period", tone: "indigo" },
     { key: "on_time", label: "Paid on time", format: "percent", value: 50, subtitle: "1 of 2 payment allocations", tone: "emerald" },
     { key: "days_to_pay", label: "Avg days to pay", format: "days", value: 71, subtitle: "Invoice date to payment", tone: "gray" },
@@ -68,6 +70,18 @@ beforeEach(() => {
 });
 
 describe("APReportsPage", () => {
+  it("separates today's position from the period, and explains each tile", async () => {
+    renderPage();
+    const now = await screen.findByRole("region", { name: "Right now" });
+    expect(within(now).getByText("Still to pay")).toBeInTheDocument();
+    const period = screen.getByRole("region", { name: "In the selected period" });
+    expect(within(period).getByText("Invoiced")).toBeInTheDocument();
+    expect(within(period).queryByText("Still to pay")).toBeNull();
+    expect(within(period).getByText(/01 Aug 2026 – 09 Oct 2026/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "What does Still to pay mean?" }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("not yet paid, as of today");
+  });
+
   it("shows the period summary: KPI tiles in each format and the vendor breakdown", async () => {
     renderPage();
     expect((await screen.findAllByText("₹1,80,606")).length).toBe(2); // KPI tile + vendor breakdown
