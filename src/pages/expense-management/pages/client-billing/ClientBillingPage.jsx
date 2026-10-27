@@ -17,44 +17,12 @@ import SelectableStatCard from "@/pages/expense-management/components/common/Sel
 import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 import { formatMoney, formatDate, formatDateTime } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
-import { useEligibleExpenses, useHandedOff, useHandoffSummary, useMarkHandedOff, useRedeliverToAr } from "./hooks/useInvoiceHandoff";
+import { useEligibleExpenses, useHandedOff, useHandoffSummary, useMarkHandedOff } from "./hooks/useInvoiceHandoff";
 import Pagination from "@/components/Pagination/pagination";
 
 const unknownClientKey = "__none__";
 
 const projectLabel = (item) => (item.projectCode ? `${item.projectCode} — ${item.projectName}` : "—");
-
-/** Whether a handoff has reached AR's queue. No status = handed off before XMS sent to AR (AR pulled it). */
-function ArDeliveryStatus({ item }) {
-  const status = item.arDeliveryStatus;
-  if (status === "SENT") {
-    return (
-      <span className="leading-tight">
-        <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Sent to AR</span>
-        {item.arDeliveredAt && <span className="block text-[11px] text-gray-400">{formatDateTime(item.arDeliveredAt)}</span>}
-      </span>
-    );
-  }
-  if (status === "FAILED") {
-    return (
-      <span className="leading-tight">
-        <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">Not delivered</span>
-        <span className="block text-[11px] text-gray-500">
-          {item.arDeliveryAttempts} attempt{item.arDeliveryAttempts === 1 ? "" : "s"} · retried automatically
-        </span>
-        {item.arDeliveryError && (
-          <span className="block max-w-[220px] truncate text-[11px] text-rose-600" title={item.arDeliveryError}>
-            {item.arDeliveryError}
-          </span>
-        )}
-      </span>
-    );
-  }
-  if (status === "PENDING") {
-    return <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">Sending…</span>;
-  }
-  return <span className="text-[11px] text-gray-400">Fetched by AR</span>;
-}
 
 /** Ready expenses grouped by client — AR invoices per client; project is optional per expense. */
 function groupByClient(items) {
@@ -109,24 +77,6 @@ export default function ClientBillingPage() {
   const readyQuery = useEligibleExpenses(filters, readyPage, readySize);
   const historyQuery = useHandedOff(historyPage, historySize);
   const markHandedOff = useMarkHandedOff();
-  const redeliverToAr = useRedeliverToAr();
-  const [resendingId, setResendingId] = useState(null);
-
-  const resendToAr = async (item) => {
-    setResendingId(item.syncId);
-    try {
-      const result = await redeliverToAr.mutateAsync(item.syncId);
-      if (result?.arDeliveryStatus === "SENT") {
-        showStatusToast(`Sent to AR: ${item.reportNumber}`, "success");
-      } else {
-        showStatusToast(`Still couldn't reach AR: ${result?.arDeliveryError || "unknown error"}`, "error");
-      }
-    } catch (err) {
-      showStatusToast(err.response?.data?.message || err.message || "Failed to resend to AR.", "error");
-    } finally {
-      setResendingId(null);
-    }
-  };
 
   const summary = summaryQuery.data;
   const matches = (item) => {
@@ -268,21 +218,6 @@ export default function ClientBillingPage() {
         />
       </div>
 
-      {summary?.arDeliveryFailedCount > 0 && (
-        <div className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 sm:flex-row sm:items-center sm:justify-between">
-          <span className="flex items-start gap-2">
-            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-            {summary.arDeliveryFailedCount} handed-off expense{summary.arDeliveryFailedCount === 1 ? " hasn't" : "s haven't"} reached
-            AR yet. XMS retries automatically every few minutes; you can also resend from the Handed off tab.
-          </span>
-          {tab !== "history" && (
-            <Button size="small" variant="outline" onClick={() => switchTab("history")}>
-              View handoffs
-            </Button>
-          )}
-        </div>
-      )}
-
       <Tabs value={tab} onValueChange={switchTab}>
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="ready">
@@ -406,8 +341,8 @@ export default function ClientBillingPage() {
           ) : (
             <div className="w-full overflow-x-auto">
               <GenericTable
-                headers={["Handed off", "Client", "Project", "Employee", "Expense", "Report", "Amount", "Invoice ref.", "AR delivery", "Action"]}
-                columns={["handedOffAt", "client", "project", "employee", "expense", "report", "amount", "invoiceReference", "arDelivery", "action"]}
+                headers={["Handed off", "Client", "Project", "Employee", "Expense", "Report", "Amount", "Invoice ref.", "Action"]}
+                columns={["handedOffAt", "client", "project", "employee", "expense", "report", "amount", "invoiceReference", "action"]}
                 rows={historyItems.map((item) => ({
                   handedOffAt: <span className="whitespace-nowrap text-xs text-gray-600">{formatDateTime(item.handedOffAt)}</span>,
                   client: item.resolvedClientName || "—",
@@ -427,25 +362,10 @@ export default function ClientBillingPage() {
                   ) : (
                     <span className="text-xs text-gray-400">Not given</span>
                   ),
-                  arDelivery: <ArDeliveryStatus item={item} />,
                   action: (
-                    <div className="flex flex-col items-stretch gap-1.5">
-                      {item.arDeliveryStatus !== "SENT" && (
-                        <Button
-                          size="small"
-                          variant="primary"
-                          onClick={() => resendToAr(item)}
-                          loading={resendingId === item.syncId}
-                          loadingText="Sending..."
-                          disabled={resendingId !== null}
-                        >
-                          <Send size={13} className="mr-1" /> Resend to AR
-                        </Button>
-                      )}
-                      <Button size="small" variant="outline" onClick={() => openHandoff(item, { again: true })}>
-                        <RotateCcw size={13} className="mr-1" /> Hand off again
-                      </Button>
-                    </div>
+                    <Button size="small" variant="outline" onClick={() => openHandoff(item, { again: true })}>
+                      <RotateCcw size={13} className="mr-1" /> Hand off again
+                    </Button>
                   ),
                 }))}
               />
@@ -493,7 +413,7 @@ export default function ClientBillingPage() {
                 <span className="font-mono font-semibold text-gray-900">{formatMoney(target.baseAmount, target.baseCurrencyCode)}</span>
               </div>
               <p className="mt-1.5 text-[11px] text-gray-500">
-                This records that the invoicing team now has this expense to bill the client, and sends it to AR. It doesn't pay the employee or send anything to the client.
+                This records that the invoicing team now has this expense to bill the client. It doesn't pay the employee or send anything to the client.
               </p>
             </div>
 

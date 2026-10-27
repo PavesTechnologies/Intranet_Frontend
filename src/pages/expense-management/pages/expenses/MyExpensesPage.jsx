@@ -10,7 +10,7 @@ import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "@/components/status/statusbadge";
-import PaymentStatusBadge from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
+import PaymentStatusBadge, { paymentStateOf } from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -339,8 +339,8 @@ export default function MyExpensesPage() {
     totalAmount: <span className="font-mono font-semibold text-xs text-gray-900">{formatAmount(r.totalAmount)}</span>,
     status: (
       <div className="flex flex-col items-start gap-1">
-        <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />
-        <PaymentStatusBadge report={r} />
+        {/* One pill: once approved, the payment state (Awaiting payment / Paid) says more than "Approved". */}
+        {paymentStateOf(r) ? <PaymentStatusBadge report={r} /> : <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />}
         {getSubmissionDeadlineInfo(r)?.isOverdue && (
           <span className="text-[11px] font-medium text-red-700">Overdue submission</span>
         )}
