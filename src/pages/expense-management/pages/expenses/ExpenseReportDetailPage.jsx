@@ -69,6 +69,10 @@ import {
 } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 import {
+  LineItemAllocationDetails,
+  LineItemTaxDetails,
+} from "@/pages/expense-management/components/expense-reports/LineItemDetailSections";
+import {
   SplitAllocationSection,
   crossDepartmentCostCenterLabels,
   useSplitAllocation,
@@ -1935,6 +1939,7 @@ export default function ExpenseReportDetailPage() {
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 {lineItemToView && (
                   <>
+                    <PolicyResultBanner lineStatus={lineItemToView.lineStatus} policyWarnings={lineItemToView.policyWarnings} />
                     <div className="grid grid-cols-2 gap-3">
                       <DetailField icon={<Layers size={15} />} label="Category" value={lineItemToView.categoryName || "—"} />
                       <DetailField icon={<Calendar size={15} />} label="Expense Date" value={formatDate(lineItemToView.expenseDate)} />
@@ -1974,7 +1979,20 @@ export default function ExpenseReportDetailPage() {
                         </div>
                       </div>
 
-                      <DetailField icon={<Landmark size={15} />} label="Base Amount" value={`${formatAmount(lineItemToView.baseAmount)} ${lineItemToView.baseCurrencyCode}`} />
+                      <DetailField
+                        icon={<Landmark size={15} />}
+                        label="Base Amount"
+                        value={
+                          <>
+                            {`${formatAmount(lineItemToView.baseAmount)} ${lineItemToView.baseCurrencyCode}`}
+                            {lineItemToView.currencyCode && lineItemToView.currencyCode !== lineItemToView.baseCurrencyCode && lineItemToView.exchangeRate != null && (
+                              <span className="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                1 {lineItemToView.currencyCode} = {Number(lineItemToView.exchangeRate)} {lineItemToView.baseCurrencyCode}
+                              </span>
+                            )}
+                          </>
+                        }
+                      />
                       <DetailField icon={<Briefcase size={15} />} label="Client Billable?" value={lineItemToView.clientBillable ? "Yes" : "No"} />
                       {lineItemToView.clientBillable && (
                         <div className="col-span-2">
@@ -1990,6 +2008,13 @@ export default function ExpenseReportDetailPage() {
                         <DetailField icon={<FileText size={15} />} label="Description" value={lineItemToView.description || "—"} />
                       </div>
                     </div>
+
+                    <LineItemTaxDetails lineItem={lineItemToView} formatAmount={formatAmount} />
+                    <LineItemAllocationDetails
+                      lineItem={lineItemToView}
+                      splits={lineItemSplitsMap[lineItemToView.lineItemId] || []}
+                      formatAmount={formatAmount}
+                    />
 
                     {/* Attached Receipts list */}
                     <div className="border-t border-gray-100 pt-4 space-y-2">
