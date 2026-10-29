@@ -110,6 +110,12 @@ const TAB_LABELS = {
   msme_form1: "MSME Form-1",
 };
 
+// Display-only header renames; the backend column keys and the exported files are unchanged.
+const COLUMN_LABELS = {
+  ageing: { not_due: "Within Due Date" },
+};
+const columnLabel = (reportKey, column) => COLUMN_LABELS[reportKey]?.[column.key] || column.label;
+
 function cellValue(column, row) {
   const value = row[column.key];
   if (value === null || value === undefined || value === "") return <span className="text-slate-300">—</span>;
@@ -142,6 +148,7 @@ function DetailedReports({ reports, reportKey, onSelect, filters, isRange, month
     enabled: Boolean(reportKey) && !filters.invalid,
     retry: false,
   });
+  console.log("data from report : " ,report);
 
   const doExport = async (format) => {
     setExporting(format);
@@ -219,7 +226,10 @@ function DetailedReports({ reports, reportKey, onSelect, filters, isRange, month
           ) : (
             <div className="max-h-[560px] overflow-auto">
               <GenericTable
-                headers={report.columns.map((c) => (NUMERIC.includes(c.type) ? <span className="block w-full text-right">{c.label}</span> : c.label))}
+                headers={report.columns.map((c) => {
+                  const label = columnLabel(reportKey, c);
+                  return NUMERIC.includes(c.type) ? <span className="block w-full text-right">{label}</span> : label;
+                })}
                 columns={report.columns.map((c) => c.key)}
                 rows={report.rows.slice(0, PREVIEW_ROWS).map((row) =>
                   Object.fromEntries(report.columns.map((c) => [c.key, cellValue(c, row)])),

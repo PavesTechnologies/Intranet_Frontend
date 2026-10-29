@@ -39,8 +39,11 @@ const KPI_ICONS = {
 const amountIn = (list, code) => Number(list?.find((a) => a.currency_code === code)?.amount ?? 0);
 const countIn = (list, code) => Number(list?.find((a) => a.currency_code === code)?.count ?? 0);
 
+// Display-only rename of the backend's "Not yet due" bucket; the API label is unchanged.
+const AGE_LABEL = { "Not yet due": "Within due date" };
+
 const AGE_SHORT = {
-  "Not yet due": "Not due",
+  "Not yet due": "Within due",
   "1-15 days overdue": "1–15 d",
   "16-30 days overdue": "16–30 d",
   "31-60 days overdue": "31–60 d",
@@ -124,7 +127,7 @@ function UpcomingCard({ upcoming, currency }) {
 
 function AgeingCard({ ageing, currency }) {
   const buckets = ageing.buckets.map((b) => ({
-    label: b.label,
+    label: AGE_LABEL[b.label] || b.label,
     short: AGE_SHORT[b.label] || b.label,
     amount: amountIn(b.amounts, currency),
     count: countIn(b.amounts, currency),
@@ -366,9 +369,9 @@ export default function FinanceDashboard({ data }) {
   );
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {(data.kpis || []).map((kpi) => (
-          <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} currency={currency} />
+          <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} currency={currency} variant="detailed" />
         ))}
       </div>
 

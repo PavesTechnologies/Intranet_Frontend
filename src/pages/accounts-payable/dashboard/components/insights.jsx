@@ -216,8 +216,8 @@ export function StackedMoneyBars({ points, series, currency = "INR", height = 24
 }
 
 /**
- * Ageing columns, one measure (money): light -> dark blue as the delay grows (ordinal ramp), "not
- * yet due" and "unverified" in recessive neutrals so color never implies a status on its own — the
+ * Ageing columns, one measure (money): light -> dark blue as the delay grows (ordinal ramp), "within
+ * due date" and "unverified" in recessive neutrals so color never implies a status on its own — the
  * x-axis labels carry the meaning.
  */
 export function AgeingColumns({ buckets, currency = "INR", height = 220 }) {
