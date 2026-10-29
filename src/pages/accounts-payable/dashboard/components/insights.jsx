@@ -6,7 +6,7 @@
  * label, categorical hues in fixed order.
  */
 import { useId } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom" ;
 import {
   Area,
   AreaChart,
