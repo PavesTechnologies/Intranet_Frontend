@@ -7,6 +7,7 @@ import SettingsAIProviders from "./components/SettingsAIProviders";
 import SettingsIntegrations from "./components/SettingsIntegrations";
 import SettingsEducationFields from "./components/SettingsEducationFields";
 import SettingsProfileTemplates from "./components/SettingsProfileTemplates";
+import OutcomeOverridesReport from "../monitoring/components/OutcomeOverridesReport";
 
 const PROVIDER_LABEL = { microsoft: "Microsoft Calendar", google: "Google Calendar" };
 
@@ -80,6 +81,7 @@ export default function SettingsPage() {
       {/* HR_ADMIN only - renders nothing for other roles. */}
       <SettingsEducationFields />
       <SettingsProfileTemplates />
+      <OutcomeOverridesReport />
     </div>
   );
 }

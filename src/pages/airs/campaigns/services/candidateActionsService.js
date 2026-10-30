@@ -1,4 +1,5 @@
 import api from "../../../../api/axiosInstance";
+import { withOverrideReason } from "../../utils/withOverrideReason";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 const ROOT = `${BASE_URL}/candidate-actions`;
@@ -22,34 +23,36 @@ export const getAllowedTransitions = async (campaignId, campaignCandidateId) => 
   return response.data?.data || null;
 };
 
-// One candidate. Reason is mandatory server-side (min 10 chars).
+// One candidate. Reason is mandatory server-side (min 10 chars). A move against the system's
+// outcome asks for a reason code first (withOverrideReason).
 export const moveCandidateStage = async (campaignId, campaignCandidateId, targetStage, reason) => {
-  const response = await api.post(
+  const response = await withOverrideReason((overrideReasonCode) => api.post(
     `${ROOT}/campaigns/${campaignId}/candidates/${campaignCandidateId}/stage-move`,
-    { target_stage: targetStage, reason },
+    { target_stage: targetStage, reason, override_reason_code: overrideReasonCode },
     { headers: authHeaders() },
-  );
+  ));
   return response.data?.data || null;
 };
 
 // Reject one candidate straight from the list.
 export const rejectCandidate = async (campaignId, campaignCandidateId, reason) => {
-  const response = await api.post(
+  const response = await withOverrideReason((overrideReasonCode) => api.post(
     `${ROOT}/campaigns/${campaignId}/candidates/${campaignCandidateId}/reject`,
-    { reason },
+    { reason, override_reason_code: overrideReasonCode },
     { headers: authHeaders() },
-  );
+  ));
   return response.data?.data || null;
 };
 
 // Batch. All selected candidates must currently share one stage; the
 // server rejects mixed selections rather than partially applying them.
 export const bulkMoveStage = async (campaignId, campaignCandidateIds, targetStage, reason) => {
-  const response = await api.post(
+  const response = await withOverrideReason((overrideReasonCode) => api.post(
     `${ROOT}/campaigns/${campaignId}/bulk-stage-move`,
-    { campaign_candidate_ids: campaignCandidateIds, target_stage: targetStage, reason },
+    { campaign_candidate_ids: campaignCandidateIds, target_stage: targetStage, reason,
+      override_reason_code: overrideReasonCode },
     { headers: authHeaders() },
-  );
+  ));
   return response.data?.data || null;
 };
 
@@ -130,11 +133,11 @@ export const getRejectionHistory = async (campaignCandidateId) => {
 // Lives under /campaign-candidates, not /candidate-actions — this endpoint
 // predates M11 and is owned by M07; M11 only calls it.
 export const applyHrOverride = async (campaignCandidateId, overrideReason) => {
-  const response = await api.post(
+  const response = await withOverrideReason((overrideReasonCode) => api.post(
     `${BASE_URL}/campaign-candidates/${campaignCandidateId}/override`,
-    { override_reason: overrideReason },
+    { override_reason: overrideReason, override_reason_code: overrideReasonCode },
     { headers: authHeaders() },
-  );
+  ));
   return response.data?.data || null;
 };
 

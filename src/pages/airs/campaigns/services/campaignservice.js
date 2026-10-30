@@ -1,4 +1,5 @@
 import api from "../../../../api/axiosInstance";
+import { withOverrideReason } from "../../utils/withOverrideReason";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 const UMS_BASE_URL = window.__APP_CONFIG__.USER_MANAGEMENT_URL;
@@ -505,10 +506,12 @@ export const escalateStalledCandidate = async (campaignId, campaignCandidateId, 
 
 export const overrideCandidateStage = async (campaignId, campaignCandidateId, reason, targetStage) => {
     try {
-        const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/override-stage`,
-            { reason, target_stage: targetStage || null },
+        // Against the system's outcome (or resolving a HOLD): asks for a reason code first.
+        const response = await withOverrideReason((overrideReasonCode) => api.post(
+            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/override-stage`,
+            { reason, target_stage: targetStage || null, override_reason_code: overrideReasonCode },
             { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-        );
+        ));
         return response.data;
     } catch (error) {
         console.error("Error overriding candidate stage:", error);
