@@ -28,3 +28,18 @@ export const saveLlmPrices = async (models) => {
   const response = await api.put(`${BASE_URL}/monitoring/llm-prices`, { models }, { headers: authHeaders() });
   return unwrap(response.data);
 };
+
+// { min_group_size, candidates, meeting_min_experience, dimensions: [{ key, label, all, meeting_min_experience }], notes }
+export const getFairnessReport = async ({ days, campaignId } = {}) => {
+  const params = {};
+  if (days) params.days = days;
+  if (campaignId) params.campaign_id = campaignId;
+  const response = await api.get(`${BASE_URL}/monitoring/fairness-report`, { headers: authHeaders(), params });
+  return unwrap(response.data);
+};
+
+export const saveFairnessMinGroupSize = async (minGroupSize) => {
+  const response = await api.put(`${BASE_URL}/monitoring/fairness-settings`, { min_group_size: minGroupSize },
+    { headers: authHeaders() });
+  return unwrap(response.data);
+};

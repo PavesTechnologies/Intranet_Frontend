@@ -8,6 +8,7 @@ import { apiErrorMessage } from "../../settings/services/aiProviderService";
 import OutcomesOverTimeChart from "./OutcomesOverTimeChart";
 import LlmPricesEditor from "./LlmPricesEditor";
 import OutcomeOverridesReport from "./OutcomeOverridesReport";
+import FairnessReport from "./FairnessReport";
 
 const selectClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white";
 const th = "py-1.5 pr-3 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400";
@@ -36,7 +37,7 @@ function Section({ title, children }) {
 }
 
 // Phase 4 monitoring (HR_ADMIN): how scoring is running - outcomes over time, vote quality, LLM usage and
-// cost, quota per model, task health, recruiter overrides. Counts and rates only, no candidate details.
+// cost, quota per model, task health, fairness, recruiter overrides. Counts and rates only, no candidate details.
 export default function ScoringMonitoringPanel() {
   const [days, setDays] = useState(30);
   const [campaignId, setCampaignId] = useState("");
@@ -208,6 +209,8 @@ export default function ScoringMonitoringPanel() {
               </p>
             ))}
           </Section>
+
+          <FairnessReport days={days} campaignId={campaignId} />
 
           <Section title="Prices">
             <LlmPricesEditor onSaved={load} />
