@@ -14,6 +14,7 @@ import CampaignTable from "./components/CampaignTable";
 import NavBadges from "./components/NavBadges";
 import OverrideRateAlerts from "./components/OverrideRateAlerts";
 import PlatformHealthStrip from "./components/PlatformHealthStrip";
+import ScoringMonitoringPanel from "../monitoring/components/ScoringMonitoringPanel";
 import {
   EmptyState, SectionError,
 } from "./components/DashboardStates";
@@ -252,6 +253,8 @@ export default function AirsDashboardPage() {
         )}
       </div>
 
+      {/* Phase 4 monitoring - HR_ADMIN only. */}
+      {isHRAdmin && <ScoringMonitoringPanel />}
     </div>
   );
 }
