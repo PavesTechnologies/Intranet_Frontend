@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { getCampaignBoard, formatApiError } from "../../campaigns/services/campaignservice";
-import { moveCandidateStage } from "../../campaigns/services/candidateActionsService";
+import { getAllowedTransitions, moveCandidateStage } from "../../campaigns/services/candidateActionsService";
 import { initialsFromName } from "../../candidates/utils/candidateDataUtils";
-import { PIPELINE_STAGES } from "../constants/pipelineConstants";
+import { PIPELINE_STAGES, PIPELINE_STAGE_LABEL } from "../constants/pipelineConstants";
 import useAirsSocket from "../../websockets/useAirsSocket";
 import { dispatchAirsEvent } from "../../websockets/airsEventDispatch";
 
@@ -53,7 +53,8 @@ function mapCandidate(cc) {
   };
 }
 
-export default function usePipelineBoard(campaignId) {
+// canMove: the caller's role may move candidates at all (useCampaignPermissions).
+export default function usePipelineBoard(campaignId, { canMove = false } = {}) {
   const [columnsByStage, setColumnsByStage] = useState({});
   const [otherCount, setOtherCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -64,6 +65,10 @@ export default function usePipelineBoard(campaignId) {
   // { card, toStage } — set only when the backend has rejected the move
   // asking for a reason; drives StageReasonModal.
   const [pendingReason, setPendingReason] = useState(null);
+  // While a card is dragged: { cardId, fromStage, allowed: Set of stages | null while
+  // loading or if it couldn't be loaded }. The moves this candidate can make for the
+  // caller's role, from .../allowed-transitions - the same rules the move endpoint checks.
+  const [dragTargets, setDragTargets] = useState(null);
 
   // silent=true skips the loading spinner — used when a WS event tells us
   // to reconcile from REST in the background (e.g. another user's action),
@@ -160,7 +165,32 @@ export default function usePipelineBoard(campaignId) {
   const columns = PIPELINE_STAGES.map((stage) => ({ stage, cards: columnsByStage[stage] || [] }));
 
   const startDrag = (card) => {
+    if (!canMove) return;
     dragCard.current = card;
+    setDragTargets({ cardId: card.id, fromStage: card.stage, allowed: null });
+    getAllowedTransitions(campaignId, card.id)
+      .then((data) => {
+        const allowed = new Set((data?.allowed_transitions || []).map((t) => t.to_stage));
+        setDragTargets((prev) => (prev?.cardId === card.id ? { ...prev, allowed } : prev));
+      })
+      // Unknown: every column stays open and the server decides, as before.
+      .catch(() => {});
+  };
+
+  const endDrag = () => setDragTargets(null);
+
+  // false only when the allowed moves are known and this column isn't one of them.
+  const canDropOn = (stage) =>
+    !dragTargets || !dragTargets.allowed || stage === dragTargets.fromStage || dragTargets.allowed.has(stage);
+
+  // Why a column is closed to the dragged card, in words.
+  const blockedReason = (stage) => {
+    if (canDropOn(stage)) return null;
+    const from = PIPELINE_STAGE_LABEL[dragTargets.fromStage] || dragTargets.fromStage;
+    const options = [...dragTargets.allowed].map((s) => PIPELINE_STAGE_LABEL[s] || s);
+    return options.length
+      ? `Not a move your role can make from ${from}. You can move this candidate to: ${options.join(", ")}.`
+      : `Your role can't move this candidate from ${from}.`;
   };
 
   // Never mutates local board state before the API call resolves — on
@@ -189,7 +219,13 @@ export default function usePipelineBoard(campaignId) {
   const dropOnStage = (toStage) => {
     const card = dragCard.current;
     dragCard.current = null;
+    const reason = blockedReason(toStage);
+    setDragTargets(null);
     if (!card || card.stage === toStage) return;
+    if (reason) {
+      toast.info(reason);
+      return;
+    }
     performMove(card, toStage, undefined);
   };
 
@@ -209,7 +245,11 @@ export default function usePipelineBoard(campaignId) {
     error,
     refresh: load,
     startDrag,
+    endDrag,
     dropOnStage,
+    canMove,
+    canDropOn,
+    blockedReason,
     pendingReason,
     confirmPendingReason,
     cancelPendingReason,

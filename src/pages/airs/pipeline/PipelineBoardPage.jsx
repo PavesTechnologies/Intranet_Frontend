@@ -5,6 +5,7 @@ import ErrorState from "../skill-ontology/components/ErrorState";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { activeCampaigns } from "../service/resumeIntake";
 import usePipelineBoard from "./hooks/usePipelineBoard";
+import useCampaignPermissions from "../campaigns/hooks/useCampaignPermissions";
 import PipelineColumn from "./components/PipelineColumn";
 import StageReasonModal from "./components/StageReasonModal";
 import { PIPELINE_STAGE_LABEL } from "./constants/pipelineConstants";
@@ -39,17 +40,21 @@ export default function PipelineBoardPage() {
 
   const campaignId = campaignIdFromUrl || (campaigns.length > 0 ? campaigns[0].id : null);
 
+  const { canMoveCandidates } = useCampaignPermissions();
   const {
     columns,
     loading,
     error,
     refresh,
     startDrag,
+    endDrag,
     dropOnStage,
+    canMove,
+    blockedReason,
     pendingReason,
     confirmPendingReason,
     cancelPendingReason,
-  } = usePipelineBoard(campaignId);
+  } = usePipelineBoard(campaignId, { canMove: canMoveCandidates });
 
   const campaignOptions = campaigns.map((c) => ({ label: c.name, value: c.id }));
 
@@ -78,7 +83,11 @@ export default function PipelineBoardPage() {
       <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">Pipeline Board</h1>
-          <p className="text-xs text-slate-500 mt-1">Drag candidate cards across stages. Changes sync to their record instantly.</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {canMove
+              ? "Drag candidate cards across stages. Changes sync to their record instantly."
+              : "View only: recruiters and hiring managers move candidates between stages, so cards can't be dragged here."}
+          </p>
         </div>
         <div className="w-64">
           <FilterListbox
@@ -109,7 +118,10 @@ export default function PipelineBoardPage() {
                 stage={stage}
                 cards={cards}
                 onDragStart={startDrag}
+                onDragEnd={endDrag}
                 onDrop={() => dropOnStage(stage)}
+                canDrag={canMove}
+                blockedReason={blockedReason(stage)}
                 // The real Candidate Scorecard (Summary/Resume/Deterministic/
                 // Semantic/AI Evaluation/Final Status), keyed by
                 // campaign_candidate_id (card.id) — not the pipeline-only

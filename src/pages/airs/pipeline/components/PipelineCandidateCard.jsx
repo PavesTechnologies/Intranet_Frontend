@@ -58,13 +58,16 @@ const matchTone = (composite) => {
   return "bg-rose-50 text-rose-700 border-rose-100";
 };
 
-export default function PipelineCandidateCard({ card, onDragStart, onClick, onViewDetails }) {
+export default function PipelineCandidateCard({ card, draggable = false, onDragStart, onDragEnd, onClick, onViewDetails }) {
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
+      draggable={draggable}
+      onDragStart={draggable ? onDragStart : undefined}
+      onDragEnd={draggable ? onDragEnd : undefined}
       onClick={onClick}
-      className="bg-white p-3 cursor-grab active:cursor-grabbing hover:bg-slate-50 transition-colors"
+      className={`bg-white p-3 hover:bg-slate-50 transition-colors ${
+        draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+      }`}
     >
       <div className="flex items-center gap-2 mb-2">
         <div className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">

@@ -33,6 +33,11 @@ export default function useCampaignPermissions() {
     // HIRING_MANAGER, or this will 403 despite being visible here.
     canViewPipeline: isHRAdmin || isRecruiter || isHiringManager,
 
+    // ── RECRUITER + HIRING_MANAGER ───────────────────────────────────
+    // single-candidate stage moves (candidate-actions .../stage-move);
+    // which targets each may choose comes from .../allowed-transitions
+    canMoveCandidates: isRecruiter || isHiringManager,
+
     // ── any campaign role (backend scopes HIRING_MANAGER to own) ────
     canViewCampaigns: isHRAdmin || isRecruiter || isHiringManager,
   };
