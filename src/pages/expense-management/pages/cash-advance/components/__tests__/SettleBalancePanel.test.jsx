@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettleBalancePanel from "@/pages/expense-management/pages/cash-advance/components/SettleBalancePanel";
 import { recoveryApi } from "@/pages/expense-management/api/recoveryApi";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
+import { carryForwardApi } from "@/pages/expense-management/api/carryForwardApi";
 import { showStatusToast } from "@/components/toastfy/toast";
 
 vi.mock("@/pages/expense-management/api/recoveryApi", () => ({
@@ -17,7 +18,10 @@ vi.mock("@/pages/expense-management/api/recoveryApi", () => ({
   },
 }));
 vi.mock("@/pages/expense-management/api/cashAdvanceApi", () => ({
-  cashAdvanceApi: { repay: vi.fn(), getSettlement: vi.fn() },
+  cashAdvanceApi: { repay: vi.fn(), getSettlement: vi.fn(), getAll: vi.fn() },
+}));
+vi.mock("@/pages/expense-management/api/carryForwardApi", () => ({
+  carryForwardApi: { getReady: vi.fn(), markReady: vi.fn(), cancelReady: vi.fn() },
 }));
 vi.mock("@/components/toastfy/toast", () => ({ showStatusToast: vi.fn() }));
 
@@ -47,10 +51,11 @@ describe("SettleBalancePanel - two settlement options", () => {
     expect(screen.getByRole("radio", { name: /Salary deduction/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Carry forward/ })).toBeInTheDocument();
     expect(screen.queryByText("Return from employee")).toBeNull();
-    expect(await screen.findByText("Ask the employee to pay the balance")).toBeInTheDocument();
+    expect(screen.queryByText("Ask the employee to pay the balance")).toBeNull();
   });
 
-  it("sends the payment request to the employee from the first step", async () => {
+  // Repayment by the employee is not part of the current flows (carry-forward and salary deduction only).
+  it.skip("sends the payment request to the employee from the first step", async () => {
     recoveryApi.sendPaymentRequest.mockResolvedValue({ dueAt: "2026-10-27T18:00:00" });
     renderPanel();
     fireEvent.click(await screen.findByRole("button", { name: "Send payment request" }));
@@ -59,7 +64,7 @@ describe("SettleBalancePanel - two settlement options", () => {
     expect(showStatusToast).toHaveBeenCalledWith(expect.stringContaining("Payment request sent"), "success", 6000);
   });
 
-  it("shows the open payment request with its due time and the automatic salary fallback", async () => {
+  it.skip("shows the open payment request with its due time and the automatic salary fallback", async () => {
     recoveryApi.listOpenNotices.mockResolvedValue([
       {
         recoveryCaseId: "case-1",
@@ -77,13 +82,24 @@ describe("SettleBalancePanel - two settlement options", () => {
     expect(screen.getByRole("button", { name: "Cancel payment request" })).toBeInTheDocument();
   });
 
-  it("carry forward explains why it cannot be submitted, and sends nothing", async () => {
+  it("carry forward marks the full balance ready in one click", async () => {
+    carryForwardApi.getReady.mockResolvedValue({ readyAmount: null });
+    carryForwardApi.markReady.mockResolvedValue({ readyAmount: 4163 });
     renderPanel();
     fireEvent.click(screen.getByRole("radio", { name: /Carry forward/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Carry forward" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Carry forward INR/ }));
 
-    expect(showStatusToast).toHaveBeenCalledWith(expect.any(String), "error", 8000);
+    expect(carryForwardApi.markReady).toHaveBeenCalledWith(expect.objectContaining({ amount: 4163 }));
     expect(recoveryApi.createSalaryDeduction).not.toHaveBeenCalled();
     expect(cashAdvanceApi.repay).not.toHaveBeenCalled();
+  });
+
+  it("shows the carry-forward confirmation once the balance is ready", async () => {
+    carryForwardApi.getReady.mockResolvedValue({ readyAmount: 1503.85 });
+    renderPanel();
+    fireEvent.click(screen.getByRole("radio", { name: /Carry forward/ }));
+
+    expect(await screen.findByText(/is ready to carry forward/)).toBeInTheDocument();
+    expect(screen.getByText(/Carry-forward confirmation/)).toBeInTheDocument();
   });
 });

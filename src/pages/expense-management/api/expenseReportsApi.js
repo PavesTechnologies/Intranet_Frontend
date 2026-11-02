@@ -68,6 +68,12 @@ export const lineItemService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // The dates a line on this report may carry. Same rules the server applies when a line is saved.
+  getExpenseDateRange: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/line-items/expense-date-range`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
   create: (reportId, payload) =>
     api.post(`/xms/employee/expense-reports/${reportId}/line-items`, payload, {
       baseURL: EXPENSE_API_BASE,

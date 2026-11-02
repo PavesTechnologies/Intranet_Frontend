@@ -36,6 +36,7 @@ export const getStageIndex = (statusStr) => {
       return 5;
     case "EXPENSE_VERIFIED":
     case "EXPENSE VERIFIED":
+    case "AWAITING_REIMBURSEMENT":
     case "SETTLEMENT_PENDING":
     case "SETTLEMENT PENDING":
     case "PARTIALLY_SETTLED":

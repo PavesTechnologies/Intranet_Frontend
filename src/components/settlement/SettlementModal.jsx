@@ -2,13 +2,14 @@ import React, { useState } from "react";
 import Modal from "@/components/Modal/modal";
 import Button from "@/components/Button/Button";
 import SalaryDeductionPanel from "@/pages/expense-management/pages/cash-advance/components/SalaryDeductionPanel";
+import CarryForwardPanel from "@/pages/expense-management/pages/cash-advance/components/CarryForwardPanel";
 
 /**
  * Settlement of a cash advance balance. One shared modal for the settlement list.
  *
  * Two ways to clear the balance, as agreed:
  * - Salary deduction: Finance requests the recovery through payroll (SalaryDeductionPanel).
- * - Carry forward to next expense: not enabled by policy yet, so it is shown but not submitted.
+ * - Carry forward to next expense: one click marks the balance ready; it is added to the next approved advance automatically.
  *
  * The employee's own payment is requested and recorded on the advance's settlement page, not here.
  */
@@ -22,9 +23,6 @@ const CHOICES = [
   { value: SETTLEMENT_CHOICE.SALARY, label: "Salary deduction", hint: "Recovered from salary in a payroll month Finance chooses" },
   { value: SETTLEMENT_CHOICE.CARRY_FORWARD, label: "Carry forward to next expense", hint: "The balance is set against the next expense report" },
 ];
-
-const NOT_ENABLED_MESSAGE =
-  "Carry forward is not enabled yet. It needs the Finance policy to be approved first.";
 
 const formatMoney = (amount, currency) =>
   `${currency || "INR"} ${Number(amount || 0).toLocaleString("en-IN", {
@@ -130,8 +128,13 @@ export default function SettlementModal({ isOpen, advance, onClose, onSettled })
           <p className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">This advance has no balance to recover.</p>
         )}
 
-        {choice === SETTLEMENT_CHOICE.CARRY_FORWARD && (
-          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{NOT_ENABLED_MESSAGE}</p>
+        {choice === SETTLEMENT_CHOICE.CARRY_FORWARD && balanceIsDue && (
+          <CarryForwardPanel
+            advanceId={advance.advanceId}
+            currencyCode={advance.currencyCode}
+            outstanding={advance.balance}
+            onChanged={() => onSettled?.()}
+          />
         )}
 
         <div className="flex justify-end gap-2 border-t border-gray-200 pt-4">

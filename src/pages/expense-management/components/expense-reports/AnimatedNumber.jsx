@@ -7,11 +7,16 @@ import { animate } from "framer-motion";
  * Management, Projects, Header, etc.), just not yet inside XMS.
  */
 export default function AnimatedNumber({ value = 0, format, duration = 0.6, className = "" }) {
-  const [display, setDisplay] = useState(0);
-  const prevValueRef = useRef(0);
+  // Start at the real value so a page load never shows a count-up from 0. Only later changes tween.
+  const initial = Number.isFinite(value) ? value : 0;
+  const [display, setDisplay] = useState(initial);
+  const prevValueRef = useRef(initial);
 
   useEffect(() => {
     const safeValue = Number.isFinite(value) ? value : 0;
+    if (prevValueRef.current === safeValue) {
+      return undefined;
+    }
     const controls = animate(prevValueRef.current, safeValue, {
       duration,
       ease: "easeOut",

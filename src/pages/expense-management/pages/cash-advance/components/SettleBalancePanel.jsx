@@ -1,15 +1,12 @@
 import React, { useState } from "react";
-import Button from "@/components/Button/Button";
-import { showStatusToast } from "@/components/toastfy/toast";
-import { getSettlementBlockReason } from "@/pages/expense-management/api/adjustmentRequest";
-import { SETTLEMENT_ACTION } from "@/pages/expense-management/components/disbursement/settlementRecord";
-import PaymentRequestPanel from "@/pages/expense-management/pages/cash-advance/components/PaymentRequestPanel";
+// import PaymentRequestPanel from "@/pages/expense-management/pages/cash-advance/components/PaymentRequestPanel";
 import SalaryDeductionPanel from "@/pages/expense-management/pages/cash-advance/components/SalaryDeductionPanel";
+import CarryForwardPanel from "@/pages/expense-management/pages/cash-advance/components/CarryForwardPanel";
 
 /**
  * The two ways to clear an outstanding balance after the employee has been asked to pay:
  * - Salary deduction: Finance requests the recovery through payroll (see SalaryDeductionPanel).
- * - Carry forward to the next expense: not enabled by the server yet, so it explains why and sends nothing.
+ * - Carry forward to the next approved advance: marked ready here, added automatically when that advance is approved (see CarryForwardPanel).
  *
  * The employee's own payment is not a separate option. It is recorded against the payment request.
  */
@@ -20,23 +17,15 @@ export const SETTLE_OPTION = {
 
 const OPTIONS = [
   { value: SETTLE_OPTION.SALARY, label: "Salary deduction", hint: "Recovered from salary in a payroll month Finance chooses." },
-  { value: SETTLE_OPTION.DEFER, label: "Carry forward to next expense", hint: "The balance is set against the employee's next expense report." },
+  { value: SETTLE_OPTION.DEFER, label: "Carry forward to next expense", hint: "The balance moves to another approved advance for this employee, once Finance approves it." },
 ];
 
 export default function SettleBalancePanel({ advanceId, outstanding, currencyCode, advanceNumber, onSettled }) {
   const [option, setOption] = useState(SETTLE_OPTION.SALARY);
-  const [submitting, setSubmitting] = useState(false);
   const balance = Number(outstanding) || 0;
 
   const formatMoney = (amount) =>
     `${currencyCode || "INR"} ${Number(amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  const handleCarryForward = () => {
-    // Deferral has no equivalent in the adjustment endpoint, so nothing is sent (see getSettlementBlockReason).
-    setSubmitting(true);
-    showStatusToast(getSettlementBlockReason(SETTLEMENT_ACTION.ADJUST), "error", 8000);
-    setSubmitting(false);
-  };
 
   return (
     <div className="space-y-4">
@@ -48,6 +37,7 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
           </p>
         </div>
 
+        {/* Repayment by the employee is not part of the current flows. Only salary deduction and carry-forward remain.
         <div className="space-y-2">
           <p className="text-xs font-semibold text-gray-800">Step 1 · Ask the employee to pay</p>
           <PaymentRequestPanel
@@ -57,9 +47,10 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
             onChanged={onSettled}
           />
         </div>
+        */}
 
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-800">Step 2 · If it is not settled, choose how it is cleared</p>
+          <p className="text-xs font-semibold text-gray-800">Choose how it is cleared</p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2" role="radiogroup" aria-label="Settlement option">
             {OPTIONS.map((opt) => {
               const selected = option === opt.value;
@@ -94,19 +85,12 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
         )}
 
         {option === SETTLE_OPTION.DEFER && (
-          <div className="space-y-3">
-            <p className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900">
-              {formatMoney(balance)} is set against the employee's next expense report. Nothing is paid now.
-            </p>
-            <p className="text-xs text-gray-500">
-              Carry forward is not enabled yet, so it cannot be submitted. The advance stays open until the balance is cleared.
-            </p>
-            <div className="flex justify-end">
-              <Button type="button" variant="outline" disabled={submitting} onClick={handleCarryForward}>
-                Carry forward
-              </Button>
-            </div>
-          </div>
+          <CarryForwardPanel
+            advanceId={advanceId}
+            currencyCode={currencyCode}
+            outstanding={balance}
+            onChanged={onSettled}
+          />
         )}
       </div>
     </div>
