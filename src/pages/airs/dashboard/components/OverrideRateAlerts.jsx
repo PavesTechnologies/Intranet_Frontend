@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
-import { getOverrideReport } from "../../campaigns/services/campaignservice";
+import { getOutcomeOverrideReport } from "../../monitoring/services/outcomeOverrideService";
 
-// Campaigns whose override rate crossed OVERRIDE_RATE_ALERT_THRESHOLD. The
-// rate and the flag are computed server-side, so this and the report can never
-// disagree. Renders nothing when nothing is wrong.
+// Campaigns whose override rate crossed OVERRIDE_RATE_ALERT_THRESHOLD, from the
+// recruiter-overrides report (candidates moved against the system's screening
+// outcome / candidates with a decided outcome). The rate and the flag are computed
+// server-side, so this and the report can never disagree. Renders nothing when
+// nothing is wrong.
 export default function OverrideRateAlerts() {
   const [alerts, setAlerts] = useState([]);
 
@@ -13,9 +15,9 @@ export default function OverrideRateAlerts() {
     let cancelled = false;
     (async () => {
       try {
-        const report = await getOverrideReport();
+        const report = await getOutcomeOverrideReport();
         if (cancelled) return;
-        setAlerts((report?.campaign_alerts || []).filter((a) => a.override_alert));
+        setAlerts((report?.by_campaign || []).filter((a) => a.override_alert));
       } catch {
         // HR_ADMIN-only endpoint; a recruiter simply sees no panel.
         if (!cancelled) setAlerts([]);
@@ -36,8 +38,8 @@ export default function OverrideRateAlerts() {
         </span>
       </h2>
       <p className="text-[11px] text-amber-800 mb-3">
-        A high share of rejections being overridden usually means the campaign's thresholds or
-        mandatory skills are too strict for the candidates actually applying.
+        A high share of screening outcomes being overridden usually means the campaign's JD
+        calibration, core skills or thresholds don't fit the candidates actually applying.
       </p>
       <div className="space-y-1.5">
         {alerts.map((a) => (
@@ -47,17 +49,17 @@ export default function OverrideRateAlerts() {
             className="flex items-center justify-between gap-3 bg-white border border-amber-100 rounded-lg px-3 py-2 hover:border-amber-300 transition"
           >
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-900 truncate">{a.campaign_name}</p>
+              <p className="text-xs font-semibold text-slate-900 truncate">{a.campaign}</p>
               {a.recommendation && (
                 <p className="text-[10px] text-slate-500 truncate">{a.recommendation}</p>
               )}
             </div>
             <div className="text-right shrink-0">
               <p className="text-sm font-bold text-amber-700 tabular-nums">
-                {Number(a.override_rate).toFixed(1)}%
+                {(Number(a.override_rate) * 100).toFixed(1)}%
               </p>
               <p className="text-[10px] text-slate-400">
-                {a.override_count} of {a.rejected_count} rejections
+                {a.overridden_candidates} of {a.decided_candidates} decided
               </p>
             </div>
           </Link>

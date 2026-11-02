@@ -1,24 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { getCampaignBoard, moveCampaignCandidateStage, formatApiError } from "../../campaigns/services/campaignservice";
+import { getCampaignBoard, formatApiError } from "../../campaigns/services/campaignservice";
+import { moveCandidateStage } from "../../campaigns/services/candidateActionsService";
 import { initialsFromName } from "../../candidates/utils/candidateDataUtils";
 import { PIPELINE_STAGES } from "../constants/pipelineConstants";
 import useAirsSocket from "../../websockets/useAirsSocket";
 import { dispatchAirsEvent } from "../../websockets/airsEventDispatch";
 
-// PipelineTransitionReasonRequiredException surfaces as this exact
-// combination — see pipeline_transition_service.py / campaign_candidate_service.py
-// move_pipeline_stage: CampaignException(str(exc), 400) where the message is
-// "Transition from {from} to {to} requires a reason to be provided.".
+// PipelineTransitionReasonRequiredException surfaces as a 422 whose message
+// starts with "REASON_REQUIRED:" (pipeline_transition_exceptions.py).
 // Checked defensively (status + message), never assumed from stage names —
 // the frontend has no copy of allowed_transitions to predict this itself.
+// (A move against the system's outcome is a different 422 -
+// OVERRIDE_REASON_REQUIRED - which moveCandidateStage's reason-code picker handles.)
 function isReasonRequiredError(err) {
   const status = err?.response?.status;
   const message = err?.response?.data?.message;
-  return status === 400 && typeof message === "string" && message.toLowerCase().includes("requires a reason");
+  return status === 422 && typeof message === "string" && message.startsWith("REASON_REQUIRED");
 }
 
-// POST .../stage error bodies carry the specifics under error.detail —
+// Stage-move error bodies may carry the specifics under error.detail —
 // { success, message, error: { code, detail } } — with detail either a
 // string (404 CANDIDATE_NOT_FOUND, 409 INVALID_STAGE_TRANSITION) or a list
 // of { field, message } (422 VALIDATION_ERROR). Falls back to the top-level
@@ -167,10 +168,16 @@ export default function usePipelineBoard(campaignId) {
   // ever moved locally, so there's nothing to "restore".
   const performMove = async (card, toStage, reason) => {
     try {
-      const res = await moveCampaignCandidateStage(card.id, toStage, reason);
-      toast.success(res?.message || `${card.name || "Candidate"} moved.`);
+      // The same endpoint as the Move dialog, so a move against the system's
+      // screening outcome asks for a reason code first.
+      const res = await moveCandidateStage(campaignId, card.id, toStage, reason);
+      toast.success(res?.detail || `${card.name || "Candidate"} moved.`);
       await load();
     } catch (err) {
+      if (err?.cancelled) {
+        toast.info(err.message);
+        return;
+      }
       if (isReasonRequiredError(err) && !reason) {
         setPendingReason({ card, toStage });
         return;

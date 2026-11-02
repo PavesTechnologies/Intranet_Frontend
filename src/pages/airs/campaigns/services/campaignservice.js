@@ -210,23 +210,6 @@ export const getCampaignBoard = async (campaignId) => {
     }
 };
 
-// Pipeline Board drag-and-drop — POST /campaign-candidates/{campaign_candidate_id}/stage.
-// Resume selection/transition validation stays entirely server-side
-// (PipelineTransitionService) — this only ever sends the target stage.
-export const moveCampaignCandidateStage = async (campaignCandidateId, toStage, reason) => {
-    try {
-        const response = await api.post(
-            `${BASE_URL}/campaign-candidates/${campaignCandidateId}/stage`,
-            { to_stage: toStage, reason: reason || undefined },
-            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-        );
-        return response.data;
-    } catch (error) {
-        console.error("Error moving campaign candidate stage:", error);
-        throw error;
-    }
-};
-
 export const getNameByRoles = async (roleName) => {
     try {
         const response = await api.get(`${UMS_BASE_URL}/admin/roles/${roleName}/users`, {
@@ -560,23 +543,6 @@ export const getRejectionAnalytics = async (campaignId) => {
         throw error;
     }
 };
-
-// HR override report. campaign_alerts carries the per-campaign
-// override_rate and the server-computed override_alert flag that the dashboard
-// warning (T03) renders. HR_ADMIN only.
-export const getOverrideReport = async ({ campaignId, dateFrom, dateTo } = {}) => {
-    const params = {};
-    if (campaignId) params.campaign_id = campaignId;
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    const response = await api.get(`${BASE_URL}/campaign-candidates/override-report`, {
-        params,
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    });
-    return response.data?.data || null;
-};
-
-
 
 // Scoring v2 (Phase 1) shadow report - HR_ADMIN only. v1 next to v2 (and an
 // optional recruiter ranking) per candidate; v2 never decides anything here.

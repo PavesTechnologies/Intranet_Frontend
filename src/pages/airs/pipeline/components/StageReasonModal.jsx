@@ -6,12 +6,17 @@ import Button from "../../../../components/Button/Button";
 // required" (PipelineTransitionReasonRequiredException) — the frontend
 // never decides up front whether a transition needs a reason; it just
 // reacts to that specific rejection and retries once with one.
+// The server's minimum reason length (SingleStageMoveRequest.reason).
+const MIN_REASON_LENGTH = 10;
+
 export default function StageReasonModal({ isOpen, onClose, onConfirm, candidateName, stageLabel }) {
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const tooShort = reason.trim().length < MIN_REASON_LENGTH;
+
   const handleConfirm = async () => {
-    if (!reason.trim()) return;
+    if (tooShort) return;
     setSubmitting(true);
     try {
       await onConfirm(reason.trim());
@@ -35,6 +40,9 @@ export default function StageReasonModal({ isOpen, onClose, onConfirm, candidate
         className="w-full rounded-lg border border-slate-200 p-2.5 text-[12.5px] outline-none focus:border-indigo-400"
         autoFocus
       />
+      {reason.trim() && tooShort && (
+        <p className="text-[11px] text-slate-500 mt-1">At least {MIN_REASON_LENGTH} characters.</p>
+      )}
       <div className="flex justify-end gap-2 mt-4">
         <Button variant="outline" size="small" onClick={onClose} disabled={submitting}>
           Cancel
@@ -43,7 +51,7 @@ export default function StageReasonModal({ isOpen, onClose, onConfirm, candidate
           variant="primary"
           size="small"
           onClick={handleConfirm}
-          disabled={!reason.trim()}
+          disabled={tooShort}
           loading={submitting}
           loadingText="Moving..."
         >
