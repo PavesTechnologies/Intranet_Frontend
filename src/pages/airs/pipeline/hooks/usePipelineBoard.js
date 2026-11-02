@@ -50,6 +50,7 @@ function mapCandidate(cc) {
     requirementsScore: cc.deterministic_score,
     relevanceScore: cc.semantic_score,
     aiScore: cc.ai_ats_score,
+    awaitingFullScoring: !!cc.awaiting_full_scoring,
   };
 }
 

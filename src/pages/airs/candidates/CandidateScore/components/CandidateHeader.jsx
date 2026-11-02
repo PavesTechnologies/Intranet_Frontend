@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowLeft, MapPin, Briefcase, Mail } from "lucide-react";
 import { renderStageBadge } from "../../utils/candidateUtils.jsx";
 import { DECISION_SOURCE_LABEL } from "../../constants/candidateConstants";
+import AwaitingFullScoringBadge from "../../../components/AwaitingFullScoringBadge";
 import { formatDateTime } from "../../utils/candidateDataUtils";
 
 export default function CandidateHeader({ candidate, onBack, actions }) {
@@ -38,6 +39,7 @@ export default function CandidateHeader({ candidate, onBack, actions }) {
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-[15px] font-bold text-slate-900">{candidate.name}</span>
               <span title={rejectionTooltip}>{renderStageBadge(candidate.stage)}</span>
+              <AwaitingFullScoringBadge show={candidate.awaitingFullScoring} />
             </div>
             <div className="text-[12px] flex items-center gap-3 flex-wrap text-slate-400">
               <span className="flex items-center gap-1">

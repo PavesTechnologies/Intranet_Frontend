@@ -1,6 +1,7 @@
 import React from "react";
 import { AlertTriangle, UserCog } from "lucide-react";
 import { Badge } from "../../../../components/ui/badge";
+import AwaitingFullScoringBadge from "../../components/AwaitingFullScoringBadge";
 import {
   CANDIDATE_STAGE_BADGE_TONE,
   PIPELINE_STAGE_LABEL,
@@ -80,16 +81,24 @@ export function renderAiRecommendationBadge(recommendation) {
 // rather than their own columns to keep the table scannable.
 export function renderDecisionBadge(candidate) {
   const type = candidate.decisionType;
-  if (!type) return <span className="text-slate-400 text-xs">—</span>;
+  const awaiting = <AwaitingFullScoringBadge show={candidate.awaitingFullScoring} compact />;
+  if (!type) return candidate.awaitingFullScoring ? awaiting : <span className="text-slate-400 text-xs">—</span>;
   const tone = DECISION_TYPE_BADGE_TONE[type] || "bg-slate-100 text-slate-600 border-slate-200";
   const sourceLabel = candidate.decisionSource ? DECISION_SOURCE_LABEL[candidate.decisionSource] || candidate.decisionSource : "";
   const tooltip = candidate.decisionReason
     ? `${sourceLabel ? `${sourceLabel}: ` : ""}${candidate.decisionReason}`
     : sourceLabel || undefined;
-  return (
+  const badge = (
     <Badge className={`${tone} font-semibold px-2.5 py-1 text-xs`} title={tooltip}>
       {type.replace(/_/g, " ")}
     </Badge>
+  );
+  if (!candidate.awaitingFullScoring) return badge;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {badge}
+      {awaiting}
+    </span>
   );
 }
 

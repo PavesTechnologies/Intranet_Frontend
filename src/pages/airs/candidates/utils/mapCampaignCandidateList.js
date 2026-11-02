@@ -30,6 +30,8 @@ export function mapCampaignCandidateRow(row = {}) {
     decisionSource: row.decision_source || null,
     decisionReason: row.decision_reason || null,
     decisionAt: row.decision_at || null,
+    // Held by the no-LLM fallback until full scoring runs (AwaitingFullScoringBadge).
+    awaitingFullScoring: !!row.awaiting_full_scoring,
     parseStatus: row.parse_status || null,
     starred: false,
   };

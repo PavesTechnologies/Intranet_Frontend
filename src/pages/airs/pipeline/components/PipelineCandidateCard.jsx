@@ -1,5 +1,6 @@
 import React from "react";
 import { GripVertical } from "lucide-react";
+import AwaitingFullScoringBadge from "../../components/AwaitingFullScoringBadge";
 import { Badge } from "../../../../components/ui/badge";
 
 // What happens next for this candidate. "active" = an automated step the
@@ -76,6 +77,7 @@ export default function PipelineCandidateCard({ card, draggable = false, onDragS
         <div className="flex-1 min-w-0">
           <div className="text-[12.5px] font-semibold truncate text-slate-900">{card.name}</div>
           <div className="text-[10.5px] truncate text-slate-400">{card.role}</div>
+          <AwaitingFullScoringBadge show={card.awaitingFullScoring} compact />
         </div>
         <button
           type="button"

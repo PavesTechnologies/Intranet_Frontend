@@ -88,6 +88,7 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
     decisionSource: data.decision_source ?? fallback.decisionSource ?? null,
     decisionReason: data.decision_reason ?? fallback.decisionReason ?? null,
     decisionAt: data.decision_at ?? fallback.decisionAt ?? null,
+    awaitingFullScoring: !!(data.awaiting_full_scoring ?? fallback.awaitingFullScoring),
 
     deterministic: numberOr(data.deterministic_score, 0),
     semantic: numberOr(data.semantic_score, 0),

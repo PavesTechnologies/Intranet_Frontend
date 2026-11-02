@@ -65,6 +65,7 @@ export default function CandidateScorePage() {
     decisionSource: navCandidate?.decisionSource ?? navCandidate?.decision_source,
     decisionReason: navCandidate?.decisionReason ?? navCandidate?.decision_reason,
     decisionAt: navCandidate?.decisionAt ?? navCandidate?.decision_at,
+    awaitingFullScoring: navCandidate?.awaitingFullScoring ?? navCandidate?.awaiting_full_scoring,
     notice: navCandidate?.notice,
     salary: navCandidate?.salary,
   }), [navCandidate, candidateId, location.state?.campaignId]);
