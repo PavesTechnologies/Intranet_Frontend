@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { AlertCircle, CheckCircle2, Info, Loader2 } from "lucide-react";
 
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
@@ -123,6 +124,9 @@ const isOverdueAdvance = (advance) => {
 // Settlement must fall within this many days after the needed-by date.
 const SETTLEMENT_WINDOW_DAYS = 30;
 
+/** Today on the employee's calendar, as yyyy-mm-dd. Dates on or before this are refused. */
+const todayIso = () => toIsoDate(new Date());
+
 const toIsoDate = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -131,6 +135,17 @@ const toIsoDate = (date) => {
 };
 
 /** Earliest and latest settlement dates allowed for a needed-by date (YYYY-MM-DD), or null when unset. */
+/**
+ * The expected trip dates are optional, so the report can be prefilled. When both are given, the end cannot be before the
+ * start. Returns the message to show, or null. These dates are separate from the needed-by and settlement dates.
+ */
+export const expectedTripDateError = (start, end) => {
+  if (!start || !end || !isValidDate(start) || !isValidDate(end)) return null;
+  return new Date(`${end}T00:00:00`) < new Date(`${start}T00:00:00`)
+    ? "Expected trip end date cannot be before the expected trip start date."
+    : null;
+};
+
 export const getSettlementDateRange = (neededByDate) => {
   if (!neededByDate || !isValidDate(neededByDate)) return null;
   const start = new Date(`${neededByDate}T00:00:00`);
@@ -176,6 +191,8 @@ export default function RequestAdvancePage() {
     currencyId: "",
     purpose: "",
     neededByDate: "",
+    expectedTripStartDate: "",
+    expectedTripEndDate: "",
     settlementDueDate: "",
     notes: "",
   });
@@ -183,6 +200,7 @@ export default function RequestAdvancePage() {
   const [errors, setErrors] = useState({});
 
   const [submitting, setSubmitting] = useState(false);
+  const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
 
   const [advances, setAdvances] = useState([]);
@@ -488,11 +506,25 @@ export default function RequestAdvancePage() {
     if (!formData.neededByDate) {
       newErrors.neededByDate =
         "Needed By Date is required.";
+    } else if (isValidDate(formData.neededByDate) && formData.neededByDate <= todayIso()) {
+      newErrors.neededByDate =
+        "Needed By Date must be after today.";
     }
 
     if (!formData.settlementDueDate) {
       newErrors.settlementDueDate =
         "Settlement Expected Date is required.";
+    } else if (isValidDate(formData.settlementDueDate) && formData.settlementDueDate <= todayIso()) {
+      newErrors.settlementDueDate =
+        "Settlement Expected Date must be after today.";
+    }
+
+    const tripDateError = expectedTripDateError(
+      formData.expectedTripStartDate,
+      formData.expectedTripEndDate
+    );
+    if (tripDateError) {
+      newErrors.expectedTripEndDate = tripDateError;
     }
 
     /*
@@ -549,30 +581,44 @@ export default function RequestAdvancePage() {
   /*
    * Submit cash advance request
    */
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
+    // Ask first. The request is created and sent for approval only after the user confirms.
+    setConfirmSubmitOpen(true);
+  };
+
+  /*
+   * Create the request, then send it for approval. Confirmed by the user in the dialog.
+   */
+  const confirmSubmit = async () => {
     setSubmitting(true);
 
     try {
       const payload = buildPayload();
 
-      console.log(
-        "Cash Advance Payload:",
-        payload
-      );
+      const created = await cashAdvanceApi.create(payload);
+      const advanceId =
+        created?.data?.data?.advanceId ||
+        created?.data?.advanceId ||
+        created?.data?.data?.id;
 
-      await cashAdvanceApi.create(payload);
+      if (!advanceId) {
+        throw new Error("The request was created but its ID was not returned.");
+      }
+
+      await cashAdvanceApi.submit(advanceId);
 
       showStatusToast(
-        "Cash advance request submitted successfully.",
+        "Cash advance request submitted for approval.",
         "success"
       );
 
+      setConfirmSubmitOpen(false);
       navigate("/expense-management/cash-advance/my");
     } catch (error) {
       console.error(
@@ -583,6 +629,7 @@ export default function RequestAdvancePage() {
       showStatusToast(
         error?.response?.data?.message ||
           error?.response?.data?.error ||
+          error?.message ||
           "Failed to submit cash advance request.",
         "error"
       );
@@ -784,6 +831,8 @@ export default function RequestAdvancePage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Title */}
           <FormInput
+            labelClassName="block text-sm font-medium text-gray-700 leading-5"
+            inputClassName="h-10"
             label={
               <RequiredLabel>
                 Title / Subject
@@ -826,6 +875,8 @@ export default function RequestAdvancePage() {
 
           {/* Amount */}
           <FormInput
+            labelClassName="block text-sm font-medium text-gray-700 leading-5"
+            inputClassName="h-10"
             label={
               <RequiredLabel>
                 Amount
@@ -923,6 +974,24 @@ export default function RequestAdvancePage() {
               )
             }
             error={errors.neededByDate}
+          />
+
+          <FormInput
+            label="Expected Trip Start Date"
+            name="expectedTripStartDate"
+            type="date"
+            value={getDateValue(formData.expectedTripStartDate)}
+            onChange={(event) => updateField("expectedTripStartDate", event.target.value)}
+            error={errors.expectedTripStartDate}
+          />
+
+          <FormInput
+            label="Expected Trip End Date"
+            name="expectedTripEndDate"
+            type="date"
+            value={getDateValue(formData.expectedTripEndDate)}
+            onChange={(event) => updateField("expectedTripEndDate", event.target.value)}
+            error={errors.expectedTripEndDate}
           />
 
           {/* Settlement Date */}
@@ -1036,6 +1105,17 @@ export default function RequestAdvancePage() {
           </Button>
         </div>
       </form>
+
+      <ConfirmationModal
+        isOpen={confirmSubmitOpen}
+        title="Submit cash advance request"
+        message="This sends the request to your approver. You cannot change the amount or details after it is submitted."
+        confirmText="Submit for approval"
+        cancelText="Cancel"
+        onConfirm={confirmSubmit}
+        onCancel={() => setConfirmSubmitOpen(false)}
+        isLoading={submitting}
+      />
     </div>
   );
 }

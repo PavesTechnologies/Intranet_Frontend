@@ -26,6 +26,7 @@ import FormSelect from "@/components/forms/FormSelect";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import Pagination from "@/components/Pagination/pagination";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
@@ -41,6 +42,8 @@ const LINKABLE_EXPENSE_STATUSES = [
   "PARTIALLY_ADJUSTED",
   "PARTIALLY_SETTLED",
 ];
+
+const PAGE_SIZE = 10;
 
 const canSubmitLinkedExpenses = (adv) =>
   LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
@@ -94,6 +97,7 @@ export default function MyAdvancesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modals state
   const [editingAdvance, setEditingAdvance] = useState(null); // Edit modal
@@ -211,6 +215,27 @@ export default function MyAdvancesPage() {
       return matchSearch && matchStatus;
     });
   }, [advances, searchTerm, statusFilter]);
+
+  // Newest first, so the latest request is on the first page and older ones move to the last pages
+  const sortedAdvances = useMemo(() => {
+    const createdTime = (adv) => {
+      const time = new Date(adv.createdAt || adv.createdDate || adv.created_at).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+    return [...filteredAdvances].sort((a, b) => createdTime(b) - createdTime(a));
+  }, [filteredAdvances]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedAdvances.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pagedAdvances = useMemo(
+    () => sortedAdvances.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE),
+    [sortedAdvances, safeCurrentPage]
+  );
+
+  // Go back to page 1 whenever the search or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -487,7 +512,7 @@ export default function MyAdvancesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredAdvances.map((adv, idx) => {
+                {pagedAdvances.map((adv, idx) => {
                   const advId = adv.advanceId || adv.id || "N/A";
                   const statusUpper = (adv.status || "").toUpperCase();
                   const isDraft = statusUpper === "DRAFT";
@@ -496,7 +521,7 @@ export default function MyAdvancesPage() {
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
                       <td className="py-3 px-4 font-medium text-gray-600">
-                        {idx + 1}
+                        {(safeCurrentPage - 1) * PAGE_SIZE + idx + 1}
                       </td>
                       <td className="py-3 px-4 font-mono font-medium text-blue-700">
                         #{String(advId).slice(0, 8)}
@@ -593,6 +618,13 @@ export default function MyAdvancesPage() {
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+              onNext={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))}
+              className="border-t border-gray-100"
+            />
           </div>
         )}
       </div>

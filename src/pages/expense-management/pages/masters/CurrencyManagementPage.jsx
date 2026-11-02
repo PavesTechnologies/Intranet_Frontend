@@ -19,6 +19,7 @@ import api from "@/api/axiosInstance";
 import { Fonts } from "@/components/Fonts/Fonts";
 import Pagination from "@/components/Pagination/pagination";
 import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
+import { toIsoDate } from "@/pages/expense-management/pages/reports/reportUtils";
 
 const EXPENSE_API_BASE = XMS_BASE_URL;
 
@@ -184,7 +185,7 @@ export default function CurrencyManagementPage() {
     fromCurrencyId: "",
     toCurrencyId: "",
     rate: "",
-    effectiveDate: new Date().toISOString().split("T")[0],
+    effectiveDate: toIsoDate(new Date()),
     source: "Manual",
     status: "ACTIVE",
   });
@@ -533,7 +534,7 @@ export default function CurrencyManagementPage() {
       fromCurrencyId: "",
       toCurrencyId: "",
       rate: "",
-      effectiveDate: new Date().toISOString().split("T")[0],
+      effectiveDate: toIsoDate(new Date()),
       source: "Manual",
       status: "ACTIVE",
     });

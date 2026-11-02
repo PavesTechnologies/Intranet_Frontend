@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, Eye, DollarSign, Calendar, RefreshCw, Send, AlertCircle } from "lucide-react";
 import Button from "@/components/Button/Button";
@@ -301,7 +302,7 @@ const canApproveAdvance = (adv, user, hasRole) => {
  * "MANAGER" (the Approvals tab) shows advances waiting for the manager, "FINANCE" (the Finance tab)
  * shows advances waiting for Finance. Approved and rejected history is not split by stage.
  */
-export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", stage = "MANAGER" }) {
+export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", stage = "MANAGER", embedded = false }) {
   const { user, hasRole } = useAuth();
   const ws = useApprovalWebSocket();
   const [advances, setAdvances] = useState([]);
@@ -468,37 +469,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
     }
   };
 
-  return (
-    <div className="space-y-3">
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-12 flex flex-col items-center justify-center text-gray-500">
-            <LoadingSpinner size="lg" className="mb-2" />
-            <p className="text-xs">Loading cash advance approval requests...</p>
-          </div>
-        ) : filteredAdvances.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-gray-300 mb-2" />
-            <p className="text-sm font-semibold text-gray-700">No cash advance requests found</p>
-            <p className="text-xs text-gray-400 mt-1">There are no {activeTab} cash advance requests matching your filter.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-gray-700">
-              <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                <tr>
-                  <th className="py-3 px-4">REPORT #</th>
-                  <th className="py-3 px-4">EMPLOYEE</th>
-                  <th className="py-3 px-4">TITLE</th>
-                  <th className="py-3 px-4">COST CENTER</th>
-                  <th className="py-3 px-4">CURRENCY</th>
-                  <th className="py-3 px-4">NEEDED BY</th>
-                  <th className="py-3 px-4">STATUS</th>
-                  <th className="py-3 px-4 text-right">ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredAdvances.map((adv) => {
+  const rowNodes = filteredAdvances.map((adv) => {
                   const advId = adv.advanceId || adv.id;
                   const isActionable = canApproveAdvance(adv, user, hasRole);
                   // Show the buttons on every awaiting-approval row; disable them when this user can't act yet
@@ -518,29 +489,29 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
-                      <td className="py-3 px-4 font-mono font-medium text-blue-700 whitespace-nowrap">
+                      <td className="px-2.5 py-1.5" />
+                      <td className="px-2.5 py-1.5 font-mono font-medium text-blue-700 whitespace-nowrap">
+                        <span className="mr-1.5 inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-emerald-800">Cash Advance</span>
                         {formatAdvanceNumber(adv)}
                       </td>
-                      <td className="py-3 px-4 font-medium text-gray-900 whitespace-nowrap">
+                      <td className="px-2.5 py-1.5 font-medium text-gray-900 whitespace-nowrap">
                         <EmployeeLabel employeeId={empId} />
                       </td>
-                      <td className="py-3 px-4 max-w-xs">
-                        <p className="font-semibold text-gray-900 truncate">{adv.title || "Cash Advance"}</p>
-                        {adv.purpose && <p className="text-[11px] text-gray-500 truncate mt-0.5">{adv.purpose}</p>}
+                      <td className="px-2.5 py-1.5 max-w-[220px]">
+                        <p className="font-semibold text-gray-900 truncate text-xs">{adv.title || "Cash Advance"}</p>
+                        <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                          {getCostCenterValue(adv, costCentersMap)} · Needed by {formatDate(getNeededByDateValue(adv))}
+                        </p>
                       </td>
-                      <td className="py-3 px-4 font-medium text-gray-700 whitespace-nowrap">
-                        {getCostCenterValue(adv, costCentersMap)}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-gray-900 whitespace-nowrap">
-                        {formatMoney(adv.amount, adv.currencyCode || "INR")}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-gray-600">
-                        {formatDate(getNeededByDateValue(adv))}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="px-2.5 py-1.5 whitespace-nowrap">
                         {getStatusBadge(adv.status)}
                       </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <td className="px-2.5 py-1.5 text-xs text-gray-400">—</td>
+                      <td className="px-2.5 py-1.5 text-xs text-gray-400">—</td>
+                      <td className="px-2.5 py-1.5 font-bold text-gray-900 whitespace-nowrap text-xs">
+                        {formatMoney(adv.amount, adv.currencyCode || "INR")}
+                      </td>
+                      <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => navigate(`/expense-management/approvals/cash-advance/${adv.advanceId || adv.id}`)}
@@ -577,13 +548,10 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                });
 
+  const modals = createPortal(
+    <>
       {/* Approve Confirmation Modal */}
       {approvingAdvance && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -664,6 +632,67 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
           </div>
         </div>
       )}
+    </>,
+    document.body,
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {loading && (
+          <tbody>
+            <tr>
+              <td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
+            </tr>
+          </tbody>
+        )}
+        {!loading && filteredAdvances.length > 0 && (
+          <tbody className="divide-y divide-gray-100">{rowNodes}</tbody>
+        )}
+        {modals}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="p-12 flex flex-col items-center justify-center text-gray-500">
+            <LoadingSpinner size="lg" className="mb-2" />
+            <p className="text-xs">Loading cash advance approval requests...</p>
+          </div>
+        ) : filteredAdvances.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">
+            <CheckCircle2 className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+            <p className="text-sm font-semibold text-gray-700">No cash advance requests found</p>
+            <p className="text-xs text-gray-400 mt-1">There are no {activeTab} cash advance requests matching your filter.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-gray-700">
+              <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                <tr>
+                  <th className="w-8 px-2.5 py-2" />
+                  <th className="px-2.5 py-2">Report</th>
+                  <th className="px-2.5 py-2">Employee</th>
+                  <th className="px-2.5 py-2">Title / Merchant</th>
+                  <th className="px-2.5 py-2">Level / Status</th>
+                  <th className="px-2.5 py-2">Expenses</th>
+                  <th className="px-2.5 py-2">Policy</th>
+                  <th className="px-2.5 py-2">Amount</th>
+                  <th className="px-2.5 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rowNodes}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {modals}
     </div>
   );
 }

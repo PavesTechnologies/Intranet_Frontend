@@ -3,6 +3,7 @@ import Modal from "@/components/Modal/modal";
 import Button from "@/components/Button/Button";
 import FormInput from "@/components/forms/FormInput";
 import { formatMoney } from "../../../approval-engine/constants/approvalLabels";
+import { toIsoDate } from "@/pages/expense-management/pages/reports/reportUtils";
 
 /** Mirrors the backend PaymentMethod enum. */
 const PAYMENT_METHODS = [
@@ -13,7 +14,7 @@ const PAYMENT_METHODS = [
   { value: "OTHER", label: "Other" },
 ];
 
-const today = () => new Date().toISOString().split("T")[0];
+const today = () => toIsoDate(new Date());
 
 /**
  * AP records the payment it actually made. The report becomes "Paid" only when the server accepts

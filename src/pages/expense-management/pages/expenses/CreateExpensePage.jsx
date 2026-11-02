@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -53,12 +53,16 @@ import api from "@/api/axiosInstance";
 import { isJustified } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import PolicyJustificationModal from "@/pages/expense-management/components/expense-reports/PolicyJustificationModal";
 import { LineItemDrawer } from "./ExpenseReportDetailPage";
+import { advanceExpenseDeadline } from "@/pages/expense-management/components/expense-reports/expenseDateRange";
+import { nextAdvanceSelection } from "@/pages/expense-management/components/expense-reports/advanceReportPrefill";
+import LineItemEntryFlow from "@/pages/expense-management/components/expense-reports/LineItemEntryFlow";
 
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import TaxBreakdownPanel, {
   emptyTaxValue,
 } from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
 import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
+import { toIsoDate } from "@/pages/expense-management/pages/reports/reportUtils";
 const breadcrumbs = [
   {
     label: "Expense Management",
@@ -332,11 +336,12 @@ export default function CreateExpensePage() {
   const [isLineItemDrawerOpen, setIsLineItemDrawerOpen] =
     useState(false);
 
+  const [isSelectionDialogOpen, setIsSelectionDialogOpen] = useState(false);
   const [editingLineItem, setEditingLineItem] = useState(null);
 
   const [lineItemFormData, setLineItemFormData] = useState({
     categoryId: "",
-    expenseDate: new Date().toISOString().split("T")[0],
+    expenseDate: toIsoDate(new Date()),
     merchantName: "",
     description: "",
     amount: "",
@@ -697,6 +702,48 @@ export default function CreateExpensePage() {
     [categories]
   );
 
+
+  // The advance this report is linked to. Its request date bounds the trip dates (server rule).
+  const linkedAdvance = useMemo(
+    () =>
+      formData.cashAdvanceId
+        ? cashAdvances.find((a) => String(a.advanceId || a.id || a.cashAdvanceId || "") === String(formData.cashAdvanceId))
+        : null,
+    [formData.cashAdvanceId, cashAdvances]
+  );
+
+  // The values the selected advance filled in last time, so changing or clearing the advance refreshes only those.
+  const autoFilledRef = useRef({});
+
+  // The advance whose values were last applied to the form, so each selection is filled once.
+  const appliedAdvanceRef = useRef(null);
+
+  const handleAdvanceSelect = (advanceId) => {
+    const advance = advanceId
+      ? cashAdvances.find((a) => String(a.advanceId || a.id || a.cashAdvanceId || "") === String(advanceId))
+      : null;
+    const result = nextAdvanceSelection({
+      form: formData,
+      previousAuto: autoFilledRef.current,
+      advance,
+      costCenters,
+      currencies,
+    });
+    appliedAdvanceRef.current = advanceId || null;
+    autoFilledRef.current = result.autoFilled;
+    setFormData(result.form);
+  };
+
+  // An advance opened from the URL (?cashAdvanceId=) is set before the advance list loads, so fill its values here.
+  useEffect(() => {
+    const advanceId = formData.cashAdvanceId;
+    if (!advanceId || appliedAdvanceRef.current === advanceId) return;
+    const loaded = cashAdvances.some((a) => String(a.advanceId || a.id || a.cashAdvanceId || "") === String(advanceId));
+    if (!loaded) return;
+    handleAdvanceSelect(advanceId);
+    // handleAdvanceSelect reads the current form and lists, so it runs when either changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.cashAdvanceId, cashAdvances, costCenters, currencies]);
 
   const cashAdvanceOptions = useMemo(() => {
     return cashAdvances
@@ -1427,6 +1474,33 @@ export default function CreateExpensePage() {
   // LINE ITEM INPUT
   // ============================================================
 
+  // Manual Entry: a blank line for the drawer. Used by the Add Line Item chooser.
+  const openManualLineItem = () => {
+    setEditingLineItem(null);
+    setLineItemFormData({
+      categoryId: "",
+      expenseDate: toIsoDate(new Date()),
+      merchantName: "",
+      description: "",
+      amount: "",
+      currencyId: createdReport?.currencyId || formData.currencyId || "",
+      taxAmount: "0",
+      clientBillable: false,
+      projectId: "",
+    });
+    setReceiptFile(null);
+    setLineItemErrors({});
+    setIsLineItemDrawerOpen(true);
+  };
+
+  // After a line is saved (typed or scanned), continue on the report page, where the report is submitted.
+  const handleLineItemSavedContinue = async () => {
+    const itemsRes = await lineItemService.getAll(reportId);
+    const payload = itemsRes.data?.data;
+    setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
+    navigate(`/expense-management/expenses/reports/${reportId}`);
+  };
+
   const handleLineItemInputChange = (
     e
   ) => {
@@ -1858,7 +1932,7 @@ export default function CreateExpensePage() {
               setEditingLineItem(li);
               setLineItemFormData({
                 categoryId: li.categoryId || "",
-                expenseDate: li.expenseDate || new Date().toISOString().split("T")[0],
+                expenseDate: li.expenseDate || toIsoDate(new Date()),
                 merchantName: li.merchantName || "",
                 description: li.description || "",
                 amount: li.amount || "",
@@ -2031,6 +2105,11 @@ export default function CreateExpensePage() {
                 error={formErrors.tripEndDate}
               />
             </div>
+            {linkedAdvance && formData.tripEndDate && advanceExpenseDeadline(formData.tripEndDate) && (
+              <p className="text-xs text-gray-500">
+                Expenses must be dated within the trip dates. Submit this report by {advanceExpenseDeadline(formData.tripEndDate)} (30 days after the trip ends).
+              </p>
+            )}
 
 
 
@@ -2247,8 +2326,7 @@ export default function CreateExpensePage() {
                 }
 
                 onChange={(opt) =>
-                  handleSelectChange(
-                    "cashAdvanceId",
+                  handleAdvanceSelect(
                     opt
                       ? opt.value
                       : ""
@@ -2402,35 +2480,7 @@ export default function CreateExpensePage() {
               <Button
                 type="button"
                 variant="primary"
-                onClick={() => {
-
-                  setEditingLineItem(
-                    null
-                  );
-
-
-                  setLineItemFormData({
-                    categoryId: "",
-                    expenseDate:
-                      new Date()
-                        .toISOString()
-                        .split(
-                          "T"
-                        )[0],
-                    merchantName:
-                      "",
-                    description:
-                      "",
-                    amount: "",
-                    currencyId: createdReport?.currencyId || formData.currencyId || "",
-                    taxAmount: "0",
-                    clientBillable: false,
-                    projectId: "",
-                  });
-                  setReceiptFile(null);
-                  setLineItemErrors({});
-                  setIsLineItemDrawerOpen(true);
-                }}
+                onClick={() => setIsSelectionDialogOpen(true)}
                 className="shadow-sm"
               >
 
@@ -2913,13 +2963,25 @@ export default function CreateExpensePage() {
         categoryOptions={categoryOptions}
         costCenterOptions={costCenterOptions}
         currencyOptions={currencyOptions}
-        onSaved={async () => {
-          const itemsRes = await lineItemService.getAll(reportId);
-          const payload = itemsRes.data?.data;
-          setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
-          // After a line is saved, continue on the report page (where the report is submitted).
-          navigate(`/expense-management/expenses/reports/${reportId}`);
+        onSaved={handleLineItemSavedContinue}
+      />
+
+      <LineItemEntryFlow
+        isOpen={isSelectionDialogOpen}
+        onClose={() => setIsSelectionDialogOpen(false)}
+        onManual={openManualLineItem}
+        onSaved={handleLineItemSavedContinue}
+        reportId={reportId}
+        report={{
+          costCenterId: createdReport?.costCenterId || formData.costCenterId,
+          currencyId: createdReport?.currencyId || formData.currencyId,
         }}
+        categories={categories}
+        currencies={currencies}
+        categoryOptions={categoryOptions}
+        costCenterOptions={costCenterOptions}
+        currencyOptions={currencyOptions}
+        projects={projects}
       />
 
 

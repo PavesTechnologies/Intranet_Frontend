@@ -36,6 +36,7 @@ export function buildMovements(settlement, advanceId) {
       proofPath: `${base}/disbursement/proof`,
     });
   }
+  /* Repayment by the employee is not part of the current flows (carry-forward and salary deduction only).
   (settlement.repayments || []).forEach((r) => {
     const payroll = r.paymentMode === "PAYROLL";
     rows.push({
@@ -49,6 +50,7 @@ export function buildMovements(settlement, advanceId) {
       proofPath: `${base}/repayments/${r.repaymentId}/proof`,
     });
   });
+  */
   return rows.sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
 }
 
@@ -70,24 +72,28 @@ export async function viewProof(path) {
   }
 }
 
-export default function MoneyMovements({ settlement, currencyCode, advanceId }) {
+export default function MoneyMovements({ settlement, currencyCode, advanceId, carriedOut = 0, salaryDeducted = 0 }) {
   const rows = buildMovements(settlement, advanceId);
   if (rows.length === 0) {
     return <p className="text-xs text-gray-500">No money has moved on this advance yet.</p>;
   }
   const outTotal = rows.filter((r) => r.direction === "OUT").reduce((sum, r) => sum + Number(r.amount || 0), 0);
-  const inTotal = rows.filter((r) => r.direction !== "OUT").reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  // const inTotal: repayments by the employee are not part of the current flows.
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 text-xs">
         <div className="rounded-md bg-blue-50 px-3 py-2">
           <p className="text-blue-700">Paid out to employee</p>
           <p className="font-semibold text-gray-900">{formatMoney(outTotal, currencyCode)}</p>
         </div>
-        <div className="rounded-md bg-emerald-50 px-3 py-2">
-          <p className="text-emerald-700">Received back</p>
-          <p className="font-semibold text-gray-900">{formatMoney(inTotal, currencyCode)}</p>
+        <div className="rounded-md bg-indigo-50 px-3 py-2">
+          <p className="text-indigo-700">Carried forward</p>
+          <p className="font-semibold text-gray-900">{formatMoney(carriedOut, currencyCode)}</p>
+        </div>
+        <div className="rounded-md bg-rose-50 px-3 py-2">
+          <p className="text-rose-700">Salary deduction</p>
+          <p className="font-semibold text-gray-900">{formatMoney(salaryDeducted, currencyCode)}</p>
         </div>
         <div className="rounded-md bg-gray-50 px-3 py-2">
           <p className="text-gray-600">Still outstanding</p>

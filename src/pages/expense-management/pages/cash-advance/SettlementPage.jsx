@@ -301,7 +301,9 @@ export default function SettlementPage() {
 
     setSubmitting(true);
     try {
-      await cashAdvanceApi.disburse(advanceId, buildDisbursementFormData(values));
+      // Fully covered by carried-in balance: there is no payment to describe, so nothing is sent with the request.
+      const noPaymentDue = Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) <= 0;
+      await cashAdvanceApi.disburse(advanceId, noPaymentDue ? null : buildDisbursementFormData(values));
       showStatusToast(`Cash advance #${String(advanceId).slice(0, 8)} disbursed successfully!`, "success");
       setDisbursing(null);
       fetchSettlementAdvances();
@@ -660,6 +662,7 @@ export default function SettlementPage() {
         <RecordDisbursementModal
           title="Disburse Cash Advance"
           submitLabel="Confirm Disburse"
+          paymentRequired={Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) > 0}
           isSubmitting={submitting}
           onCancel={() => setDisbursing(null)}
           onSubmit={handleConfirmDisburse}
@@ -680,12 +683,26 @@ export default function SettlementPage() {
                   <span className="text-xs font-medium text-gray-600">Outstanding Balance:</span>
                   <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.outstandingBalance || disbursing.amount, disbursing.currencyCode || "INR")}</span>
                 </div>
+                {Number(disbursing.carriedInAmount) > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-medium text-gray-600">Carried in (already with the employee):</span>
+                      <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.carriedInAmount, disbursing.currencyCode || "INR")}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-200 pt-2">
+                      <span className="text-xs font-medium text-gray-600">Pay to employee now:</span>
+                      <span className="text-sm font-bold text-emerald-700">{formatMoney(Number(disbursing.amount) - Number(disbursing.carriedInAmount), disbursing.currencyCode || "INR")}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="text-xs text-gray-600 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
-                <p className="font-medium text-amber-900 mb-1">Payment will be initiated to:</p>
-                <p className="text-amber-800">{disbursing.employeeName || `Employee ID: ${disbursing.employeeId || disbursing.employee_id}`}</p>
-              </div>
+              {Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) > 0 && (
+                <div className="text-xs text-gray-600 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="font-medium text-amber-900 mb-1">Payment will be initiated to:</p>
+                  <p className="text-amber-800">{disbursing.employeeName || `Employee ID: ${disbursing.employeeId || disbursing.employee_id}`}</p>
+                </div>
+              )}
             </>
           }
         />

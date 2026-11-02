@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/Lokeshwari.Busam/Desktop/Myfiles/projects/Expense_Management_Service/src/main/java/com/expense_management_service/service/**)"
+      "Read(//c/Users/Lokeshwari.Busam/Desktop/Myfiles/projects/Expense_Management_Service/src/main/java/com/expense_management_service/service/**)",
+      "Bash(python -)",
+      "Bash(timeout 580 npx vitest run src/pages/expense-management/approval-engine)",
+      "Bash(python \"c:/Users/LOKESH~1.BUS/AppData/Local/Temp/claude/c--Users-Lokeshwari-Busam-Desktop-Myfiles-projects-intranet-fe/2397af98-4fa9-4119-9e82-6ba430619456/scratchpad/edit_date_policy_backend.py\")",
+      "Bash(where.exe npx *)",
+      "Bash(npx --version)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Lokeshwari.Busam\\Desktop\\Myfiles\\projects\\Expense_Management_Service\\src\\main\\java\\com\\expense_management_service\\entity",

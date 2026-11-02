@@ -221,6 +221,9 @@ export default function PaymentRequestPanel({ advanceId, outstanding, currencyCo
             errors={errors}
             modes={lockedMode ? [lockedMode] : REPAY_MODES}
             onFieldChange={(key, value) => setConfirmation((prev) => ({ ...prev, [key]: value }))}
+            onScreenshotRead={(fields) => {
+              if (fields?.amount) setAmount(String(fields.amount));
+            }}
           />
           <Field id="repay-remarks" label="Remarks" required={false}>
             <textarea

@@ -16,6 +16,7 @@ export default function RecordDisbursementModal({
   title,
   submitLabel,
   summary,
+  paymentRequired = true,
   isSubmitting = false,
   onCancel,
   onSubmit,
@@ -28,6 +29,11 @@ export default function RecordDisbursementModal({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (isSubmitting) return;
+    if (!paymentRequired) {
+      // Fully covered by carried-in balance: nothing to validate, no payment details to send.
+      onSubmit({});
+      return;
+    }
     const nextErrors = validateDisbursementConfirmation(values);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length === 0) onSubmit(values);
@@ -60,18 +66,26 @@ export default function RecordDisbursementModal({
       <form id={FORM_ID} onSubmit={handleSubmit} noValidate className="space-y-5">
         {summary}
 
-        <DisbursementConfirmationFields values={values} errors={errors} onFieldChange={handleFieldChange} />
+        {paymentRequired ? (
+          <DisbursementConfirmationFields values={values} errors={errors} onFieldChange={handleFieldChange} />
+        ) : (
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            The carried-in balance covers this advance, so no cash is paid. The advance is recorded as disbursed by carry-forward.
+          </p>
+        )}
 
-        <Field id="disb-note" label="Confirmation note" required={false}>
-          <textarea
-            id="disb-note"
-            rows={2}
-            maxLength={500}
-            className={confirmationInputClass}
-            value={values.confirmationNote}
-            onChange={(e) => handleFieldChange("confirmationNote", e.target.value)}
-          />
-        </Field>
+        {paymentRequired && (
+          <Field id="disb-note" label="Confirmation note" required={false}>
+            <textarea
+              id="disb-note"
+              rows={2}
+              maxLength={500}
+              className={confirmationInputClass}
+              value={values.confirmationNote}
+              onChange={(e) => handleFieldChange("confirmationNote", e.target.value)}
+            />
+          </Field>
+        )}
       </form>
     </Modal>
   );

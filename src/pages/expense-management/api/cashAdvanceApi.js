@@ -112,6 +112,15 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // Reads a payment screenshot (UPI or bank) and returns the fields it shows. Used to fill the payment form.
+  extractPaymentProof: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api
+      .post("/xms/finance/payment-proofs/extract", formData, multipartConfig())
+      .then((res) => res?.data?.data ?? res?.data ?? null);
+  },
+
   // A stored payment proof, as a blob, so the login token is sent. Path comes from the settlement record.
   getProofFile: (path) =>
     api.get(path, {
@@ -139,14 +148,6 @@ export const cashAdvanceApi = {
   // once this succeeds and the server has verified the payment details.
   repay: (advanceId, formData) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, formData, multipartConfig()),
-
-  // EP04-S4: apply verified expense amount against outstanding cash advance
-  // REST contract: POST /xms/api/v1/expense-reports/{id}/apply-advance-offset
-  applyAdvanceOffset: (expenseReportId, payload = {}) =>
-    api.post(`/xms/api/v1/expense-reports/${expenseReportId}/apply-advance-offset`, payload, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
 
   // Settlement / Reimbursement Adjustment Endpoints (/xms/finance/reimbursements)
   getReimbursementAdjustments: (params) =>

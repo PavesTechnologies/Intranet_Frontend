@@ -11,6 +11,7 @@ import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PendingApprovalsPage from "./PendingApprovalsPage";
 import ApprovalHistoryPage from "./ApprovalHistoryPage";
 import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
+import MyDelegateCard from "../components/MyDelegateCard";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
@@ -345,12 +346,44 @@ export default function ApprovalsPage() {
       <div className="approvals-tab-container space-y-6">
         {/* Expense Reports */}
         {activeTab === "pending" && (
-          <PendingApprovalsPage
-            key={`pending-${reloadKey}`}
-            searchTerm={searchTerm}
-            hideHeader
-            noPadding
-          />
+          <>
+            <MyDelegateCard />
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
+                    <tr>
+                      <th className="w-8 px-2.5 py-2" />
+                      <th className="px-2.5 py-2">Report</th>
+                      <th className="px-2.5 py-2">Employee</th>
+                      <th className="px-2.5 py-2">Title / Merchant</th>
+                      <th className="px-2.5 py-2">Level / Status</th>
+                      <th className="px-2.5 py-2">Expenses</th>
+                      <th className="px-2.5 py-2">Policy</th>
+                      <th className="px-2.5 py-2">Amount</th>
+                      <th className="px-2.5 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <PendingApprovalsPage
+                    key={`pending-${reloadKey}`}
+                    searchTerm={searchTerm}
+                    hideHeader
+                    noPadding
+                    embedded
+                  />
+                  {(isManager || isFinance) && (
+                    <CashAdvanceApprovalsList
+                      key={`cash-pending-${reloadKey}`}
+                      activeTab="pending"
+                      searchTerm={searchTerm}
+                      stage={cashAdvanceStage}
+                      embedded
+                    />
+                  )}
+                </table>
+              </div>
+            </div>
+          </>
         )}
         {activeTab === "approved" && (
           <ApprovalHistoryPage
@@ -376,7 +409,7 @@ export default function ApprovalsPage() {
         )}
 
         {/* Cash Advances (shown to managers and Finance; the stage decides which items each user acts on) */}
-        {(isManager || isFinance) && (
+        {activeTab !== "pending" && (isManager || isFinance) && (
           <CashAdvanceApprovalsList
             key={`cash-${activeTab}-${reloadKey}`}
             activeTab={activeTab}

@@ -22,6 +22,7 @@ import { taxCodeService } from "@/pages/expense-management/api/expenseReportsApi
 import Pagination from "@/components/Pagination/pagination";
 import CategoryTaxMappingModal from "@/pages/expense-management/components/masters/CategoryTaxMappingModal";
 import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
+import { toIsoDate } from "@/pages/expense-management/pages/reports/reportUtils";
 
 const EXPENSE_API_BASE = XMS_BASE_URL;
 
@@ -132,7 +133,7 @@ export default function ExpenseCategoriesPage() {
     receiptRequired: true,
     maxLimit: 0,
     taxCode: "",
-    effectiveFrom: new Date().toISOString().split("T")[0],
+    effectiveFrom: toIsoDate(new Date()),
     effectiveTo: "",
     status: "ACTIVE",
   });
@@ -365,7 +366,7 @@ export default function ExpenseCategoriesPage() {
       receiptRequired: true,
       maxLimit: 0,
       taxCode: "",
-      effectiveFrom: new Date().toISOString().split("T")[0],
+      effectiveFrom: toIsoDate(new Date()),
       effectiveTo: "",
       status: "ACTIVE",
     });
