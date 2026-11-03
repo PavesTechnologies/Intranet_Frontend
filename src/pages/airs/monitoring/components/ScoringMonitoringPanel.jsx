@@ -37,7 +37,8 @@ function Section({ title, children }) {
 }
 
 // Phase 4 monitoring (HR_ADMIN): how scoring is running - outcomes over time, vote quality, LLM usage and
-// cost, quota per model, task health, fairness, recruiter overrides. Counts and rates only, no candidate details.
+// cost, quota per model, task health, re-parses of rejected candidates, fairness, recruiter overrides. Counts
+// and rates only, no candidate details.
 export default function ScoringMonitoringPanel() {
   const [days, setDays] = useState(30);
   const [campaignId, setCampaignId] = useState("");
@@ -73,6 +74,7 @@ export default function ScoringMonitoringPanel() {
   const stuck = (tasks?.stuck || []).reduce((n, s) => n + s.count, 0);
   const dead = (tasks?.open_dead_letters || []).reduce((n, d) => n + d.count, 0);
   const problemTypes = (tasks?.by_task_type || []).filter((t) => PROBLEM_STATUSES.some((s) => t[s]));
+  const reparses = summary?.rejected_reparses;
 
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
@@ -208,6 +210,43 @@ export default function ScoringMonitoringPanel() {
                 {p.count} {p.scoring_version} result(s) PENDING in {p.campaign || p.campaign_id}.
               </p>
             ))}
+          </Section>
+
+          {/* Not overrides: a re-parse corrects the input and the new score decides - counted here on
+              their own so a pattern shows without inflating override rates. */}
+          <Section title="Re-parses of rejected candidates (not counted as overrides)">
+            {reparses?.total ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <table className="w-full">
+                  <thead><tr>
+                    <th className={th}>Campaign</th><th className={`${th} text-right`}>Re-parses</th>
+                    <th className={`${th} text-right`} title="Sent back to screening to be re-scored">Back to screening</th>
+                  </tr></thead>
+                  <tbody>
+                    {reparses.by_campaign.map((c) => (
+                      <tr key={c.campaign_id} className="border-t border-slate-100">
+                        <td className={td}>{c.campaign || c.campaign_id}</td>
+                        <td className={`${td} text-right tabular-nums`}>{c.count}</td>
+                        <td className={`${td} text-right tabular-nums`}>{c.moved_to_screening}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <table className="w-full">
+                  <thead><tr>
+                    <th className={th}>Requested by</th><th className={`${th} text-right`}>Re-parses</th>
+                  </tr></thead>
+                  <tbody>
+                    {reparses.by_recruiter.map((r) => (
+                      <tr key={r.actor_id || "unknown"} className="border-t border-slate-100">
+                        <td className={td}>{r.recruiter || "Unknown user"}</td>
+                        <td className={`${td} text-right tabular-nums`}>{r.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="text-xs text-slate-400">No rejected candidates re-parsed in this period.</p>}
           </Section>
 
           <FairnessReport days={days} campaignId={campaignId} />
