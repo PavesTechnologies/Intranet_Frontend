@@ -1,19 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { AlertTriangle, FlaskConical, RefreshCw, Save } from "lucide-react";
+import { AlertTriangle, FlaskConical, Plus, RefreshCw, Save } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import {
+  createScoringVersion,
   formatApiError,
   getScoringShadowReport,
+  listScoringVersions,
+  promoteScoringVersion,
+  retireScoringVersion,
   saveShadowRecruiterRanking,
-  setScoringV2Shadow,
+  setCandidateScoringVersion,
 } from "../services/campaignservice";
 
-// Scoring v2 shadow report (HR_ADMIN). v1 is what the pipeline acts on; v2 is
-// computed alongside for comparison only. A recruiter's own ranking can be
-// entered to compare both against. Rows where v1 and v2 (or either and the
-// recruiter) disagree are highlighted.
+// Shadow report (HR_ADMIN, retire v1 phase D). The current scoring version is what the pipeline acts on;
+// a candidate version can be tried on this campaign - scored alongside, never deciding anything. A
+// recruiter's own ranking can be entered to compare both against. Rows where the two versions (or
+// either and the recruiter) disagree are highlighted. Promoting a version makes it current for every
+// campaign.
 
 const OUTCOME_STYLES = {
   PASS: "bg-emerald-50 text-emerald-700",
@@ -24,6 +29,7 @@ const OUTCOME_STYLES = {
   NOT_SCORED: "bg-slate-50 text-slate-400",
 };
 const OUTCOME_LABELS = { NOT_RUN: "Not run", NOT_SCORED: "Not scored", PENDING: "Pending" };
+const selectClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white";
 
 function Outcome({ value, title }) {
   return (
@@ -42,22 +48,88 @@ function List({ label, items, tone = "text-slate-600" }) {
   );
 }
 
+function Counts({ label, counts }) {
+  return Object.entries(counts || {}).map(([outcome, n]) => (
+    <span key={`${label}-${outcome}`} className={`px-2 py-0.5 rounded ${OUTCOME_STYLES[outcome] || OUTCOME_STYLES.NOT_SCORED}`}>
+      {label} {OUTCOME_LABELS[outcome] || outcome}: {n}
+    </span>
+  ));
+}
+
+// A candidate version: a label, the configuration keys that differ from the defaults (JSON), and
+// optionally its own core-confirmation model.
+function NewVersionForm({ onCreated }) {
+  const [label, setLabel] = useState("");
+  const [configuration, setConfiguration] = useState("{\n  \n}");
+  const [model, setModel] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const create = async () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(configuration || "{}");
+    } catch {
+      toast.error("The configuration isn't valid JSON.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await createScoringVersion({ label: label.trim(), configuration: parsed, model: model.trim() });
+      toast.success("Candidate scoring version created.");
+      setLabel("");
+      setConfiguration("{\n  \n}");
+      setModel("");
+      onCreated(res?.data ?? res);
+    } catch (err) {
+      toast.error(formatApiError(err, "Could not create the scoring version."));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr_2fr]">
+      <div className="space-y-2">
+        <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={100} placeholder="Label, e.g. core x3"
+          aria-label="Version label" className="w-full px-2 py-1 border border-slate-200 rounded text-xs" />
+        <input value={model} onChange={(e) => setModel(e.target.value)} maxLength={150}
+          placeholder="Confirmation model (optional)" aria-label="Confirmation model"
+          className="w-full px-2 py-1 border border-slate-200 rounded text-xs" />
+        <p className="text-[10px] text-slate-500">
+          Only configuration can differ. Code and prompt changes go through the golden set instead.
+        </p>
+        <Button variant="primary" size="small" loading={creating} disabled={!label.trim()} onClick={create}>
+          Create candidate version
+        </Button>
+      </div>
+      <textarea value={configuration} onChange={(e) => setConfiguration(e.target.value)} rows={6} spellCheck={false}
+        aria-label="Configuration (JSON)" placeholder='{"importance_weights": {"core": 3.0}}'
+        className="w-full px-2 py-1 border border-slate-200 rounded font-mono text-[11px]" />
+    </div>
+  );
+}
+
 export default function ScoringShadowReport({ campaignId }) {
   const [report, setReport] = useState(null);
+  const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [ranks, setRanks] = useState({});
   const [rankedBy, setRankedBy] = useState("");
   const [saving, setSaving] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [picked, setPicked] = useState("");
+  const [showNew, setShowNew] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const res = await getScoringShadowReport(campaignId);
+      const [res, listed] = await Promise.all([getScoringShadowReport(campaignId), listScoringVersions()]);
       const data = res?.data ?? res;
       setReport(data);
+      setVersions(listed?.data ?? listed ?? []);
+      setPicked(data?.candidate_version?.id || "");
       setRanks(Object.fromEntries((data?.rows || []).map((r) => [r.campaign_candidate_id, r.recruiter_rank ?? ""])));
       setRankedBy((data?.rows || []).find((r) => r.recruiter_ranked_by)?.recruiter_ranked_by || "");
     } catch {
@@ -75,6 +147,8 @@ export default function ScoringShadowReport({ campaignId }) {
     () => (report?.rows || []).some((r) => String(r.recruiter_rank ?? "") !== String(ranks[r.campaign_candidate_id] ?? "")),
     [report, ranks]
   );
+  const candidates = versions.filter((v) => v.status === "candidate");
+  const trying = report?.candidate_version;
 
   const saveRanks = async () => {
     setSaving(true);
@@ -93,19 +167,49 @@ export default function ScoringShadowReport({ campaignId }) {
     }
   };
 
-  const toggleShadow = async (enabled) => {
+  const tryVersion = async (versionId) => {
     setSwitching(true);
     try {
-      const res = await setScoringV2Shadow(campaignId, enabled, enabled);
+      const res = await setCandidateScoringVersion(campaignId, versionId, Boolean(versionId));
       const result = res?.data ?? res;
       toast.success(
-        enabled
-          ? `Shadow scoring on. ${result?.queued ?? 0} candidate(s) queued for v2 - refresh in a few minutes.`
-          : "Shadow scoring off. Stored v2 results stay in the report."
+        versionId
+          ? `Trying the version. ${result?.queued ?? 0} candidate(s) queued - refresh in a few minutes.`
+          : "Stopped trying the version. Its stored results stay in the history."
       );
       await load();
     } catch (err) {
-      toast.error(formatApiError(err, "Could not change shadow scoring."));
+      toast.error(formatApiError(err, "Could not change the candidate scoring version."));
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const promote = async () => {
+    if (!trying) return;
+    if (!window.confirm(`Make "${trying.label}" the current scoring version? Every campaign is scored and decided `
+      + `with it from the next scoring on; "${report.current_version?.label}" is retired.`)) return;
+    setSwitching(true);
+    try {
+      await promoteScoringVersion(trying.id);
+      toast.success(`"${trying.label}" is now the current scoring version.`);
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err, "Could not promote the scoring version."));
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const retire = async () => {
+    if (!trying || !window.confirm(`Retire "${trying.label}"? Every campaign trying it stops.`)) return;
+    setSwitching(true);
+    try {
+      await retireScoringVersion(trying.id);
+      toast.success(`"${trying.label}" retired.`);
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err, "Could not retire the scoring version."));
     } finally {
       setSwitching(false);
     }
@@ -115,16 +219,19 @@ export default function ScoringShadowReport({ campaignId }) {
   if (error && !report) return <p className="text-sm text-rose-700">Couldn't load the shadow report.</p>;
   if (!report) return null;
 
-  const counts = report.v2_outcome_counts || {};
+  const currentLabel = report.current_version?.label || "Current";
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <div className="flex flex-wrap items-center gap-3">
           <FlaskConical className="h-5 w-5 text-slate-500" />
           <div className="mr-auto">
-            <h3 className="text-sm font-semibold text-slate-800">Scoring v2 — shadow comparison</h3>
+            <h3 className="text-sm font-semibold text-slate-800">Scoring versions — shadow comparison</h3>
             <p className="text-[11px] text-slate-500">
-              v1 decides. v2 is computed alongside for comparison only and never changes a candidate's stage.
+              <span className="font-semibold">{currentLabel}</span> (current) decides.
+              {trying
+                ? <> <span className="font-semibold">{trying.label}</span> is scored alongside for comparison only and never changes a candidate's stage.</>
+                : " Try a candidate version to compare it on this campaign."}
             </p>
           </div>
           <span className="text-[11px] text-slate-500">
@@ -133,22 +240,45 @@ export default function ScoringShadowReport({ campaignId }) {
           <Button variant="outline" size="small" onClick={load} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button
-            variant={report.scoring_v2_shadow ? "outline" : "primary"}
-            size="small"
-            loading={switching}
-            onClick={() => toggleShadow(!report.scoring_v2_shadow)}
-            title={report.scoring_v2_shadow ? "Stop computing v2 for this campaign" : "Compute v2 for this campaign's candidates (uses LLM calls)"}
-          >
-            {report.scoring_v2_shadow ? "Turn shadow off" : "Turn shadow on & score existing candidates"}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <select className={selectClass} value={picked} aria-label="Candidate scoring version"
+            onChange={(e) => setPicked(e.target.value)} disabled={switching}>
+            <option value="">No candidate version</option>
+            {candidates.map((v) => (
+              <option key={v.id} value={v.id}>{v.label}{v.model ? ` (${v.model})` : ""}</option>
+            ))}
+          </select>
+          <Button variant="primary" size="small" loading={switching}
+            disabled={(picked || "") === (trying?.id || "")} onClick={() => tryVersion(picked || null)}
+            title="Score this campaign's candidates with the picked version too (uses LLM calls)">
+            {picked ? "Try on this campaign & score existing candidates" : "Stop trying"}
+          </Button>
+          {trying && (
+            <>
+              <Button variant="outline" size="small" disabled={switching} onClick={promote}
+                title="Make it the current version for every campaign">
+                Promote to current
+              </Button>
+              <Button variant="outline" size="small" disabled={switching} onClick={retire}>Retire</Button>
+            </>
+          )}
+          <Button variant="outline" size="small" onClick={() => setShowNew((v) => !v)}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> New candidate version
           </Button>
         </div>
+        {showNew && (
+          <NewVersionForm onCreated={(version) => {
+            setShowNew(false);
+            setVersions((prev) => [...prev, version]);
+            setPicked(version?.id || "");
+          }} />
+        )}
+
         <div className="flex flex-wrap gap-2 mt-3 text-[11px]">
-          {Object.entries(counts).map(([outcome, n]) => (
-            <span key={outcome} className={`px-2 py-0.5 rounded ${OUTCOME_STYLES[outcome] || OUTCOME_STYLES.NOT_SCORED}`}>
-              v2 {OUTCOME_LABELS[outcome] || outcome}: {n}
-            </span>
-          ))}
+          <Counts label={currentLabel} counts={report.outcome_counts?.current} />
+          {trying && <Counts label={trying.label} counts={report.outcome_counts?.candidate} />}
           <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">Disagreements: {report.disagreement_count}</span>
         </div>
         {report.assumed_jd_senses?.length > 0 && (
@@ -165,19 +295,20 @@ export default function ScoringShadowReport({ campaignId }) {
             <tr>
               <th className="px-3 py-2 font-semibold">Candidate</th>
               <th className="px-3 py-2 font-semibold">Stage</th>
-              <th className="px-3 py-2 font-semibold">v1 score</th>
-              <th className="px-3 py-2 font-semibold">v1</th>
-              <th className="px-3 py-2 font-semibold">v1 rank</th>
-              <th className="px-3 py-2 font-semibold">v2 score</th>
-              <th className="px-3 py-2 font-semibold">v2</th>
-              <th className="px-3 py-2 font-semibold">v2 rank</th>
+              <th className="px-3 py-2 font-semibold">Current score</th>
+              <th className="px-3 py-2 font-semibold">Current</th>
+              <th className="px-3 py-2 font-semibold">Current rank</th>
+              <th className="px-3 py-2 font-semibold">Candidate score</th>
+              <th className="px-3 py-2 font-semibold">Candidate</th>
+              <th className="px-3 py-2 font-semibold">Candidate rank</th>
               <th className="px-3 py-2 font-semibold">Recruiter rank</th>
-              <th className="px-3 py-2 font-semibold">v2 core skills</th>
+              <th className="px-3 py-2 font-semibold">Core skills</th>
             </tr>
           </thead>
           <tbody>
             {report.rows.map((row) => {
               const flagged = row.disagreements?.length > 0;
+              const core = row.candidate_core_confirmed || row.current_core_confirmed;
               return (
                 <tr key={row.campaign_candidate_id} className={`border-t border-slate-100 align-top ${flagged ? "bg-amber-50/40" : ""}`}>
                   <td className="px-3 py-2">
@@ -185,12 +316,12 @@ export default function ScoringShadowReport({ campaignId }) {
                     {flagged && <span className="block text-[10px] text-amber-700">{row.disagreements.join(" · ")}</span>}
                   </td>
                   <td className="px-3 py-2 text-slate-600">{row.stage}</td>
-                  <td className="px-3 py-2">{row.v1_score ?? "—"}</td>
-                  <td className="px-3 py-2"><Outcome value={row.v1_outcome} /></td>
-                  <td className="px-3 py-2">{row.v1_rank ?? "—"}</td>
-                  <td className="px-3 py-2">{row.v2_score ?? "—"}</td>
-                  <td className="px-3 py-2"><Outcome value={row.v2_outcome} title={row.v2_outcome_reason} /></td>
-                  <td className="px-3 py-2">{row.v2_rank ?? "—"}</td>
+                  <td className="px-3 py-2">{row.current_score ?? "—"}</td>
+                  <td className="px-3 py-2"><Outcome value={row.current_outcome} title={row.current_outcome_reason} /></td>
+                  <td className="px-3 py-2">{row.current_rank ?? "—"}</td>
+                  <td className="px-3 py-2">{row.candidate_score ?? "—"}</td>
+                  <td className="px-3 py-2"><Outcome value={row.candidate_outcome} title={row.candidate_outcome_reason} /></td>
+                  <td className="px-3 py-2">{row.candidate_rank ?? "—"}</td>
                   <td className="px-3 py-2">
                     <input
                       type="number"
@@ -202,12 +333,12 @@ export default function ScoringShadowReport({ campaignId }) {
                     />
                   </td>
                   <td className="px-3 py-2 text-[11px]">
-                    {row.v2_core_confirmed && <span className="block font-semibold text-slate-700">{row.v2_core_confirmed} confirmed</span>}
-                    <List label="Confirmed" items={row.v2_core_confirmed_names} tone="text-emerald-700" />
-                    <List label="Uncertain" items={row.v2_core_uncertain} tone="text-amber-700" />
-                    <List label="Found, not confirmed as core" items={row.v2_core_found_not_confirmed} />
-                    <List label="Not the candidate's own skill" items={row.v2_core_rejected_by_llm} tone="text-rose-700" />
-                    <List label="Different meaning" items={row.v2_core_sense_mismatch} tone="text-slate-500" />
+                    {core && <span className="block font-semibold text-slate-700">{core} confirmed</span>}
+                    <List label="Confirmed" items={row.core_confirmed_names} tone="text-emerald-700" />
+                    <List label="Uncertain" items={row.core_uncertain} tone="text-amber-700" />
+                    <List label="Found, not confirmed as core" items={row.core_found_not_confirmed} />
+                    <List label="Not the candidate's own skill" items={row.core_rejected_by_llm} tone="text-rose-700" />
+                    <List label="Different meaning" items={row.core_sense_mismatch} tone="text-slate-500" />
                   </td>
                 </tr>
               );

@@ -544,8 +544,8 @@ export const getRejectionAnalytics = async (campaignId) => {
     }
 };
 
-// Scoring v2 (Phase 1) shadow report - HR_ADMIN only. v1 next to v2 (and an
-// optional recruiter ranking) per candidate; v2 never decides anything here.
+// Shadow report (retire v1, phase D) - HR_ADMIN only. The current scoring version next to the
+// campaign's candidate version (and an optional recruiter ranking); the candidate never decides.
 export const getScoringShadowReport = async (campaignId) => {
     const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/scoring-shadow-report`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -561,11 +561,41 @@ export const saveShadowRecruiterRanking = async (campaignId, rankings, rankedByN
     return response.data;
 };
 
-// Opt this campaign in/out of v2 shadow; backfill queues v2 for candidates
-// v1 already scored (subject to the daily LLM call cap).
-export const setScoringV2Shadow = async (campaignId, enabled, backfill = false) => {
-    const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/scoring-v2-shadow`,
-        { enabled, backfill },
+// Try a candidate scoring version on this campaign (versionId null stops); backfill scores its
+// already-scored candidates with it now (subject to the daily LLM call cap).
+export const setCandidateScoringVersion = async (campaignId, versionId, backfill = false) => {
+    const response = await api.put(`${BASE_URL}/campaigns/${campaignId}/candidate-scoring-version`,
+        { version_id: versionId || null, backfill },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    return response.data;
+};
+
+// Scoring versions - HR_ADMIN only: the current one, candidates, retired ones.
+export const listScoringVersions = async () => {
+    const response = await api.get(`${BASE_URL}/scoring-versions`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    return response.data;
+};
+
+export const createScoringVersion = async ({ label, configuration, model, note }) => {
+    const response = await api.post(`${BASE_URL}/scoring-versions`,
+        { label, configuration, model: model || null, note: note || null },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    return response.data;
+};
+
+export const promoteScoringVersion = async (versionId) => {
+    const response = await api.post(`${BASE_URL}/scoring-versions/${versionId}/promote`, {},
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    return response.data;
+};
+
+export const retireScoringVersion = async (versionId) => {
+    const response = await api.post(`${BASE_URL}/scoring-versions/${versionId}/retire`, {},
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
     return response.data;
