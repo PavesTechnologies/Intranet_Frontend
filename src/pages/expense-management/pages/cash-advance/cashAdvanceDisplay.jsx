@@ -82,6 +82,18 @@ export const getCostCenterValue = (adv) => {
 };
 
 
+// Reports in these statuses are dead and do not block a new report for the advance.
+const DEAD_REPORT_STATUSES = ["REJECTED", "CANCELLED"];
+
+/**
+ * True when an expense report already exists for this advance (draft or submitted). Used to disable
+ * "create expense report" on the advance, so the same advance does not get a second report.
+ */
+export const hasSubmittedLinkedReport = (adv) => {
+  const reports = adv?.linkedExpenseReports || (adv?.linkedExpenseReport ? [adv.linkedExpenseReport] : []);
+  return reports.some((r) => !DEAD_REPORT_STATUSES.includes(String(r.status || r.reportStatus || "").toUpperCase()));
+};
+
 export const getStatusBadge = (status) => {
   const upper = (status || "").toUpperCase();
   switch (upper) {

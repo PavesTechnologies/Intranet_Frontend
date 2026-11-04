@@ -18,7 +18,7 @@ import {
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
-import { formatMoney, formatDate, getCostCenterValue, getStatusBadge } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
+import { formatMoney, formatDate, getCostCenterValue, getStatusBadge, hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
@@ -508,7 +508,7 @@ export default function MyAdvancesPage() {
                   <th className="py-3 px-4">Needed By</th>
                   <th className="py-3 px-4 text-right">Outstanding</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="sticky right-0 bg-gray-50 py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -530,29 +530,39 @@ export default function MyAdvancesPage() {
                         <p className="font-semibold text-gray-900 truncate">{adv.title || "Cash Advance"}</p>
                         {adv.purpose && <p className="text-[11px] text-gray-500 truncate mt-0.5">{adv.purpose}</p>}
                       </td>
-                      <td className="py-3 px-4 font-medium text-gray-700 whitespace-nowrap">
+                      <td className="py-3 px-4 font-medium text-gray-700">
                         {getCostCenterValue(adv)}
                       </td>
-                      <td className="py-3 px-4 font-bold text-gray-900 whitespace-nowrap">
+                      <td className="py-3 px-4 font-bold text-gray-900">
                         {formatMoney(adv.amount, adv.currencyCode || "INR")}
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-gray-600">
+                      <td className="py-3 px-4 text-gray-600">
                         {formatDate(getNeededByDateValue(adv))}
                       </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap font-semibold">
+                      <td className="py-3 px-4 text-right font-semibold">
                         <span className={isOverdue(adv) ? "text-rose-600" : "text-amber-600"}>
                           {formatMoney(adv.outstandingBalance, adv.currencyCode || "INR")}
                         </span>
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4">
                         {isOverdue(adv) ? getStatusBadge("OVERDUE") : getStatusBadge(adv.status)}
                         {isOverdue(adv) && (
                           <p className="text-[10px] text-rose-600 mt-1 font-medium">{getAgingDays(adv)} day(s) overdue</p>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <td className="sticky right-0 bg-white py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* View Detail Action */}
+                          {canSubmitLinkedExpenses(adv) && (
+                            <button
+                              onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
+                              disabled={hasSubmittedLinkedReport(adv)}
+                              title={hasSubmittedLinkedReport(adv) ? "An expense report is already submitted for this advance" : "Submit linked expenses"}
+                              className={`p-1.5 rounded transition ${hasSubmittedLinkedReport(adv) ? "text-gray-300 cursor-not-allowed" : "text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"}`}
+                            >
+                              <Receipt size={15} />
+                            </button>
+                          )}
                           <button
                             onClick={() => navigate(`/expense-management/cash-advance/${adv.advanceId || adv.id}`)}
                             title="View details"
@@ -562,15 +572,6 @@ export default function MyAdvancesPage() {
                           </button>
 
                           {/* Submit linked expenses (same action as the detail page's Stage 4 button) */}
-                          {canSubmitLinkedExpenses(adv) && (
-                            <button
-                              onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
-                              title="Submit linked expenses"
-                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition"
-                            >
-                              <Receipt size={15} />
-                            </button>
-                          )}
 
                           {/* Draft Actions */}
                           {isDraft && (

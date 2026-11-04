@@ -2,6 +2,7 @@ import React, { useState } from "react";
 // import PaymentRequestPanel from "@/pages/expense-management/pages/cash-advance/components/PaymentRequestPanel";
 import SalaryDeductionPanel from "@/pages/expense-management/pages/cash-advance/components/SalaryDeductionPanel";
 import CarryForwardPanel from "@/pages/expense-management/pages/cash-advance/components/CarryForwardPanel";
+import { SETTLEMENT_LOCK, useSettlementLock } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
 
 /**
  * The two ways to clear an outstanding balance after the employee has been asked to pay:
@@ -23,6 +24,18 @@ const OPTIONS = [
 export default function SettleBalancePanel({ advanceId, outstanding, currencyCode, advanceNumber, onSettled }) {
   const [option, setOption] = useState(SETTLE_OPTION.SALARY);
   const balance = Number(outstanding) || 0;
+  // Once carry-forward or a salary request is set, the options stay locked until it is cancelled.
+  const lock = useSettlementLock(advanceId);
+  const handleChanged = () => {
+    lock.reload();
+    onSettled?.();
+  };
+  const effectiveOption =
+    lock.kind === SETTLEMENT_LOCK.CARRY_FORWARD
+      ? SETTLE_OPTION.DEFER
+      : lock.kind === SETTLEMENT_LOCK.SALARY
+        ? SETTLE_OPTION.SALARY
+        : option;
 
   const formatMoney = (amount) =>
     `${currencyCode || "INR"} ${Number(amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -44,11 +57,12 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
             advanceId={advanceId}
             outstanding={balance}
             currencyCode={currencyCode}
-            onChanged={onSettled}
+            onChanged={handleChanged}
           />
         </div>
         */}
 
+        {!lock.kind && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-gray-800">Choose how it is cleared</p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2" role="radiogroup" aria-label="Settlement option">
@@ -74,22 +88,31 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
             })}
           </div>
         </div>
+        )}
 
-        {option === SETTLE_OPTION.SALARY && (
+        {lock.kind && (
+          <div className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-900">
+            {lock.kind === SETTLEMENT_LOCK.CARRY_FORWARD
+              ? `Carry-forward is set: ${formatMoney(lock.amount)} is ready for the next approved advance. Settlement options are locked; cancel the carry-forward below to change it.`
+              : "A salary deduction is already requested for this advance. Settlement options are locked; cancel the request below to change it."}
+          </div>
+        )}
+
+        {effectiveOption === SETTLE_OPTION.SALARY && (
           <SalaryDeductionPanel
             advanceId={advanceId}
             outstanding={balance}
             currencyCode={currencyCode}
-            onChanged={onSettled}
+            onChanged={handleChanged}
           />
         )}
 
-        {option === SETTLE_OPTION.DEFER && (
+        {effectiveOption === SETTLE_OPTION.DEFER && (
           <CarryForwardPanel
             advanceId={advanceId}
             currencyCode={currencyCode}
             outstanding={balance}
-            onChanged={onSettled}
+            onChanged={handleChanged}
           />
         )}
       </div>

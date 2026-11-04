@@ -193,7 +193,7 @@ const getStatusBadge = (status) => {
   }
 };
 
-const canApproveAdvance = (adv, user, hasRole) => {
+export const canApproveAdvance = (adv, user, hasRole) => {
   if (!adv) return false;
 
   const statusUpper = (adv.status || "").toUpperCase();
@@ -302,7 +302,7 @@ const canApproveAdvance = (adv, user, hasRole) => {
  * "MANAGER" (the Approvals tab) shows advances waiting for the manager, "FINANCE" (the Finance tab)
  * shows advances waiting for Finance. Approved and rejected history is not split by stage.
  */
-export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", stage = "MANAGER", embedded = false }) {
+export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", embedded = false }) {
   const { user, hasRole } = useAuth();
   const ws = useApprovalWebSocket();
   const [advances, setAdvances] = useState([]);
@@ -414,14 +414,11 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
         (adv.employeeName || adv.employee_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         formatAdvanceNumber(adv).toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Pending items belong to one stage only: manager-stage on Approvals, finance-stage on Finance.
-      const isFinanceStage = statusUpper.includes("FINANCE");
-      const matchStage =
-        activeTab !== "pending" || (stage === "FINANCE") === isFinanceStage;
-
-      return matchTab && matchSearch && matchStage;
+      // The backend already scopes /my-approvals to what this user is part of. Rows the user cannot act on yet
+      // stay visible with disabled actions, as the card counts above do.
+      return matchTab && matchSearch;
     });
-  }, [advances, activeTab, searchTerm, stage]);
+  }, [advances, activeTab, searchTerm]);
 
   const handleApprove = (adv) => {
     setApprovingAdvance(adv);
@@ -491,8 +488,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
                       <td className="px-2.5 py-1.5" />
                       <td className="px-2.5 py-1.5 font-mono font-medium text-blue-700 whitespace-nowrap">
-                        <span className="mr-1.5 inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-emerald-800">Cash Advance</span>
-                        {formatAdvanceNumber(adv)}
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-emerald-800">Cash Advance</span>
                       </td>
                       <td className="px-2.5 py-1.5 font-medium text-gray-900 whitespace-nowrap">
                         <EmployeeLabel employeeId={empId} />

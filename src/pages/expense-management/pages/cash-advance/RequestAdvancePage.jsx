@@ -977,7 +977,7 @@ export default function RequestAdvancePage() {
           />
 
           <FormInput
-            label="Expected Trip Start Date"
+            label="Expected Trip/meeting Start Date"
             name="expectedTripStartDate"
             type="date"
             value={getDateValue(formData.expectedTripStartDate)}
