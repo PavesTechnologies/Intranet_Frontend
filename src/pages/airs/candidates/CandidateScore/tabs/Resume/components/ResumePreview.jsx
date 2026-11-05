@@ -4,6 +4,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { renderAsync } from "docx-preview";
 import { saveAs } from "file-saver";
 import Button from "@/components/Button/Button";
+import { sanitizeRenderedDocx } from "./sanitizeRenderedDocx";
 
 // Set up the PDF.js worker using unpkg CDN matching the current version of pdfjs
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -69,16 +70,29 @@ export default function ResumePreview({ file, onExpired }) {
     };
   }, [file.url, isDocx, onExpired]);
 
-  // Render DOCX blob
+  // Render DOCX blob: into a detached container first, sanitized there, and only then
+  // attached - a link or embedded HTML from the resume never reaches the live page unchecked.
+  // altChunks are off: docx-preview renders them as same-origin srcdoc iframes.
   useEffect(() => {
-    if (docxBlob && docxContainerRef.current) {
-      docxContainerRef.current.innerHTML = "";
-      renderAsync(docxBlob, docxContainerRef.current)
-        .catch((err) => {
-          console.error("DOCX rendering error:", err);
-          setError("Failed to render DOCX preview content");
-        });
-    }
+    if (!docxBlob || !docxContainerRef.current) return;
+    let active = true;
+    const container = docxContainerRef.current;
+    const staging = document.createElement("div");
+    container.replaceChildren();
+    renderAsync(docxBlob, staging, staging, { renderAltChunks: false })
+      .then(() => {
+        if (!active) return;
+        sanitizeRenderedDocx(staging);
+        container.replaceChildren(...staging.childNodes);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error("DOCX rendering error:", err);
+        setError("Failed to render DOCX preview content");
+      });
+    return () => {
+      active = false;
+    };
   }, [docxBlob]);
 
   // Handle PDF callbacks
