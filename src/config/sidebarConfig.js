@@ -208,15 +208,21 @@ export const XMS_SUBMENU = [
       { label: "Expense Reports", to: "/expense-management/expenses/reports", allowedRoles: XMS_MANAGER },
     ],
   },
+  // Cash advance pages are top-level entries of their own, outside the Expenses group.
   {
-    label: "Cash Advance",
+    label: "Request Advance",
+    to: "/expense-management/cash-advance/request",
+    allowedRoles: XMS_EVERYONE,
+  },
+  {
+    label: "My Advances",
     to: "/expense-management/cash-advance/my",
     allowedRoles: XMS_EVERYONE,
-    children: [
-      { label: "Request Advance", to: "/expense-management/cash-advance/request" },
-      { label: "My Advances",     to: "/expense-management/cash-advance/my" },
-      { label: "Settlement",      to: "/expense-management/cash-advance/settlement" },
-    ],
+  },
+  {
+    label: "Settlement",
+    to: "/expense-management/cash-advance/settlement",
+    allowedRoles: XMS_EVERYONE,
   },
   {
     label: "Approvals",

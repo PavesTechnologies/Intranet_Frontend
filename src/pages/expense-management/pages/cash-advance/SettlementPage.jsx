@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { loadSettlementLock, SETTLEMENT_LOCK } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
 import { DollarSign, CheckCircle2, RefreshCw, Eye, Receipt, CheckCircle, Clock, FileText, AlertCircle, Layers, ArrowUpRight, ArrowDownLeft, CreditCard, XCircle, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -12,6 +13,7 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import SettlementModal, { toSettlementAdvance } from "@/components/settlement/SettlementModal";
 import { getSettlementBlockReason } from "@/pages/expense-management/api/adjustmentRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
+import { hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
@@ -86,9 +88,12 @@ const LINKABLE_EXPENSE_STATUSES = [
 ];
 
 // The button is for the advance's own employee only. The backend checks this again when the report is created.
+// The login token carries the employee id as employee_id; accept the camelCase form too.
+const signedInEmployeeId = (user) => user?.employeeId ?? user?.employee_id ?? "";
+
 const canOpenExpenseFor = (adv, user) =>
-  Boolean(user?.employeeId) &&
-  String(adv.employeeId ?? "").trim().toLowerCase() === String(user.employeeId).trim().toLowerCase() &&
+  Boolean(signedInEmployeeId(user)) &&
+  String(adv.employeeId ?? "").trim().toLowerCase() === String(signedInEmployeeId(user)).trim().toLowerCase() &&
   LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
   Number(adv.outstandingBalance ?? 0) > 0;
 
@@ -97,6 +102,8 @@ export default function SettlementPage() {
   const { data: directory } = useEmployeeDirectory();
   const navigate = useNavigate();
   const [advances, setAdvances] = useState([]);
+  // Per advance: what has already been done with the balance (carry-forward or salary request), if anything.
+  const [settlementLocks, setSettlementLocks] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -237,6 +244,19 @@ export default function SettlementPage() {
       setLoading(false);
     }
   };
+
+  // Lock state for every advance on the list, so a settled-by-action advance cannot be settled again.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = advances.map((a) => a.advanceId || a.id).filter(Boolean);
+    Promise.all(ids.map((id) => loadSettlementLock(id).then((lock) => [id, lock]).catch(() => [id, { kind: null }])))
+      .then((pairs) => {
+        if (!cancelled) setSettlementLocks(Object.fromEntries(pairs));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [advances]);
 
   useEffect(() => {
     fetchSettlementAdvances();
@@ -610,8 +630,9 @@ export default function SettlementPage() {
                           {canOpenExpenseFor(adv, user) && (
                             <button
                               onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
-                              title="Create an expense report for this cash advance"
-                              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
+                              disabled={hasSubmittedLinkedReport(adv)}
+                              title={hasSubmittedLinkedReport(adv) ? "An expense report is already submitted for this advance" : "Create an expense report for this cash advance"}
+                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${hasSubmittedLinkedReport(adv) ? "border-gray-200 text-gray-400 cursor-not-allowed" : "border-indigo-200 text-indigo-700 hover:bg-indigo-50"}`}
                             >
                               <Receipt size={13} /> Cash Advance Expense
                             </button>
@@ -632,16 +653,28 @@ export default function SettlementPage() {
                                   Disburse
                                 </Button>
                               )}
-                              {!isSettled && statusUpper !== "APPROVED" && (
-                                <Button
-                                  size="sm"
-                                  variant="primary"
-                                  onClick={() => handleOpenSettle(adv)}
-                                  className="!py-1 !px-2.5 !text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
-                                >
-                                  Settle Advance
-                                </Button>
-                              )}
+                              {!isSettled && statusUpper !== "APPROVED" && (() => {
+                                const lockKind = settlementLocks[adv.advanceId || adv.id]?.kind;
+                                const locked = Boolean(lockKind);
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="primary"
+                                    onClick={() => handleOpenSettle(adv)}
+                                    disabled={locked}
+                                    title={
+                                      lockKind === SETTLEMENT_LOCK.CARRY_FORWARD
+                                        ? "Carry-forward is already set for this advance"
+                                        : lockKind === SETTLEMENT_LOCK.SALARY
+                                          ? "A salary deduction is already requested for this advance"
+                                          : undefined
+                                    }
+                                    className={`!py-1 !px-2.5 !text-[11px] text-white ${locked ? "bg-gray-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"}`}
+                                  >
+                                    Settle Advance
+                                  </Button>
+                                );
+                              })()}
                             </>
                           )}
                         </div>

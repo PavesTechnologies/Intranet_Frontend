@@ -13,11 +13,14 @@ import SettleBalancePanel from "@/pages/expense-management/pages/cash-advance/co
 import MoneyMovements from "@/pages/expense-management/pages/cash-advance/components/MoneyMovements";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
+import CashAdvanceApprovalPanel from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceApprovalPanel";
+import { canApproveAdvance } from "@/pages/expense-management/approval-engine/components/CashAdvanceApprovalsList";
 import {
   formatDate,
   formatMoney,
   getCostCenterValue,
   getStatusBadge,
+  hasSubmittedLinkedReport,
 } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 
 const APPROVALS_PATH = "/expense-management/approvals";
@@ -40,7 +43,7 @@ export default function CashAdvanceDetailPage() {
   const { advanceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { hasRole } = useAuth();
+  const { user, hasRole } = useAuth();
 
   const isApprovalView = location.pathname.startsWith(APPROVALS_PATH);
   const isSettlementView = location.pathname.startsWith(SETTLEMENT_PATH);
@@ -410,11 +413,21 @@ export default function CashAdvanceDetailPage() {
           </div>
         )}
 
+        {isApprovalView && (
+          <CashAdvanceApprovalPanel
+            advance={advance}
+            canAct={canApproveAdvance(advance, user, hasRole)}
+            onChanged={fetchAdvance}
+          />
+        )}
+
         {!isApprovalView && !isSettlementView && ["DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "SETTLEMENT_PENDING", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED"].includes(status) && Number(outstanding) > 0 && (
           <div className="pt-2">
             <Button
               variant="primary"
               onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${advance.advanceId || advance.id}`)}
+              disabled={hasSubmittedLinkedReport(advance)}
+              title={hasSubmittedLinkedReport(advance) ? "An expense report is already submitted for this advance" : undefined}
               className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               <Send size={13} className="mr-1.5" /> Stage 4: Submit Linked Expenses

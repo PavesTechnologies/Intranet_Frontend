@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
+  Eye,
   Inbox,
   Layers,
   ShieldAlert,
@@ -196,6 +198,8 @@ export default function FinancePage() {
     });
   }, [items, searchTerm, paymentFilter, directory, activeTab]);
 
+  const navigate = useNavigate();
+
   const reviewButton = (item, label, variant = "outline") => (
     <Button size="small" variant={variant} onClick={() => setReviewingReport(item)}>
       {label}
@@ -257,15 +261,25 @@ export default function FinancePage() {
       amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(adv.amount, adv.currencyCode)}</span>,
       status: <span className="text-xs text-gray-700">{(adv.status || "").replace(/_/g, " ")}</span>,
       date: formatDate(adv.neededByDate),
-      action:
-        activeTab === "PENDING" ? (
-          <div className="flex gap-1">
-            <Button size="small" variant="primary" onClick={() => setApprovingAdvance(adv)}>Approve</Button>
-            <Button size="small" variant="outline" onClick={() => setRejectingAdvance(adv)}>Reject</Button>
-          </div>
-        ) : (
-          <span className="text-xs text-gray-400">—</span>
-        ),
+      action: (
+        <div className="flex gap-1">
+          <button
+            type="button"
+            title="View"
+            aria-label="View cash advance"
+            onClick={() => navigate(`/expense-management/approvals/cash-advance/${adv.advanceId || adv.id}`)}
+            className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+          >
+            <Eye size={15} />
+          </button>
+          {activeTab === "PENDING" && (
+            <>
+              <Button size="small" variant="primary" onClick={() => setApprovingAdvance(adv)}>Approve</Button>
+              <Button size="small" variant="outline" onClick={() => setRejectingAdvance(adv)}>Reject</Button>
+            </>
+          )}
+        </div>
+      ),
     })),
   ];
 
