@@ -26,6 +26,7 @@ import {
   getNameByRoles,
   formatApiError,
 } from "./services/campaignservice";
+import { logError } from "@/pages/airs/utils/logError";
 
 const DEFAULT_CAMPAIGN_FORM = {
   jd_id: "",
@@ -148,7 +149,7 @@ export default function Campaigns() {
       setCampaigns(items);
       setHrTotalPages(Math.max(1, Math.ceil((data.total ?? items.length) / (data.page_size || CAMPAIGNS_PER_PAGE))));
     } catch (err) {
-      console.error("Failed to load campaigns:", err);
+      logError("Failed to load campaigns:", err);
       toast.error("Failed to load campaigns.");
     } finally {
       setIsLoading(false);
@@ -174,7 +175,7 @@ export default function Campaigns() {
             : [];
       setCampaigns(list);
     } catch (err) {
-      console.error("Failed to load campaigns:", err);
+      logError("Failed to load campaigns:", err);
       toast.error("Failed to load campaigns.");
     } finally {
       setIsLoading(false);

@@ -1,5 +1,6 @@
 import api from "../../../../api/axiosInstance";
 import { withOverrideReason } from "../../utils/withOverrideReason";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 const UMS_BASE_URL = window.__APP_CONFIG__.USER_MANAGEMENT_URL;
@@ -34,7 +35,7 @@ export const createCampaign = async (campaignData) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error creating campaign:", error);
+        logError("Error creating campaign:", error);
         throw error;
     }
 };
@@ -52,7 +53,7 @@ export const getAllCampaignsHrAdmin = async ({ show_closed = false, search, stat
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching campaigns:", error);
+        logError("Error fetching campaigns:", error);
         throw error;
     }
 };
@@ -72,7 +73,7 @@ export const getAllCampaigns = async (filters = {}) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching campaigns:", error);
+        logError("Error fetching campaigns:", error);
         throw error;
     }
 };
@@ -87,7 +88,7 @@ export const getCampaignsByHiringManager = async ({ show_closed = false } = {}) 
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching campaigns:", error);
+        logError("Error fetching campaigns:", error);
         throw error;
     }
 };
@@ -101,7 +102,7 @@ export const getCampaignDetails = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching campaign details:", error);
+        logError("Error fetching campaign details:", error);
         throw error;
     }
 };
@@ -115,7 +116,7 @@ export const getPipelineSummary = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching pipeline summary:", error);
+        logError("Error fetching pipeline summary:", error);
         throw error;
     }
 };
@@ -139,7 +140,7 @@ export const getCampaignInterviews = async (campaignId, filters = {}) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching campaign interviews:", error);
+        logError("Error fetching campaign interviews:", error);
         throw error;
     }
 };
@@ -156,7 +157,7 @@ export const getCampaignTimeline = async (campaignId, { limit = 20, offset = 0, 
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching campaign timeline:", error);
+        logError("Error fetching campaign timeline:", error);
         throw error;
     }
 };
@@ -170,7 +171,7 @@ export const updateCampaign = async (campaignId, payload) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error updating campaign:", error);
+        logError("Error updating campaign:", error);
         throw error;
     }
 };
@@ -186,7 +187,7 @@ export const getCampaignCandidates = async (campaignId, params) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching campaign candidates:", error);
+        logError("Error fetching campaign candidates:", error);
         throw error;
     }
 };
@@ -201,7 +202,7 @@ export const getCampaignBoard = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching campaign board:", error);
+        logError("Error fetching campaign board:", error);
         throw error;
     }
 };
@@ -215,7 +216,7 @@ export const getNameByRoles = async (roleName) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching names by roles:", error);
+        logError("Error fetching names by roles:", error);
         throw error;
     }
 };
@@ -227,7 +228,7 @@ export const getPauseSummary = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching pause summary:", error);
+        logError("Error fetching pause summary:", error);
         throw error;
     }
 };
@@ -239,7 +240,7 @@ export const getResumeSummary = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching resume summary:", error);
+        logError("Error fetching resume summary:", error);
         throw error;
     }
 };
@@ -253,7 +254,7 @@ export const getClosureSummary = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching closure summary:", error);
+        logError("Error fetching closure summary:", error);
         throw error;
     }
 };
@@ -266,7 +267,7 @@ export const closeCampaign = async (campaignId, closureReason) => {
         );
         return response.data;
     } catch (error) {
-        console.error("Error closing campaign:", error);
+        logError("Error closing campaign:", error);
         throw error;
     }
 };
@@ -280,7 +281,7 @@ export const getReopenReadiness = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching reopen readiness:", error);
+        logError("Error fetching reopen readiness:", error);
         throw error;
     }
 };
@@ -292,7 +293,7 @@ export const reopenCampaign = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error reopening campaign:", error);
+        logError("Error reopening campaign:", error);
         throw error;
     }
 };
@@ -306,7 +307,7 @@ export const getWeightPresets = async () => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching weight presets:", error);
+        logError("Error fetching weight presets:", error);
         throw error;
     }
 };
@@ -318,7 +319,7 @@ export const createWeightPreset = async (payload) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error creating weight preset:", error);
+        logError("Error creating weight preset:", error);
         throw error;
     }
 };
@@ -330,7 +331,7 @@ export const updateWeightPreset = async (presetId, payload) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error updating weight preset:", error);
+        logError("Error updating weight preset:", error);
         throw error;
     }
 };
@@ -342,7 +343,7 @@ export const deleteWeightPreset = async (presetId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error deleting weight preset:", error);
+        logError("Error deleting weight preset:", error);
         throw error;
     }
 };
@@ -356,7 +357,7 @@ export const resetScoringConfig = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error resetting scoring configuration:", error);
+        logError("Error resetting scoring configuration:", error);
         throw error;
     }
 };
@@ -370,7 +371,7 @@ export const updatePlatformDefaultWeights = async (payload) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error updating platform default weights:", error);
+        logError("Error updating platform default weights:", error);
         throw error;
     }
 };
@@ -384,7 +385,7 @@ export const getPlatformScoringDefaults = async () => {
         });
         return response.data?.data || null;
     } catch (error) {
-        console.error("Error fetching platform scoring defaults:", error);
+        logError("Error fetching platform scoring defaults:", error);
         return null;
     }
 };
@@ -398,7 +399,7 @@ export const getProcessingStatus = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching processing status:", error);
+        logError("Error fetching processing status:", error);
         throw error;
     }
 };
@@ -411,7 +412,7 @@ export const getDeadLetterQueue = async (campaignId, params) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching dead letter queue:", error);
+        logError("Error fetching dead letter queue:", error);
         throw error;
     }
 };
@@ -425,7 +426,7 @@ export const getProcessingQueue = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching processing queue:", error);
+        logError("Error fetching processing queue:", error);
         throw error;
     }
 };
@@ -438,7 +439,7 @@ export const replayDeadLetterTasks = async (campaignId, dlqIds) => {
         );
         return response.data;
     } catch (error) {
-        console.error("Error replaying dead letter tasks:", error);
+        logError("Error replaying dead letter tasks:", error);
         throw error;
     }
 };
@@ -452,7 +453,7 @@ export const getStalledCandidates = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching stalled candidates:", error);
+        logError("Error fetching stalled candidates:", error);
         throw error;
     }
 };
@@ -465,7 +466,7 @@ export const reprocessStalledCandidate = async (campaignId, campaignCandidateId)
         );
         return response.data;
     } catch (error) {
-        console.error("Error reprocessing stalled candidate:", error);
+        logError("Error reprocessing stalled candidate:", error);
         throw error;
     }
 };
@@ -478,7 +479,7 @@ export const escalateStalledCandidate = async (campaignId, campaignCandidateId, 
         );
         return response.data;
     } catch (error) {
-        console.error("Error escalating stalled candidate:", error);
+        logError("Error escalating stalled candidate:", error);
         throw error;
     }
 };
@@ -493,7 +494,7 @@ export const overrideCandidateStage = async (campaignId, campaignCandidateId, re
         ));
         return response.data;
     } catch (error) {
-        console.error("Error overriding candidate stage:", error);
+        logError("Error overriding candidate stage:", error);
         throw error;
     }
 };
@@ -506,7 +507,7 @@ export const flagCandidateForReview = async (campaignId, campaignCandidateId, re
         );
         return response.data;
     } catch (error) {
-        console.error("Error flagging candidate for review:", error);
+        logError("Error flagging candidate for review:", error);
         throw error;
     }
 };
@@ -521,7 +522,7 @@ export const getBulkUploadsForCampaign = async (campaignId, { page = 1, size = 1
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching bulk uploads for campaign:", error);
+        logError("Error fetching bulk uploads for campaign:", error);
         throw error;
     }
 };
@@ -535,7 +536,7 @@ export const getRejectionAnalytics = async (campaignId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching rejection analytics:", error);
+        logError("Error fetching rejection analytics:", error);
         throw error;
     }
 };

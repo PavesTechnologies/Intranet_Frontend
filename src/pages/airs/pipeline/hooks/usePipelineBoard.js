@@ -6,6 +6,7 @@ import { initialsFromName } from "../../candidates/utils/candidateDataUtils";
 import { PIPELINE_STAGES, PIPELINE_STAGE_LABEL } from "../constants/pipelineConstants";
 import useAirsSocket from "../../websockets/useAirsSocket";
 import { dispatchAirsEvent } from "../../websockets/airsEventDispatch";
+import { safeError } from "@/pages/airs/utils/logError";
 
 // PipelineTransitionReasonRequiredException surfaces as a 422 whose message
 // starts with "REASON_REQUIRED:" (pipeline_transition_exceptions.py).
@@ -92,7 +93,7 @@ export default function usePipelineBoard(campaignId, { canMove = false } = {}) {
       setOtherCount(data?.other_count || 0);
     } catch (err) {
       if (!silent) setError(err);
-      else console.warn("Silent board reconciliation failed; keeping last known state.", err);
+      else console.warn("Silent board reconciliation failed; keeping last known state.", safeError(err));
     } finally {
       if (!silent) setLoading(false);
     }

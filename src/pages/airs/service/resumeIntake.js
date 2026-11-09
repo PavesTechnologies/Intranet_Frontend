@@ -1,4 +1,5 @@
 import api from "../../../api/axiosInstance";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -11,7 +12,7 @@ export const activeCampaigns = async () => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching active campaigns:", error);
+        logError("Error fetching active campaigns:", error);
         throw error;
     }
 };
@@ -26,7 +27,7 @@ export const resumeUpload = async (formData) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error uploading resume:", error);
+        logError("Error uploading resume:", error);
         throw error;
     }
 };
@@ -40,7 +41,7 @@ export const pipelineStatus = async (taskId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching resume processing status:", error);
+        logError("Error fetching resume processing status:", error);
         throw error;
     }
 };
@@ -55,7 +56,7 @@ export const getAllResumes = async (filters) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching all resumes:", error);
+        logError("Error fetching all resumes:", error);
         throw error;
     }
 };
@@ -74,7 +75,7 @@ export const getResumesPipelineStatus = async (filters) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching resumes pipeline status:", error);
+        logError("Error fetching resumes pipeline status:", error);
         throw error;
     }
 };
@@ -89,7 +90,7 @@ export const resumeTimeline = async (resumeId, attemptNumber) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching resume timeline:", error);
+        logError("Error fetching resume timeline:", error);
         throw error;
     }
 };
@@ -103,7 +104,7 @@ export const getResumeById = async (resumeId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching resume by ID:", error);
+        logError("Error fetching resume by ID:", error);
         throw error;
     }
 };
@@ -120,7 +121,7 @@ export const retryResume = async (resumeId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error retrying resume:", error);
+        logError("Error retrying resume:", error);
         throw error;
     }
 };
@@ -136,7 +137,7 @@ export const replayResumeDlqEntry = async (dlqId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error replaying resume DLQ entry:", error);
+        logError("Error replaying resume DLQ entry:", error);
         throw error;
     }
 };
@@ -151,7 +152,7 @@ export const bulkUpload = async (formData) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error in bulk upload:", error);
+        logError("Error in bulk upload:", error);
         throw error;
     }
 };
@@ -167,7 +168,7 @@ export const getResumeVersions = async (candidateId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching resume versions:", error);
+        logError("Error fetching resume versions:", error);
         throw error;
     }
 };
@@ -184,7 +185,7 @@ export const getResumeDownloadUrl = async (resumeId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching resume download URL:", error);
+        logError("Error fetching resume download URL:", error);
         throw error;
     }
 };
@@ -201,7 +202,7 @@ export const compareResumeVersions = async (resumeId1, resumeId2) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error comparing resume versions:", error);
+        logError("Error comparing resume versions:", error);
         throw error;
     }
 };
@@ -215,7 +216,7 @@ export const candidateJson = async (candidateId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching candidate JSON:", error);
+        logError("Error fetching candidate JSON:", error);
         throw error;
     }
 };
@@ -229,7 +230,7 @@ export const deleteCandidate = async (candidateId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error deleting candidate:", error);
+        logError("Error deleting candidate:", error);
         throw error;
     }
 };
@@ -244,7 +245,7 @@ export const getBulkUploadJobs = async (params) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching bulk upload jobs:", error);
+        logError("Error fetching bulk upload jobs:", error);
         throw error;
     }
 };
@@ -262,7 +263,7 @@ export const getBulkUploadJobsByRecruiter = async (params) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching bulk upload jobs by recruiter:", error);
+        logError("Error fetching bulk upload jobs by recruiter:", error);
         throw error;
     }
 };
@@ -276,7 +277,7 @@ export const getBulkUploadProgress = async (bulkUploadJobId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching bulk upload progress:", error);
+        logError("Error fetching bulk upload progress:", error);
         throw error;
     }
 };
@@ -291,7 +292,7 @@ export const getBulkUploadFileLog = async (bulkUploadJobId, params) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching bulk upload file log:", error);
+        logError("Error fetching bulk upload file log:", error);
         throw error;
     }
 };
@@ -306,7 +307,7 @@ export const getBulkUploadFiles = async (bulkUploadJobId, params) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching bulk upload files:", error);
+        logError("Error fetching bulk upload files:", error);
         throw error;
     }
 };
@@ -320,7 +321,7 @@ export const getBulkUploadFileDetail = async (bulkUploadJobId, fileId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching bulk upload file detail:", error);
+        logError("Error fetching bulk upload file detail:", error);
         throw error;
     }
 };
@@ -334,7 +335,7 @@ export const getBulkUploadFileTimeline = async (bulkUploadJobId, fileId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching bulk upload file timeline:", error);
+        logError("Error fetching bulk upload file timeline:", error);
         throw error;
     }
 };
@@ -349,7 +350,7 @@ export const replayBulkUploadFile = async (bulkUploadJobId, fileId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error replaying bulk upload file:", error);
+        logError("Error replaying bulk upload file:", error);
         throw error;
     }
 };

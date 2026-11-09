@@ -14,6 +14,7 @@
 // without it. See getBrowserTimeZone() below; EditInterviewersModal's
 // flow reuses rescheduleInterview() directly, so it's covered too.
 import api from "@/api/axiosInstance";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -98,7 +99,7 @@ export const getInterviews = async (campaignCandidateId) => {
     return Array.isArray(items) ? items.map(mapApiInterviewToInternal) : [];
   } catch (error) {
     if (error?.response?.status === 404) return [];
-    console.error("Error fetching interviews:", error);
+    logError("Error fetching interviews:", error);
     throw error;
   }
 };
@@ -129,7 +130,7 @@ export const scheduleInterview = async (campaignCandidateId, payload) => {
     );
     return mapApiInterviewToInternal(response.data?.data || {});
   } catch (error) {
-    console.error("Error scheduling interview:", error);
+    logError("Error scheduling interview:", error);
     throw error;
   }
 };
@@ -155,7 +156,7 @@ export const rescheduleInterview = async (interviewId, payload) => {
     );
     return mapApiInterviewToInternal(response.data?.data || {});
   } catch (error) {
-    console.error("Error rescheduling interview:", error);
+    logError("Error rescheduling interview:", error);
     throw error;
   }
 };
@@ -169,7 +170,7 @@ export const cancelInterview = async (interviewId, reason) => {
     );
     return mapApiInterviewToInternal(response.data?.data || {});
   } catch (error) {
-    console.error("Error cancelling interview:", error);
+    logError("Error cancelling interview:", error);
     throw error;
   }
 };
@@ -196,7 +197,7 @@ export const getRoundFeedback = async (campaignCandidateId, interviewId) => {
     const items = Array.isArray(response.data) ? response.data : response.data?.data;
     return Array.isArray(items) ? items.map(mapFeedbackEntry) : [];
   } catch (error) {
-    console.error("Error fetching round feedback:", error);
+    logError("Error fetching round feedback:", error);
     throw error;
   }
 };
@@ -211,7 +212,7 @@ export const requestFeedback = async (interviewId) => {
     const body = response.data?.data ?? response.data ?? {};
     return body.queued_count ?? 0;
   } catch (error) {
-    console.error("Error requesting feedback:", error);
+    logError("Error requesting feedback:", error);
     throw error;
   }
 };
@@ -224,7 +225,7 @@ export const completeInterview = async (interviewId) => {
     const body = response.data?.data ?? response.data ?? {};
     return { status: body.status, feedbackQueuedCount: body.feedback_queued_count ?? 0 };
   } catch (error) {
-    console.error("Error completing interview:", error);
+    logError("Error completing interview:", error);
     throw error;
   }
 };

@@ -1,4 +1,5 @@
 import api from "../../../../api/axiosInstance";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -63,7 +64,7 @@ export const searchTalentPoolCandidates = async ({
         });
         return response.data;
     } catch (error) {
-        console.error("Error searching talent pool candidates:", error);
+        logError("Error searching talent pool candidates:", error);
         throw error;
     }
 };
@@ -129,7 +130,7 @@ export const semanticSearchTalentPoolCandidates = async ({
         );
         return response.data;
     } catch (error) {
-        console.error("Error running talent pool semantic search:", error);
+        logError("Error running talent pool semantic search:", error);
         throw error;
     }
 };
@@ -145,7 +146,7 @@ export const getTalentPoolFilters = async () => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching talent pool filter options:", error);
+        logError("Error fetching talent pool filter options:", error);
         throw error;
     }
 };
@@ -157,7 +158,7 @@ export const getTalentPoolCandidateProfile = async (candidateId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching talent pool candidate profile:", error);
+        logError("Error fetching talent pool candidate profile:", error);
         throw error;
     }
 };
@@ -173,7 +174,7 @@ export const addTalentPoolCandidateToCampaign = async (candidateId, campaignId) 
         );
         return response.data;
     } catch (error) {
-        console.error("Error adding talent pool candidate to campaign:", error);
+        logError("Error adding talent pool candidate to campaign:", error);
         throw error;
     }
 };
@@ -189,7 +190,7 @@ export const bulkAddTalentPoolCandidatesToCampaign = async (campaignId, candidat
         );
         return response.data;
     } catch (error) {
-        console.error("Error bulk-adding talent pool candidates to campaign:", error);
+        logError("Error bulk-adding talent pool candidates to campaign:", error);
         throw error;
     }
 };

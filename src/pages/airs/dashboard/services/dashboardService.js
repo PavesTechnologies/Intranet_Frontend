@@ -1,4 +1,5 @@
 import api from "../../../../api/axiosInstance";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -11,7 +12,7 @@ export const getDashboardStats = async () => {
         const response = await api.get(`${BASE_URL}/dashboard/stats`, { headers: authHeaders() });
         return response.data;
     } catch (error) {
-        console.error("Error fetching dashboard stats:", error);
+        logError("Error fetching dashboard stats:", error);
         throw error;
     }
 };
@@ -24,7 +25,7 @@ export const getHiringFunnel = async (days = 30) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching hiring funnel:", error);
+        logError("Error fetching hiring funnel:", error);
         throw error;
     }
 };
@@ -37,7 +38,7 @@ export const getTopCandidates = async (limit = 5) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching top candidates:", error);
+        logError("Error fetching top candidates:", error);
         throw error;
     }
 };
@@ -50,7 +51,7 @@ export const getDashboardNotifications = async (limit = 10) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching dashboard notifications:", error);
+        logError("Error fetching dashboard notifications:", error);
         throw error;
     }
 };

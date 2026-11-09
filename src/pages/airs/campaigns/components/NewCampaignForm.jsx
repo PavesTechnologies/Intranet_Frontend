@@ -5,6 +5,7 @@ import FormInput from "../../../../components/forms/FormInput";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import usePromptTemplateLookup from "../../prompt-templates/hooks/usePromptTemplateLookup";
 import { getNameByRoles } from "../services/campaignservice";
+import { logError } from "@/pages/airs/utils/logError";
 
 const LABEL_CLASS = "text-[10px] uppercase font-bold text-slate-400 block mb-1.5";
 
@@ -34,7 +35,7 @@ export default function NewCampaignForm({
                 setHiringManager(hmData);
                 setRecruiter(recData);
             } catch (error) {
-                console.error("Error fetching names by roles:", error);
+                logError("Error fetching names by roles:", error);
             }
         };
         fetchNamesByRoles();

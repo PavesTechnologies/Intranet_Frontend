@@ -35,6 +35,7 @@ import GenericTable from "../../../components/Table/table";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import JdForm from "./JdForm";
 import JdProcessingList from "./JdProcessingList";
+import { logError } from "@/pages/airs/utils/logError";
 
 
 const statusOptions = [
@@ -440,7 +441,7 @@ export default function JdLibrary() {
       toast.success("Job Descriptions exported successfully.");
 
     } catch (error) {
-      console.error(error);
+      logError("Error:", error);
 
       toast.error(
         error?.response?.data?.message ||

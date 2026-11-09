@@ -45,6 +45,7 @@ import {
   SuggestionTabsSection,
 } from "../skill-ontology/UnknownSkillDetailPage";
 import { bulkApproveUnknownSkills, bulkDeleteUnknownSkills } from "../skill-ontology/services/skillOntologyService";
+import { logError } from "@/pages/airs/utils/logError";
 
 const DEFAULT_CAMPAIGN_FORM = {
   name: "",
@@ -213,7 +214,7 @@ export default function JdDetails() {
 
       toast.success("Job Description downloaded successfully.");
     } catch (error) {
-      console.error(error);
+      logError("Error:", error);
       toast.error("Failed to download Job Description.");
     } finally {
       setIsDownloading(false);
@@ -262,7 +263,7 @@ export default function JdDetails() {
 
       toast.success("Job Description exported successfully.");
     } catch (error) {
-      console.error(error);
+      logError("Error:", error);
       toast.error("Failed to export Job Description.");
     } finally {
       setIsExporting(false);
@@ -342,7 +343,7 @@ export default function JdDetails() {
         setDbCampaigns(res.data);
       }
     } catch (err) {
-      console.error("Failed to load campaigns:", err);
+      logError("Failed to load campaigns:", err);
       toast.error("Failed to load campaigns.");
     } finally {
       setIsLoadingCampaigns(false);
@@ -367,7 +368,7 @@ export default function JdDetails() {
         setJdSkillsData(res.data);
       }
     } catch (err) {
-      console.error("Failed to load JD skills:", err);
+      logError("Failed to load JD skills:", err);
     } finally {
       setIsLoadingSkills(false);
     }
@@ -382,7 +383,7 @@ export default function JdDetails() {
         setJdUnknownSkillsData(res.data);
       }
     } catch (err) {
-      console.error("Failed to load JD unknown skills:", err);
+      logError("Failed to load JD unknown skills:", err);
     } finally {
       setIsLoadingUnknownSkills(false);
     }

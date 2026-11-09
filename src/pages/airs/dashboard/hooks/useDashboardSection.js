@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { logError } from "@/pages/airs/utils/logError";
 
 // Each dashboard section owns its own fetch so a failure in one never blanks
 // the page, and each can be retried independently.
@@ -24,7 +25,7 @@ export default function useDashboardSection(fetcher, deps = []) {
       hasDataRef.current = true;
       setData(result);
     } catch (err) {
-      console.error("Dashboard section failed to load:", err);
+      logError("Dashboard section failed to load:", err);
       setError(err);
     } finally {
       setLoading(false);

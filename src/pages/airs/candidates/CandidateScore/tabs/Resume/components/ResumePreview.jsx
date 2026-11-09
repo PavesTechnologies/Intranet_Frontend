@@ -5,6 +5,7 @@ import { renderAsync } from "docx-preview";
 import { saveAs } from "file-saver";
 import Button from "@/components/Button/Button";
 import { sanitizeRenderedDocx } from "./sanitizeRenderedDocx";
+import { logError } from "@/pages/airs/utils/logError";
 
 // Set up the PDF.js worker using unpkg CDN matching the current version of pdfjs
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -87,7 +88,7 @@ export default function ResumePreview({ file, onExpired }) {
       })
       .catch((err) => {
         if (!active) return;
-        console.error("DOCX rendering error:", err);
+        logError("DOCX rendering error:", err);
         setError("Failed to render DOCX preview content");
       });
     return () => {
@@ -102,7 +103,7 @@ export default function ResumePreview({ file, onExpired }) {
   };
 
   const onDocumentLoadError = (err) => {
-    console.error("PDF load error:", err);
+    logError("PDF load error:", err);
     onExpired?.();
     setError("Failed to load PDF. The preview link may have expired. Retrying...");
     setLoading(false);
@@ -120,7 +121,7 @@ export default function ResumePreview({ file, onExpired }) {
       const blob = await res.blob();
       saveAs(blob, file.name);
     } catch (err) {
-      console.error("Download failed:", err);
+      logError("Download failed:", err);
       // Fallback: Open in new tab
       window.open(file.url, "_blank");
     }

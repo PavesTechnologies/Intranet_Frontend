@@ -4,6 +4,7 @@
 // try/catch/throw shape.
 
 import api from "../../../../api/axiosInstance";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -108,7 +109,7 @@ export const getUnknownSkills = async (params = {}) => {
         total: payload.total ?? items.length,
       });
     } catch (error) {
-      console.error("Error fetching unknown skills:", error);
+      logError("Error fetching unknown skills:", error);
       throw error;
     }
   });
@@ -157,7 +158,7 @@ export const deleteUnknownSkill = async (unknownSkillId, payload = {}) => {
     });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
-    console.error("Error deleting unknown skill:", error);
+    logError("Error deleting unknown skill:", error);
     throw error;
   }
 };
@@ -173,7 +174,7 @@ export const dismissUnknownSkill = async (unknownSkillId, confirmCore = false) =
     });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
-    console.error("Error dismissing unknown skill:", error);
+    logError("Error dismissing unknown skill:", error);
     throw error;
   }
 };
@@ -186,7 +187,7 @@ export const getUnknownSkillJds = async (unknownSkillId) => {
     const response = await api.get(`${BASE_URL}/skills/unknown/${unknownSkillId}/jds`, { headers: authHeaders() });
     return response.data?.data || [];
   } catch (error) {
-    console.error("Error loading JDs for unknown skill:", error);
+    logError("Error loading JDs for unknown skill:", error);
     throw error;
   }
 };
@@ -204,7 +205,7 @@ export const bulkApproveUnknownSkills = async (unknownSkillIds) => {
     const response = await api.post(url, body, { headers: authHeaders() });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
-    console.error("Error bulk approving unknown skills:", error);
+    logError("Error bulk approving unknown skills:", error);
     throw error;
   }
 };
@@ -219,7 +220,7 @@ export const bulkDeleteUnknownSkills = async (unknownSkillIds) => {
     const response = await api.post(url, body, { headers: authHeaders() });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
-    console.error("Error bulk deleting unknown skills:", error);
+    logError("Error bulk deleting unknown skills:", error);
     throw error;
   }
 };
@@ -241,7 +242,7 @@ export const resolveUnknownSkill = async (unknownSkillId, payload) => {
     const response = await api.post(url, body, { headers: authHeaders() });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
-    console.error("Error resolving unknown skill:", error);
+    logError("Error resolving unknown skill:", error);
     throw error;
   }
 };
@@ -264,7 +265,7 @@ export const createCanonicalSkillFromUnknown = async (unknownSkillId, payload) =
     const response = await api.post(url, body, { headers: authHeaders() });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
-    console.error("Error creating canonical skill from unknown skill:", error);
+    logError("Error creating canonical skill from unknown skill:", error);
     throw error;
   }
 };
@@ -285,7 +286,7 @@ export const getUnknownSkillSuggestions = async (unknownSkillId, suggestionType,
       const isAlias = isAliasSuggestionType(suggestionType);
       return ok(items.map((raw) => mapSuggestion(raw, isAlias)));
     } catch (error) {
-      console.error(`Error fetching ${suggestionType} suggestions:`, error);
+      logError(`Error fetching ${suggestionType} suggestions:`, error);
       throw error;
     }
   });
@@ -320,7 +321,7 @@ export const getSkills = async (params = {}) => {
         total: payload.total ?? 0,
       });
     } catch (error) {
-      console.error("Error fetching skills:", error);
+      logError("Error fetching skills:", error);
       throw error;
     }
   });
@@ -331,7 +332,7 @@ export const getSkill = async (skillId) => {
     const response = await api.get(`${BASE_URL}/skill-ontology/${skillId}`, { headers: authHeaders() });
     return ok(mapApiSkillToInternal(response.data?.data || {}));
   } catch (error) {
-    console.error("Error fetching skill:", error);
+    logError("Error fetching skill:", error);
     throw error;
   }
 };
@@ -354,7 +355,7 @@ export const createSkill = async (payload) => {
     );
     return ok(mapApiSkillToInternal(response.data?.data || {}));
   } catch (error) {
-    console.error("Error creating skill:", error);
+    logError("Error creating skill:", error);
     throw error;
   }
 };
@@ -388,7 +389,7 @@ export const updateSkill = async (skillId, payload) => {
     );
     return ok(mapApiSkillToInternal(response.data?.data || {}));
   } catch (error) {
-    console.error("Error updating skill:", error);
+    logError("Error updating skill:", error);
     throw error;
   }
 };
@@ -406,7 +407,7 @@ export const updateSkillStatus = async (skillId, isActive, childHandling) => {
     );
     return ok(response.data?.data || { id: skillId, is_active: isActive });
   } catch (error) {
-    console.error("Error updating skill status:", error);
+    logError("Error updating skill status:", error);
     throw error;
   }
 };
@@ -424,7 +425,7 @@ export const getCategories = async () => {
       const items = response.data?.data || [];
       return ok([...items].sort((a, b) => a.category.localeCompare(b.category)));
     } catch (error) {
-      console.error("Error fetching skill categories:", error);
+      logError("Error fetching skill categories:", error);
       throw error;
     }
   });
@@ -441,7 +442,7 @@ export const searchParents = async (query) => {
     const items = response.data?.data || [];
     return ok(items.map((p) => ({ id: p.id, canonicalName: p.canonical_name })));
   } catch (error) {
-    console.error("Error searching parent skills:", error);
+    logError("Error searching parent skills:", error);
     throw error;
   }
 };
@@ -483,7 +484,7 @@ export const validateImportFile = async (file) => {
     });
     return ok(mapValidationResult(response.data?.data || response.data || {}));
   } catch (error) {
-    console.error("Error validating import file:", error);
+    logError("Error validating import file:", error);
     throw error;
   }
 };
@@ -500,7 +501,7 @@ export const importSkills = async (file, onUploadProgress) => {
     });
     return ok(mapImportResult(response.data?.data || response.data || {}));
   } catch (error) {
-    console.error("Error importing skills:", error);
+    logError("Error importing skills:", error);
     throw error;
   }
 };
@@ -514,7 +515,7 @@ export const getImportErrorReport = async (importId) => {
     });
     return response;
   } catch (error) {
-    console.error("Error downloading import error report:", error);
+    logError("Error downloading import error report:", error);
     throw error;
   }
 };
@@ -528,7 +529,7 @@ export const getSkillHierarchy = async () => {
     const items = payload?.items || payload || [];
     return ok({ items: items.map(mapHierarchyNode) });
   } catch (error) {
-    console.error("Error fetching skill hierarchy:", error);
+    logError("Error fetching skill hierarchy:", error);
     throw error;
   }
 };
@@ -541,7 +542,7 @@ export const getSkillChildren = async (skillId) => {
     const items = payload?.items || payload || [];
     return ok({ items: items.map(mapHierarchyNode) });
   } catch (error) {
-    console.error("Error fetching child skills:", error);
+    logError("Error fetching child skills:", error);
     throw error;
   }
 };
@@ -561,7 +562,7 @@ export const exportSkills = async (params = {}) => {
     });
     return response;
   } catch (error) {
-    console.error("Error exporting skills:", error);
+    logError("Error exporting skills:", error);
     throw error;
   }
 };

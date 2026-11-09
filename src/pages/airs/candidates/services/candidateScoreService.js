@@ -1,4 +1,5 @@
 import api from "../../../../api/axiosInstance";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -16,7 +17,7 @@ export const getParsedResume = async (campaignCandidateId) => {
     });
     return response.data;
   } catch (error) {
-    console.error("Error fetching parsed resume:", error);
+    logError("Error fetching parsed resume:", error);
     throw error;
   }
 };
@@ -32,7 +33,7 @@ export const getDeterministicScoreBreakdown = async (campaignCandidateId) => {
     });
     return response.data;
   } catch (error) {
-    console.error("Error fetching deterministic score breakdown:", error);
+    logError("Error fetching deterministic score breakdown:", error);
     throw error;
   }
 };
@@ -48,7 +49,7 @@ export const getSemanticScoreBreakdown = async (campaignCandidateId) => {
     });
     return response.data;
   } catch (error) {
-    console.error("Error fetching semantic score breakdown:", error);
+    logError("Error fetching semantic score breakdown:", error);
     throw error;
   }
 };
@@ -64,7 +65,7 @@ export const getAiEvaluationBreakdown = async (campaignCandidateId) => {
     });
     return response.data;
   } catch (error) {
-    console.error("Error fetching AI evaluation breakdown:", error);
+    logError("Error fetching AI evaluation breakdown:", error);
     throw error;
   }
 };
@@ -80,7 +81,7 @@ export const getCompositeScoreBreakdown = async (campaignCandidateId) => {
     });
     return response.data;
   } catch (error) {
-    console.error("Error fetching composite score breakdown:", error);
+    logError("Error fetching composite score breakdown:", error);
     throw error;
   }
 };
@@ -102,7 +103,7 @@ export const sendRejectionEmail = async (campaignCandidateId) => {
     );
     return response.data;
   } catch (error) {
-    console.error("Error sending rejection email:", error);
+    logError("Error sending rejection email:", error);
     throw error;
   }
 };
@@ -125,7 +126,7 @@ export const sendSelectionEmail = async (campaignCandidateId) => {
     );
     return response.data;
   } catch (error) {
-    console.error("Error sending selection email:", error);
+    logError("Error sending selection email:", error);
     throw error;
   }
 };
@@ -149,7 +150,7 @@ export const bulkSendRejectionEmail = async (campaignCandidateIds) => {
     );
     return response.data;
   } catch (error) {
-    console.error("Error bulk-sending rejection emails:", error);
+    logError("Error bulk-sending rejection emails:", error);
     throw error;
   }
 };

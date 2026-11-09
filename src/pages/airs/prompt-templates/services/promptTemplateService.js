@@ -4,6 +4,7 @@
 // GET de-duplication; callers (hooks/pages) own toasts.
 
 import api from "../../../../api/axiosInstance";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -56,7 +57,7 @@ export const getPromptTemplates = async (params = {}) => {
         total: payload.total ?? 0,
       });
     } catch (error) {
-      console.error("Error fetching prompt templates:", error);
+      logError("Error fetching prompt templates:", error);
       throw error;
     }
   });
@@ -67,7 +68,7 @@ export const getPromptTemplate = async (id) => {
     const response = await api.get(`${BASE_URL}/prompt-templates/${id}`, { headers: authHeaders() });
     return ok(mapApiPromptTemplateToInternal(response.data?.data || {}));
   } catch (error) {
-    console.error("Error fetching prompt template:", error);
+    logError("Error fetching prompt template:", error);
     throw error;
   }
 };
@@ -87,7 +88,7 @@ export const createPromptTemplate = async (payload) => {
     );
     return ok(mapApiPromptTemplateToInternal(response.data?.data || {}));
   } catch (error) {
-    console.error("Error creating prompt template:", error);
+    logError("Error creating prompt template:", error);
     throw error;
   }
 };
@@ -106,7 +107,7 @@ export const updatePromptTemplate = async (id, payload) => {
     );
     return ok(mapApiPromptTemplateToInternal(response.data?.data || {}));
   } catch (error) {
-    console.error("Error updating prompt template:", error);
+    logError("Error updating prompt template:", error);
     throw error;
   }
 };
@@ -116,7 +117,7 @@ export const deletePromptTemplate = async (id) => {
     const response = await api.delete(`${BASE_URL}/prompt-templates/${id}`, { headers: authHeaders() });
     return ok(response.data?.data || { id });
   } catch (error) {
-    console.error("Error deleting prompt template:", error);
+    logError("Error deleting prompt template:", error);
     throw error;
   }
 };
@@ -137,7 +138,7 @@ const getPromptTemplateLookup = async (taskTypeSlug) => {
       const items = Array.isArray(response.data) ? response.data : response.data?.data || [];
       return ok(items.map(mapLookupItem));
     } catch (error) {
-      console.error(`Error fetching ${taskTypeSlug} prompt template lookup:`, error);
+      logError(`Error fetching ${taskTypeSlug} prompt template lookup:`, error);
       throw error;
     }
   });

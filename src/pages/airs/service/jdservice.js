@@ -1,5 +1,6 @@
 import { toast } from "react-toastify";
 import api from "../../../api/axiosInstance";
+import { logError } from "@/pages/airs/utils/logError";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -16,7 +17,7 @@ export const getAllJDs = async (params) => {
         toast.success(response.data?.message || "Job descriptions fetched successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error fetching JDs:", error);
+        logError("Error fetching JDs:", error);
         toast.error(getErrorMessage(error, "Failed to fetch job descriptions."));
         throw error
     }
@@ -32,7 +33,7 @@ export const createJD = async (payload) => {
         toast.success(response.data?.message || "Job description created successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error creating JD:", error);
+        logError("Error creating JD:", error);
         toast.error(getErrorMessage(error, "Failed to create job description."));
         throw error;
     }
@@ -55,7 +56,7 @@ export const createJDFromFile = async (file, fields = {}) => {
         toast.success(response.data?.message || "Job description created from file successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error creating JD from file:", error);
+        logError("Error creating JD from file:", error);
         toast.error(getErrorMessage(error, "Failed to create job description from file."));
         throw error;
     }
@@ -71,7 +72,7 @@ export const getJDById = async (jdId) => {
         toast.success(response.data?.message || "Job description fetched successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error fetching JD:", error);
+        logError("Error fetching JD:", error);
         toast.error(getErrorMessage(error, "Failed to fetch job description."));
         throw error
     }
@@ -87,7 +88,7 @@ export const deleteJDById = async (jdId) => {
         toast.success(response.data?.message || "Job description deleted successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error deleting JD: ", error);
+        logError("Error deleting JD: ", error);
         toast.error(getErrorMessage(error, "Failed to delete job description."));
         throw error
     }
@@ -103,7 +104,7 @@ export const updateJDById = async (jdId, updatedData) => {
         toast.success(response.data?.message || "Job description updated successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error updating JD:", error);
+        logError("Error updating JD:", error);
         toast.error(getErrorMessage(error, "Failed to update job description."));
         throw error;
     }
@@ -126,7 +127,7 @@ export const updateJDFromFile = async (jdId, file, fields = {}) => {
         toast.success(response.data?.message || "Job description updated from file successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error updating JD from file:", error);
+        logError("Error updating JD from file:", error);
         toast.error(getErrorMessage(error, "Failed to update job description from file."));
         throw error;
     }
@@ -143,7 +144,7 @@ export const viewJDFile = async (jdId) => {
         toast.success("Job description file loaded successfully.");
         return response;
     } catch (error) {
-        console.error("Error viewing JD file:", error);
+        logError("Error viewing JD file:", error);
         toast.error(getErrorMessage(error, "Failed to view job description file."));
         throw error;
     }
@@ -160,7 +161,7 @@ export const exportSingleJD = async (jdId) => {
         toast.success("Job description exported successfully.");
         return response;
     } catch (error) {
-        console.error("Error exporting JD:", error);
+        logError("Error exporting JD:", error);
         toast.error(getErrorMessage(error, "Failed to export job description."));
         throw error;
     }
@@ -181,7 +182,7 @@ export const exportJDs = async (params) => {
         toast.success("Job descriptions exported successfully.");
         return response;
     } catch (error) {
-        console.error("Error exporting JDs:", error);
+        logError("Error exporting JDs:", error);
         toast.error(getErrorMessage(error, "Failed to export job descriptions."));
         throw error;
     }
@@ -197,7 +198,7 @@ export const downloadJDById = async (jdId) => {
         });
         return response;
     } catch (error) {
-        console.error("Error downloading JD:", error);
+        logError("Error downloading JD:", error);
         toast.error(getErrorMessage(error, "Failed to download job description."));
         throw error;
     }
@@ -213,7 +214,7 @@ export const getMyJDUploads = async () => {
         toast.success(response.data?.message || "JD uploads fetched successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error fetching JD uploads:", error);
+        logError("Error fetching JD uploads:", error);
         toast.error(getErrorMessage(error, "Failed to fetch JD uploads."));
         throw error;
     }
@@ -234,7 +235,7 @@ export const retryJDProcessingTask = async (taskId) => {
         toast.info(response.data?.message || "Retry queued.");
         return response.data;
     } catch (error) {
-        console.error("Error retrying JD processing task:", error);
+        logError("Error retrying JD processing task:", error);
         const status = error?.response?.status;
         if (status === 409) {
             toast.error(getErrorMessage(error, "This upload can't be retried — please upload the file again."));
@@ -259,7 +260,7 @@ export const getJDProcessingStatus = async (taskId) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching JD processing status:", error);
+        logError("Error fetching JD processing status:", error);
         throw error;
     }
 };
@@ -274,7 +275,7 @@ export const deleteJDProcessingTask = async (taskId) => {
         toast.success(response.data?.message || "Processing task deleted successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error deleting JD processing task:", error);
+        logError("Error deleting JD processing task:", error);
         toast.error(getErrorMessage(error, "Failed to delete processing task."));
         throw error;
     }
@@ -290,7 +291,7 @@ export const getJDSkills = async (jdId) => {
         toast.success(response.data?.message || "JD skills fetched successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error fetching JD skills:", error);
+        logError("Error fetching JD skills:", error);
         toast.error(getErrorMessage(error, "Failed to fetch JD skills."));
         throw error;
     }
@@ -310,7 +311,7 @@ export const updateJDSkill = async (jdSkillId, { mandatory, importance }) => {
         toast.success(response.data?.message || "JD skill updated.");
         return response.data;
     } catch (error) {
-        console.error("Error updating JD skill:", error);
+        logError("Error updating JD skill:", error);
         toast.error(getErrorMessage(error, "Failed to update JD skill."));
         throw error;
     }
@@ -326,7 +327,7 @@ export const removeJDSkill = async (jdSkillId) => {
         toast.success(response.data?.message || "Skill removed from JD.");
         return response.data;
     } catch (error) {
-        console.error("Error removing JD skill:", error);
+        logError("Error removing JD skill:", error);
         toast.error(getErrorMessage(error, "Failed to remove skill from JD."));
         throw error;
     }
@@ -342,7 +343,7 @@ export const getEducationOptions = async () => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error fetching education options:", error);
+        logError("Error fetching education options:", error);
         return null;
     }
 };
@@ -357,7 +358,7 @@ export const getJDUnknownSkills = async (jdId) => {
         toast.success(response.data?.message || "JD unknown skills fetched successfully.");
         return response.data;
     } catch (error) {
-        console.error("Error fetching JD unknown skills:", error);
+        logError("Error fetching JD unknown skills:", error);
         toast.error(getErrorMessage(error, "Failed to fetch JD unknown skills."));
         throw error;
     }
@@ -374,7 +375,7 @@ export const getJDCalibration = async (jdId) => {
         const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/calibration`, { headers: authHeader() });
         return response.data?.data ?? response.data;
     } catch (error) {
-        console.error("Error fetching JD calibration:", error);
+        logError("Error fetching JD calibration:", error);
         toast.error(getErrorMessage(error, "Failed to load the JD calibration."));
         throw error;
     }
@@ -389,7 +390,7 @@ export const saveJDCalibration = async (jdId, payload) => {
         toast.success(response.data?.message || "JD calibrated.");
         return response.data?.data ?? response.data;
     } catch (error) {
-        console.error("Error saving JD calibration:", error);
+        logError("Error saving JD calibration:", error);
         toast.error(getErrorMessage(error, "Failed to save the JD calibration."));
         throw error;
     }
@@ -401,7 +402,7 @@ export const getJDCalibrationVersions = async (jdId) => {
         const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/calibration/versions`, { headers: authHeader() });
         return response.data?.data ?? response.data ?? [];
     } catch (error) {
-        console.error("Error fetching JD calibration history:", error);
+        logError("Error fetching JD calibration history:", error);
         return [];
     }
 };
@@ -413,7 +414,7 @@ export const getJDUnknownSkillSuggestions = async (jdId) => {
         const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/unknown-skills/suggestions`, { headers: authHeader() });
         return response.data?.data ?? response.data ?? [];
     } catch (error) {
-        console.error("Error fetching unknown-skill suggestions:", error);
+        logError("Error fetching unknown-skill suggestions:", error);
         return [];
     }
 };
@@ -428,7 +429,7 @@ export const resolveJDUnknownSkill = async (jdId, unknownSkillId, payload) => {
         toast.success(response.data?.message || "Resolved.");
         return response.data?.data ?? response.data;
     } catch (error) {
-        console.error("Error resolving unknown skill:", error);
+        logError("Error resolving unknown skill:", error);
         toast.error(getErrorMessage(error, "Failed to resolve the unknown skill."));
         throw error;
     }
@@ -443,7 +444,7 @@ export const addJDCalibrationSkill = async (jdId, payload) => {
         toast.success(response.data?.message || "Skill added.");
         return response.data?.data ?? response.data;
     } catch (error) {
-        console.error("Error adding calibration skill:", error);
+        logError("Error adding calibration skill:", error);
         toast.error(getErrorMessage(error, "Failed to add the skill."));
         throw error;
     }
@@ -457,7 +458,7 @@ export const removeJDCalibrationSkill = async (jdId, jdSkillId) => {
         toast.success(response.data?.message || "Skill removed.");
         return response.data?.data ?? response.data;
     } catch (error) {
-        console.error("Error removing calibration skill:", error);
+        logError("Error removing calibration skill:", error);
         toast.error(getErrorMessage(error, "Failed to remove the skill."));
         throw error;
     }
