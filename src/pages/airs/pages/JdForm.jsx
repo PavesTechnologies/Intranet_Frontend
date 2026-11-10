@@ -209,7 +209,6 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
     if (!jurisdiction) newErrors.jurisdiction = "Jurisdiction is required.";
     if (!promptTemplateId) newErrors.promptTemplateId = "Please select a JD Parsing Prompt.";
     if (minExperienceYears === "") newErrors.minExperienceYears = "Minimum experience is required.";
-    if (maxExperienceYears === "") newErrors.maxExperienceYears = "Maximum experience is required.";
     if (noticePeriod === "") newErrors.noticePeriod = "Notice period is required.";
     if (!educationDegree.trim()) newErrors.educationDegree = "Education degree is required.";
     if (!educationField.trim()) newErrors.educationField = "Education field is required.";
@@ -402,11 +401,14 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
           />
         </FormField>
 
-        <FormField label="Max Experience (Years)" required error={errors.maxExperienceYears}>
+        {/* Optional: a maximum correlates with age, so it is informational only - never used to
+            reject or rank a candidate. */}
+        <FormField label="Max Experience (Years, optional)" error={errors.maxExperienceYears}>
           <input
             type="number"
             min="0"
-            placeholder="e.g. 5"
+            placeholder="No maximum"
+            title="Optional. Never used to reject or rank candidates."
             value={maxExperienceYears}
             onChange={(e) => {
               setMaxExperienceYears(e.target.value);
