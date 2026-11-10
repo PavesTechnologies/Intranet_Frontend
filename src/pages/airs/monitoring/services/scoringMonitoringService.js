@@ -43,3 +43,17 @@ export const saveFairnessMinGroupSize = async (minGroupSize) => {
     { headers: authHeaders() });
   return unwrap(response.data);
 };
+
+// Emails stuck in SENDING (delivery unknown): [{ id, trigger_event, recipient_type, minutes, provider_message_id, ... }]
+export const getStuckEmails = async () => {
+  const response = await api.get(`${BASE_URL}/monitoring/stuck-emails`, { headers: authHeaders() });
+  const data = unwrap(response.data);
+  return Array.isArray(data) ? data : [];
+};
+
+// outcome: "SENT" (delivered, per the email provider) | "FAILED" (not delivered). Audited; sends nothing.
+export const resolveStuckEmail = async (notificationId, outcome, note) => {
+  const response = await api.post(`${BASE_URL}/monitoring/stuck-emails/${notificationId}/resolve`,
+    { outcome, note: note || undefined }, { headers: authHeaders() });
+  return unwrap(response.data);
+};
