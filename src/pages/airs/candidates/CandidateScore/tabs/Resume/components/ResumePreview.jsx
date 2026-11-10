@@ -6,9 +6,11 @@ import { saveAs } from "file-saver";
 import Button from "@/components/Button/Button";
 import { sanitizeRenderedDocx } from "./sanitizeRenderedDocx";
 import { logError } from "@/pages/airs/utils/logError";
+// The PDF.js worker is bundled with the app (F-8), never fetched from a CDN at run time: no third-party
+// script runs with the reviewer's session, and it is always the pdfjs-dist version react-pdf uses.
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-// Set up the PDF.js worker using unpkg CDN matching the current version of pdfjs
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 export default function ResumePreview({ file, onExpired }) {
   const [numPages, setNumPages] = useState(file.pageCount || 1);
