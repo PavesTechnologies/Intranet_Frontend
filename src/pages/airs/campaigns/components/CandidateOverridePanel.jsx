@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { RotateCcw, ShieldCheck, Undo2 } from "lucide-react";
+import { ShieldCheck, Undo2 } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import ReasonModal from "./ReasonModal";
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
-  applyHrOverride,
   clearOverride,
   getRejectionHistory,
 } from "../services/candidateActionsService";
 
-// Which action is offered comes from the candidate's state, not a toggle: the
-// two are never both valid. A REJECTED candidate can be overridden; an override
-// that has not yet produced a new outcome can be cleared.
+// Overriding a rejection here was removed before launch: outcomes are overridden only through
+// stage moves with a reason code. What's left: clearing an HR override recorded earlier (while the
+// candidate is still in screening) and the decision history.
 export default function CandidateOverridePanel({ candidate, onChanged }) {
   const { hasRole } = useAuth();
   const isHrAdmin = hasRole(["HR_ADMIN"]);
@@ -38,14 +37,13 @@ export default function CandidateOverridePanel({ candidate, onChanged }) {
   if (!candidate?.id || !isHrAdmin) return null;
 
   const stage = (candidate.pipelineStage || candidate.stage || "").toUpperCase();
-  const canOverride = stage === "REJECTED" && !candidate.hrOverride;
   // The server only permits clearing while the candidate is still in SCREENING
   // Past that the override has produced a real outcome. Mirrored here so we
   // don't offer a button that is guaranteed to 409.
   const canClear = candidate.hrOverride && stage === "SCREENING";
 
   // Nothing to act on AND nothing to show — stay out of the way entirely.
-  if (!canOverride && !canClear && history.length === 0) return null;
+  if (!canClear && history.length === 0) return null;
 
 
   return (
@@ -53,19 +51,6 @@ export default function CandidateOverridePanel({ candidate, onChanged }) {
       <h3 className="text-xs font-bold text-slate-900 flex items-center gap-2 mb-2">
         <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> HR Override
       </h3>
-
-      {canOverride && (
-        <>
-          <p className="text-[11px] text-slate-600 mb-2">
-            This candidate was rejected automatically. An override returns them to screening and
-            re-runs the remaining scoring pipeline. Available only for deterministic or semantic
-            rejections.
-          </p>
-          <Button variant="primary" size="small" onClick={() => setOpen("apply")}>
-            <RotateCcw className="h-3 w-3 mr-1" /> Override rejection
-          </Button>
-        </>
-      )}
 
       {canClear && (
         <>
@@ -114,27 +99,6 @@ export default function CandidateOverridePanel({ candidate, onChanged }) {
           </div>
         </div>
       )}
-
-      <ReasonModal
-        isOpen={open === "apply"}
-        onClose={() => setOpen(null)}
-        title="Override this rejection"
-        description="The original rejection is preserved on the record — it is replaced, never deleted."
-        confirmLabel="Apply override"
-        placeholder="Why should this candidate re-enter the pipeline?"
-        onConfirm={async (reason) => {
-          try {
-            await applyHrOverride(candidate.id, reason);
-            toast.success("Override applied — the candidate is back in screening.");
-            setOpen(null);
-            // No detail re-fetch backs this page — apply the known outcome
-            // (server-guaranteed by the endpoint's own contract) directly.
-            onChanged?.({ hrOverride: true, pipelineStage: "SCREENING", stage: "SCREENING", overrideReason: reason });
-          } catch (err) {
-            toast.error(err?.response?.data?.message || "Could not apply the override.");
-          }
-        }}
-      />
 
       <ReasonModal
         isOpen={open === "clear"}

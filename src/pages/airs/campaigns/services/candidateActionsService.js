@@ -128,19 +128,6 @@ export const getRejectionHistory = async (campaignCandidateId) => {
   return response.data?.data || [];
 };
 
-// ── apply HR override (M07 endpoint) ─────────────
-
-// Lives under /campaign-candidates, not /candidate-actions — this endpoint
-// predates M11 and is owned by M07; M11 only calls it.
-export const applyHrOverride = async (campaignCandidateId, overrideReason) => {
-  const response = await withOverrideReason((overrideReasonCode) => api.post(
-    `${BASE_URL}/campaign-candidates/${campaignCandidateId}/override`,
-    { override_reason: overrideReason, override_reason_code: overrideReasonCode },
-    { headers: authHeaders() },
-  ));
-  return response.data?.data || null;
-};
-
 // ── delete campaign candidate ────────────────────────
 
 // Also under /campaign-candidates, keyed by campaign_candidate_id — not
