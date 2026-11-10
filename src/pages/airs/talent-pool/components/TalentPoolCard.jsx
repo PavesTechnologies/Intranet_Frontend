@@ -106,13 +106,19 @@ export default function TalentPoolCard({ item, onViewProfile, isSelected, onTogg
       )}
 
       <div className="flex items-center gap-2 mt-auto pt-1">
-        <Button variant="outline" size="small" className="flex-1" onClick={onViewProfile}>
+        {/* No onViewProfile = the viewer's role can't open profiles (HR admin only): disabled, with why. */}
+        <Button variant="outline" size="small" className="flex-1" onClick={onViewProfile} disabled={!onViewProfile}
+          title={onViewProfile ? undefined : "Candidate profiles are available to HR admins only."}>
           View Profile
         </Button>
         <Button variant="primary" size="small" className="flex-1" onClick={() => setPickerOpen(true)}>
           Add To Campaign
         </Button>
       </div>
+
+      {!onViewProfile && (
+        <p className="text-[10.5px] text-slate-400 -mt-1">Profiles are available to HR admins only.</p>
+      )}
 
       <CampaignPickerModal
         isOpen={pickerOpen}

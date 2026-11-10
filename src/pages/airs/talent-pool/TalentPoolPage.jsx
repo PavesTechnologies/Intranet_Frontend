@@ -16,9 +16,12 @@ import CampaignPickerModal from "./components/CampaignPickerModal";
 import BulkAddResultsModal from "./components/BulkAddResultsModal";
 import { bulkAddTalentPoolCandidatesToCampaign } from "./services/talentPoolService";
 import { formatApiError } from "../campaigns/services/campaignservice";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function TalentPoolPage() {
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
+  const canViewProfile = hasRole(["HR_ADMIN"]);
   const {
     results,
     loading,
@@ -187,9 +190,10 @@ export default function TalentPoolPage() {
                 isSelected={selectedIds.includes(item.candidate.candidate_id)}
                 onToggleSelect={toggleSelect}
                 onAdded={refetch}
-                onViewProfile={() =>
+                // The profile page and GET /talent-pool/candidates/{id} are HR_ADMIN only.
+                onViewProfile={canViewProfile ? () =>
                   navigate(`/ai-screening/talent-pool/${item.candidate.candidate_id}`, { state: { item } })
-                }
+                  : undefined}
               />
             ))}
           </div>
