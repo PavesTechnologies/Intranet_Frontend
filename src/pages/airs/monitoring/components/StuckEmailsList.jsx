@@ -10,7 +10,6 @@ import { apiErrorMessage } from "../../settings/services/aiProviderService";
 export default function StuckEmailsList({ count, onResolved }) {
   const [rows, setRows] = useState([]);
   const [resolving, setResolving] = useState(null); // { row, outcome }
-  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -31,10 +30,9 @@ export default function StuckEmailsList({ count, onResolved }) {
   const confirm = async () => {
     setSaving(true);
     try {
-      await resolveStuckEmail(resolving.row.id, resolving.outcome, note.trim());
+      await resolveStuckEmail(resolving.row.id, resolving.outcome);
       toast.success(resolving.outcome === "SENT" ? "Recorded as delivered." : "Recorded as not delivered.");
       setResolving(null);
-      setNote("");
       await load();
       onResolved?.();
     } catch (err) {
@@ -88,17 +86,8 @@ export default function StuckEmailsList({ count, onResolved }) {
         variant={resolving?.outcome === "SENT" ? "primary" : "danger"}
         isLoading={saving}
         onConfirm={confirm}
-        onCancel={() => { setResolving(null); setNote(""); }}
-      >
-        <textarea
-          className="w-full rounded-lg border border-slate-200 p-2 text-xs"
-          rows={2}
-          maxLength={500}
-          placeholder="What you checked (optional, kept in the audit trail)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </ConfirmationModal>
+        onCancel={() => setResolving(null)}
+      />
     </div>
   );
 }

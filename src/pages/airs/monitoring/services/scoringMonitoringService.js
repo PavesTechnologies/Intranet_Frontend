@@ -52,8 +52,8 @@ export const getStuckEmails = async () => {
 };
 
 // outcome: "SENT" (delivered, per the email provider) | "FAILED" (not delivered). Audited; sends nothing.
-export const resolveStuckEmail = async (notificationId, outcome, note) => {
+export const resolveStuckEmail = async (notificationId, outcome) => {
   const response = await api.post(`${BASE_URL}/monitoring/stuck-emails/${notificationId}/resolve`,
-    { outcome, note: note || undefined }, { headers: authHeaders() });
+    { outcome }, { headers: authHeaders() });
   return unwrap(response.data);
 };
