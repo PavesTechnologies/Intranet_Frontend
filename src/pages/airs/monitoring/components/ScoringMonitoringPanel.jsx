@@ -73,6 +73,8 @@ export default function ScoringMonitoringPanel() {
   const pending = (tasks?.pending_results || []).reduce((n, p) => n + p.count, 0);
   const stuck = (tasks?.stuck || []).reduce((n, s) => n + s.count, 0);
   const dead = (tasks?.open_dead_letters || []).reduce((n, d) => n + d.count, 0);
+  // Emails whose send was claimed but never confirmed: delivery unknown, never re-sent automatically.
+  const stuckEmails = tasks?.stuck_emails;
   const problemTypes = (tasks?.by_task_type || []).filter((t) => PROBLEM_STATUSES.some((s) => t[s]));
   const reparses = summary?.rejected_reparses;
 
@@ -101,7 +103,7 @@ export default function ScoringMonitoringPanel() {
 
       {loading && !summary ? <div className="py-6"><LoadingSpinner /></div> : summary && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             <Tile label="LLM calls" value={appCalls} hint="app calls in the period" />
             <Tile label="Estimated cost" value={usd(appCost)} hint="at list price" />
             <Tile label="Per resume" value={usage?.per_resume?.calls ? usage.per_resume.calls.median : "—"}
@@ -110,6 +112,8 @@ export default function ScoringMonitoringPanel() {
             <Tile label="Pending results" value={pending} hint="scoring waiting on the model" />
             <Tile label="Stuck tasks" value={stuck} hint={`queued or running over ${tasks?.stuck_after_minutes} min`} />
             <Tile label="Open dead letters" value={dead} />
+            <Tile label="Emails stuck sending" value={stuckEmails?.count ?? "—"}
+              hint={`delivery unknown over ${stuckEmails?.stuck_after_minutes ?? 30} min`} />
           </div>
 
           <OutcomesOverTimeChart series={summary.outcomes_over_time} bucket={summary.bucket} />
@@ -183,7 +187,7 @@ export default function ScoringMonitoringPanel() {
           </Section>
 
           <Section title="Tasks">
-            {!problemTypes.length && !stuck && !pending && !dead
+            {!problemTypes.length && !stuck && !pending && !dead && !stuckEmails?.count
               ? <p className="text-xs text-slate-400">No failed, stuck or pending work.</p> : (
                 <table className="w-full">
                   <thead><tr>
@@ -205,6 +209,14 @@ export default function ScoringMonitoringPanel() {
                 {s.count} {s.task_type} task(s) {s.status.toLowerCase()} for over {tasks.stuck_after_minutes} minutes.
               </p>
             ))}
+            {stuckEmails?.count > 0 && (
+              <p className="text-[11px] text-amber-700">
+                {stuckEmails.count} email(s) sending for over {stuckEmails.stuck_after_minutes} minutes
+                {stuckEmails.oldest_minutes != null && ` (oldest ${stuckEmails.oldest_minutes} min)`}:{" "}
+                {(stuckEmails.by_trigger || []).map((t) => `${t.trigger_event} ${t.count}`).join(", ")}.
+                {" "}Delivery is unknown and they are not re-sent automatically - check them before sending again.
+              </p>
+            )}
             {(tasks?.pending_results || []).map((p) => (
               <p key={`${p.campaign_id}-${p.scoring_version}`} className="text-[11px] text-amber-700">
                 {p.count} {p.scoring_version} result(s) PENDING in {p.campaign || p.campaign_id}.
