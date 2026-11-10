@@ -9,6 +9,7 @@ import OutcomesOverTimeChart from "./OutcomesOverTimeChart";
 import LlmPricesEditor from "./LlmPricesEditor";
 import OutcomeOverridesReport from "./OutcomeOverridesReport";
 import FairnessReport from "./FairnessReport";
+import StuckEmailsList from "./StuckEmailsList";
 
 const selectClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white";
 const th = "py-1.5 pr-3 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400";
@@ -217,6 +218,7 @@ export default function ScoringMonitoringPanel() {
                 {" "}Delivery is unknown and they are not re-sent automatically - check them before sending again.
               </p>
             )}
+            {stuckEmails?.count > 0 && <StuckEmailsList count={stuckEmails.count} onResolved={load} />}
             {(tasks?.pending_results || []).map((p) => (
               <p key={`${p.campaign_id}-${p.scoring_version}`} className="text-[11px] text-amber-700">
                 {p.count} {p.scoring_version} result(s) PENDING in {p.campaign || p.campaign_id}.
