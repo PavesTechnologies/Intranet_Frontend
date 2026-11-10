@@ -629,8 +629,9 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const isHiringManager = hasRole(["HIRING_MANAGER"]);
-  // Mirrors the backend (review item 26): rejection emails are HR_ADMIN and HIRING_MANAGER.
-  const canBulkMove = canAct;
+  // Mirrors the backend (review item 26, F-3): the bulk stage move is HR_ADMIN only; rejection
+  // emails are HR_ADMIN and HIRING_MANAGER. Only those roles get the selection and the bulk bar.
+  const canBulkMove = isHrAdmin;
   const canSendEmails = hasRole(["HR_ADMIN", "HIRING_MANAGER"]);
   const canSelect = canBulkMove || canSendEmails;
   const [confirmingBulkEmail, setConfirmingBulkEmail] = useState(false);
