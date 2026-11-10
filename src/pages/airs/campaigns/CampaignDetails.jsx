@@ -14,6 +14,7 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
 import CandidateTable from "../candidates/components/CandidateTable";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { mapCampaignCandidateList } from "../candidates/utils/mapCampaignCandidateList";
 import { paginate } from "../candidates/utils/candidateUtils.jsx";
 import { CANDIDATE_PAGE_SIZE } from "../candidates/constants/candidateConstants";
@@ -628,6 +629,11 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const isHiringManager = hasRole(["HIRING_MANAGER"]);
+  // Mirrors the backend (review item 26): rejection emails are HR_ADMIN and HIRING_MANAGER.
+  const canBulkMove = canAct;
+  const canSendEmails = hasRole(["HR_ADMIN", "HIRING_MANAGER"]);
+  const canSelect = canBulkMove || canSendEmails;
+  const [confirmingBulkEmail, setConfirmingBulkEmail] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -739,12 +745,18 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   // includes at least one REJECTED candidate; the backend still validates
   // per-id, so a mixed selection is fine, this just avoids showing the
   // button for a selection that's guaranteed to skip every row.
-  const selectedRejectedCount = allCandidates.filter(
+  const selectedRejected = allCandidates.filter(
     (c) => selectedIds.has(c.id) && (c.stage || "").toUpperCase() === "REJECTED"
-  ).length;
+  );
+  const selectedRejectedCount = selectedRejected.length;
+  // Named in the confirmation (review item 26): who gets an email that can't be recalled.
+  const recipientPreview = selectedRejected.slice(0, 10).map((c) => c.name || c.id).join(", ")
+    + (selectedRejectedCount > 10 ? `, and ${selectedRejectedCount - 10} more` : "");
 
   const handleBulkSendRejectionEmail = async () => {
-    const ids = [...selectedIds];
+    // Only the REJECTED candidates confirmed above - never the rest of the selection.
+    const ids = selectedRejected.map((c) => c.id);
+    setConfirmingBulkEmail(false);
     setSendingBulkRejectionEmail(true);
     try {
       const res = await bulkSendRejectionEmail(ids);
@@ -785,15 +797,18 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
       />
 
       {/* The bulk bar only exists while something is selected */}
-      {canAct && selectedIds.size > 0 && (
+      {canSelect && selectedIds.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
           <span className="text-xs font-bold text-indigo-900">
             {selectedIds.size} selected
           </span>
-          <span className="text-[11px] text-indigo-700">
-            All selected candidates must be in the same stage.
-          </span>
+          {canBulkMove && (
+            <span className="text-[11px] text-indigo-700">
+              All selected candidates must be in the same stage.
+            </span>
+          )}
           <div className="ml-auto flex items-center gap-2">
+            {canBulkMove && (
             <select
               className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white"
               value=""
@@ -806,11 +821,12 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
               {["SCREENING", "SHORTLISTED", "HM_REVIEW", "INTERVIEW", "SELECTED", "HOLD", "REJECTED"]
                 .map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
             </select>
-            {selectedRejectedCount > 0 && (
+            )}
+            {canSendEmails && selectedRejectedCount > 0 && (
               <Button
                 variant="outline"
                 size="small"
-                onClick={handleBulkSendRejectionEmail}
+                onClick={() => setConfirmingBulkEmail(true)}
                 loading={sendingBulkRejectionEmail}
                 loadingText="Sending..."
               >
@@ -831,7 +847,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         onDeleted={() => setReloadKey((k) => k + 1)}
         showViewButton={false}
         showActionsColumn={!isHiringManager}
-        selectable={canAct}
+        selectable={canSelect}
         selectedIds={selectedIds}
         noteCounts={noteCounts}
         onToggleSelect={(ccId) => setSelectedIds((prev) => {
@@ -864,6 +880,18 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
             )}
           </>
         ) : undefined}
+      />
+
+      <ConfirmationModal
+        isOpen={confirmingBulkEmail}
+        title={`Send ${selectedRejectedCount} rejection email${selectedRejectedCount === 1 ? "" : "s"}?`}
+        message={`This emails ${selectedRejectedCount} rejected candidate${selectedRejectedCount === 1 ? "" : "s"} now: `
+          + `${recipientPreview}. Emails can't be recalled once sent.`}
+        confirmText={`Send ${selectedRejectedCount} email${selectedRejectedCount === 1 ? "" : "s"}`}
+        variant="danger"
+        isLoading={sendingBulkRejectionEmail}
+        onConfirm={handleBulkSendRejectionEmail}
+        onCancel={() => setConfirmingBulkEmail(false)}
       />
 
       <CandidateActionModals

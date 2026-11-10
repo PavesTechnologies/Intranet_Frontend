@@ -11,6 +11,8 @@ import { renderStageBadge, renderDecisionBadge } from "../../../utils/candidateU
 import { DECISION_SOURCE_LABEL } from "../../../constants/candidateConstants";
 import { numberOr, formatDateTime } from "../../../utils/candidateDataUtils";
 import { sendRejectionEmail, sendSelectionEmail } from "../../../services/candidateScoreService";
+import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Tone for the hero card/ring — keyed off whichever outcome is most
 // authoritative: the recorded decision (can reflect an HR override), falling
@@ -79,6 +81,11 @@ export default function FinalStatusTab({ candidate }) {
   const { breakdown, loading, error, refetch } = useCompositeScore(candidate?.id);
   const [sendingRejectionEmail, setSendingRejectionEmail] = useState(false);
   const [sendingSelectionEmail, setSendingSelectionEmail] = useState(false);
+  // Review item 26: an email can't be recalled - each send is confirmed first, naming the recipient.
+  const [confirmingEmail, setConfirmingEmail] = useState(null); // "rejection" | "selection" | null
+  const { hasRole } = useAuth();
+  // The backend allows these sends to HR_ADMIN and HIRING_MANAGER only (recruiters get 403).
+  const canSendEmails = hasRole(["HR_ADMIN", "HIRING_MANAGER"]);
 
   const stage = candidate?.stage;
   const hasStage = stage && stage !== "-";
@@ -92,6 +99,7 @@ export default function FinalStatusTab({ candidate }) {
   const isSelected = stage === "SELECTED";
 
   const handleSendRejectionEmail = async () => {
+    setConfirmingEmail(null);
     setSendingRejectionEmail(true);
     try {
       await sendRejectionEmail(candidate.id);
@@ -104,6 +112,7 @@ export default function FinalStatusTab({ candidate }) {
   };
 
   const handleSendSelectionEmail = async () => {
+    setConfirmingEmail(null);
     setSendingSelectionEmail(true);
     try {
       await sendSelectionEmail(candidate.id);
@@ -151,11 +160,11 @@ export default function FinalStatusTab({ candidate }) {
               </div>
             </div>
 
-            {isRejected && (
+            {isRejected && canSendEmails && (
               <Button
                 variant="outline"
                 size="small"
-                onClick={handleSendRejectionEmail}
+                onClick={() => setConfirmingEmail("rejection")}
                 loading={sendingRejectionEmail}
                 loadingText="Sending..."
                 className="shrink-0"
@@ -164,11 +173,11 @@ export default function FinalStatusTab({ candidate }) {
               </Button>
             )}
 
-            {isSelected && (
+            {isSelected && canSendEmails && (
               <Button
                 variant="outline"
                 size="small"
-                onClick={handleSendSelectionEmail}
+                onClick={() => setConfirmingEmail("selection")}
                 loading={sendingSelectionEmail}
                 loadingText="Sending..."
                 className="shrink-0"
@@ -197,6 +206,19 @@ export default function FinalStatusTab({ candidate }) {
           )}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={!!confirmingEmail}
+        title={confirmingEmail === "selection" ? "Send selection email?" : "Send rejection email?"}
+        message={`This sends the ${confirmingEmail === "selection" ? "selection" : "rejection"} email to `
+          + `${candidate?.name || "this candidate"}${candidate?.email ? ` (${candidate.email})` : ""} now. `
+          + "An email can't be recalled once sent."}
+        confirmText="Send email"
+        variant={confirmingEmail === "selection" ? "primary" : "danger"}
+        isLoading={sendingRejectionEmail || sendingSelectionEmail}
+        onConfirm={confirmingEmail === "selection" ? handleSendSelectionEmail : handleSendRejectionEmail}
+        onCancel={() => setConfirmingEmail(null)}
+      />
 
       {loading && (
         <div className="py-8 flex items-center justify-center">
