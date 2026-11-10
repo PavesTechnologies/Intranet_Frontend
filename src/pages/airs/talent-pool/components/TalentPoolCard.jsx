@@ -31,7 +31,9 @@ function initialsOf(name) {
 // page still shows the candidate's full skill list.
 const PRIMARY_SKILLS_COUNT = 6;
 
-export default function TalentPoolCard({ item, onViewProfile, isSelected, onToggleSelect, onAdded }) {
+export default function TalentPoolCard({
+  item, onViewProfile, isSelected, onToggleSelect, onAdded, canAddToCampaign = true,
+}) {
   const { candidate, skills, best_composite_score: bestCompositeScore } = item;
   const primarySkills = (skills || []).slice(0, PRIMARY_SKILLS_COUNT);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -111,13 +113,20 @@ export default function TalentPoolCard({ item, onViewProfile, isSelected, onTogg
           title={onViewProfile ? undefined : "Candidate profiles are available to HR admins only."}>
           View Profile
         </Button>
-        <Button variant="primary" size="small" className="flex-1" onClick={() => setPickerOpen(true)}>
+        <Button variant="primary" size="small" className="flex-1" onClick={() => setPickerOpen(true)}
+          disabled={!canAddToCampaign}
+          title={canAddToCampaign ? undefined : "Adding candidates to a campaign is available to HR admins only."}>
           Add To Campaign
         </Button>
       </div>
 
-      {!onViewProfile && (
-        <p className="text-[10.5px] text-slate-400 -mt-1">Profiles are available to HR admins only.</p>
+      {(!onViewProfile || !canAddToCampaign) && (
+        <p className="text-[10.5px] text-slate-400 -mt-1">
+          {!onViewProfile && !canAddToCampaign
+            ? "Profiles and adding to campaigns are available to HR admins only."
+            : !onViewProfile ? "Profiles are available to HR admins only."
+              : "Adding to a campaign is available to HR admins only."}
+        </p>
       )}
 
       <CampaignPickerModal

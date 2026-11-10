@@ -22,6 +22,8 @@ export default function TalentPoolPage() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
   const canViewProfile = hasRole(["HR_ADMIN"]);
+  // Adding to a campaign (single and bulk) is HR_ADMIN only in the backend too.
+  const canAddToCampaign = hasRole(["HR_ADMIN"]);
   const {
     results,
     loading,
@@ -106,9 +108,14 @@ export default function TalentPoolPage() {
         </div>
         {selectedIds.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="primary" size="medium" onClick={() => setBulkPickerOpen(true)}>
+            <Button variant="primary" size="medium" onClick={() => setBulkPickerOpen(true)}
+              disabled={!canAddToCampaign}
+              title={canAddToCampaign ? undefined : "Adding candidates to a campaign is available to HR admins only."}>
               <UserPlus className="h-4 w-4" /> Add Selected to Campaign ({selectedIds.length})
             </Button>
+            {!canAddToCampaign && (
+              <span className="text-[11px] text-slate-400">Adding to a campaign is available to HR admins only.</span>
+            )}
           </div>
         )}
       </div>
@@ -190,6 +197,7 @@ export default function TalentPoolPage() {
                 isSelected={selectedIds.includes(item.candidate.candidate_id)}
                 onToggleSelect={toggleSelect}
                 onAdded={refetch}
+                canAddToCampaign={canAddToCampaign}
                 // The profile page and GET /talent-pool/candidates/{id} are HR_ADMIN only.
                 onViewProfile={canViewProfile ? () =>
                   navigate(`/ai-screening/talent-pool/${item.candidate.candidate_id}`, { state: { item } })
