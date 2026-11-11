@@ -188,8 +188,8 @@ export default function CampaignDetails() {
     // Its own tab rather than scattered buttons, so every export for
     // this campaign is discoverable in one place.
     { id: "exports", label: "Exports", icon: Download, show: true },
-    // Scoring v2 (Phase 1) shadow comparison - HR_ADMIN only, never decides.
-    { id: "scoringV2", label: "Scoring v2 (shadow)", icon: Activity, show: isHRAdmin },
+    // Scoring-version shadow comparison - HR_ADMIN only; a candidate version never decides.
+    { id: "scoringV2", label: "Scoring versions", icon: Activity, show: isHRAdmin },
   ].filter((t) => t.show);
 
   const statusStyle = {

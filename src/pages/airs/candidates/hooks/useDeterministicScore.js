@@ -8,7 +8,7 @@ export default function useDeterministicScore(campaignCandidateId) {
   const [error, setError] = useState(null);
   // Set when this layer's task dead-lettered (backend `failure` block) - null otherwise.
   const [failure, setFailure] = useState(null);
-  // Scoring v2 shadow result - only sent to HR_ADMIN, read-only.
+  // Core-skill detail of the acted-on result - only sent to HR_ADMIN, read-only.
   const [shadowV2, setShadowV2] = useState(null);
 
   const fetchBreakdown = useCallback(async () => {

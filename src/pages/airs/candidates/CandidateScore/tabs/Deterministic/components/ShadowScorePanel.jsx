@@ -1,9 +1,9 @@
 import React from "react";
-import { FlaskConical } from "lucide-react";
+import { ListChecks } from "lucide-react";
 
-// Scoring v2 shadow result for this candidate - HR_ADMIN only (the backend
-// sends `scoring_v2_shadow` for that role only). Read-only and explicitly not
-// used for any decision: v1 above is what the pipeline acts on.
+// Core-skill detail of this candidate's acted-on scoring result - HR_ADMIN only (the backend sends
+// `scoring_v2_shadow`, a historical name, for that role only). Read only: how each core skill was
+// found and confirmed, behind the score above.
 
 const OUTCOME_STYLES = {
   PASS: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -29,10 +29,10 @@ export default function ShadowScorePanel({ shadow }) {
   return (
     <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4">
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <FlaskConical className="h-4 w-4 text-slate-500" />
-        <h3 className="text-sm font-semibold text-slate-800">Scoring v2</h3>
+        <ListChecks className="h-4 w-4 text-slate-500" />
+        <h3 className="text-sm font-semibold text-slate-800">Core-skill check</h3>
         <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
-          Shadow — not used for decisions
+          HR admin view
         </span>
         <span className={`ml-auto px-2 py-0.5 rounded border text-[11px] font-semibold ${OUTCOME_STYLES[outcome] || OUTCOME_STYLES.PENDING}`}>
           {OUTCOME_LABELS[outcome] || outcome}
