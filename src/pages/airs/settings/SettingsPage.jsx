@@ -1,19 +1,44 @@
 import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Settings as SettingsIcon } from "lucide-react";
+import {
+  BellRing, Bot, CalendarClock, GraduationCap, LayoutTemplate, ListChecks, Mail, Plug, Scale,
+  Settings as SettingsIcon, SlidersHorizontal,
+} from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import SettingsWeightConfig from "./components/SettingsWeightConfig";
 import SettingsAIProviders from "./components/SettingsAIProviders";
 import SettingsIntegrations from "./components/SettingsIntegrations";
 import SettingsEducationFields from "./components/SettingsEducationFields";
 import SettingsProfileTemplates from "./components/SettingsProfileTemplates";
+import SettingsGeneral from "./components/SettingsGeneral";
+import SettingsAlerts from "./components/SettingsAlerts";
+import SettingsEmailTemplates from "./components/SettingsEmailTemplates";
+import SettingsReasonCodes from "./components/SettingsReasonCodes";
+import SettingsSchedules from "./components/SettingsSchedules";
 
 const PROVIDER_LABEL = { microsoft: "Microsoft Calendar", google: "Google Calendar" };
 
+// One tab per area (?tab=...). The page's route is HR_ADMIN only; every endpoint checks it too.
+const TABS = [
+  { value: "general", label: "General", icon: SlidersHorizontal, Component: SettingsGeneral },
+  { value: "alerts", label: "Alerts", icon: BellRing, Component: SettingsAlerts },
+  { value: "email-templates", label: "Email templates", icon: Mail, Component: SettingsEmailTemplates },
+  { value: "reason-codes", label: "Reason codes", icon: ListChecks, Component: SettingsReasonCodes },
+  { value: "scoring-defaults", label: "Campaign defaults", icon: Scale, Component: SettingsWeightConfig },
+  { value: "profile-templates", label: "Profile templates", icon: LayoutTemplate, Component: SettingsProfileTemplates },
+  { value: "education-fields", label: "Education fields", icon: GraduationCap, Component: SettingsEducationFields },
+  { value: "ai-providers", label: "AI providers", icon: Bot, Component: SettingsAIProviders },
+  { value: "integrations", label: "Integrations", icon: Plug, Component: SettingsIntegrations },
+  { value: "schedules", label: "Schedules", icon: CalendarClock, Component: SettingsSchedules },
+];
+
 export default function SettingsPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const activeTab = TABS.some((t) => t.value === searchParams.get("tab")) ? searchParams.get("tab") : "general";
+  const ActiveComponent = TABS.find((t) => t.value === activeTab).Component;
 
   // The OAuth callback redirects back here as
   // ?connected=microsoft&status=success|error — surface that once, then
@@ -43,7 +68,7 @@ export default function SettingsPage() {
       toast.error(`Couldn't connect ${label}. Please try again.`);
     }
 
-    navigate(location.pathname, { replace: true });
+    navigate(`${location.pathname}?tab=integrations`, { replace: true });
     // Deliberately mount-only — this reads whatever the URL was redirected
     // in with, not anything that should re-run as the user navigates the page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,27 +84,27 @@ export default function SettingsPage() {
           AIRS Platform Settings
         </h1>
         <p className="text-xs text-slate-500 mt-2 max-w-xl">
-          Configure campaign scoring defaults, the AI model used for processing, and calendar integrations.
+          Every AIRS setting an HR admin can change, one area per tab. Each change is checked before it is
+          saved and recorded in the audit log.
         </p>
       </div>
 
-      {/* AI providers full width (its per-purpose model list needs the room);
-          scoring defaults and calendar integrations share the row below,
-          stacking below lg. */}
-      <SettingsAIProviders />
+      <Tabs value={activeTab} onValueChange={(value) => setSearchParams({ tab: value })}>
+        <TabsList className="bg-white border border-slate-200 shadow-sm mb-5 p-1 h-auto flex flex-wrap justify-start">
+          {TABS.map(({ value, label, icon: Icon }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-none text-slate-500"
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch mt-5">
-        <div className="min-w-0">
-          <SettingsWeightConfig />
-        </div>
-        <div className="min-w-0">
-          <SettingsIntegrations />
-        </div>
-      </div>
-
-      {/* HR_ADMIN only - renders nothing for other roles. */}
-      <SettingsEducationFields />
-      <SettingsProfileTemplates />
+      <ActiveComponent />
     </div>
   );
 }
