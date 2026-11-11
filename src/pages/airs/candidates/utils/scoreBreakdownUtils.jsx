@@ -33,20 +33,6 @@ export function renderMatchTypeBadge(matchType) {
   );
 }
 
-export function formatWeightApplied(weight) {
-  return `${Math.round(weight * 100)}%`;
-}
-
-// "Normalisation Discount" (candidate_scoring_weight) is a distinct column
-// from Hierarchy Multiplier — it shows how much the raw match was discounted
-// for being a partial/fuzzy/vector-normalized skill match rather than an
-// exact/alias one.
-export function formatNormalisationDiscount(weight) {
-  if (!weight) return "—";
-  if (weight >= 1) return "No discount";
-  return `-${Math.round((1 - weight) * 100)}%`;
-}
-
 export function renderDeterministicStatusBadge(status) {
   const tone =
     status === "PASSED"
@@ -83,13 +69,3 @@ export function renderAiRecommendationBadge(recommendation) {
   return <Badge className={`${tone} font-bold px-3 py-1 text-xs`}>{recommendation.replace(/_/g, " ")}</Badge>;
 }
 
-const MATCH_TIER_TONE = {
-  RELATED: "bg-blue-50 text-blue-700 border-blue-100",
-  ADJACENT: "bg-indigo-50 text-indigo-700 border-indigo-100",
-  UNRECOGNIZED: "bg-slate-100 text-slate-600 border-slate-200",
-};
-
-export function renderMatchTierBadge(matchTier) {
-  const tone = MATCH_TIER_TONE[matchTier] || MATCH_TIER_TONE.UNRECOGNIZED;
-  return <Badge className={`${tone} font-semibold px-2.5 py-1 text-[11px]`}>{matchTier}</Badge>;
-}

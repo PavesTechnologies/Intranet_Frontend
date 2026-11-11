@@ -57,18 +57,6 @@ export const STATUS_FILTER_OPTIONS = [
   { label: "Inactive", value: SKILL_STATUS.INACTIVE },
 ];
 
-export const EMBEDDING_STATUS = {
-  GENERATED: "GENERATED",
-  PENDING: "PENDING",
-  OUTDATED: "OUTDATED",
-};
-
-export const EMBEDDING_STATUS_LABEL = {
-  GENERATED: "Generated",
-  PENDING: "Pending",
-  OUTDATED: "Outdated",
-};
-
 export const SKILL_ONTOLOGY_PAGE_SIZE = 10;
 
 export const BULK_IMPORT_ACCEPTED_TYPES = [".xlsx"];

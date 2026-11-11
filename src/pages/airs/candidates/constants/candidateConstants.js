@@ -1,10 +1,5 @@
 import { CANDIDATE_STAGES } from "../mock/candidateMockData";
 
-export const CANDIDATE_STAGE_FILTER_OPTIONS = [
-  { label: "All Stages", value: "All" },
-  ...CANDIDATE_STAGES.map((s) => ({ label: s, value: s })),
-];
-
 export const CANDIDATE_STAGE_BADGE_TONE = {
   Screening: "bg-amber-50 text-amber-700 border-amber-100",
   Shortlisted: "bg-blue-50 text-blue-700 border-blue-100",
@@ -73,16 +68,5 @@ export const DECISION_SOURCE_LABEL = {
   HR_ADMIN: "HR Admin",
   SYSTEM: "System",
 };
-
-export const CANDIDATE_SORT_OPTIONS = [
-  { label: "Overall score (high to low)", value: "composite:desc" },
-  { label: "Overall score (low to high)", value: "composite:asc" },
-  { label: "ATS score", value: "ats:desc" },
-  { label: "Relevance score", value: "semantic:desc" },
-  { label: "Experience", value: "experience:desc" },
-  { label: "Risk (high to low)", value: "risk:desc" },
-];
-
-export const CANDIDATE_DETAIL_TABS = ["Summary", "Resume", "Evaluation", "Timeline", "Comments"];
 
 export const CANDIDATE_PAGE_SIZE = 8;

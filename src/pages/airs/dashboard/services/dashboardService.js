@@ -55,70 +55,12 @@ export const getDashboardNotifications = async (limit = 10) => {
         throw error;
     }
 };
-export const getHrAdminSummary = async () => {
-  const response = await api.get(`${BASE_URL}/dashboard/hr-admin/summary`, {
-    headers: authHeaders(),
-  });
-  return response.data?.data || null;
-};
-
-export const getRecruiterSummary = async () => {
-  const response = await api.get(`${BASE_URL}/dashboard/recruiter/summary`, {
-    headers: authHeaders(),
-  });
-  return response.data?.data || null;
-};
-
-// Scoping is decided server-side from the caller's role — HR_ADMIN gets every
-// campaign, RECRUITER only the ones they uploaded to or created.
-export const getDashboardCampaigns = async ({
-  limit = 12, show_closed = false, search, status,
-} = {}) => {
-  const params = { limit, show_closed };
-  if (search) params.search = search;
-  if (status && status !== "All") params.status = status;
-  const response = await api.get(`${BASE_URL}/dashboard/campaigns`, {
-    params,
-    headers: authHeaders(),
-  });
-  return response.data?.data || [];
-};
-
-export const getNavBadges = async () => {
-  const response = await api.get(`${BASE_URL}/dashboard/badges`, {
-    headers: authHeaders(),
-  });
-  return response.data?.data || null;
-};
-
 export const getStageTiming = async (campaignId) => {
   const response = await api.get(
     `${BASE_URL}/dashboard/campaigns/${campaignId}/stage-timing`,
     { headers: authHeaders() },
   );
   return response.data?.data || [];
-};
-
-// ── skill search ─────────────────────────────────────────
-
-export const getSkillSuggestions = async (campaignId, q, limit = 10) => {
-  const response = await api.get(
-    `${BASE_URL}/dashboard/campaigns/${campaignId}/skill-suggestions`,
-    { params: { q, limit }, headers: authHeaders() },
-  );
-  return response.data?.data || [];
-};
-
-// AND logic — a candidate must hold every skill passed here.
-export const filterCandidatesBySkills = async (campaignId, skillIds, q = "") => {
-  const params = new URLSearchParams();
-  skillIds.forEach((id) => params.append("skill_ids", id));
-  if (q) params.append("q", q);
-  const response = await api.get(
-    `${BASE_URL}/dashboard/campaigns/${campaignId}/skill-filter?${params.toString()}`,
-    { headers: authHeaders() },
-  );
-  return response.data?.data || { campaign_candidate_ids: [], match_tiers: {}, result_count: 0 };
 };
 
 // ── resume-derived filters ───────────────────────────────

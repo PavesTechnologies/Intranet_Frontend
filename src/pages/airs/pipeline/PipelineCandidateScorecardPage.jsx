@@ -19,8 +19,6 @@ import LayerDeadLetterBanner from "./components/LayerDeadLetterBanner";
 import ParseChangesPanel from "./components/ParseChangesPanel";
 import ReasonModal from "../campaigns/components/ReasonModal";
 import { reparseCandidateResume, rescoreCandidate } from "../candidates/services/candidateScoreService";
-// import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
-// import { mapMockCandidateForScorecard } from "./utils/mapMockCandidateForScorecard";
 
 const SummaryTab = lazy(() => import("../candidates/CandidateScore/tabs/Summary/SummaryTab"));
 const ResumeTab = lazy(() => import("../candidates/CandidateScore/tabs/Resume/ResumeTab"));

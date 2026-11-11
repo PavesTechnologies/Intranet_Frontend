@@ -15,13 +15,6 @@ export const PARSE_STAGE_ORDER = [
   "PERSISTENCE",
 ];
 
-export const MOCK_CAMPAIGNS = [
-  { id: "CMP-2041", name: "Senior Backend Engineer — Platform Team" },
-  { id: "CMP-2042", name: "Frontend Engineer — Growth" },
-  { id: "CMP-2039", name: "DevOps / SRE — Infrastructure" },
-  { id: "CMP-2036", name: "Data Scientist — Analytics" },
-];
-
 export function buildStages(overrides = {}) {
   return PARSE_STAGE_ORDER.map((stage) => ({
     stage,
@@ -279,10 +272,6 @@ export function maskEmail(email) {
 
 export function getResumeById(resumeId) {
   return MOCK_RESUMES.find((r) => r.resume_id === resumeId) || null;
-}
-
-export function getProcessingStatusByResumeId(resumeId) {
-  return MOCK_PROCESSING_STATUS[resumeId] || null;
 }
 
 export function getParsedJsonByResumeId(resumeId) {

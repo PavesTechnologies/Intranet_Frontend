@@ -17,24 +17,7 @@ export const SCORE_LABELS = {
 };
 
 /** Short forms, for table column headers where space is tight. */
-export const SCORE_LABELS_SHORT = {
-  deterministic: "Requirements",
-  semantic: "Relevance",
-  ai: "AI Review",
-  composite: "Overall",
-};
-
 /** One-line explanations — pair each label with its tooltip. */
-export const SCORE_HINTS = {
-  deterministic:
-    "Checks the must-have skills, experience and education listed in the job description.",
-  semantic:
-    "Compares the whole résumé against the whole job description by meaning, so a good match worded differently still counts.",
-  ai: "An AI reviewer's assessment of the candidate, with its reasoning.",
-  composite:
-    "The single ranking number, combining the three checks using the weights set for this campaign.",
-};
-
 /**
  * Rejection layers as stored in decision_source. Keys are the backend enum
  * values and must not change; only the labels are for humans.

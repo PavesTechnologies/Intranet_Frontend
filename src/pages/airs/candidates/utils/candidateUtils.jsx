@@ -21,12 +21,6 @@ export function filterCandidates(candidates, { search = "", stage = "All" } = {}
   });
 }
 
-export function sortCandidates(candidates, sortValue = "composite:desc") {
-  const [field, dir] = sortValue.split(":");
-  const mult = dir === "asc" ? 1 : -1;
-  return [...candidates].sort((a, b) => (a[field] - b[field]) * mult);
-}
-
 export function paginate(items, page, pageSize) {
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const current = Math.min(page, totalPages);
@@ -36,15 +30,6 @@ export function paginate(items, page, pageSize) {
     totalPages,
     currentPage: current,
   };
-}
-
-export function computeCandidateStats(candidates) {
-  const shortlisted = candidates.filter((c) => ["Shortlisted", "Interview", "Selected"].includes(c.stage)).length;
-  const selected = candidates.filter((c) => c.stage === "Selected").length;
-  const avgComposite = candidates.length
-    ? Math.round(candidates.reduce((sum, c) => sum + c.composite, 0) / candidates.length)
-    : 0;
-  return { total: candidates.length, shortlisted, selected, avgComposite };
 }
 
 // `stage` comes straight off the real API as an UPPER_SNAKE_CASE enum
