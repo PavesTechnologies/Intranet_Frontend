@@ -1,26 +1,14 @@
 import React from "react";
 import { FileText, Lock } from "lucide-react";
 import Button from "../../../../../../components/Button/Button";
-import { Input } from "../../../../../../components/ui/input";
 import { renderParseStatusBadge, renderConfidenceBadge } from "../../utils/intakeUtils.jsx";
 
-export default function ReviewHeader({ resume, onChange, isEditing }) {
+export default function ReviewHeader({ resume }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6 flex items-start justify-between gap-6">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2.5 flex-wrap">
-          {isEditing ? (
-            <div className="w-80 mb-2">
-              <Input
-                value={resume.candidate_name || ""}
-                onChange={(e) => onChange({ candidate_name: e.target.value })}
-                placeholder="Candidate full name"
-                className="h-8 text-sm font-semibold"
-              />
-            </div>
-          ) : (
-            <h1 className="text-lg font-bold text-slate-900 truncate">{resume.candidate_name}</h1>
-          )}
+          <h1 className="text-lg font-bold text-slate-900 truncate">{resume.candidate_name}</h1>
           <div className="flex items-center gap-1.5">
             {renderParseStatusBadge(resume.parse_status)}
             {renderConfidenceBadge(resume.parse_confidence_score)}

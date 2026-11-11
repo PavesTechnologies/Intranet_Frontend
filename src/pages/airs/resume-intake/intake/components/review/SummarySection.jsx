@@ -1,7 +1,7 @@
 import React from "react";
 import { Sparkles, MinusCircle } from "lucide-react";
 
-export default function SummarySection({ summary, isEditing, onChange }) {
+export default function SummarySection({ summary }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="px-5 py-4 border-b border-slate-100">
@@ -10,15 +10,7 @@ export default function SummarySection({ summary, isEditing, onChange }) {
         </h2>
       </div>
       <div className="p-5">
-        {isEditing ? (
-          <textarea
-            value={summary || ""}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="AI Candidate Summary..."
-            className="w-full rounded-md border border-slate-300 bg-white p-3 text-xs text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={5}
-          />
-        ) : summary ? (
+        {summary ? (
           <div className="rounded-lg bg-blue-50 border border-blue-100 p-4">
             <p className="text-[12.5px] text-slate-700 leading-relaxed">{summary}</p>
           </div>

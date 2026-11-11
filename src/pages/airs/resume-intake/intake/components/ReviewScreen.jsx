@@ -1,28 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { AlertTriangle, Loader2, Edit2, Check, X } from "lucide-react";
+import React from "react";
+import { AlertTriangle, Loader2, Info } from "lucide-react";
 import ReviewHeader from "./review/ReviewHeader";
 import ExperienceSection from "./review/ExperienceSection";
 import EducationSection from "./review/EducationSection";
 import SkillsSection from "./review/SkillsSection";
 import SummarySection from "./review/SummarySection";
 import { STAGE_LABELS, STAGE_FAILURE_COPY } from "../constants/intakeConstants";
-import { updateParsedJson, updateCandidateSkills, updateResumeDetails } from "../mock/intakeMockData";
-import { toast } from "react-toastify";
-import Button from "../../../../../components/Button/Button";
 
+// Read only: no API saves corrections to a parsed resume (planned after launch, with audit, skill
+// evidence and re-scoring). A wrong parse is corrected by re-parsing the resume.
 export default function ReviewScreen({ resume, parsedJson, candidateSkills, processingStatus }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [resumeState, setResumeState] = useState(resume);
-  const [parsedJsonState, setParsedJsonState] = useState(parsedJson);
-  const [skillsState, setSkillsState] = useState(candidateSkills);
-
-  useEffect(() => {
-    setResumeState(resume);
-    setParsedJsonState(parsedJson);
-    setSkillsState(candidateSkills);
-    setIsEditing(false);
-  }, [resume, parsedJson, candidateSkills]);
-
   if (!resume) {
     return (
       <div className="max-w-5xl">
@@ -33,65 +20,18 @@ export default function ReviewScreen({ resume, parsedJson, candidateSkills, proc
     );
   }
 
-  const isFailed = resumeState?.parse_status === "FAILED";
-  const isStillProcessing = resumeState?.parse_status === "PENDING" || resumeState?.parse_status === "PARSING";
-
-  const handleSave = () => {
-    try {
-      updateResumeDetails(resume.resume_id, resumeState);
-      updateParsedJson(resume.resume_id, parsedJsonState);
-      updateCandidateSkills(resume.resume_id, skillsState);
-      setIsEditing(false);
-      toast.success("Changes saved successfully.");
-    } catch (err) {
-      toast.error("Failed to save changes.");
-    }
-  };
-
-  const handleCancel = () => {
-    setResumeState(resume);
-    setParsedJsonState(parsedJson);
-    setSkillsState(candidateSkills);
-    setIsEditing(false);
-  };
+  const isFailed = resume.parse_status === "FAILED";
+  const isStillProcessing = resume.parse_status === "PENDING" || resume.parse_status === "PARSING";
 
   return (
     <div className="max-w-5xl space-y-4">
-      <div className="flex items-center justify-between gap-3 bg-white p-3 px-5 rounded-xl border border-slate-200 shadow-sm">
-        <span className="text-[12.5px] text-slate-500 font-medium">
-          {isEditing ? (
-            <span className="text-blue-700 font-semibold">Edit Mode Active: modify parsed details and hit save.</span>
-          ) : (
-            <span>You can edit this parsed profile to correct any errors.</span>
-          )}
-        </span>
-        <div className="flex items-center gap-2">
-          {!isStillProcessing && !isFailed && (
-            <>
-              {!isEditing ? (
-                <Button variant="outline" size="small" onClick={() => setIsEditing(true)}>
-                  <Edit2 size={12} className="mr-1.5" /> Edit Profile
-                </Button>
-              ) : (
-                <>
-                  <Button variant="ghost" size="small" onClick={handleCancel}>
-                    <X size={12} className="mr-1.5" /> Cancel
-                  </Button>
-                  <Button variant="success" size="small" onClick={handleSave}>
-                    <Check size={12} className="mr-1.5" /> Save Changes
-                  </Button>
-                </>
-              )}
-            </>
-          )}
+      {!isStillProcessing && !isFailed && (
+        <div className="flex items-center gap-2 bg-white p-3 px-5 rounded-xl border border-slate-200 shadow-sm text-[12.5px] text-slate-500 font-medium">
+          <Info size={14} className="text-slate-400 shrink-0" /> To correct this resume, use Re-parse.
         </div>
-      </div>
+      )}
 
-      <ReviewHeader
-        resume={resumeState}
-        onChange={(updated) => setResumeState((prev) => ({ ...prev, ...updated }))}
-        isEditing={isEditing}
-      />
+      <ReviewHeader resume={resume} />
 
       {isFailed && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 flex items-start gap-3">
@@ -123,41 +63,14 @@ export default function ReviewScreen({ resume, parsedJson, candidateSkills, proc
       {!isFailed && (
         <>
           <ExperienceSection
-            workExperience={parsedJsonState?.work_experience}
-            totalExperienceYears={parsedJsonState?.total_experience_years}
-            isEditing={isEditing}
-            onChange={(updatedExp) =>
-              setParsedJsonState((prev) => ({ ...prev, work_experience: updatedExp }))
-            }
+            workExperience={parsedJson?.work_experience}
+            totalExperienceYears={parsedJson?.total_experience_years}
           />
           <div className="grid grid-cols-2 gap-4">
-            <EducationSection
-              education={parsedJsonState?.education}
-              certifications={parsedJsonState?.certifications}
-              isEditing={isEditing}
-              onChange={(updatedEdu) =>
-                setParsedJsonState((prev) => ({ ...prev, ...updatedEdu }))
-              }
-            />
-            <SummarySection
-              summary={parsedJsonState?.summary}
-              isEditing={isEditing}
-              onChange={(val) => setParsedJsonState((prev) => ({ ...prev, summary: val }))}
-            />
+            <EducationSection education={parsedJson?.education} certifications={parsedJson?.certifications} />
+            <SummarySection summary={parsedJson?.summary} />
           </div>
-          <SkillsSection
-            skills={parsedJsonState?.skills}
-            candidateSkills={skillsState}
-            isEditing={isEditing}
-            onSkillsChange={(updatedSkills) => {
-              setSkillsState(updatedSkills);
-              // sync the raw list of strings in parsedJsonState.skills with the canonical names
-              const rawNames = updatedSkills
-                .map((s) => s.canonical_name || s.raw_extracted_text)
-                .filter(Boolean);
-              setParsedJsonState((prev) => ({ ...prev, skills: rawNames }));
-            }}
-          />
+          <SkillsSection skills={parsedJson?.skills} candidateSkills={candidateSkills} />
         </>
       )}
     </div>
