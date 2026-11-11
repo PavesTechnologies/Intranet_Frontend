@@ -4,8 +4,17 @@ import HiringFunnelCard from "./components/HiringFunnelCard";
 import TopCandidatesCard from "./components/TopCandidatesCard";
 import ActiveCampaignsCard from "./components/ActiveCampaignsCard";
 import TasksNotificationsCard from "./components/TasksNotificationsCard";
+import OverrideRateAlerts from "./components/OverrideRateAlerts";
+import ScoringMonitoringPanel from "../monitoring/components/ScoringMonitoringPanel";
+import { useAuth } from "../../../contexts/AuthContext";
 
+// The routed dashboard for every airs role (/ai-screening/dashboard). HR admins also get the scoring
+// monitoring panel (monitoring, fairness, override report, LLM prices, stuck emails) and the high
+// override-rate alerts: they used to live on AirsDashboardPage, which no route renders.
 export default function RecruiterDashboardPage() {
+  const { hasRole } = useAuth();
+  const isHRAdmin = hasRole(["HR_ADMIN"]);
+
   return (
     <div className="p-6 bg-slate-50/40 min-h-screen text-slate-800 font-sans">
       <div className="mb-4">
@@ -14,6 +23,8 @@ export default function RecruiterDashboardPage() {
           A snapshot of hiring activity across campaigns, candidates, and pending actions.
         </p>
       </div>
+
+      {isHRAdmin && <div className="mb-4"><OverrideRateAlerts /></div>}
 
       <DashboardStats />
 
@@ -30,6 +41,8 @@ export default function RecruiterDashboardPage() {
         <ActiveCampaignsCard />
         <TasksNotificationsCard />
       </div>
+
+      {isHRAdmin && <div className="mt-4"><ScoringMonitoringPanel /></div>}
     </div>
   );
 }
