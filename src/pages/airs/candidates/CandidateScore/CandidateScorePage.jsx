@@ -5,7 +5,7 @@ import useParsedResumeCandidate from "../hooks/useParsedResumeCandidate";
 import CandidateHeader from "./components/CandidateHeader";
 import CandidateTabs from "./components/CandidateTabs";
 import ErrorState from "../../skill-ontology/components/ErrorState";
-import CandidateOverridePanel from "../../campaigns/components/CandidateOverridePanel";
+import DecisionHistoryPanel from "../../campaigns/components/DecisionHistoryPanel";
 import CandidateNotesPanel from "../../campaigns/components/CandidateNotesPanel";
 import { exportScorecard } from "../../campaigns/services/exportService";
 import Button from "../../../../components/Button/Button";
@@ -59,8 +59,6 @@ export default function CandidateScorePage() {
     campaignCandidateId: navCandidate?.id ?? navCandidate?.campaign_candidate_id ?? candidateId,
     campaignId: navCandidate?.campaignId ?? location.state?.campaignId,
     stage: navCandidate?.stage ?? navCandidate?.pipeline_stage,
-    hrOverride: navCandidate?.hrOverride ?? navCandidate?.hr_override,
-    overrideReason: navCandidate?.overrideReason ?? navCandidate?.override_reason,
     decisionType: navCandidate?.decisionType ?? navCandidate?.decision_type,
     decisionSource: navCandidate?.decisionSource ?? navCandidate?.decision_source,
     decisionReason: navCandidate?.decisionReason ?? navCandidate?.decision_reason,
@@ -70,13 +68,7 @@ export default function CandidateScorePage() {
     salary: navCandidate?.salary,
   }), [navCandidate, candidateId, location.state?.campaignId]);
 
-  const { candidate: fetchedCandidate, loading, error, status, refetch } = useParsedResumeCandidate(candidateId, fallback);
-  // Applying/clearing an HR override has no detail re-fetch to lean on —
-  // the endpoint returns the resume parse, not a live candidate record —
-  // so the known outcome is patched in directly instead.
-  const [overridePatch, setOverridePatch] = useState(null);
-  useEffect(() => { setOverridePatch(null); }, [candidateId]);
-  const candidate = fetchedCandidate && overridePatch ? { ...fetchedCandidate, ...overridePatch } : fetchedCandidate;
+  const { candidate, loading, error, status, refetch } = useParsedResumeCandidate(candidateId, fallback);
 
   // Lets a caller (e.g. the Interview Calendar's event chips) deep-link
   // straight into a specific tab via ?tab=interview instead of always
@@ -162,7 +154,7 @@ export default function CandidateScorePage() {
       {/* Actions on the candidate, alongside the read-only scorecard */}
       {candidate.campaignId && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-          <CandidateOverridePanel candidate={candidate} onChanged={setOverridePatch} />
+          <DecisionHistoryPanel candidate={candidate} />
           <div className="bg-white border border-slate-200 rounded-xl p-4">
             <CandidateNotesPanel
               campaignCandidateId={candidate.id}

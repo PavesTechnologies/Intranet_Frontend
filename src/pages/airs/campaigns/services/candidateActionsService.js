@@ -56,17 +56,6 @@ export const bulkMoveStage = async (campaignId, campaignCandidateIds, targetStag
   return response.data?.data || null;
 };
 
-// ── clear override ───────────────────────────────────
-
-export const clearOverride = async (campaignCandidateId, reason) => {
-  const response = await api.post(
-    `${ROOT}/candidates/${campaignCandidateId}/clear-override`,
-    { reason },
-    { headers: authHeaders() },
-  );
-  return response.data?.data || null;
-};
-
 // ── recruiter notes ──────────────────────────────────────
 
 export const getCandidateNotes = async (campaignCandidateId) => {
@@ -116,10 +105,8 @@ export const getNoteCounts = async (campaignCandidateIds) => {
   }
 };
 
-// ── override / rejection history ─────────────────────
+// ── rejection history ─────────────────────────────────
 
-// Each entry carries hr_override, so the same list shows both the rejection
-// and whether it was overridden — no second endpoint needed for the history.
 export const getRejectionHistory = async (campaignCandidateId) => {
   const response = await api.get(
     `${BASE_URL}/campaign-candidates/${campaignCandidateId}/rejection-history`,

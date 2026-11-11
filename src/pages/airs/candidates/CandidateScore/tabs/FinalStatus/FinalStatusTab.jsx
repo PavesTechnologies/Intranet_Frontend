@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
 import Button from "@/components/Button/Button";
-import { Award, Clock, GitBranch, Sigma, Calculator, UserCog, MessageSquare, Mail } from "lucide-react";
+import { Award, Clock, GitBranch, Sigma, Calculator, MessageSquare, Mail } from "lucide-react";
 import ScoreRing from "../../../components/ScoreRing";
 import AccordionSection from "../../components/AccordionSection";
 import useCompositeScore from "../../../hooks/useCompositeScore";
@@ -15,7 +15,7 @@ import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal
 import { useAuth } from "@/contexts/AuthContext";
 
 // Tone for the hero card/ring — keyed off whichever outcome is most
-// authoritative: the recorded decision (can reflect an HR override), falling
+// authoritative: the recorded decision, falling
 // back to the composite calculation's ranking status, then the raw pipeline
 // stage. Mirrors DECISION_TYPE_BADGE_TONE/PIPELINE_STAGE_BADGE_TONE so the
 // hero card never disagrees with the badges rendered elsewhere.
@@ -94,7 +94,7 @@ export default function FinalStatusTab({ candidate }) {
   const tone = OUTCOME_TONE[outcomeKey] || DEFAULT_TONE;
   // Gated on the raw pipeline_stage, matching exactly what the backend
   // itself validates — not decisionType/outcomeKey, which can diverge
-  // (e.g. an HR override) from the actual stage this endpoint checks.
+  // from the actual stage this endpoint checks.
   const isRejected = stage === "REJECTED";
   const isSelected = stage === "SELECTED";
 
@@ -131,7 +131,7 @@ export default function FinalStatusTab({ candidate }) {
   const decisionSourceLabel = candidate?.decisionSource
     ? DECISION_SOURCE_LABEL[candidate.decisionSource] || candidate.decisionSource
     : null;
-  const hasDecisionNote = candidate?.decisionReason || candidate?.overrideReason;
+  const hasDecisionNote = candidate?.decisionReason;
 
   return (
     <div className="space-y-4">
@@ -148,11 +148,6 @@ export default function FinalStatusTab({ candidate }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   {hasStage && renderStageBadge(stage)}
                   {decisionType && renderDecisionBadge(candidate)}
-                  {candidate?.hrOverride && (
-                    <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5">
-                      <UserCog size={11} /> HR override
-                    </span>
-                  )}
                   {!hasStage && !decisionType && (
                     <span className="text-[11.5px] text-slate-400">No decision recorded yet.</span>
                   )}
@@ -197,9 +192,6 @@ export default function FinalStatusTab({ candidate }) {
                     {candidate.decisionReason}
                     {candidate.decisionAt && <span className="text-slate-400"> · {formatDateTime(candidate.decisionAt)}</span>}
                   </div>
-                )}
-                {candidate.overrideReason && (
-                  <div className="italic text-indigo-700">HR override — "{candidate.overrideReason}"</div>
                 )}
               </div>
             </div>

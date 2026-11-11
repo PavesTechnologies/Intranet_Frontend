@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, UserCog } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Badge } from "../../../../components/ui/badge";
 import AwaitingFullScoringBadge from "../../components/AwaitingFullScoringBadge";
 import {
@@ -102,10 +102,9 @@ export function renderDecisionBadge(candidate) {
   );
 }
 
-// is_fraud_flagged / hr_override are independent booleans, so both can show
-// at once; renders a dash when neither applies rather than two empty icons.
+// The fraud flag, or a dash when it doesn't apply.
 export function renderFlags(candidate) {
-  if (!candidate.isFraudFlagged && !candidate.hrOverride) {
+  if (!candidate.isFraudFlagged) {
     return <span className="text-slate-300 text-xs">—</span>;
   }
   return (
@@ -116,14 +115,6 @@ export function renderFlags(candidate) {
           className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-rose-50 text-rose-600 border border-rose-100"
         >
           <AlertTriangle className="h-3 w-3" />
-        </span>
-      )}
-      {candidate.hrOverride && (
-        <span
-          title="HR override applied"
-          className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100"
-        >
-          <UserCog className="h-3 w-3" />
         </span>
       )}
     </div>

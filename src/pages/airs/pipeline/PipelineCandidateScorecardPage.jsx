@@ -5,7 +5,7 @@ import CandidateHeader from "../candidates/CandidateScore/components/CandidateHe
 import CandidateTabs from "../candidates/CandidateScore/components/CandidateTabs";
 import ErrorState from "../skill-ontology/components/ErrorState";
 import useParsedResumeCandidate from "../candidates/hooks/useParsedResumeCandidate";
-import CandidateOverridePanel from "../campaigns/components/CandidateOverridePanel";
+import DecisionHistoryPanel from "../campaigns/components/DecisionHistoryPanel";
 import CandidateNotesPanel from "../campaigns/components/CandidateNotesPanel";
 import { exportScorecard } from "../campaigns/services/exportService";
 import Button from "../../../components/Button/Button";
@@ -117,12 +117,7 @@ export default function PipelineCandidateScorecardPage({
       resumeRow?.decisionAt,
     ]
   );
-  const { candidate: fetchedCandidate, loading, error, status, refetch } = useParsedResumeCandidate(candidateId, fallback);
-  // Applying/clearing an HR override has no detail re-fetch to lean on here
-  // either — same optimistic-patch approach as CandidateScorePage.
-  const [overridePatch, setOverridePatch] = useState(null);
-  useEffect(() => { setOverridePatch(null); }, [candidateId]);
-  const candidate = fetchedCandidate && overridePatch ? { ...fetchedCandidate, ...overridePatch } : fetchedCandidate;
+  const { candidate, loading, error, status, refetch } = useParsedResumeCandidate(candidateId, fallback);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
   const isModal = variant === "modal";
   const { user, hasRole } = useAuth();
@@ -418,7 +413,7 @@ export default function PipelineCandidateScorecardPage({
 
       {!isModal && candidate.campaignId && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-          <CandidateOverridePanel candidate={candidate} onChanged={setOverridePatch} />
+          <DecisionHistoryPanel candidate={candidate} />
           <div className="bg-white border border-slate-200 rounded-xl p-4">
             <CandidateNotesPanel
               campaignCandidateId={candidate.id}

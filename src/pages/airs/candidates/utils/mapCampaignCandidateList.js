@@ -25,7 +25,6 @@ export function mapCampaignCandidateRow(row = {}) {
     risk: numberOrDash(row.risk_score),
     aiRecommendation: row.ai_recommendation || null,
     isFraudFlagged: !!row.is_fraud_flagged,
-    hrOverride: !!row.hr_override,
     decisionType: row.decision_type || null,
     decisionSource: row.decision_source || null,
     decisionReason: row.decision_reason || null,

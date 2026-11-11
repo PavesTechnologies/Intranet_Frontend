@@ -1,10 +1,10 @@
 // Adapts GET /airs/resumes/candidate/{campaign_candidate_id}/parsed-json into
 // the full candidate shape CandidateHeader/SummaryTab/ResumeTab/
-// CandidateOverridePanel/CandidateNotesPanel render — this is now the single
+// DecisionHistoryPanel/CandidateNotesPanel render — this is now the single
 // data source for the Candidate Scorecard everywhere it's opened (Candidates
 // tab, Pipeline Board, Interview Calendar, Resume Upload History), replacing
 // the old GET /campaign-candidates/{id} detail call. The endpoint carries
-// campaign_candidate_id/campaign_id/email/phone/pipeline_stage/hr_override/
+// campaign_candidate_id/campaign_id/email/phone/pipeline_stage/
 // decision_*/scores/ai_candidate_summary directly now, so `fallback` (the
 // row the caller navigated from) is only a stand-in for whatever a given
 // backend response still leaves out — the API value always wins when present.
@@ -82,8 +82,6 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
     // this against raw values ("REJECTED", "SCREENING"), so it must not be
     // dashed when absent.
     pipelineStage: data.pipeline_stage ?? fallback.stage ?? null,
-    hrOverride: !!(data.hr_override ?? fallback.hrOverride),
-    overrideReason: data.override_reason ?? fallback.overrideReason ?? null,
     decisionType: data.decision_type ?? fallback.decisionType ?? null,
     decisionSource: data.decision_source ?? fallback.decisionSource ?? null,
     decisionReason: data.decision_reason ?? fallback.decisionReason ?? null,
