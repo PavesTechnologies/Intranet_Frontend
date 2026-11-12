@@ -546,7 +546,6 @@ export default function SettlementPage() {
             <table className="w-full text-left text-xs text-gray-700">
               <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                 <tr>
-                  <th className="py-3 px-4">Ref #</th>
                   {isFinanceExecutive && <th className="py-3 px-4">Employee Name</th>}
                   <th className="py-3 px-4">Title & Purpose</th>
                   <th className="py-3 px-4 text-right">Advance Disbursed</th>
@@ -564,9 +563,6 @@ export default function SettlementPage() {
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
-                      <td className="py-3 px-4 font-mono font-medium text-blue-700">
-                        #{String(advId).slice(0, 8)}
-                      </td>
                       {isFinanceExecutive && (
                         <td className="py-3 px-4 font-medium text-gray-900 whitespace-nowrap">
                           {getEmployeeName(adv, directory)}
@@ -632,9 +628,10 @@ export default function SettlementPage() {
                               onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
                               disabled={hasSubmittedLinkedReport(adv)}
                               title={hasSubmittedLinkedReport(adv) ? "An expense report is already submitted for this advance" : "Create an expense report for this cash advance"}
-                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${hasSubmittedLinkedReport(adv) ? "border-gray-200 text-gray-400 cursor-not-allowed" : "border-indigo-200 text-indigo-700 hover:bg-indigo-50"}`}
+                              aria-label="Cash Advance Expense"
+                              className={`inline-flex items-center rounded-md border p-1.5 ${hasSubmittedLinkedReport(adv) ? "border-gray-200 text-gray-400 cursor-not-allowed" : "border-indigo-200 text-indigo-700 hover:bg-indigo-50"}`}
                             >
-                              <Receipt size={13} /> Cash Advance Expense
+                              <Receipt size={15} />
                             </button>
                           )}
 

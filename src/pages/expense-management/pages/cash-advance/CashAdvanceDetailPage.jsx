@@ -14,6 +14,7 @@ import MoneyMovements from "@/pages/expense-management/pages/cash-advance/compon
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import CashAdvanceApprovalPanel from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceApprovalPanel";
+import DecisionNotice from "@/pages/expense-management/pages/cash-advance/components/DecisionNotice";
 import { canApproveAdvance } from "@/pages/expense-management/approval-engine/components/CashAdvanceApprovalsList";
 import {
   formatDate,
@@ -229,6 +230,14 @@ export default function CashAdvanceDetailPage() {
           </div>
           <div>{getStatusBadge(advance.status)}</div>
         </div>
+
+        {!isSettlementView && (
+          <DecisionNotice
+            advance={advance}
+            isOwner={!!user?.employeeId && user.employeeId === advance.employeeId}
+            onChanged={fetchAdvance}
+          />
+        )}
 
 
         {/* Settlement breakdown (settlement view only) */}

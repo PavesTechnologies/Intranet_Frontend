@@ -85,7 +85,6 @@ import {
 } from "@/pages/expense-management/components/expense-reports/BillableClientFields";
 import { expenseDateError, expenseDateHint, useExpenseDateRange } from "@/pages/expense-management/components/expense-reports/expenseDateRange";
 import { toIsoDate } from "@/pages/expense-management/pages/reports/reportUtils";
-import DeadlineOverridePanel from "@/pages/expense-management/components/expense-reports/DeadlineOverridePanel";
 import LineItemEntryFlow from "@/pages/expense-management/components/expense-reports/LineItemEntryFlow";
 import ReportHistoryTimeline from "@/pages/expense-management/components/expense-reports/ReportHistoryTimeline";
 import api from "@/api/axiosInstance";
@@ -197,7 +196,6 @@ export default function ExpenseReportDetailPage() {
   // — don't show write actions (Edit/Delete/Add Line Item/Submit) to Manager.
   const canManage = hasRole(["General"]);
   // Finance and Admin may extend or reopen a draft's submission deadline. The server enforces this as well.
-  const canOverrideDeadline = hasRole(["Finance", "FINANCE", "FINANCE_EXECUTIVE", "Admin", "ADMIN"]);
 
   useApprovalLiveSync();
   const { data: approvalStatus } = useApprovalStatus(reportId);
@@ -925,13 +923,6 @@ export default function ExpenseReportDetailPage() {
                       ? `Overdue: submission was due ${formatDeadlineDate(deadlineInfo.deadline)}`
                       : `Submit by ${formatDeadlineDate(deadlineInfo.deadline)} (${deadlineInfo.daysRemaining} day${deadlineInfo.daysRemaining === 1 ? "" : "s"} left)`}
                   </p>
-                )}
-                {canOverrideDeadline && report.reportStatus === "DRAFT" && (
-                  <DeadlineOverridePanel
-                    reportId={reportId}
-                    currentDeadline={deadlineInfo?.deadline ?? null}
-                    onApplied={fetchReport}
-                  />
                 )}
               </div>
 

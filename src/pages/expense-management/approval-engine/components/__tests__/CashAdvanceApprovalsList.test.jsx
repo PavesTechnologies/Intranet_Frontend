@@ -68,7 +68,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/approve cash advance request/i)).toBeInTheDocument();
+        expect(screen.getByText(/decide on cash advance request/i)).toBeInTheDocument();
         expect(screen.getByText(/business trip/i)).toBeInTheDocument();
       });
     });
@@ -94,7 +94,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         fireEvent.click(approveButton);
       });
 
-      const remarksField = screen.getByPlaceholderText(/approval remarks/i);
+      const remarksField = screen.getByPlaceholderText(/explain the decision/i);
       await userEvent.type(remarksField, 'Approved with budget review');
 
       expect(remarksField.value).toBe('Approved with budget review');
@@ -112,14 +112,14 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
       fireEvent.click(cancelButton);
 
       await waitFor(() => {
-        expect(screen.queryByText(/approve cash advance request/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/decide on cash advance request/i)).not.toBeInTheDocument();
       });
     });
   });
 
   describe('Approval Submission', () => {
     it('should call approve API when confirmed', async () => {
-      cashAdvanceApi.approve.mockResolvedValue({
+      cashAdvanceApi.managerDecision.mockResolvedValue({
         data: { data: { ...mockAdvances[0], status: 'APPROVED' } },
       });
 
@@ -130,16 +130,16 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         fireEvent.click(approveButton);
       });
 
-      const confirmButton = screen.getByRole('button', { name: /confirm approve/i });
+      const confirmButton = screen.getByRole('button', { name: /confirm decision/i });
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
-        expect(cashAdvanceApi.approve).toHaveBeenCalledWith('adv-1');
+        expect(cashAdvanceApi.managerDecision).toHaveBeenCalledWith('adv-1', { decision: 'APPROVE_FULL', justification: null });
       });
     });
 
     it('should disable button during submission', async () => {
-      cashAdvanceApi.approve.mockImplementation(() =>
+      cashAdvanceApi.managerDecision.mockImplementation(() =>
         new Promise(resolve => setTimeout(() => resolve({ data: { data: mockAdvances[0] } }), 500))
       );
 
@@ -150,7 +150,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         fireEvent.click(approveButton);
       });
 
-      const confirmButton = screen.getByRole('button', { name: /confirm approve/i });
+      const confirmButton = screen.getByRole('button', { name: /confirm decision/i });
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
@@ -243,7 +243,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
 
   describe('Error Handling', () => {
     it('should show error message on approval failure', async () => {
-      cashAdvanceApi.approve.mockRejectedValue({
+      cashAdvanceApi.managerDecision.mockRejectedValue({
         response: { data: { message: 'Cannot approve - manager not authorized' } },
       });
 
@@ -254,11 +254,11 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         fireEvent.click(approveButton);
       });
 
-      const confirmButton = screen.getByRole('button', { name: /confirm approve/i });
+      const confirmButton = screen.getByRole('button', { name: /confirm decision/i });
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
-        expect(cashAdvanceApi.approve).toHaveBeenCalled();
+        expect(cashAdvanceApi.managerDecision).toHaveBeenCalled();
       });
     });
   });

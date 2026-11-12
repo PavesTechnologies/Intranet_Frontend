@@ -50,6 +50,9 @@ export const getStageIndex = (statusStr) => {
     case "REJECTED":
     case "CANCELLED":
       return -1;
+    // Deferred requests wait at the manager's review until the employee sends them again.
+    case "DEFERRED":
+      return 1;
     default:
       return 3;
   }
