@@ -101,3 +101,23 @@ export const restoreEmailTemplate = async (triggerEvent, templateId) => {
   );
   return unwrap(response.data);
 };
+
+// ── stage transitions (phase 2) ───────────────────────────────
+// { stages, terminal_stages, roles, routes_for_role, transitions: [{ id, previous_stage, from_stage, to_stage,
+//   allowed_roles, requires_reason, protected, system }] }
+export const getTransitions = async () => {
+  const response = await api.get(`${BASE_URL}/settings/transitions`, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+// changes: [{ op: "update", id, allowed_roles?, requires_reason? } | { op: "add", ... } | { op: "remove", id }]
+// 422 data.problems: every pipeline rule the batch would break.
+export const previewTransitions = async (changes) => {
+  const response = await api.post(`${BASE_URL}/settings/transitions/preview`, { changes }, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+export const saveTransitions = async (changes) => {
+  const response = await api.put(`${BASE_URL}/settings/transitions`, { changes }, { headers: authHeaders() });
+  return unwrap(response.data);
+};
