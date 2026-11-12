@@ -158,3 +158,44 @@ export const previewReferenceImpact = async (payload) => {
   const response = await api.post(`${BASE_URL}/settings/reference-impact`, payload, { headers: authHeaders() });
   return unwrap(response.data);
 };
+
+// ── LLM limits and embeddings (phase 4) ───────────────────────
+// { default, models: { model: n }, models_in_use: [...] }
+export const getLlmCaps = async () => {
+  const response = await api.get(`${BASE_URL}/settings/llm/caps`, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+// payload { default, models } -> { changes: { key: { before, after } }, warnings: [...] }
+export const previewLlmCaps = async (payload) => {
+  const response = await api.post(`${BASE_URL}/settings/llm/caps/preview`, payload, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+export const saveLlmCaps = async (payload) => {
+  const response = await api.put(`${BASE_URL}/settings/llm/caps`, payload, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+// { rules: [...], providers, structured_output_methods: { provider: [...] }, assigned_models: [{ provider, model }] }
+export const getLlmCapabilities = async () => {
+  const response = await api.get(`${BASE_URL}/settings/llm/capabilities`, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+// -> { changes: { rules_added, rules_removed, rules_changed, order_changed } }
+export const previewLlmCapabilities = async (rules) => {
+  const response = await api.post(`${BASE_URL}/settings/llm/capabilities/preview`, { rules }, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+export const saveLlmCapabilities = async (rules) => {
+  const response = await api.put(`${BASE_URL}/settings/llm/capabilities`, { rules }, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+// { active: { model_name, model_version, vector_dimensions, distance_metric, activated_at }, resume_embeddings, jd_embeddings }
+export const getEmbeddingOverview = async () => {
+  const response = await api.get(`${BASE_URL}/settings/embeddings`, { headers: authHeaders() });
+  return unwrap(response.data);
+};
