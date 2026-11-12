@@ -8,6 +8,8 @@ import {
   addEducationFieldRelation, getEducationFieldRelations, removeEducationFieldRelation,
 } from "../services/educationFieldService";
 import { apiErrorMessage } from "../services/aiProviderService";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
+import ReferenceImpactNote from "./ReferenceImpactNote";
 
 const FIELD_LABELS = {
   COMPUTER_SCIENCE: "Computer Science",
@@ -42,6 +44,7 @@ export default function SettingsEducationFields() {
   const [pair, setPair] = useState(EMPTY_PAIR);
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(null);
+  const [confirmAdd, setConfirmAdd] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -71,6 +74,7 @@ export default function SettingsEducationFields() {
       toast.error(apiErrorMessage(error, "Couldn't add the related fields."));
     } finally {
       setBusy(false);
+      setConfirmAdd(false);
     }
   };
 
@@ -116,18 +120,10 @@ export default function SettingsEducationFields() {
                     <span className="font-semibold text-slate-800">{label(FIELD_LABELS, r.field_b)}</span>
                     {r.note && <span className="text-[10px] text-slate-400 truncate">{r.note}</span>}
                     <span className="ml-auto whitespace-nowrap">
-                      {confirmRemove === r.id ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="text-[10px] text-slate-500">Remove?</span>
-                          <Button variant="danger" size="small" disabled={busy} onClick={() => remove(r)}>Remove</Button>
-                          <Button variant="outline" size="small" disabled={busy} onClick={() => setConfirmRemove(null)}>Keep</Button>
-                        </span>
-                      ) : (
-                        <Button variant="outline" size="small" disabled={busy} title="Remove this pair"
-                          onClick={() => setConfirmRemove(r.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
+                      <Button variant="outline" size="small" disabled={busy} title="Remove this pair"
+                        onClick={() => setConfirmRemove(r)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </span>
                   </li>
                 ))}
@@ -156,12 +152,28 @@ export default function SettingsEducationFields() {
             <input className="border border-slate-200 rounded-lg px-2 py-1 text-xs w-56" placeholder="Note (optional)"
               maxLength={500} value={pair.note} disabled={busy}
               onChange={(e) => setPair((p) => ({ ...p, note: e.target.value }))} />
-            <Button variant="outline" size="small" disabled={!canAdd} onClick={add}>
+            <Button variant="outline" size="small" disabled={!canAdd} onClick={() => setConfirmAdd(true)}>
               <Plus className="h-3.5 w-3.5" /> Add
             </Button>
           </div>
         </>
       )}
+
+      {/* Settings phase 3: every change shows the live campaigns it affects before it is saved. */}
+      <ConfirmationModal
+        isOpen={confirmAdd || !!confirmRemove}
+        title={confirmAdd ? "Add this related pair?" : "Remove this related pair?"}
+        message={confirmAdd
+          ? `${label(FIELD_LABELS, pair.field_1)} and ${label(FIELD_LABELS, pair.field_2)} will count as one family on ${label(DOMAIN_LABELS, pair.role_domain)} JDs.`
+          : confirmRemove ? `${label(FIELD_LABELS, confirmRemove.field_a)} and ${label(FIELD_LABELS, confirmRemove.field_b)} will no longer count as one family on ${label(DOMAIN_LABELS, confirmRemove.role_domain)} JDs.` : ""}
+        confirmText={confirmAdd ? "Add" : "Remove"}
+        variant={confirmAdd ? "primary" : "danger"}
+        isLoading={busy}
+        onCancel={() => { setConfirmAdd(false); setConfirmRemove(null); }}
+        onConfirm={() => (confirmAdd ? add() : remove(confirmRemove))}
+      >
+        <ReferenceImpactNote target={{ kind: "education_relation", role_domain: confirmAdd ? pair.role_domain : confirmRemove?.role_domain }} />
+      </ConfirmationModal>
     </div>
   );
 }

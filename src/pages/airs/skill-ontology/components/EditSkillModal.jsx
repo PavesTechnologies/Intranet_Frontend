@@ -4,6 +4,7 @@ import Button from "../../../../components/Button/Button";
 import SkillForm from "./SkillForm";
 import { EMPTY_SKILL_FORM } from "../constants/skillOntologyConstants";
 import { validateSkillForm } from "../utils/skillOntologyUtils.jsx";
+import ReferenceImpactNote from "../../settings/components/ReferenceImpactNote";
 
 // Edit uses the project's existing global Modal (centered, same backdrop/animation
 // as every other edit dialog in the app) instead of a drawer — clicking the Edit
@@ -50,6 +51,8 @@ export default function EditSkillModal({ open, skill, existingSkills = [], categ
           />
         )}
 
+        {/* Settings phase 3: the live campaigns this skill change affects. */}
+        {open && skill?.id && <ReferenceImpactNote target={{ kind: "skill", skill_ids: [skill.id] }} />}
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" size="small" onClick={onClose}>
             Cancel

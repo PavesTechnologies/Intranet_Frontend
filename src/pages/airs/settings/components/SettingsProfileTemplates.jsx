@@ -5,6 +5,8 @@ import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { getProfileTemplates, updateProfileTemplate } from "../services/profileTemplateService";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
+import ReferenceImpactNote from "./ReferenceImpactNote";
 import { apiErrorMessage } from "../services/aiProviderService";
 
 const SECTION_LABELS = { SUMMARY: "Summary", EXPERIENCE: "Experience", SKILLS: "Skills", PROJECTS: "Projects" };
@@ -34,6 +36,7 @@ export default function SettingsProfileTemplates() {
   const [drafts, setDrafts] = useState({});
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState(null);
+  const [confirmSave, setConfirmSave] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -170,13 +173,26 @@ export default function SettingsProfileTemplates() {
                     {template.updated_at ? `Edited ${template.updated_at.split("T")[0]}` : "As seeded"}
                   </span>
                   <Button variant="outline" size="small" disabled={busy || !draft.label.trim()}
-                    onClick={() => save(template)}>Save</Button>
+                    onClick={() => setConfirmSave(template)}>Save</Button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+      {/* Settings phase 3: the live campaigns a template change affects, shown before it is saved. */}
+      <ConfirmationModal
+        isOpen={!!confirmSave}
+        title={confirmSave ? `Save the ${confirmSave.label} template?` : ""}
+        message="A change to the internship credit, tolerance, evidence sections or listed-only confirmation marks scored candidates of these campaigns out of date; a name, description or education change marks nothing."
+        confirmText="Save"
+        variant="primary"
+        isLoading={!!busyKey}
+        onCancel={() => setConfirmSave(null)}
+        onConfirm={async () => { const t = confirmSave; setConfirmSave(null); await save(t); }}
+      >
+        <ReferenceImpactNote target={confirmSave ? { kind: "profile_template", template_key: confirmSave.key } : null} />
+      </ConfirmationModal>
     </div>
   );
 }

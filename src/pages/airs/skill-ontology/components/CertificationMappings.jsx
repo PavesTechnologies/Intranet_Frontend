@@ -9,6 +9,8 @@ import {
   addCertification, addCertificationSkill, getCertifications, getSkillMeanings, removeCertification,
   removeCertificationSkill,
 } from "../services/certificationService";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
+import ReferenceImpactNote from "../../settings/components/ReferenceImpactNote";
 
 const inputClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white";
 
@@ -22,7 +24,8 @@ export default function CertificationMappings() {
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState({ name: "", variants: "", note: "" });
   const [adding, setAdding] = useState({});          // certification id -> { skill, senseKey }
-  const [confirmRemove, setConfirmRemove] = useState(null);
+  // Settings phase 3: { kind: "map" | "unmap" | "remove", cert, skill? } - confirmed with its impact.
+  const [pending, setPending] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -101,20 +104,10 @@ export default function CertificationMappings() {
                 </p>
                 {cert.note && <p className="text-[10px] text-slate-400">{cert.note}</p>}
               </div>
-              {confirmRemove === cert.id ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="text-[10px] text-slate-500">Remove the certification and its mappings?</span>
-                  <Button variant="danger" size="small" disabled={busy}
-                    onClick={() => run(() => removeCertification(cert.id), "Certification removed.",
-                      "Couldn't remove the certification.").then(() => setConfirmRemove(null))}>Remove</Button>
-                  <Button variant="outline" size="small" disabled={busy} onClick={() => setConfirmRemove(null)}>Keep</Button>
-                </span>
-              ) : (
-                <Button variant="outline" size="small" disabled={busy} title="Remove this certification"
-                  onClick={() => setConfirmRemove(cert.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
+              <Button variant="outline" size="small" disabled={busy} title="Remove this certification"
+                onClick={() => setPending({ kind: "remove", cert })}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             </div>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {cert.skills.length === 0 && <span className="text-[10px] text-slate-400">No skills mapped yet.</span>}
@@ -125,8 +118,7 @@ export default function CertificationMappings() {
                   {s.sense_key && <span className="text-slate-400">({senseLabel(s.canonical_skill_id, s.sense_key)})</span>}
                   <button type="button" disabled={busy} className="text-slate-400 hover:text-rose-600"
                     aria-label={`Remove ${s.skill}`} title="Remove this skill from the certification"
-                    onClick={() => run(() => removeCertificationSkill(cert.id, s.canonical_skill_id),
-                      "Skill removed.", "Couldn't remove the skill.")}>
+                    onClick={() => setPending({ kind: "unmap", cert, skill: s })}>
                     <X className="h-3 w-3" />
                   </button>
                 </span>
@@ -143,7 +135,7 @@ export default function CertificationMappings() {
                       {pickSenses.map((s) => <option key={s.sense_key} value={s.sense_key}>{s.label}</option>)}
                     </select>
                   )}
-                  <Button variant="outline" size="small" disabled={busy} onClick={() => mapSkill(cert)}>
+                  <Button variant="outline" size="small" disabled={busy} onClick={() => setPending({ kind: "map", cert })}>
                     <Plus className="h-3.5 w-3.5" /> Map
                   </Button>
                   <Button variant="outline" size="small" disabled={busy}
@@ -173,6 +165,35 @@ export default function CertificationMappings() {
         </div>
         <p className="text-[10px] text-slate-400 mt-1">Then map its skills above.</p>
       </div>
+      <ConfirmationModal
+        isOpen={!!pending}
+        title={{ map: "Map this skill?", unmap: "Remove this skill from the certification?", remove: "Remove this certification and its mappings?" }[pending?.kind] || ""}
+        message={(() => {
+          if (!pending) return "";
+          if (pending.kind === "map") return `${adding[pending.cert.id]?.skill?.canonicalName} will be evidence for anyone holding ${pending.cert.name}.`;
+          if (pending.kind === "unmap") return `${pending.cert.name} will no longer be evidence of ${pending.skill.skill || "this skill"}.`;
+          return `${pending.cert.name} and its ${pending.cert.skills.length} mapping(s) will be removed.`;
+        })()}
+        confirmText={pending?.kind === "map" ? "Map" : "Remove"}
+        variant={pending?.kind === "map" ? "primary" : "danger"}
+        isLoading={busy}
+        onCancel={() => setPending(null)}
+        onConfirm={async () => {
+          const { kind, cert, skill } = pending;
+          setPending(null);
+          if (kind === "map") await mapSkill(cert);
+          else if (kind === "unmap") {
+            await run(() => removeCertificationSkill(cert.id, skill.canonical_skill_id), "Skill removed.", "Couldn't remove the skill.");
+          } else {
+            await run(() => removeCertification(cert.id), "Certification removed.", "Couldn't remove the certification.");
+          }
+        }}
+      >
+        <ReferenceImpactNote target={!pending ? null
+          : pending.kind === "map" ? { kind: "skill", skill_ids: [adding[pending.cert.id]?.skill?.id].filter(Boolean) }
+            : pending.kind === "unmap" ? { kind: "skill", skill_ids: [pending.skill.canonical_skill_id] }
+              : { kind: "certification", certification_id: pending.cert.id }} />
+      </ConfirmationModal>
     </div>
   );
 }

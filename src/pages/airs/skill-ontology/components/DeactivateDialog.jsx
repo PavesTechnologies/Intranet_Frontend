@@ -2,6 +2,7 @@ import React from "react";
 import { AlertTriangle } from "lucide-react";
 import Modal from "../../../../components/ui/Modal";
 import Button from "../../../../components/Button/Button";
+import ReferenceImpactNote from "../../settings/components/ReferenceImpactNote";
 
 // Usage impact (T01) is read directly off the skill object already in hand
 // (jdCount/candidateCount from GET .../{skill_id}, children from the same
@@ -45,6 +46,8 @@ export default function DeactivateDialog({ open, skill, onClose, onConfirm, isSu
           </div>
         )}
 
+        {/* Settings phase 3: the live campaigns this skill change affects. */}
+        {open && skill?.id && <ReferenceImpactNote target={{ kind: "skill", skill_ids: [skill.id] }} />}
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" size="small" onClick={onClose}>
             Cancel

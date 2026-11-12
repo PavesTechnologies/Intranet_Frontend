@@ -2,6 +2,7 @@ import React from "react";
 import Modal from "../../../../components/ui/Modal";
 import Button from "../../../../components/Button/Button";
 import { renderVerificationBadge, formatDate } from "../utils/skillOntologyUtils.jsx";
+import ReferenceImpactNote from "../../settings/components/ReferenceImpactNote";
 
 export default function ReactivateDialog({ open, skill, onClose, onConfirm, isSubmitting }) {
   return (
@@ -20,6 +21,8 @@ export default function ReactivateDialog({ open, skill, onClose, onConfirm, isSu
           Reactivating this skill makes it available again for JD and candidate matching.
         </p>
 
+        {/* Settings phase 3: the live campaigns this skill change affects. */}
+        {open && skill?.id && <ReferenceImpactNote target={{ kind: "skill", skill_ids: [skill.id] }} />}
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" size="small" onClick={onClose}>
             Cancel
