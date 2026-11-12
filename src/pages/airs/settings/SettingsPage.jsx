@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  BellRing, Bot, CalendarClock, GitBranch, GraduationCap, LayoutTemplate, ListChecks, Mail, Plug, Rocket, Scale,
+  BellRing, Bot, CalendarClock, Gauge, GitBranch, GraduationCap, LayoutTemplate, ListChecks, Mail, Plug, Rocket, Scale,
   Settings as SettingsIcon, SlidersHorizontal,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
@@ -18,6 +18,7 @@ import SettingsReasonCodes from "./components/SettingsReasonCodes";
 import SettingsSchedules from "./components/SettingsSchedules";
 import SettingsTransitions from "./components/SettingsTransitions";
 import SettingsScoring from "./components/SettingsScoring";
+import SettingsAiLimits from "./components/SettingsAiLimits";
 
 const PROVIDER_LABEL = { microsoft: "Microsoft Calendar", google: "Google Calendar" };
 
@@ -33,6 +34,7 @@ const TABS = [
   { value: "profile-templates", label: "Profile templates", icon: LayoutTemplate, Component: SettingsProfileTemplates },
   { value: "education-fields", label: "Education fields", icon: GraduationCap, Component: SettingsEducationFields },
   { value: "ai-providers", label: "AI providers", icon: Bot, Component: SettingsAIProviders },
+  { value: "ai-limits", label: "AI limits", icon: Gauge, Component: SettingsAiLimits },
   { value: "integrations", label: "Integrations", icon: Plug, Component: SettingsIntegrations },
   { value: "schedules", label: "Schedules", icon: CalendarClock, Component: SettingsSchedules },
 ];
