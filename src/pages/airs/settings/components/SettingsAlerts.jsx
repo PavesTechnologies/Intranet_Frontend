@@ -68,10 +68,17 @@ export default function SettingsAlerts() {
                   <span className={`text-[10px] font-semibold ${r.enabled ? "text-emerald-700" : "text-slate-400"}`}>
                     {r.enabled ? "Receives" : "Switched off"}
                   </span>
-                  <Button variant="outline" size="small" disabled={busy}
-                    onClick={() => setPending({ alert, recipient: r })}>
-                    {r.enabled ? "Switch off" : "Switch on"}
-                  </Button>
+                  {(() => {
+                    // The server refuses switching off an alert's only recipient; say why up front.
+                    const onlyOne = r.enabled && r.has_email && alert.receiving === 1;
+                    return (
+                      <Button variant="outline" size="small" disabled={busy || onlyOne}
+                        title={onlyOne ? "The only HR admin receiving this alert. Switch another HR admin on first." : undefined}
+                        onClick={() => setPending({ alert, recipient: r })}>
+                        {r.enabled ? "Switch off" : "Switch on"}
+                      </Button>
+                    );
+                  })()}
                 </span>
               </li>
             ))}
