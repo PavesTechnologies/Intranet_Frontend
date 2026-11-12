@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { AlertTriangle, FlaskConical, Plus, RefreshCw, Save } from "lucide-react";
 import Button from "../../../../components/Button/Button";
@@ -8,7 +9,6 @@ import {
   formatApiError,
   getScoringShadowReport,
   listScoringVersions,
-  promoteScoringVersion,
   retireScoringVersion,
   saveShadowRecruiterRanking,
   setCandidateScoringVersion,
@@ -110,6 +110,7 @@ function NewVersionForm({ onCreated }) {
 }
 
 export default function ScoringShadowReport({ campaignId }) {
+  const navigate = useNavigate();
   const [report, setReport] = useState(null);
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -185,22 +186,6 @@ export default function ScoringShadowReport({ campaignId }) {
     }
   };
 
-  const promote = async () => {
-    if (!trying) return;
-    if (!window.confirm(`Make "${trying.label}" the current scoring version? Every campaign is scored and decided `
-      + `with it from the next scoring on; "${report.current_version?.label}" is retired.`)) return;
-    setSwitching(true);
-    try {
-      await promoteScoringVersion(trying.id);
-      toast.success(`"${trying.label}" is now the current scoring version.`);
-      await load();
-    } catch (err) {
-      toast.error(formatApiError(err, "Could not promote the scoring version."));
-    } finally {
-      setSwitching(false);
-    }
-  };
-
   const retire = async () => {
     if (!trying || !window.confirm(`Retire "${trying.label}"? Every campaign trying it stops.`)) return;
     setSwitching(true);
@@ -257,9 +242,11 @@ export default function ScoringShadowReport({ campaignId }) {
           </Button>
           {trying && (
             <>
-              <Button variant="outline" size="small" disabled={switching} onClick={promote}
-                title="Make it the current version for every campaign">
-                Promote to current
+              {/* Settings phase 3: promotion needs a passing golden run - done on Settings > Scoring. */}
+              <Button variant="outline" size="small" disabled={switching}
+                onClick={() => navigate("/ai-screening/settings?tab=scoring")}
+                title="Promotion needs a passing golden run for this version, on Settings > Scoring">
+                Promote… (Settings › Scoring)
               </Button>
               <Button variant="outline" size="small" disabled={switching} onClick={retire}>Retire</Button>
             </>

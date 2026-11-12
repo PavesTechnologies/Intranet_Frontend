@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  BellRing, Bot, CalendarClock, GitBranch, GraduationCap, LayoutTemplate, ListChecks, Mail, Plug, Scale,
+  BellRing, Bot, CalendarClock, GitBranch, GraduationCap, LayoutTemplate, ListChecks, Mail, Plug, Rocket, Scale,
   Settings as SettingsIcon, SlidersHorizontal,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
@@ -17,6 +17,7 @@ import SettingsEmailTemplates from "./components/SettingsEmailTemplates";
 import SettingsReasonCodes from "./components/SettingsReasonCodes";
 import SettingsSchedules from "./components/SettingsSchedules";
 import SettingsTransitions from "./components/SettingsTransitions";
+import SettingsScoring from "./components/SettingsScoring";
 
 const PROVIDER_LABEL = { microsoft: "Microsoft Calendar", google: "Google Calendar" };
 
@@ -27,6 +28,7 @@ const TABS = [
   { value: "email-templates", label: "Email templates", icon: Mail, Component: SettingsEmailTemplates },
   { value: "reason-codes", label: "Reason codes", icon: ListChecks, Component: SettingsReasonCodes },
   { value: "stage-moves", label: "Stage moves", icon: GitBranch, Component: SettingsTransitions },
+  { value: "scoring", label: "Scoring", icon: Rocket, Component: SettingsScoring },
   { value: "scoring-defaults", label: "Campaign defaults", icon: Scale, Component: SettingsWeightConfig },
   { value: "profile-templates", label: "Profile templates", icon: LayoutTemplate, Component: SettingsProfileTemplates },
   { value: "education-fields", label: "Education fields", icon: GraduationCap, Component: SettingsEducationFields },
