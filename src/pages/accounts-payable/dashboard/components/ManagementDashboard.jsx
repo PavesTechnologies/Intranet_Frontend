@@ -24,6 +24,19 @@ const KPI_ICONS = {
   spend_fy: TrendingUp,
 };
 
+/**
+ * "Money going out" categories, in stacking order. Own colours rather than the shared SERIES
+ * palette, whose orange (#eb6834) and amber (#eda100) made "Not yet approved" and "TDS to deposit"
+ * hard to tell apart. Each colour drives the bar segment, the legend marker and the tooltip dot,
+ * so they always match.
+ */
+const OUTFLOW_SERIES = [
+  { key: "approved", label: "Approved - to pay", color: "#3478D4" },
+  { key: "pipeline", label: "Not yet approved", color: "#E4572E" },
+  { key: "recurring", label: "Expected rent & subscriptions (estimate)", color: "#18A879" },
+  { key: "tds", label: "TDS to deposit", color: "#8B5CF6" },
+];
+
 const days = (v) => (v == null ? "—" : `${Number(v).toLocaleString("en-IN", { maximumFractionDigits: 1 })} d`);
 const toSlices = (list) => (list || []).map((s) => ({ ...s, amount: Number(s.amount) }));
 
@@ -250,9 +263,11 @@ export default function ManagementDashboard({ data }) {
     <div className="space-y-4">
       <Highlights items={data.highlights} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {/* Six columns only from 2xl: below that a 6-up row leaves too little width for a full
+          money value, so the cards run three to a row instead. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         {data.kpis.map((kpi) => (
-          <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} currency={currency} />
+          <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} currency={currency} variant="detailed" />
         ))}
       </div>
 
@@ -261,12 +276,7 @@ export default function ManagementDashboard({ data }) {
           <StackedMoneyBars
             points={outflow}
             currency={currency}
-            series={[
-              { key: "approved", label: "Approved - to pay", color: SERIES[0] },
-              { key: "pipeline", label: "Not yet approved", color: SERIES[1] },
-              { key: "recurring", label: "Expected rent & subscriptions (estimate)", color: SERIES[2] },
-              { key: "tds", label: "TDS to deposit", color: SERIES[3] },
-            ]}
+            series={OUTFLOW_SERIES}
           />
           <p className="mt-2 text-[11px] text-slate-400">{data.note}</p>
         </ChartCard>

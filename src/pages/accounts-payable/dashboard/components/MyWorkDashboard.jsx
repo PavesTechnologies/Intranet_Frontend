@@ -32,9 +32,9 @@ export default function MyWorkDashboard({ data }) {
   const intake = data.intake_trend.map((m) => ({ ...m }));
   return (
     <div className="space-y-4">
-      <div className={clsx("grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3", data.kpis.length >= 6 ? "xl:grid-cols-6" : "xl:grid-cols-5")}>
+      <div className={clsx("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3", data.kpis.length >= 6 ? "2xl:grid-cols-6" : "xl:grid-cols-5")}>
         {data.kpis.map((kpi) => (
-          <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} />
+          <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} variant="detailed" />
         ))}
       </div>
 

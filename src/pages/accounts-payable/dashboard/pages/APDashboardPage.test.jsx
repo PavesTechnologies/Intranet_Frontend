@@ -56,7 +56,7 @@ const DATA = {
   },
   management: {
     as_of: "2026-10-09", base_currency: "INR",
-    highlights: [
+    highlights:  [
       { tone: "bad", text: "₹2.6 L on 1 approved invoice is past its due date - pay it now.", link: "/accounts-payable/reports?report=ageing" },
       { tone: "good", text: "91.7% of invoices were paid on time in the last 90 days.", link: null },
     ],
