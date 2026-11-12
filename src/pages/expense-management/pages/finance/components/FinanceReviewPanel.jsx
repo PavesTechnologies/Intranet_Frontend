@@ -23,6 +23,7 @@ import FinanceApprovalLevelTimeline from "./FinanceApprovalLevelTimeline";
 import ReceiptViewer from "../../../approval-engine/components/ReceiptViewer";
 import CommentPromptModal from "../../../approval-engine/components/CommentPromptModal";
 import { useFinanceStatus, useFinanceReviews, useVerifyLineItem, useQueryLineItem, useAdjustLineTax } from "../hooks/useFinanceVerification";
+import CashAdvanceOffsetSection from "./CashAdvanceOffsetSection";
 import FinanceTaxPanel, { AdjustTaxModal, needsTaxConfirmation } from "./FinanceTaxPanel";
 import LineAllocationDetails from "@/pages/expense-management/components/expense-reports/LineAllocationDetails";
 import { useAuth } from "@/contexts/AuthContext";
@@ -442,6 +443,18 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
             ) : (
               <Section icon={<FileText className="h-4 w-4 text-gray-400" />} title="Expense Information">
                 <p className="text-sm text-gray-400">No line item details available for this report.</p>
+              </Section>
+            )}
+
+            {(
+              <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Cash advance offset">
+                <CashAdvanceOffsetSection
+                  reportId={reportId}
+                  employeeId={fullReport?.employeeId}
+                  reportTotal={fullReport?.totalAmount}
+                  currencyCode={fullReport?.currencyCode}
+                  onApplied={() => {}}
+                />
               </Section>
             )}
 

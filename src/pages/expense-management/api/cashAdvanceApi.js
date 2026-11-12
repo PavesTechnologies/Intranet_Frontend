@@ -31,6 +31,7 @@ const multipartConfig = () => ({
  * - POST /xms/employee/cash-advances/{advanceId}/submit
  * - POST /xms/employee/cash-advances/{advanceId}/approve
  * - POST /xms/employee/cash-advances/{advanceId}/reject
+ * - POST /xms/employee/cash-advances/{advanceId}/manager-decision
  * - POST /xms/employee/cash-advances/{advanceId}/disburse
  * - POST /xms/employee/cash-advances/{advanceId}/cancel
  * - GET /xms/employee/cash-advances/my-advances
@@ -69,6 +70,20 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // Calculation preview for the request form. The server calculates it; the browser only displays it.
+  preview: (payload) =>
+    api.post("/xms/employee/cash-advances/preview", payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
+  // The signed-in employee's identity for the request form (read-only).
+  myProfile: () =>
+    api.get("/xms/employee/cash-advances/my-profile", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
   update: (advanceId, payload) =>
     api.put(`/xms/employee/cash-advances/${advanceId}`, payload, {
       baseURL: EXPENSE_API_BASE,
@@ -87,11 +102,22 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // The employee's other open advances and what each still owes, shown to the approver before deciding.
+  approvalBalance: (advanceId) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/approval-balance`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
   approve: (advanceId) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/approve`, null, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+
+  // The manager's decision: APPROVE_FULL, APPROVE_REDUCED, SET_OFF, DEFER or REJECT. The server re-checks every rule.
+  managerDecision: (advanceId, body) =>
+    api.post(`/xms/employee/cash-advances/${advanceId}/manager-decision`, body),
 
   reject: (advanceId, reason) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/reject`, null, {

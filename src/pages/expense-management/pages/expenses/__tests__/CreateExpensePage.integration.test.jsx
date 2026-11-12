@@ -49,8 +49,8 @@ const pickOption = async (labelText, optionText) => {
 const fillReport = async ({ advanceTitle } = {}) => {
   fireEvent.change(screen.getByLabelText(/report title/i), { target: { value: 'Hotel Expense Report' } });
   fireEvent.change(screen.getByLabelText(/business purpose/i), { target: { value: PURPOSE } });
-  fireEvent.change(screen.getByLabelText(/trip \/ meeting start date/i), { target: { value: '2026-10-01' } });
-  fireEvent.change(screen.getByLabelText(/estimated end date/i), { target: { value: '2026-10-05' } });
+  fireEvent.change(screen.getByLabelText(/trip start date/i), { target: { value: '2026-10-01' } });
+  fireEvent.change(screen.getByLabelText(/trip end date/i), { target: { value: '2026-10-05' } });
   await pickOption(/^Cost Center/, 'ENG - Engineering');
   await pickOption(/^Report Currency/, 'USD - US Dollar');
   if (advanceTitle) {
@@ -229,7 +229,7 @@ describe('CreateExpensePage - EP04-S4: Expense-Advance Integration', () => {
       renderWithProviders(<CreateExpensePage />);
       await fillReport();
       // Other required fields are valid; only the end date is moved before the start date.
-      fireEvent.change(screen.getByLabelText(/estimated end date/i), { target: { value: '2026-09-30' } });
+      fireEvent.change(screen.getByLabelText(/trip end date/i), { target: { value: '2026-09-30' } });
       fireEvent.click(screen.getByRole('button', { name: /create expense report/i }));
 
       await waitFor(() => {

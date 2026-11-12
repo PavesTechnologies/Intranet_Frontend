@@ -4,6 +4,7 @@ import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
+import ManagerDecisionSummary from "@/pages/expense-management/pages/cash-advance/components/ManagerDecisionSummary";
 
 const MANAGER_STAGE = ["SUBMITTED", "PENDING", "PENDING_APPROVAL", "PENDING_MANAGER_APPROVAL"];
 const COST_CENTER_STAGE = ["PENDING_COST_CENTER_APPROVAL", "PENDING_COST_CENTER"];
@@ -149,6 +150,10 @@ export default function CashAdvanceApprovalPanel({ advance, canAct, onChanged })
           )}
         </ul>
       </div>
+
+      {canAct && !rejected && current >= 3 && (
+        <ManagerDecisionSummary advance={advance} canAct={canAct} onChanged={onChanged} />
+      )}
 
       {canAct && !rejecting && (
         <div className="flex flex-wrap gap-2">

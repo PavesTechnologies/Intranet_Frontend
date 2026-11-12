@@ -2084,7 +2084,7 @@ export default function CreateExpensePage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormInput
-                label="Trip / Meeting Start Date"
+                label="Trip start date"
                 name="tripStartDate"
                 type="date"
                 value={formData.tripStartDate}
@@ -2094,7 +2094,7 @@ export default function CreateExpensePage() {
                 error={formErrors.tripStartDate}
               />
               <FormInput
-                label="Estimated End Date"
+                label="Trip end date"
                 name="tripEndDate"
                 type="date"
                 value={formData.tripEndDate}

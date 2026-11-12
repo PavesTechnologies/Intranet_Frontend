@@ -97,6 +97,8 @@ export default function MyAdvancesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  // Closed and cancelled records are hidden under "All Statuses" unless this is ticked.
+  const [showClosed, setShowClosed] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Modals state
@@ -208,13 +210,13 @@ export default function MyAdvancesPage() {
 
       const advStatus = (adv.status || "").toUpperCase();
       const matchStatus =
-        statusFilter === "ALL" ||
+        (statusFilter === "ALL" && (showClosed || !["CLOSED", "CANCELLED"].includes(advStatus))) ||
         (statusFilter === "PENDING" && (advStatus === "SUBMITTED" || advStatus === "PENDING" || advStatus === "PENDING_APPROVAL")) ||
         advStatus === statusFilter;
 
       return matchSearch && matchStatus;
     });
-  }, [advances, searchTerm, statusFilter]);
+  }, [advances, searchTerm, statusFilter, showClosed]);
 
   // Newest first, so the latest request is on the first page and older ones move to the last pages
   const sortedAdvances = useMemo(() => {
@@ -466,6 +468,16 @@ export default function MyAdvancesPage() {
             className="[&>label]:text-xs [&>label]:mb-1"
             buttonClassName="!py-1.5 !px-3 !text-xs"
           />
+          {statusFilter === "ALL" && (
+            <label className="flex items-center gap-2 text-xs text-gray-600 whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showClosed}
+                onChange={(e) => setShowClosed(e.target.checked)}
+              />
+              Show closed and cancelled
+            </label>
+          )}
         </div>
       </div>
 
@@ -501,7 +513,6 @@ export default function MyAdvancesPage() {
               <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                 <tr>
                   <th className="py-3 px-4">S.No</th>
-                  <th className="py-3 px-4">Report #</th>
                   <th className="py-3 px-4">Title</th>
                   <th className="py-3 px-4">Cost Center</th>
                   <th className="py-3 px-4">Currency</th>
@@ -522,9 +533,6 @@ export default function MyAdvancesPage() {
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
                       <td className="py-3 px-4 font-medium text-gray-600">
                         {(safeCurrentPage - 1) * PAGE_SIZE + idx + 1}
-                      </td>
-                      <td className="py-3 px-4 font-mono font-medium text-blue-700">
-                        #{String(advId).slice(0, 8)}
                       </td>
                       <td className="py-3 px-4 max-w-xs">
                         <p className="font-semibold text-gray-900 truncate">{adv.title || "Cash Advance"}</p>

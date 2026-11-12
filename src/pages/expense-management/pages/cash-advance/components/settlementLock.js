@@ -11,8 +11,8 @@ const NON_LOCKING_SALARY_STATUSES = ["CANCELLED", "PAYROLL_FAILED"];
 /** Reads what has already been done with this advance's balance. */
 export const loadSettlementLock = async (advanceId) => {
   const [ready, requests] = await Promise.all([
-    carryForwardApi.getReady(advanceId).catch(() => null),
-    recoveryApi.listSalaryDeductions(advanceId).catch(() => []),
+    Promise.resolve().then(() => carryForwardApi.getReady(advanceId)).catch(() => null),
+    Promise.resolve().then(() => recoveryApi.listSalaryDeductions(advanceId)).catch(() => []),
   ]);
   const readyAmount = Number(ready?.readyAmount) || 0;
   if (readyAmount > 0) {
