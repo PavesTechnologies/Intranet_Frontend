@@ -121,3 +121,40 @@ export const saveTransitions = async (changes) => {
   const response = await api.put(`${BASE_URL}/settings/transitions`, { changes }, { headers: authHeaders() });
   return unwrap(response.data);
 };
+
+// ── scoring (phase 3) ─────────────────────────────────────────
+// { defaults, schema: { section: { key: { type, min?, max? } } | { type } }, current_version_id }
+export const getScoringConfig = async () => {
+  const response = await api.get(`${BASE_URL}/settings/scoring-config`, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+// { config_hash, runs: [...], promotion_run }
+export const getGoldenRuns = async (versionId) => {
+  const response = await api.get(`${BASE_URL}/settings/scoring-versions/${versionId}/golden-runs`, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+// { model, cap, used_today, reserved_for_candidates, needed }
+export const getGoldenBudget = async (versionId, needed) => {
+  const response = await api.get(`${BASE_URL}/settings/scoring-versions/${versionId}/golden-runs/budget`, {
+    headers: authHeaders(), params: { needed },
+  });
+  return unwrap(response.data);
+};
+
+// kind: "ESTIMATE" (no LLM call) | "RUN" (needs a fresh estimate; full and no-LLM)
+export const startGoldenRun = async (versionId, kind) => {
+  const response = await api.post(`${BASE_URL}/settings/scoring-versions/${versionId}/golden-runs`, { kind }, {
+    headers: authHeaders(),
+  });
+  return unwrap(response.data);
+};
+
+// ── reference data impact (phase 3) ───────────────────────────
+// kind: skill | certification | education_relation | profile_template
+// -> { campaigns: [{ id, name }], candidates_marked_out_of_date }
+export const previewReferenceImpact = async (payload) => {
+  const response = await api.post(`${BASE_URL}/settings/reference-impact`, payload, { headers: authHeaders() });
+  return unwrap(response.data);
+};
