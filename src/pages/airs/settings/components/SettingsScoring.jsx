@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { CheckCircle2, FlaskConical, Loader2, Plus, Rocket, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FlaskConical, Loader2, Plus, Rocket, Trash2, XCircle } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
@@ -19,6 +19,8 @@ const STOP_TEXT = {
   CONFIGURATION_CHANGED: "stopped: the version changed",
 };
 const unwrapList = (res) => (Array.isArray(res) ? res : res?.data ?? []);
+const timeOf = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null);
+const dateTimeOf = (iso) => (iso ? new Date(iso).toLocaleString() : null);
 
 // The settings a version changes compared with another (dotted keys, before -> after).
 function differences(a, b, prefix = "") {
@@ -61,14 +63,21 @@ function GoldenPanel({ version, onRuns }) {
   const [budget, setBudget] = useState(null);
   const [confirmRun, setConfirmRun] = useState(false);
   const [busy, setBusy] = useState(false);
+  // A failed refresh while a run is in progress: shown next to the spinner with a Retry, not as a toast
+  // every 5 seconds (the spinner would otherwise stay up with no sign the page stopped updating).
+  const [refreshError, setRefreshError] = useState(null);
+  const [retrying, setRetrying] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ refresh = false } = {}) => {
     try {
       const result = await getGoldenRuns(version.id);
       setData(result);
+      setRefreshError(null);
       onRuns?.(result);
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Couldn't load the golden runs."));
+      const message = apiErrorMessage(error, "Couldn't load the golden runs.");
+      if (refresh) setRefreshError(message);
+      else toast.error(message);
     }
   }, [version.id, onRuns]);
 
@@ -78,9 +87,18 @@ function GoldenPanel({ version, onRuns }) {
   const running = latest && ACTIVE.includes(latest.status);
   useEffect(() => {
     if (!running) return undefined;
-    const timer = setInterval(load, 5000);
+    const timer = setInterval(() => load({ refresh: true }), 5000);
     return () => clearInterval(timer);
   }, [running, load]);
+
+  const retry = async () => {
+    setRetrying(true);
+    try {
+      await load({ refresh: true });
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const estimate = data?.runs?.find((r) => r.kind === "ESTIMATE" && r.status === "ESTIMATED" && r.config_hash === data.config_hash);
   const lastRun = data?.runs?.find((r) => r.kind === "RUN");
@@ -114,9 +132,24 @@ function GoldenPanel({ version, onRuns }) {
         {version.status === "current" && <span className="font-normal text-slate-500">— check the current version, e.g. after reference-data edits</span>}
       </h4>
       {running ? (
-        <p className="text-[11px] text-slate-600 mt-2 flex items-center gap-1.5">
-          <Loader2 className="h-3 w-3 animate-spin" /> {latest.kind === "ESTIMATE" ? "Estimating" : "Running"}… this takes a few minutes.
-        </p>
+        <div className="mt-2 space-y-1">
+          <p className="text-[11px] text-slate-600 flex items-center gap-1.5">
+            <Loader2 className="h-3 w-3 animate-spin" /> {latest.kind === "ESTIMATE" ? "Estimating" : "Running"}… this takes a few minutes.
+            <span className="text-slate-400">
+              {latest.started_at
+                ? `Started ${timeOf(latest.started_at)}`
+                : `Queued ${timeOf(latest.created_at)}, waiting for the worker`}
+            </span>
+          </p>
+          {refreshError && (
+            <p className="text-[11px] text-rose-600 flex flex-wrap items-center gap-1.5" role="alert">
+              <AlertTriangle className="h-3 w-3" /> Couldn't refresh: {refreshError} The status shown may be out of date.
+              <Button variant="outline" size="small" disabled={retrying} onClick={retry}>
+                {retrying ? "Retrying…" : "Retry"}
+              </Button>
+            </p>
+          )}
+        </div>
       ) : (
         <div className="mt-2 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -142,7 +175,8 @@ function GoldenPanel({ version, onRuns }) {
           <div className="flex items-center gap-1.5 font-semibold">
             {lastRun.status === "PASSED" ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <XCircle className="h-3.5 w-3.5 text-rose-600" />}
             Last run: {lastRun.status.toLowerCase()}{lastRun.stop_reason ? ` (${STOP_TEXT[lastRun.stop_reason] || lastRun.stop_reason})` : ""}
-            {lastRun.finished_at && <span className="font-normal text-slate-400"> · {new Date(lastRun.finished_at).toLocaleString()}</span>}
+            {lastRun.started_at && <span className="font-normal text-slate-400"> · started {dateTimeOf(lastRun.started_at)}</span>}
+            {lastRun.finished_at && <span className="font-normal text-slate-400"> · finished {dateTimeOf(lastRun.finished_at)}</span>}
             {lastRun.config_hash !== data.config_hash && <span className="font-normal text-amber-700"> · for an earlier configuration</span>}
           </div>
           <RunSummary run={lastRun} />
