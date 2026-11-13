@@ -16,17 +16,26 @@ export default function EmployeeProfileCard({ profile, loading = false }) {
     ["Designation", profile.designationName],
   ].filter(([, value]) => value);
 
+  const initials = (profile.fullName || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+
   return (
-    <section className="rounded-lg border border-gray-200 bg-gray-50/70 p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gray-600">
-        <UserRound size={14} aria-hidden="true" />
-        Your details (from your employee record)
+    <section className="flex items-start gap-4 rounded-lg border border-gray-200 bg-gray-50/70 p-3">
+      <div
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700"
+        aria-hidden="true"
+      >
+        {initials || <UserRound size={20} />}
       </div>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2">
+      <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-5">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex gap-2">
-            <dt className="w-32 shrink-0 text-gray-500">{label}</dt>
-            <dd className="min-w-0 truncate font-medium text-gray-900">{value}</dd>
+          <div key={label} className="min-w-0">
+            <dt className="text-[11px] uppercase tracking-wide text-gray-500">{label}</dt>
+            <dd className="mt-0.5 truncate text-sm font-semibold text-gray-900" title={value}>{value}</dd>
           </div>
         ))}
       </dl>

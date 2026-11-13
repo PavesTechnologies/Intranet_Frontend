@@ -106,7 +106,8 @@ export default function SettlementPage() {
   const [settlementLocks, setSettlementLocks] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  // Open items (not yet settled or closed) are the working queue; closed records are shown only when asked for.
+  const [statusFilter, setStatusFilter] = useState("OPEN");
 
   const isFinanceExecutive = useMemo(() => {
     if (typeof hasRole === "function") {
@@ -267,7 +268,9 @@ export default function SettlementPage() {
       const statusUpper = (adv.status || "").toUpperCase();
 
       let matchStatus = true;
-      if (statusFilter === "APPROVED") {
+      if (statusFilter === "OPEN") {
+        matchStatus = !["SETTLED", "CLOSED"].includes(statusUpper);
+      } else if (statusFilter === "APPROVED") {
         matchStatus = ["APPROVED"].includes(statusUpper);
       } else if (statusFilter === "DISBURSED" || statusFilter === "IN_PROGRESS") {
         matchStatus = [
@@ -442,11 +445,25 @@ export default function SettlementPage() {
   ];
 
   const statusOptions = [
-    { label: "All Advances", value: "ALL" },
+    { label: "Open (needs action)", value: "OPEN" },
+    { label: "All Advances (incl. closed)", value: "ALL" },
     { label: "Approved (Awaiting Disbursement)", value: "APPROVED" },
     { label: "Disbursed / Outstanding", value: "DISBURSED" },
-    { label: "Fully Settled", value: "SETTLED" },
+    { label: "Closed (Fully Settled)", value: "SETTLED" },
   ];
+
+  // Shown in the header so the user can see which role this session is working under.
+  const roleLabel = useMemo(() => {
+    const roles = Array.isArray(user?.roles)
+      ? user.roles.map((r) => String(r).toUpperCase())
+      : typeof user?.role === "string"
+      ? [user.role.toUpperCase()]
+      : [];
+    if (roles.some((r) => ["FINANCE EXECUTIVE", "FINANCE_EXECUTIVE", "FINANCE"].includes(r))) return "Finance Executive";
+    if (roles.some((r) => ["ADMIN", "SUPER_ADMIN"].includes(r))) return "Administrator";
+    if (roles.some((r) => r.includes("MANAGER"))) return "Manager";
+    return "Employee";
+  }, [user]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
@@ -456,6 +473,9 @@ export default function SettlementPage() {
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#0a174e]">Cash Advance Settlement & Closure</h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Signed in as <span className="font-semibold text-gray-700">{roleLabel}</span>
+          </p>
           <p className="text-xs text-gray-500 mt-0.5">
             Settle outstanding cash advance balances against submitted expenses, record repayments/reimbursements, and achieve zero-balance closure.
           </p>

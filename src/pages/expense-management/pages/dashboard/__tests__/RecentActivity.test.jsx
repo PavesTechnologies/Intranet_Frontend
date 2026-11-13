@@ -132,9 +132,10 @@ describe("recent activity", () => {
     expect(screen.getByLabelText("Loading recent activity")).toBeInTheDocument();
   });
 
-  it("the list is a labelled list of rows", () => {
+  it("the activity table has a header row and one row per record", () => {
     renderIt();
-    const list = screen.getByTestId("activity-list");
-    expect(within(list).getAllByRole("listitem")).toHaveLength(4);
+    const table = screen.getByTestId("activity-list");
+    expect(within(table).getAllByRole("row")).toHaveLength(5); // header + 4 records
+    expect(within(table).getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
   });
 });

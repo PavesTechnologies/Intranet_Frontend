@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, ClipboardCheck, Plus, RefreshCw, Wallet } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PageHeader from "@/components/ui/PageHeader";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,9 +9,8 @@ import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { dashboardService } from "@/pages/expense-management/api/expenseReportsApi";
-import { formatKpiValue } from "@/pages/expense-management/components/dashboard/dashboardTheme";
-import { ChartCard, ItemList } from "@/pages/expense-management/components/dashboard/DashboardWidgets";
 import EmployeeMoneyFlow from "@/pages/expense-management/components/dashboard/EmployeeMoneyFlow";
+import RoleDashboard from "@/pages/expense-management/components/dashboard/RoleDashboard";
 
 // Each role sees one simple money flow: four steps, left to right, showing where the money is now.
 // Each step names the figure, says what it means in one line, and points to the records behind it.
@@ -88,7 +87,14 @@ const VIEWS = [
     activityTitle: "Your recent decisions",
     link: () => "/expense-management/approvals",
     showEmployee: true,
-    actions: [{ label: "Open approvals", to: "/expense-management/approvals", icon: ClipboardCheck, variant: "primary" }],
+    attentionSubtitle: "Requests and reports waiting for your decision",
+    activitySubtitle: "What you approved or sent back recently",
+    quickActions: [
+      { key: "approvals", label: "Open approvals", hint: "Requests and reports waiting for you", icon: "ClipboardCheck", to: "/expense-management/approvals", roles: ["MANAGER", "REPORTING_MANAGER"], primary: true },
+      { key: "ca-approvals", label: "Cash advance approvals", hint: "Advance requests for your decision", icon: "Banknote", to: "/expense-management/cash-advance/approvals", roles: ["MANAGER"] },
+      { key: "team", label: "Team expenses", hint: "Expense reports from your team", icon: "FileText", to: "/expense-management/expenses/all", roles: ["MANAGER"] },
+    ],
+    actions: [],
   },
   {
     view: "finance",
@@ -106,7 +112,14 @@ const VIEWS = [
     activityTitle: "Latest verifications",
     link: () => "/expense-management/finance",
     showEmployee: true,
-    actions: [{ label: "Open Finance", to: "/expense-management/finance", icon: ClipboardCheck, variant: "primary" }],
+    attentionSubtitle: "Oldest reports first, so the longest waits are seen first",
+    activitySubtitle: "Reports you verified most recently",
+    quickActions: [
+      { key: "finance", label: "Finance verification", hint: "Reports waiting to be verified", icon: "ClipboardCheck", to: "/expense-management/finance", roles: ["FINANCE_EXECUTIVE"], primary: true },
+      { key: "settlement", label: "Cash advance settlement", hint: "Settle advances and review balances", icon: "Banknote", to: "/expense-management/cash-advance/settlement", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "reports", label: "Expense reports", hint: "All reports, with their status", icon: "FileText", to: "/expense-management/reports", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+    ],
+    actions: [],
   },
   {
     view: "ap",
@@ -124,7 +137,13 @@ const VIEWS = [
     activityTitle: "Recent payments",
     link: () => "/expense-management/ap-payments/queue",
     showEmployee: true,
-    actions: [{ label: "Open AP queue", to: "/expense-management/ap-payments/queue", icon: Wallet, variant: "primary" }],
+    attentionSubtitle: "Approved reports, oldest first",
+    activitySubtitle: "Payments confirmed recently",
+    quickActions: [
+      { key: "queue", label: "Payment queue", hint: "Reports approved and waiting for payment", icon: "Wallet", to: "/expense-management/ap-payments/queue", roles: ["AP_EXECUTIVE"], primary: true },
+      { key: "notifications", label: "Notifications", hint: "Updates on payments and returns", icon: "Bell", to: "/expense-management/activity/notifications", roles: ["AP_EXECUTIVE"] },
+    ],
+    actions: [],
   },
   {
     view: "admin",
@@ -140,19 +159,18 @@ const VIEWS = [
     activityTitle: "Latest submissions",
     link: (it) => `/expense-management/expenses/reports/${it.reportId}`,
     showEmployee: true,
-    actions: [{ label: "Masters", to: "/expense-management/masters/expense-categories", variant: "outline" }],
+    activitySubtitle: "Reports submitted most recently across the organization",
+    showBudgets: true,
+    showBreakdown: true,
+    quickActions: [
+      { key: "reports", label: "Expense reports", hint: "All reports across the organization", icon: "FileText", to: "/expense-management/reports", roles: ["ADMIN", "SUPER_ADMIN"], primary: true },
+      { key: "masters", label: "Masters", hint: "Categories, cost centres, tax and currency", icon: "Settings", to: "/expense-management/masters/expense-categories", roles: ["ADMIN", "SUPER_ADMIN"] },
+      { key: "policy", label: "Policy rules", hint: "Rules that check each expense", icon: "Shield", to: "/expense-management/policy-engine/rules", roles: ["ADMIN", "SUPER_ADMIN"] },
+      { key: "audit", label: "Audit logs", hint: "Who changed what, and when", icon: "Clock3", to: "/expense-management/activity/audit-logs", roles: ["ADMIN", "SUPER_ADMIN"] },
+    ],
+    actions: [],
   },
 ];
-
-const TONE_TEXT = {
-  indigo: "text-indigo-700", blue: "text-blue-700", emerald: "text-emerald-700",
-  amber: "text-amber-700", rose: "text-rose-700", gray: "text-slate-800",
-};
-const TONE_CARD = {
-  indigo: "border-indigo-100 bg-indigo-50/60", blue: "border-blue-100 bg-blue-50/60",
-  emerald: "border-emerald-100 bg-emerald-50/60", amber: "border-amber-100 bg-amber-50/60",
-  rose: "border-rose-100 bg-rose-50/60", gray: "border-slate-200 bg-slate-50",
-};
 
 // The role-specific view remembered per user, so a shared browser does not reopen another person's tab.
 const viewStorageKey = (user) =>
@@ -193,14 +211,13 @@ export default function DashboardPage() {
 
   const { data, isLoading, isError, error, refetch, isFetching } = useDashboard(active.view);
   const currency = data?.baseCurrencyCode || "INR";
-  const firstName = (user?.name || user?.employee_name || "").split(" ")[0];
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Dashboard" }]} />
 
       <PageHeader
-        title={firstName ? `Hi ${firstName}` : "Dashboard"}
+        title="Dashboard"
         subtitle={active.subtitle}
         actions={
           <>
@@ -248,51 +265,9 @@ export default function DashboardPage() {
   );
 }
 
-function FlowStep({ index, step, kpi, currency, last }) {
-  return (
-    <div className="relative min-w-0">
-      <div data-kpi={step.key} className={`flex h-full flex-col rounded-2xl border p-5 shadow-sm ${TONE_CARD[step.tone] || TONE_CARD.gray}`}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          {index + 1}. {step.label}
-        </p>
-        <p className={`mt-3 text-3xl font-bold tabular-nums ${TONE_TEXT[step.tone] || TONE_TEXT.gray}`}>
-          {kpi ? formatKpiValue(kpi, currency) : "-"}
-        </p>
-        <p className="mt-2 text-sm text-slate-600">{step.help}</p>
-        {kpi?.hint && <p className="mt-auto pt-3 text-xs text-slate-500">{kpi.hint}</p>}
-      </div>
-      {!last && (
-        <ArrowRight className="absolute -right-3.5 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 rounded-full bg-white text-slate-300 lg:block" />
-      )}
-    </div>
-  );
-}
-
 function DashboardBody({ data, config, currency }) {
   if (config.ledgers) {
     return <EmployeeMoneyFlow data={data} config={config} currency={currency} />;
   }
-  const byKey = useMemo(() => Object.fromEntries((data.kpis || []).map((k) => [k.key, k])), [data]);
-  return (
-    <>
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {config.steps.map((step, i) => (
-          <FlowStep key={step.key} index={i} step={step} kpi={byKey[step.key]} currency={currency} last={i === config.steps.length - 1} />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {config.attentionTitle && (
-          <ChartCard title={config.attentionTitle} className={config.activityTitle ? "lg:col-span-3" : "lg:col-span-5"}>
-            <ItemList items={data.attention} currency={currency} linkFor={config.link} showEmployee={config.showEmployee} empty={config.attentionEmpty} />
-          </ChartCard>
-        )}
-        {config.activityTitle && (
-          <ChartCard title={config.activityTitle} className={config.attentionTitle ? "lg:col-span-2" : "lg:col-span-5"}>
-            <ItemList items={data.activity} currency={currency} linkFor={config.link} showEmployee={config.showEmployee} timeline empty="No recent activity." />
-          </ChartCard>
-        )}
-      </div>
-    </>
-  );
+  return <RoleDashboard data={data} config={config} currency={currency} />;
 }

@@ -84,6 +84,34 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }).then((res) => res.data?.data ?? res.data),
 
+  // Supporting documents on a request. Upload and removal are allowed only while the request is a draft (the server checks).
+  listDocuments: (advanceId) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/documents`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
+  uploadDocument: (advanceId, category, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("category", category);
+    return api.post(`/xms/employee/cash-advances/${advanceId}/documents`, formData, multipartConfig())
+      .then((res) => res.data?.data ?? res.data);
+  },
+
+  // A short-lived link to view ("view") or download ("download") a document.
+  documentLink: (advanceId, documentId, kind) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/documents/${documentId}/${kind}`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
+  deleteDocument: (advanceId, documentId) =>
+    api.delete(`/xms/employee/cash-advances/${advanceId}/documents/${documentId}`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
   update: (advanceId, payload) =>
     api.put(`/xms/employee/cash-advances/${advanceId}`, payload, {
       baseURL: EXPENSE_API_BASE,
