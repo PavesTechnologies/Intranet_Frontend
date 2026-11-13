@@ -151,3 +151,54 @@ Still open in Workflow A:
 - Needed-by date isn't checked against the trip start date.
 - Cost Centre Owner stage and Finance disbursement screen have not been reviewed in this round.
 - The retry fix on the request page has no unit test.
+
+## 8. Slice 1 review: status and open points
+
+Done:
+- Both request types, the calculation preview, the conditional justification and the compact outstanding summary.
+- Submit is disabled until a preview has been calculated for the current amount, type and currency. Changing any of them drops the preview. The confirmation dialog shows the calculated cash and total.
+- Preview checks the whole form first, so the calculation is only made of valid input.
+- Submitted requests are read-only: only a draft can be edited. The query workflow reopens a request in Slice 4.
+- Cash Advance + Outstanding cannot be approved or disbursed until its rollover exists. The rollover is created inside Finance approval, in the same transaction, so there is no circular wait. The refusals are safety stops and are removed when the rollover step is built.
+- A justification is required whenever the employee has any open balance and selects Complete New, including balances that are not eligible for rollover (for example, expenses still awaiting approval). The only way to skip it is to have no open balance at all.
+
+Employee profile:
+- Department and designation names are left blank (not shown) until a name lookup exists. The employee cache holds only their IDs.
+- Future integration: resolve department and designation names from the employee master (synchronised employee data) through the existing employee sync. Raw IDs must never be shown as labels.
+
+Amount rule (multiples of 500):
+- This rule predates Slice 1: the backend and the form already enforced it. The preview applies the same check.
+- No approved policy for it was found in the code or the design documents. It is kept until Finance confirms or removes it. Removing it changes existing behaviour, so it is not removed without that confirmation.
+
+Migration V42:
+- Verified on MySQL 8.0.46 (the production version) against a fixture table with existing rows: the six columns are added, the rows are unchanged, the migration can be run twice, and legacy NULL request types are read as Complete New.
+- Not verified: a full replay of V1 to V41 on an empty database. The earlier review found that V1 to V38 cannot be replayed on a schema built by the entity mappings, so that check is not possible yet.
+- V1 to V38 match the last commit. V39 to V41 are not in the commit (they came from earlier work); they were not edited in Slice 1.
+
+Still open:
+- Browser verification of both request types (no browser automation was available in this session).
+
+## 9. Slice 2: supporting documents
+
+Rules:
+- Optional. At most 5 documents per request, each at most 5 MB.
+- Formats: PDF, JPG, JPEG, PNG and DOCX. Checked by extension, declared type, and the file's actual bytes (a DOCX must be a ZIP that contains the Word body).
+- Categories: travel itinerary, client approval, project approval, meeting invitation, estimated expense breakdown, other.
+- Only the owner can add or remove documents, and only while the request is a draft. The owner, the assigned manager, Finance and Admin can list them.
+- Removal is a soft delete. The file is removed from storage only after the removal commits.
+
+Storage:
+- Files are stored in object storage under the advance and employee, never in MySQL. Only the metadata row is kept (table cash_advance_document, migration V43).
+- If the metadata cannot be saved, the stored file is removed. The same happens if the transaction does not commit.
+
+Frontend:
+- The first document saves the draft if none exists yet (it needs a title and an amount first).
+- Save Draft now updates the existing draft instead of creating another one. Before this, every save created a new draft.
+
+Known limitations:
+- Documents cannot be opened or downloaded from the screens yet. A download endpoint is needed before this is complete.
+- A stored file that cannot be removed after a removal is logged, not retried. A cleanup job is needed for those.
+- Some browsers send DOCX files with a generic type. Those are refused, since the type is checked strictly.
+- Files are not scanned for malware.
+- Uploads run one after another, not in parallel.
+- Global handler change: a body that cannot be read, and a missing multipart part, now return 400 instead of 500 (this affects every endpoint).

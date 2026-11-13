@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Inbox } from "lucide-react";
 import Button from "@/components/Button/Button";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
@@ -24,9 +24,6 @@ const TONE_BADGE = {
   emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
   slate: "bg-slate-100 text-slate-700 border-slate-200",
 };
-
-// One grid for the header and every row, so the columns always line up on desktop.
-const GRID = "sm:grid sm:grid-cols-[11rem_minmax(0,1fr)_7.5rem_9rem_8.5rem] sm:items-center sm:gap-x-4";
 
 const VIEW_ALL = {
   advance: { to: "/expense-management/cash-advance/my", label: "View all advances" },
@@ -104,11 +101,14 @@ export default function RecentActivity({
       ) : everythingFailed ? (
         <p className="rounded-lg bg-rose-50 px-4 py-6 text-center text-sm text-rose-700">Recent activity couldn't be loaded.</p>
       ) : visible.length === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-4 py-8 text-center text-sm text-slate-500" data-testid="activity-empty">
-          {EMPTY_TEXT[filter]}
-        </p>
+        <div className="flex flex-col items-center gap-2 rounded-2xl bg-gradient-to-b from-slate-50 to-white px-4 py-10 text-center" data-testid="activity-empty">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0A0082]/10 text-[#0A0082]">
+            <Inbox size={20} aria-hidden="true" />
+          </span>
+          <p className="max-w-sm text-sm text-slate-600">{EMPTY_TEXT[filter]}</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-100">
+        <div className="overflow-x-auto rounded-2xl border border-slate-100">
           <table className="w-full min-w-[640px] table-fixed border-collapse text-sm" data-testid="activity-list">
             <colgroup>
               <col className="w-[15%]" />
@@ -136,7 +136,7 @@ export default function RecentActivity({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") navigate(row.to);
                   }}
-                  className="cursor-pointer transition-colors hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0A0082]/40"
+                  className="cursor-pointer transition-colors hover:bg-[#0A0082]/[0.03] focus:outline-none focus-visible:bg-[#0A0082]/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0A0082]/40"
                 >
                   <td className="px-4 py-3 align-middle">
                     <span className="block truncate font-mono text-xs font-semibold text-slate-800">{row.reference}</span>

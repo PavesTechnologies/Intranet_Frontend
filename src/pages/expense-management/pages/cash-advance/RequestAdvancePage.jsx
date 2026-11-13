@@ -13,6 +13,7 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import AdvanceTypeSelector, { ADVANCE_TYPE } from "@/pages/expense-management/pages/cash-advance/components/request/AdvanceTypeSelector";
 import EmployeeProfileCard from "@/pages/expense-management/pages/cash-advance/components/request/EmployeeProfileCard";
 import OutstandingBalanceSummary from "@/pages/expense-management/pages/cash-advance/components/request/OutstandingBalanceSummary";
+import SupportingDocumentsUpload from "@/pages/expense-management/pages/cash-advance/components/request/SupportingDocumentsUpload";
 import AdvanceCalculationPreview from "@/pages/expense-management/pages/cash-advance/components/request/AdvanceCalculationPreview";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -149,7 +150,7 @@ const toIsoDate = (date) => {
 export const expectedTripDateError = (start, end) => {
   if (!start || !end || !isValidDate(start) || !isValidDate(end)) return null;
   return new Date(`${end}T00:00:00`) < new Date(`${start}T00:00:00`)
-    ? "Expected trip end date cannot be before the expected trip start date."
+    ? "Expected event end date cannot be before the expected event start date."
     : null;
 };
 
@@ -217,6 +218,8 @@ export default function RequestAdvancePage() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
+  // The saved draft this form edits. Set by the first save or the first document; cleared after a submit.
+  const [draftId, setDraftId] = useState(null);
 
   // Read-only identity from the employee record. Missing details are simply not shown.
   useEffect(() => {
@@ -651,6 +654,31 @@ export default function RequestAdvancePage() {
       "This sends the request to your approver. You cannot change the amount or details after it is submitted."
     : "This sends the request to your approver. You cannot change the amount or details after it is submitted.";
 
+  const rememberDraft = (id) => {
+    draftIdRef.current = id;
+    setDraftId(id);
+  };
+
+  const idOfCreated = (created) =>
+    created?.data?.data?.advanceId || created?.data?.advanceId || created?.data?.data?.id;
+
+  // Saves the draft if it does not exist yet, so a document has a request to belong to. Reuses it otherwise.
+  const ensureDraftId = async () => {
+    if (draftIdRef.current) {
+      return draftIdRef.current;
+    }
+    if (!formData.title.trim() || !(Number(formData.amount) > 0)) {
+      throw new Error("Enter a title and an amount before adding documents.");
+    }
+    const created = await cashAdvanceApi.create(buildPayload());
+    const id = idOfCreated(created);
+    if (!id) {
+      throw new Error("The request was saved, but its ID was not returned.");
+    }
+    rememberDraft(id);
+    return id;
+  };
+
   const handlePreview = async () => {
     // Preview checks the whole form first, so the calculation is only ever made of valid input.
     if (!validateForm()) {
@@ -792,7 +820,12 @@ export default function RequestAdvancePage() {
         payload
       );
 
-      await cashAdvanceApi.create(payload);
+      if (draftIdRef.current) {
+        await cashAdvanceApi.update(draftIdRef.current, payload);
+      } else {
+        const created = await cashAdvanceApi.create(payload);
+        rememberDraft(idOfCreated(created));
+      }
 
       showStatusToast(
         "Cash advance draft saved successfully.",
@@ -1031,7 +1064,7 @@ export default function RequestAdvancePage() {
           />
 
           <FormInput
-            label="Expected trip start date"
+            label="Expected event start date"
             name="expectedTripStartDate"
             type="date"
             value={getDateValue(formData.expectedTripStartDate)}
@@ -1040,7 +1073,7 @@ export default function RequestAdvancePage() {
           />
 
           <FormInput
-            label="Expected trip end date"
+            label="Expected event end date"
             name="expectedTripEndDate"
             type="date"
             value={getDateValue(formData.expectedTripEndDate)}
@@ -1115,19 +1148,26 @@ export default function RequestAdvancePage() {
           </div>
         )}
 
-        {/* Preview */}
-        <div className="space-y-3">
-          <div className="flex justify-end">
+        {/* Supporting documents (optional) */}
+        <SupportingDocumentsUpload
+          advanceId={draftId}
+          ensureDraft={ensureDraftId}
+          disabled={submitting || savingDraft}
+          actions={
             <Button
               type="button"
               variant="outline"
               onClick={handlePreview}
               disabled={previewing || submitting}
-              className="text-xs"
+              className="whitespace-nowrap text-xs"
             >
               {previewing ? "Calculating..." : "Preview calculation"}
             </Button>
-          </div>
+          }
+        />
+
+        {/* Preview */}
+        <div className="space-y-3">
           <AdvanceCalculationPreview preview={preview} />
           {!preview && (
             <p className="text-right text-[11px] text-gray-500">

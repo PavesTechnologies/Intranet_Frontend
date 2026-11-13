@@ -25,10 +25,12 @@ export default function CategoryDonut({ slices, currency, claimed = null, period
 
   if (sum <= 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-8 text-center" data-donut="empty">
-        <PieChart className="h-8 w-8 text-slate-300" aria-hidden="true" />
-        <p className="text-sm font-medium text-slate-600">No claimed expenses yet</p>
-        <p className="text-xs text-slate-400">Submitted expense reports will appear here, by category.</p>
+      <div className="flex flex-col items-center gap-3 rounded-xl bg-gradient-to-b from-slate-50 to-white px-4 py-8 text-center" data-donut="empty">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ff3d72]/10 text-[#ff3d72]">
+          <PieChart className="h-6 w-6" aria-hidden="true" />
+        </span>
+        <p className="text-sm font-semibold text-[#0a174e]">No claimed expenses yet</p>
+        <p className="max-w-xs text-xs text-slate-500">Once you submit an expense report, your spend by category will appear here.</p>
       </div>
     );
   }
@@ -38,18 +40,19 @@ export default function CategoryDonut({ slices, currency, claimed = null, period
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-xs text-slate-500" data-donut="period">
-        Period: <span className="font-medium text-slate-700">{period}</span>
+      <p className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#0A0082]/5 px-3 py-1 text-xs text-slate-600" data-donut="period">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#0A0082]" aria-hidden="true" />
+        Period: <span className="font-semibold text-[#0a174e]">{period}</span>
       </p>
       <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-        <div className="relative h-44 w-44 shrink-0">
+        <div className="relative h-48 w-48 shrink-0">
           <svg
             viewBox="0 0 160 160"
             className="-rotate-90"
             role="img"
             aria-label={`Reimbursement by category, total ${formatMoney(centreTotal, currency)}`}
           >
-            <circle cx="80" cy="80" r={RADIUS} fill="none" stroke="#f1f5f9" strokeWidth="20" />
+            <circle cx="80" cy="80" r={RADIUS} fill="none" stroke="#f1f5fb" strokeWidth="20" />
             {single ? (
               <circle
                 cx="80"
@@ -84,26 +87,34 @@ export default function CategoryDonut({ slices, currency, claimed = null, period
             )}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Claimed</p>
-            <p className="px-3 text-sm font-bold tabular-nums text-slate-900" data-donut="centre">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Claimed</p>
+            <p className="px-2 text-xs font-bold tabular-nums text-[#0a174e] sm:text-sm" data-donut="centre">
               {formatMoney(centreTotal, currency)}
             </p>
           </div>
         </div>
 
-        <ul className="w-full min-w-0 space-y-2.5" aria-label="Categories">
+        <ul className="w-full min-w-0 space-y-1" aria-label="Categories">
           {positive.map((s) => (
-            <li key={s.key} className="flex items-center gap-2 text-sm" data-legend={s.key}>
+            <li
+              key={s.key}
+              className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm transition-colors hover:bg-slate-50"
+              data-legend={s.key}
+            >
               <span
-                className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                className="h-3 w-3 shrink-0 rounded-full ring-4 ring-white shadow-sm"
                 style={{ background: categoryColor(s) }}
                 aria-hidden="true"
               />
-              <span className="min-w-0 flex-1 truncate text-slate-700" title={s.label}>
+              <span className="min-w-0 flex-1 truncate font-medium text-slate-700" title={s.label}>
                 {s.label}
               </span>
               <span className="whitespace-nowrap tabular-nums text-slate-900">{formatMoney(s.amount, currency)}</span>
-              <span className="w-12 text-right text-xs tabular-nums text-slate-500">{formatShare(s.amount / sum)}</span>
+              <span
+                className="w-14 rounded-full bg-slate-100 py-0.5 text-center text-[11px] font-semibold tabular-nums text-slate-600"
+              >
+                {formatShare(s.amount / sum)}
+              </span>
             </li>
           ))}
         </ul>

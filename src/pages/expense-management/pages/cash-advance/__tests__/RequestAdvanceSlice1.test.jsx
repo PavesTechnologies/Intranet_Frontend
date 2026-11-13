@@ -187,3 +187,44 @@ describe('RequestAdvancePage: request types and justification', () => {
     expect(await screen.findByLabelText(/Reason for Separate Advance/)).toBeInTheDocument();
   });
 });
+
+describe('RequestAdvancePage: mandatory preview before submit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    lookupService.getActiveCostCenters.mockResolvedValue([]);
+    lookupService.getActiveCurrencies.mockResolvedValue([{ currencyId: 'cur-1', currencyCode: 'INR', currencyName: 'Rupee' }]);
+    cashAdvanceApi.getMyAdvances.mockResolvedValue({ data: { data: [] } });
+    cashAdvanceApi.myProfile.mockResolvedValue({ employeeId: 'EMP001', fullName: 'Ravi Menon' });
+    cashAdvanceApi.preview.mockResolvedValue({
+      requestType: ADVANCE_TYPE.COMPLETE_NEW, currencyCode: 'INR', existingOutstanding: 0, eligibleOutstanding: 0,
+      cashRequested: 5000, totalAdvanceAllocation: 5000, justificationRequired: false, exceedsLimit: false,
+    });
+  });
+
+  it('keeps Submit disabled until a preview has been calculated', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeDisabled();
+    expect(screen.getByText(/Preview the calculation before you submit/)).toBeInTheDocument();
+  });
+
+  it('drops the preview when the amount changes, so Submit is disabled again until a fresh preview', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/^Amount Required/), { target: { value: '5000' } });
+    fireEvent.change(screen.getByLabelText(/title/i), { target: { value: 'Pune trip' } });
+    fireEvent.change(screen.getByLabelText(/purpose/i), { target: { value: 'Client visit' } });
+    fireEvent.change(screen.getByLabelText(/needed by date/i), { target: { value: daysFromToday(10) } });
+    fireEvent.change(screen.getByLabelText(/settlement expected date/i), { target: { value: daysFromToday(20) } });
+    fireEvent.click(screen.getByRole('button', { name: /select currency/i }));
+    fireEvent.click(await screen.findByRole('option', { name: /INR/ }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Preview calculation/ }));
+    expect(await screen.findByText('Calculation preview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText(/^Amount Required/), { target: { value: '6000' } });
+    await waitFor(() => expect(screen.queryByText('Calculation preview')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeDisabled();
+  });
+});
