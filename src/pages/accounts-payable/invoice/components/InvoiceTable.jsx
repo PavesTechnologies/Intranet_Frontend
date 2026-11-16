@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import GenericTable from "../../../../components/Table/table";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import { formatCurrency, formatDate, calculateBalance, isOverdue } from "../../utils/formatters";
 import { AP_ROUTES } from "../../constants/routes";
 import { INVOICE_TYPE_LABELS } from "../../constants/invoiceTypes";
@@ -34,14 +34,26 @@ export default function InvoiceTable({ invoices, loading }) {
         </span>
       ),
       type: INVOICE_TYPE_LABELS[invoice.invoiceType] || invoice.invoiceType,
-      netAmount: formatCurrency(invoice.netAmount, symbol),
+      netAmount: (
+        <div>
+          <div>{formatCurrency(invoice.netAmount, symbol)}</div>
+          {/* Only shown once TDS is actually determined and applicable — a null/false
+              tds_applicable means either "not yet determined" or "no TDS," and in both cases
+              payable would just repeat net_amount, so nothing extra is shown. */}
+          {invoice.tdsApplicable && invoice.payableAmount != null && (
+            <div className="text-xs font-normal text-gray-500">
+              Payable: {formatCurrency(invoice.payableAmount, symbol)}
+            </div>
+          )}
+        </div>
+      ),
       paid: formatCurrency(invoice.amountPaid, symbol),
       balance: (
         <span className={balance > 0 ? "text-red-600" : "text-green-600"}>
           {formatCurrency(balance, symbol)}
         </span>
       ),
-      status: <StatusBadge label={invoice.status} size="sm" />,
+      status: <ApStatusBadge status={invoice.status} />,
       actions: <InvoiceRowActions invoice={invoice} />,
     };
   });

@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import vendorService from "../services/vendorService";
 
-export const VENDOR_DETAIL_KEY = (vendorId) => ["accountsPayable", "vendor", vendorId];
+// vendorId is normalized to a string: VendorDetailPage reads it as a route param, while the
+// onboarding flow holds the numeric `vendor_id` off API objects — both must hit one cache entry
+// (same reasoning as PR_DETAIL_KEY in usePurchaseRequisitionDetail.js).
+export const VENDOR_DETAIL_KEY = (vendorId) => ["accountsPayable", "vendor", String(vendorId)];
 
 /**
  * Fetches a vendor's full profile. The backend eagerly nests addresses,

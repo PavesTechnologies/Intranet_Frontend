@@ -102,6 +102,9 @@ export const normalizeTaxCalculation = (item = {}) => {
     taxCalculationId: item.taxCalculationId || item.tax_calculation_id || item.id || "",
     billingSnapshotId: item.billingSnapshotId || item.billing_snapshot_id || item.snapshotId || "",
     snapshotNumber: item.snapshotNumber || item.snapshot_number || "",
+    // Project Duration — project lifecycle dates only, never the billing period.
+    projectStartDate: item.projectStartDate || item.project_start_date || "",
+    projectEndDate: item.projectEndDate || item.project_end_date || "",
     taxRegionId: item.taxRegionId || item.tax_region_id || "",
     taxRegionCode: item.taxRegionCode || item.tax_region_code || "",
     taxConfigurationId: item.taxConfigurationId || item.tax_configuration_id || "",

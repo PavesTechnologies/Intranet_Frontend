@@ -42,7 +42,7 @@ export default function SettingsIntegrations() {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 h-full">
       <div className="font-bold text-[14px] text-slate-900 mb-1">Calendar integrations</div>
       <p className="text-[11px] text-slate-400 mb-2">
         Connect a calendar provider so scheduled interviews get a real Teams/Meet link automatically.

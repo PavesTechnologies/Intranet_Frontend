@@ -361,9 +361,20 @@ export const invoiceService = {
       const totalInvoicesThisMonth = all.filter((invoice) => isThisMonth(invoice.invoiceDate)).length;
       const pendingApprovalCount = all.filter((invoice) => invoice.status === INVOICE_STATUS.PENDING_APPROVAL).length;
 
-      // "Ready for payment" is a UI-level grouping over Approved invoices with an outstanding
-      // balance — there is no distinct READY_FOR_PAYMENT status on the backend.
-      const readyForPayment = all.filter((invoice) => invoice.status === INVOICE_STATUS.APPROVED);
+      // Ready for payment = marked ready by Finance (READY_FOR_PAYMENT) or part-paid with a balance left.
+      const readyForPayment = all.filter((invoice) =>
+        invoice.status === INVOICE_STATUS.READY_FOR_PAYMENT || invoice.status === INVOICE_STATUS.PARTIALLY_PAID);
+      const count = (...statuses) => all.filter((invoice) => statuses.includes(invoice.status)).length;
+      const statusCounts = {
+        total: all.length,
+        toReview: count(INVOICE_STATUS.OCR_REVIEW_PENDING, INVOICE_STATUS.OCR_FAILED),
+        returned: count(INVOICE_STATUS.RETURNED_FOR_REVIEW),
+        readyToSend: count(INVOICE_STATUS.OCR_REVIEWED),
+        pendingApproval: count(INVOICE_STATUS.PENDING_APPROVAL),
+        approved: count(INVOICE_STATUS.APPROVED),
+        approvedOrLater: count(INVOICE_STATUS.APPROVED, INVOICE_STATUS.READY_FOR_PAYMENT, INVOICE_STATUS.PARTIALLY_PAID, INVOICE_STATUS.PAID),
+        rejected: count(INVOICE_STATUS.REJECTED),
+      };
       const readyForPaymentBalance = readyForPayment.reduce(
         (sum, invoice) => sum + calculateBalance(invoice.netAmount, invoice.amountPaid),
         0
@@ -387,6 +398,7 @@ export const invoiceService = {
         readyForPaymentBalance,
         paidThisMonthCount: paidThisMonthInvoiceIds.size,
         paidThisMonthAmount,
+        statusCounts,
       };
     } catch (error) {
       console.error("Error in invoiceService.getInvoiceSummary:", error);

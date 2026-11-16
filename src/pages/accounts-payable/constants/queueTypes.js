@@ -38,7 +38,7 @@ export const QUEUE_STATUS_FILTERS = {
 };
 
 export const QUEUE_LABELS = {
-  [QUEUE_TYPES.OCR_REVIEW]: "OCR Review",
+  [QUEUE_TYPES.OCR_REVIEW]: "To review",
   [QUEUE_TYPES.VALIDATION]: "Validation",
   [QUEUE_TYPES.APPROVAL]: "Approval",
   [QUEUE_TYPES.ALL_INVOICES]: "All",

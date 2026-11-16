@@ -10,7 +10,7 @@ import { useEmployeeDirectory, resolveEmployeeName } from "../../../expense-mana
 // unchanged for anything not listed here, so a new backend event never disappears silently.
 const ACTION_LABELS = {
   INVOICE_CREATED: "Invoice uploaded",
-  INVOICE_OCR_REVIEWED: "OCR reviewed",
+  INVOICE_OCR_REVIEWED: "Reviewed",
   INVOICE_RESUBMITTED: "Invoice resubmitted after review",
   INVOICE_SENT_FOR_APPROVAL: "Sent for approval",
   INVOICE_APPROVAL_STEP_DECISION: "Approval decision recorded",
@@ -22,6 +22,10 @@ const ACTION_LABELS = {
   INVOICE_PAYMENT_SENT: "Payment sent to bank",
   INVOICE_PAYMENT_CLEARED: "Payment cleared",
   INVOICE_PAYMENT_FAILED: "Payment attempt failed",
+  // TDS Phase 1 — the backend only recently started writing these to audit_log, forward-only:
+  // determinations/verifications made before that change won't retroactively appear here.
+  INVOICE_TDS_DETERMINED: "TDS determined",
+  INVOICE_TDS_VERIFIED: "TDS verified",
 };
 
 function formatCurrencyAmount(value) {
@@ -47,6 +51,20 @@ function describeEvent(event) {
     values.allocated_amount != null
   ) {
     return `₹${formatCurrencyAmount(values.allocated_amount)}${values.payment_id ? ` · Payment #${values.payment_id}` : ""}`;
+  }
+  if (event.action === "INVOICE_TDS_DETERMINED") {
+    if (values.tds_applicable === false) return "Not applicable to this invoice";
+    if (values.tds_amount != null) {
+      const rate = values.tds_rate != null ? `${values.tds_rate}% · ` : "";
+      const nature = values.payment_nature_code ? ` (${values.payment_nature_code})` : "";
+      return `${rate}₹${formatCurrencyAmount(values.tds_amount)}${nature}`;
+    }
+    return values.determination_reason || null;
+  }
+  if (event.action === "INVOICE_TDS_VERIFIED") {
+    if (values.tds_applicable === false) return "No TDS to verify";
+    const amount = values.tds_amount != null ? `₹${formatCurrencyAmount(values.tds_amount)} verified` : "Verified";
+    return `${amount}${values.remarks ? `: "${values.remarks}"` : ""}`;
   }
   return null;
 }

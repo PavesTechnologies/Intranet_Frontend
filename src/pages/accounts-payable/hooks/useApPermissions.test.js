@@ -116,3 +116,72 @@ describe("useApPermissions — Payment permission flags", () => {
     expect(result.current.canViewPayment).toBe(false);
   });
 });
+
+describe("useApPermissions — Payment Management / TDS Tracking flags", () => {
+  it("PAYMENT_VIEW can open Payment Management but not record payments", () => {
+    mockAuth(["PAYMENT_VIEW"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canViewPaymentManagement).toBe(true);
+    expect(result.current.canRecordPayment).toBe(false);
+  });
+
+  it("PAYMENT_PROCESS can view and record payments", () => {
+    mockAuth(["PAYMENT_PROCESS"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canViewPaymentManagement).toBe(true);
+    expect(result.current.canRecordPayment).toBe(true);
+  });
+
+  it("TDS tracking: VIEW reads only, UPDATE reads and records, invoice-TDS permissions grant neither", () => {
+    mockAuth(["TDS_TRACKING_VIEW"]);
+    let result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canViewTdsTracking).toBe(true);
+    expect(result.current.canUpdateTdsTracking).toBe(false);
+
+    mockAuth(["TDS_TRACKING_UPDATE"]);
+    result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canViewTdsTracking).toBe(true);
+    expect(result.current.canUpdateTdsTracking).toBe(true);
+
+    mockAuth(["INVOICE_TDS_VERIFY", "PAYMENT_PROCESS"]);
+    result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canViewTdsTracking).toBe(false);
+    expect(result.current.canUpdateTdsTracking).toBe(false);
+  });
+});
+
+describe("useApPermissions — internal vendor requests (Vendor Intake)", () => {
+  // Mirrors vendor_onboarding_route.py: ONBOARDING_VIEW accepts VENDOR_READ and
+  // ONBOARDING_PROCESS accepts VENDOR_WRITE, which is what Vendor Intake actually holds.
+  it("lets a Vendor Intake user (VENDOR_VIEW + VENDOR_MANAGE) view and process requests", () => {
+    mockAuth(["VENDOR_VIEW", "VENDOR_MANAGE"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canViewOnboarding).toBe(true);
+    expect(result.current.canProcessOnboarding).toBe(true);
+    expect(result.current.canOnboardVendor).toBe(true);
+    // Raising and assigning requests stays with procurement.
+    expect(result.current.canCreateOnboarding).toBe(false);
+    expect(result.current.canAssignOnboarding).toBe(false);
+  });
+
+  it("lets VENDOR_VIEW alone see requests but not process them", () => {
+    mockAuth(["VENDOR_VIEW"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canViewOnboarding).toBe(true);
+    expect(result.current.canProcessOnboarding).toBe(false);
+  });
+
+  it("keeps the existing procurement grants working", () => {
+    mockAuth(["QUOTATION_VIEW", "QUOTATION_CREATE"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canViewOnboarding).toBe(true);
+    expect(result.current.canProcessOnboarding).toBe(true);
+  });
+
+  it("denies both to a user with no vendor, onboarding or quotation permission", () => {
+    mockAuth(["INVOICE_VIEW"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canViewOnboarding).toBe(false);
+    expect(result.current.canProcessOnboarding).toBe(false);
+  });
+});

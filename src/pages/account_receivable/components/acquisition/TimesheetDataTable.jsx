@@ -1,7 +1,11 @@
-import { useState, useMemo } from "react";
-import { Search, ArrowUpDown, Info, CheckCircle2, Clock, FileSpreadsheet } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { ArrowUpDown, Info, CheckCircle2, Clock, FileSpreadsheet } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import Loader from "../../../../components/ui/Loader";
+import SearchInput from "../../../../components/filter/Searchbar";
+import Pagination from "../../../../components/Pagination/pagination";
+
+const PAGE_SIZE = 10;
 
 export default function TimesheetDataTable({
   records = [],
@@ -13,6 +17,7 @@ export default function TimesheetDataTable({
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("workDate");
   const [sortAsc, setSortAsc] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -54,8 +59,28 @@ export default function TimesheetDataTable({
     return result;
   }, [records, searchTerm, sortField, sortAsc]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / PAGE_SIZE));
+  const pageRecords = filteredAndSorted.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   const totalHours = useMemo(() => {
     return records.reduce((acc, r) => acc + (Number(r.hours) || 0), 0);
+  }, [records]);
+
+  const payableHours = useMemo(() => {
+    return records
+      .filter((r) => r.includeInInvoice !== false && r.isBillable !== false && r.excludedFromInvoice !== true)
+      .reduce((acc, r) => acc + (Number(r.hours) || 0), 0);
   }, [records]);
 
   if (loading) {
@@ -78,25 +103,21 @@ export default function TimesheetDataTable({
           </h3>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center">
           <div className="relative w-48">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="text"
+            <SearchInput
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search employee / role..."
-              className="w-full rounded-lg border border-slate-200 bg-white py-1 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-100"
             />
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-xs font-semibold text-slate-600">
-            {records.length} records ({totalHours} hrs)
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 tabular-nums text-xs font-semibold text-slate-600">
+            {records.length} records ({totalHours} hrs{payableHours !== totalHours ? ` · ${payableHours} payable hrs` : ""})
           </div>
         </div>
       </div>
 
-      {/* Table Container with max 550px scroll height */}
-      <div className="max-h-[550px] w-full overflow-x-auto overflow-y-auto rounded-xl border border-slate-200">
+      <div className="w-full overflow-x-auto rounded-xl border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-xs">
           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
             <tr className="text-slate-600">
@@ -131,7 +152,7 @@ export default function TimesheetDataTable({
               </th>
               <th
                 onClick={() => handleSort("hours")}
-                className="cursor-pointer select-none px-4 py-3 text-center font-semibold transition-colors hover:bg-slate-100"
+                className="cursor-pointer select-none px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
               >
                 <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                   <span>Hours</span>
@@ -142,12 +163,12 @@ export default function TimesheetDataTable({
                   />
                 </span>
               </th>
-              <th className="px-4 py-3 text-right font-semibold">
+              <th className="px-4 py-3 text-left font-semibold">
                 <span className="whitespace-nowrap">Hourly Rate</span>
               </th>
               <th
                 onClick={() => handleSort("amount")}
-                className="cursor-pointer select-none px-4 py-3 text-right font-semibold transition-colors hover:bg-slate-100"
+                className="cursor-pointer select-none px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
               >
                 <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
                   <span>Commercial Amount</span>
@@ -165,23 +186,63 @@ export default function TimesheetDataTable({
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {filteredAndSorted.length > 0 ? (
-              filteredAndSorted.map((rec, idx) => (
-                <tr key={rec.id || idx} className="transition-colors hover:bg-slate-50">
-                  <td className="px-4 py-2.5 font-semibold text-slate-900">{rec.employee || "Employee"}</td>
-                  <td className="px-4 py-2.5 font-mono text-slate-600">{rec.workDate}</td>
-                  <td className="px-4 py-2.5 text-slate-500">{rec.role || "Software Engineer"}</td>
-                  <td className="px-4 py-2.5 text-center font-semibold text-slate-900">{rec.hours} hrs</td>
-                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">
-                    {currency} {Number(rec.rate || 0).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-indigo-900">
-                    {currency} {Number(rec.amount || rec.hours * rec.rate || 0).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    <StatusBadge label={rec.approvalStatus || "Approved"} size="sm" />
-                  </td>
-                </tr>
-              ))
+              pageRecords.map((rec, idx) => {
+                const isExcluded = rec.includeInInvoice === false || rec.isBillable === false || rec.excludedFromInvoice === true;
+                const hasDiscount = Boolean(
+                  rec.discountApplied ||
+                  rec.hasDiscount ||
+                  (rec.standardRate && Number(rec.standardRate) > Number(rec.rate))
+                );
+                const displayAmount = rec.amount !== undefined && rec.amount !== null
+                  ? rec.amount
+                  : Number(rec.hours || 0) * Number(rec.rate || 0);
+
+                return (
+                  <tr
+                    key={rec.id || idx}
+                    className={`transition-colors hover:bg-slate-50 ${isExcluded ? "bg-slate-50/40 opacity-80" : ""}`}
+                  >
+                    <td className="px-4 py-2.5 font-semibold text-slate-900">{rec.employee || "Employee"}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-slate-600">{rec.workDate}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{rec.role || "Software Engineer"}</td>
+                    <td className="px-4 py-2.5 text-left font-semibold text-slate-900">{rec.hours} hrs</td>
+                    <td className="px-4 py-2.5 text-left tabular-nums text-slate-700">
+                      <div className="flex flex-col">
+                        <span>{currency} {Number(rec.rate || 0).toLocaleString()}</span>
+                        {hasDiscount && (
+                          <span className="text-[10px] font-medium text-indigo-600">
+                            Discount applied {rec.standardRate ? `(base ${currency} ${Number(rec.standardRate).toLocaleString()})` : ""}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-left tabular-nums font-semibold text-indigo-900">
+                      {isExcluded ? (
+                        <div className="flex flex-col">
+                          <span className="text-slate-400 line-through">
+                            {currency} {Number(displayAmount).toLocaleString()}
+                          </span>
+                          <span className="text-[10px] font-medium text-amber-600">
+                            Excluded ({currency} 0.00 payable)
+                          </span>
+                        </div>
+                      ) : (
+                        <span>{currency} {Number(displayAmount).toLocaleString()}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <StatusBadge label={rec.approvalStatus || "Approved"} size="sm" />
+                        {isExcluded && (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
+                            Excluded
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">
@@ -195,7 +256,7 @@ export default function TimesheetDataTable({
                     ? "Timesheets were found for this billing period, but none have been approved for billing yet."
                     : billingStatus === "CONFIGURATION_REQUIRED"
                     ? "Billing configuration is incomplete. Please complete setup in Project Configuration to enable billing acquisition."
-                    : billingStatus === "ALREADY_BILLED"
+                    : billingStatus === "ALREADY_BILLED" || billingStatus === "INVOICED"
                     ? "Timesheet records for this billing period have already been processed into an invoice."
                     : billingStatus === "ACQUISITION_FAILED"
                     ? "Source billing data could not be retrieved due to a system error. Click 'Retry Acquisition' to try again."
@@ -206,6 +267,20 @@ export default function TimesheetDataTable({
           </tbody>
         </table>
       </div>
+
+      {filteredAndSorted.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+          <p className="text-xs text-slate-500">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredAndSorted.length)} of {filteredAndSorted.length} records
+          </p>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+            onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
         <Info className="h-3 w-3 flex-shrink-0" />

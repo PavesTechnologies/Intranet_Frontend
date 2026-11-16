@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { Eye } from "lucide-react";
+import { Link } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
+import { AP_ROUTES } from "../../constants/routes";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import { useReviewQueue } from "../hooks/useReviewQueue";
 import { invoiceService } from "../services/invoiceService";
 import { getApiErrorMessage } from "../../utils/apiError";
@@ -71,7 +73,7 @@ export default function InvoiceOcrReviewQueuePage() {
     vendor: item.vendor_id ? `Vendor #${item.vendor_id}` : "Unmatched",
     netAmount: item.net_amount ?? "—",
     confidence: formatConfidence(item.extraction_confidence),
-    status: item.status_code ? <StatusBadge label={item.status_code} size="sm" /> : "—",
+    status: item.status_code ? <ApStatusBadge status={item.status_code} /> : "—",
     actions: (
       <div className="flex items-center justify-center gap-2">
         <Button variant="outline" size="small" onClick={() => handleViewDocument(item.inbound_document_id)}>
@@ -86,7 +88,15 @@ export default function InvoiceOcrReviewQueuePage() {
 
   return (
     <div className="p-6">
-      <PageHeader title="OCR Review Queue" subtitle="Invoices awaiting OCR field review or vendor assignment" />
+      <PageHeader
+        title="Invoices to review"
+        subtitle="Invoices awaiting OCR field review or vendor assignment"
+        actions={
+          <Link to={AP_ROUTES.INVOICE_REVIEW_WORKBENCH}>
+            <Button variant="primary">Review &amp; send in bulk</Button>
+          </Link>
+        }
+      />
 
       {isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

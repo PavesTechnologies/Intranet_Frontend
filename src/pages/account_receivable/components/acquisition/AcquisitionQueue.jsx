@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Layers, Play, Eye, RotateCcw, FilterX } from "lucide-react";
+import { Layers, Play, Eye } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import SearchInput from "../../../../components/filter/Searchbar";
-import FilterListbox from "../../../../components/filter/FilterListbox";
+import ARClearFiltersButton from "../common/ARClearFiltersButton";
+import ARKPIStatusTabs from "../common/ARKPIStatusTabs";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../common/ARTable";
@@ -33,14 +34,12 @@ const TABLE_ALIGNMENTS = {
   client: "left",
   project: "left",
   billingType: "left",
-  billingPeriod: "center",
+  billingPeriod: "left",
   status: "center",
   reference: "left",
   actions: "center",
 };
 
-const FILTER_BUTTON_CLASS =
-  "flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
 
 export default function AcquisitionQueue({
   configs = [],
@@ -146,11 +145,6 @@ export default function AcquisitionQueue({
     { key: "INVOICED", label: "Invoiced", count: populationCounts.invoiced },
   ];
 
-  const statusFilterOptions = tabs.map((tab) => ({
-    value: tab.key,
-    label: `${tab.label} (${tab.count})`,
-  }));
-
   const totalPages = Math.ceil(filteredConfigs.length / PAGE_SIZE) || 1;
   const paginatedConfigs = filteredConfigs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
@@ -187,7 +181,17 @@ export default function AcquisitionQueue({
           client: <div className="text-left font-medium text-slate-700">{cfg.client}</div>,
           project: (
             <div className="text-left">
-              <div className="font-semibold text-slate-900">{cfg.projectName}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-900">{cfg.projectName}</span>
+                {cfg.expenseBillingEligible ? (
+                  <span
+                    className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200"
+                    title="Eligible for Expense Management billing"
+                  >
+                    Expense Eligible
+                  </span>
+                ) : null}
+              </div>
               <div className="text-xs text-slate-400">{cfg.projectCode}</div>
             </div>
           ),
@@ -199,7 +203,7 @@ export default function AcquisitionQueue({
             </div>
           ),
           billingPeriod: (
-            <div className="flex items-center justify-center font-mono text-xs text-slate-600">
+            <div className="flex items-center justify-start tabular-nums text-xs text-slate-600">
               {cfg.billingPeriod}
             </div>
           ),
@@ -253,53 +257,37 @@ export default function AcquisitionQueue({
   return (
     <PageCard>
       <PageCardContent className="space-y-4 p-4 sm:p-5">
-        {/* Header Title & Result Counter — "Acquisition Queue" preserved */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-sm font-semibold text-slate-900">Acquisition Queue</h2>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Acquisition queue</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Review billing setups by their current acquisition and invoice readiness.</p>
           </div>
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono font-semibold text-slate-700">
-              {filteredConfigs.length} {filteredConfigs.length === 1 ? "project" : "projects"}
-            </span>
-          </div>
-        </div>
-
-        {/* Controls Bar: Search Input + FilterListbox + Clear Button */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex-1">
-            <SearchInput
-              value={activeSearch}
-              onSearch={handleSearchChange}
-              placeholder="Search project, code or client..."
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-56 sm:w-64">
-              <FilterListbox
-                options={statusFilterOptions}
-                value={activeStatusFilter}
-                onChange={handleStatusFilterChange}
-                buttonClassName={FILTER_BUTTON_CLASS}
-                placeholder="Filter status"
+          <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+            <div className="min-w-0 flex-1">
+              <SearchInput
+                value={activeSearch}
+                onSearch={handleSearchChange}
+                placeholder="Search project, code or client..."
               />
             </div>
-
             {isFilterActive && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                title="Clear all search and status filters"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
-              >
-                <FilterX className="h-3.5 w-3.5 text-slate-500" />
-                <span>Clear</span>
-              </button>
+              <ARClearFiltersButton onClick={handleResetFilters} title="Clear all search and status filters" />
             )}
           </div>
         </div>
+        <ARKPIStatusTabs
+          label="Billing acquisition status"
+          loading={loading}
+          items={tabs.map((tab) => ({
+            key: tab.key,
+            label: tab.label,
+            value: tab.count,
+            active: activeStatusFilter === tab.key,
+            onClick: () => handleStatusFilterChange(
+              tab.key === "ALL" || activeStatusFilter === tab.key ? "ALL" : tab.key
+            ),
+          }))}
+        />
 
         {/* Table or Contextual Empty State */}
         {filteredConfigs.length === 0 ? (
@@ -317,15 +305,6 @@ export default function AcquisitionQueue({
                     : `No projects currently in status "${getStatusLabelText(activeStatusFilter)}".`}
               </p>
             </div>
-            {isFilterActive && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
-              >
-                <RotateCcw className="h-3 w-3" /> Clear filters to show all projects
-              </button>
-            )}
           </div>
         ) : (
           <>

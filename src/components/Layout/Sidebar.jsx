@@ -23,6 +23,7 @@ import { filterMenuByRole } from "../../utils/sidebarPermissions";
 import ArModuleIcon from "../icons/ArModuleIcon";
 import ApModuleIcon from "../icons/ApModuleIcon";
 import { AP_ALL_ROLES } from "../../pages/accounts-payable/constants/apRoles";
+import { AP_MANAGEMENT_ANY } from "../../pages/accounts-payable/constants/paymentTerms";
 import { APPLICATIONS } from "../../utils/applicationRoutes";
 // import AIRSLogo from "../icons/AIRSLogo";
 
@@ -104,32 +105,34 @@ const accountReceivableSubmenu = [
     to: "/account-receivable/invoice-approval",
   },
   {
-    label: "Configurations",
-    to: "/account-receivable/master-data",
+    // Everything after an invoice is sent to the client.
+    label: "Receivables",
+    to: "/account-receivable/receivables",
     children: [
-      {
-        label: "Configurations Overview",
-        to: "/account-receivable/master-data",
-      },
-      {
-        label: "Seller Information / Company Profile",
-        to: "/account-receivable/master-data/company-profile",
-      },
+      { label: "Outstanding Receivables", to: "/account-receivable/receivables" },
+      { label: "Payments", to: "/account-receivable/payments" },
+      { label: "Customer Ledger & Aging", to: "/account-receivable/customer-ledger" },
+      { label: "Credit & Debit Notes", to: "/account-receivable/adjustment-notes" },
+      { label: "Reminders & Collections", to: "/account-receivable/collections" },
     ],
+  },
+  {
+    label: "Configuration",
+    to: "/account-receivable/master-data",
   },
 ];
 
-// Maker-Checker split of the AR submenu above. Super Admin keeps the full,
-// unchanged accountReceivableSubmenu (existing AR access must not change);
-// Finance Executive (Maker) only gets the create/draft items — no Billing
-// Approvals; Finance Manager (Checker) only gets Billing Approvals — no
-// create/draft/edit/submit items. Derived by filtering the same source array
-// rather than hand-duplicated, so the two variants can never drift from it.
+// Maker-Checker split of the AR submenu above.
+// Finance Manager (Checker) only gets Billing Approvals, Invoice Approval and the shared items.
+// Maker roles (Finance Executive / Super Admin / Admin) only get create/draft/workflow items with NO approvals.
+const CHECKER_ONLY_LABELS = ["Billing Approvals", "Invoice Approval"];
+// Post-invoice receivables work both roles need.
+const AR_SHARED_LABELS = ["Receivables"];
 const accountReceivableMakerSubmenu = accountReceivableSubmenu.filter(
-  (item) => item.label !== "Billing Approvals",
+  (item) => !CHECKER_ONLY_LABELS.includes(item.label),
 );
 const accountReceivableCheckerSubmenu = accountReceivableSubmenu.filter(
-  (item) => item.label === "Billing Approvals" || item.label === "Invoice Approval",
+  (item) => CHECKER_ONLY_LABELS.includes(item.label) || AR_SHARED_LABELS.includes(item.label),
 );
 
 const airsSubmenu = [
@@ -235,21 +238,24 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const isAdmin = hasRole(["ADMIN"]);
   const isSuperAdmin = hasRole(["SUPER_ADMIN"]);
   const isFinanceExecutive = hasRole(["Finance_Executive", "FINANCE_EXECUTIVE"]);
+  const isFinanceManager = hasRole(AR_CHECKER_ROLES);
   const canSeeArMaker = hasRole(AR_MAKER_ROLES);
-  const canSeeArChecker = hasRole(AR_CHECKER_ROLES) && !isFinanceExecutive;
-  const canSeeAr = canSeeArMaker || canSeeArChecker;
-  // Super Admin (who is not specifically a Finance Executive): full unchanged submenu.
-  // Finance Executive (Maker): create/draft items only — no Billing Approvals.
-  // Finance Manager (Checker): Billing Approvals only.
-  const arSubmenu = (isSuperAdmin && !isFinanceExecutive)
+  const canSeeArChecker = isFinanceManager && !isFinanceExecutive;
+  const canSeeAr = canSeeArMaker || isFinanceManager;
+  // Billing Approvals and Invoice Approval are strictly for Finance Manager role only.
+  // - If user has BOTH Maker and Finance Manager roles: gets full accountReceivableSubmenu.
+  // - If user has ONLY Finance Manager role: gets accountReceivableCheckerSubmenu (approvals only).
+  // - All other roles (Super Admin, Admin, Finance Executive): get accountReceivableMakerSubmenu (no approvals).
+  const arSubmenu = (canSeeArMaker && isFinanceManager)
     ? accountReceivableSubmenu
-    : canSeeArMaker
-      ? accountReceivableMakerSubmenu
-      : accountReceivableCheckerSubmenu;
+    : isFinanceManager
+      ? accountReceivableCheckerSubmenu
+      : accountReceivableMakerSubmenu;
   // Whole-module gate: unlike EO/XMS (which have no top-level gate because at least one of
   // their items has no allowedRoles), AP must stay fully invisible outside AP_ALL_ROLES —
   // same requirement as Account Receivable's isSuperAdmin gate below.
-  const isApUser = hasRole(AP_ALL_ROLES);
+  // Management users (CEO / Chief Product Officer) hold a management permission but no AP role.
+  const isApUser = hasRole(AP_ALL_ROLES) || hasAnyPermission(AP_MANAGEMENT_ANY);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);
@@ -306,6 +312,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const [childMenu, setChildMenu] = useState(null);
   const [childMenuOwner, setChildMenuOwner] = useState(null);
   const [childTop, setChildTop] = useState(0);
+  const [childLeft, setChildLeft] = useState(null);
   const parentHoverRef = useRef(false);
   const childHoverRef = useRef(false);
   const closeTimerRef = useRef(null);
@@ -365,6 +372,8 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     if (item.children) {
       const rect = e.currentTarget.getBoundingClientRect();
       setChildTop(computeSubmenuTop(rect, item.children.length) + 4);
+      // Open right beside the hovered row so the pointer never crosses a gap between the two flyouts.
+      setChildLeft(rect.right + 4);
       setChildMenu(item.children);
       setChildMenuOwner(owner);
     } else {
@@ -398,6 +407,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
         setEoHovered(false);
         setArHovered(false);
         setXmsHovered(false);
+        setApHovered(false);
       }
     }, 260); // slightly higher = smoother
   };
@@ -471,7 +481,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     closeAllSubmenus();
     if (arRef.current) {
       const rect = arRef.current.getBoundingClientRect();
-      setSubmenuTop(computeSubmenuTop(rect, accountReceivableSubmenu.length));
+      setSubmenuTop(computeSubmenuTop(rect, arSubmenu.length));
     }
     setArHovered(true);
   };
@@ -487,16 +497,23 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     closeAllSubmenus();
     if (apRef.current) {
       const rect = apRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, filteredApSubmenu.length));
     }
     setApHovered(true);
   };
 
+  // Same close logic as AR: the flyout stays open while the pointer is on it or on a section's pages.
   const handleApMouseLeave = () => {
-    hoverTimeout.current = setTimeout(() => {
-      setApHovered(false);
-    }, 200);
+    parentHoverRef.current = false;
+    scheduleClose();
   };
+
+  // A section is highlighted while one of its pages is open.
+  const isApItemActive = (item) =>
+    (item.children || [item]).some((c) => location.pathname === c.to || location.pathname.startsWith(`${c.to}/`));
+
+  // Only shown while the flyout that opened it is open.
+  const childMenuOpen = { eo: eoHovered, ar: arHovered, xms: xmsHovered, ap: apHovered }[childMenuOwner] ?? Boolean(childMenuOwner);
 
   const resourceManagementItems = isAdmin || isRM
     ? resourceManagementSubmenu
@@ -512,6 +529,11 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     setArHovered(false);
     setXmsHovered(false);
     setApHovered(false);
+    // a second-level menu must close with its parent, or it is left floating over the new page
+    setChildMenu(null);
+    setChildMenuOwner(null);
+    parentHoverRef.current = false;
+    childHoverRef.current = false;
   }, [location.pathname]);
 
 
@@ -684,12 +706,13 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     <li
                       key={item.label}
                       onMouseEnter={(e) => handleParentHover(item, e)}
-                      onMouseDown={(e) => handleParentLeave()}
+                      onMouseDown={(e) => { if (!item.children) handleParentLeave(); }}
                       // onMouseLeave={handleParentLeave}
                       className="relative group"
                     >
                       <NavLink
                         to={item.to}
+                        onClick={(e) => { if (item.children) e.preventDefault(); }}
                         className={({ isActive }) =>
                           `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                             ? "bg-blue-100 text-[#0a174e] font-semibold"
@@ -910,19 +933,19 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     }}
                     onMouseLeave={() => {
                       parentHoverRef.current = false;
-                      setChildMenuOwner(null);
                       scheduleClose();
                     }}
                   >
                     {filteredXmsSubmenu.map((item) => (
                       <li
                         key={item.label}
-                        onMouseEnter={(e) => handleParentHover(item, e)}
-                        onMouseDown={(e) => handleParentLeave()}
+                        onMouseEnter={(e) => handleParentHover(item, e, "xms")}
+                        onMouseDown={(e) => { if (!item.children) handleParentLeave(); }}
                         className="relative group"
                       >
                         <NavLink
                           to={item.to}
+                          onClick={(e) => { if (item.children) e.preventDefault(); }}
                           className={({ isActive }) =>
                             `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                               ? "bg-blue-100 text-[#0a174e] font-semibold"
@@ -974,15 +997,23 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                       className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
                         }`}
                       style={{ top: `${submenuTop}px` }}
-                      onMouseEnter={handleApMouseEnter}
+                      onMouseEnter={() => {
+                        parentHoverRef.current = true;
+                        cancelClose();
+                      }}
                       onMouseLeave={handleApMouseLeave}
                     >
                       {filteredApSubmenu.map((item) => (
-                        <li key={item.label} className="group relative">
+                        <li
+                          key={item.label}
+                          className="group relative"
+                          onMouseEnter={(e) => handleParentHover(item, e, "ap")}
+                          onMouseDown={() => handleParentLeave()}
+                        >
                           <NavLink
                             to={item.to}
                             className={({ isActive }) =>
-                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive || isApItemActive(item)
                                 ? "bg-blue-100 text-[#0a174e] font-semibold"
                                 : "hover:bg-[#263383] hover:text-white"
                               }`
@@ -1075,11 +1106,11 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
 
         </ul>
 
-        {childMenu && (
+        {childMenu && childMenuOpen && (
           <ul
-            className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
+            className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${childLeft != null ? "" : isCollapsed ? "left-[305px]" : "left-[480px]"
               }`}
-            style={{ top: `${childTop - 4}px` }}
+            style={{ top: `${childTop - 4}px`, ...(childLeft != null ? { left: `${childLeft}px` } : {}) }}
             onMouseEnter={() => {
               childHoverRef.current = true;
               cancelClose();

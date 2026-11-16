@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Image as ImageIcon, Maximize2, Minimize2, Receipt, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, FileText, Image as ImageIcon, Maximize2, Minimize2, Receipt, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { receiptService } from "@/pages/expense-management/api/expenseReportsApi";
 
 const isImageFile = (fileName = "") => /\.(png|jpe?g|gif|webp|heic)$/i.test(fileName);
 const isPdfFile = (fileName = "") => /\.pdf$/i.test(fileName);
+
+// The receipt response carries originalFileName and contentType; older shapes used fileName. Read both.
+const nameOf = (receipt) => receipt?.fileName || receipt?.originalFileName || "";
+const isPdfReceipt = (receipt) =>
+  isPdfFile(nameOf(receipt)) || (receipt?.contentType || "").toLowerCase() === "application/pdf";
+const isImageReceipt = (receipt) =>
+  isImageFile(nameOf(receipt)) || (receipt?.contentType || "").toLowerCase().startsWith("image/");
 
 const extractUrl = (data) => {
   if (!data) return null;
@@ -33,15 +40,15 @@ function ReceiptSurface({ receipt, url, zoom }) {
       </div>
     );
   }
-  if (isPdfFile(receipt.fileName)) {
-    return <iframe title={receipt.fileName || "Receipt"} src={url} className="h-full w-full border-0 bg-white" />;
+  if (isPdfReceipt(receipt)) {
+    return <iframe title={nameOf(receipt) || "Receipt"} src={url} className="h-full w-full border-0 bg-white" />;
   }
   const isFit = zoom <= 1;
   return (
     <div className="flex h-full w-full items-center justify-center overflow-auto p-4">
       <img
         src={url}
-        alt={receipt.fileName || "Receipt"}
+        alt={nameOf(receipt) || "Receipt"}
         style={{
           transform: `scale(${zoom})`,
           transformOrigin: "center center",
@@ -94,7 +101,7 @@ export default function ReceiptViewer({ lineItemId }) {
     staleTime: 5 * 60_000,
   });
 
-  const canZoom = activeReceipt && !isPdfFile(activeReceipt.fileName);
+  const canZoom = activeReceipt && !isPdfReceipt(activeReceipt);
 
   const body = isLoading ? (
     <div className="flex h-full items-center justify-center text-xs text-gray-400">Loading receipt…</div>
@@ -151,11 +158,21 @@ export default function ReceiptViewer({ lineItemId }) {
     <div className="flex h-full flex-col bg-gray-50">
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2">
         <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-gray-600">
-          {activeReceipt && (isImageFile(activeReceipt.fileName) ? <ImageIcon className="h-3.5 w-3.5 shrink-0" /> : <FileText className="h-3.5 w-3.5 shrink-0" />)}
-          <span className="truncate">{activeReceipt?.fileName || "Receipt"}</span>
+          {activeReceipt && (isImageReceipt(activeReceipt) ? <ImageIcon className="h-3.5 w-3.5 shrink-0" /> : <FileText className="h-3.5 w-3.5 shrink-0" />)}
+          <span className="truncate">{nameOf(activeReceipt) || "Receipt"}</span>
         </div>
         {controls}
       </div>
+
+      {activeReceipt?.possibleDuplicateFileReuse && (
+        <div
+          className="flex items-center gap-1.5 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-700"
+          title="Advisory only — this exact file was already uploaded as a different receipt. Verify this isn't an accidental or intentional duplicate claim before approving."
+        >
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          Possible duplicate — this exact file matches another uploaded receipt
+        </div>
+      )}
 
       <div className="min-h-0 flex-1">{body}</div>
 

@@ -43,6 +43,7 @@ export default function InvoiceTdsPanel({ invoice }) {
   const [correctedNature, setCorrectedNature] = useState("");
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [verifyRemarks, setVerifyRemarks] = useState("");
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
 
   if (!canViewTds) return null;
 
@@ -60,6 +61,12 @@ export default function InvoiceTdsPanel({ invoice }) {
     canDetermineTds &&
     invoice.status !== INVOICE_STATUS.OCR_REVIEW_PENDING &&
     invoice.status !== INVOICE_STATUS.OCR_FAILED;
+  // Once the invoice has actually been sent for approval, the payment nature is what the
+  // approvers are reviewing against — correcting it out from under an in-flight (or completed)
+  // approval would silently invalidate a decision already made. OCR_REVIEWED is specifically
+  // "reviewed, not yet sent" (see InvoiceApprovalPanel's tdsBlocksSend), so correction stays open
+  // only through that window, same as Determine's own status gate above.
+  const canCorrectNature = isDetermined && canEditTds && invoice.status === INVOICE_STATUS.OCR_REVIEWED;
 
   const handleDetermine = () => {
     determineTds.mutate(invoice.id, {
@@ -130,7 +137,7 @@ export default function InvoiceTdsPanel({ invoice }) {
             <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <Field label="TDS Applicable" value={tds.tds_applicable ? "Yes" : "No"} />
               <div>
-                {isCorrecting ? (
+                {canCorrectNature && isCorrecting ? (
                   <FormSelect
                     label="Payment Nature"
                     name="paymentNature"
@@ -182,7 +189,24 @@ export default function InvoiceTdsPanel({ invoice }) {
               />
               <Field label="PAN Status" value={tds.pan_status} />
               <Field label="Entity Type" value={tds.entity_type} />
+              {/* threshold_type/residency_type are new fields — only rendered when the backend
+                  actually returns them, since their exact presence/naming isn't confirmed yet. */}
+              {tds.threshold_type != null && <Field label="Threshold Type" value={tds.threshold_type} />}
+              {tds.residency_type != null && <Field label="Residency Type" value={tds.residency_type} />}
             </dl>
+
+            {tds.rule_snapshot != null && (
+              <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <button
+                  type="button"
+                  onClick={() => setSnapshotOpen((open) => !open)}
+                  className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700"
+                >
+                  {snapshotOpen ? "Hide" : "Show"} Applied Rule
+                </button>
+                {snapshotOpen && <RuleSnapshotDetails snapshot={tds.rule_snapshot} />}
+              </div>
+            )}
 
             {tds.determination_reason && (
               <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -200,12 +224,12 @@ export default function InvoiceTdsPanel({ invoice }) {
             )}
 
             <div className="flex flex-wrap justify-end gap-2">
-              {isDetermined && canEditTds && !isCorrecting && (
+              {canCorrectNature && !isCorrecting && (
                 <Button variant="outline" size="small" onClick={startCorrecting}>
                   <PencilLine size={14} /> Correct Payment Nature
                 </Button>
               )}
-              {isDetermined && isCorrecting && (
+              {canCorrectNature && isCorrecting && (
                 <>
                   <Button variant="outline" size="small" onClick={() => setIsCorrecting(false)}>
                     Cancel
@@ -269,5 +293,59 @@ function Field({ label, value }) {
       <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</dt>
       <dd className="mt-1 text-sm font-medium text-gray-900">{value || "—"}</dd>
     </div>
+  );
+}
+
+const SNAPSHOT_KNOWN_LABELS = {
+  code: "Rule Code",
+  rule_code: "Rule Code",
+  rule_name: "Rule Name",
+  name: "Rule Name",
+  old_section: "Old Section",
+  new_section: "New Section",
+  rate: "Rate",
+  threshold_amount: "Threshold Amount",
+  threshold_period: "Threshold Period",
+  threshold_type: "Threshold Type",
+  rate_condition: "Rate Condition",
+  residency_type: "Residency Type",
+  effective_from: "Effective From",
+  effective_to: "Effective To",
+  legal_reference: "Legal Reference",
+};
+
+/**
+ * Readable "Applied Rule" presentation for invoice_tds.rule_snapshot (spec section 27) — a
+ * label/value list rather than a raw JSON dump. Exact snapshot shape isn't confirmed yet, so
+ * known field names get a friendly label; anything else still gets its own row (key
+ * title-cased) instead of being silently dropped or JSON.stringify'd as a blob.
+ */
+function RuleSnapshotDetails({ snapshot }) {
+  let parsed = snapshot;
+  if (typeof snapshot === "string") {
+    try {
+      parsed = JSON.parse(snapshot);
+    } catch {
+      return <p className="mt-2 text-sm text-gray-700">{snapshot}</p>;
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const entries = Object.entries(parsed).filter(([, v]) => v !== null && v !== undefined && v !== "");
+  if (entries.length === 0) return <p className="mt-2 text-sm italic text-gray-500">No rule details available.</p>;
+
+  return (
+    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            {SNAPSHOT_KNOWN_LABELS[key] || key.replace(/_/g, " ")}
+          </dt>
+          <dd className="mt-1 text-sm text-gray-900">
+            {typeof value === "object" ? JSON.stringify(value) : String(value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }

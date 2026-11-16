@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import PageGuide from "../../guide/components/PageGuide";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -29,13 +30,34 @@ const PAGE_SIZE = 10;
  * create an invoice (INVOICE_CREATE), and if the caller's requested defaultQueueType isn't one
  * of this user's visible tabs (see InvoiceStatusTabs/getVisibleQueueTypes), fall back to their
  * first visible one instead of landing on a tab they can't see.
+ *
+ * The starting tab can also be deep-linked via `?queue=<QUEUE_TYPES value>` (e.g. the AP
+ * Dashboard's "Approved Invoices" tile links to `?queue=approved` so it opens straight on the
+ * Approved tab instead of Invoice Management's default) — same one-shot
+ * `useState(searchParams.get(...) || default)` pattern already used for `?prId=` in
+ * VendorSelectionTab/QuotationTab. An unrecognized or not-currently-visible value is ignored, same
+ * as an unrecognized defaultQueueType.
  */
-export default function InvoiceQueueView({ title, subtitle, defaultQueueType, showUploadAction = false, showKpis = false }) {
+// What an empty tab means, and what brings invoices into it.
+const EMPTY_QUEUE = {
+  all_invoices: { title: "No invoices yet.", hint: "Upload an invoice, or let the mailbox / SharePoint pickup bring them in." },
+  ocr_review: { title: "Nothing to review.", hint: "New invoices land here after upload - their details are read for you to check." },
+  approval: { title: "Nothing waiting for approval.", hint: "Invoices come here when an AP Executive sends them for approval." },
+  approved: { title: "No approved invoices waiting.", hint: "Approved invoices wait here until Finance verifies TDS and marks them ready for payment." },
+  ready_for_payment: { title: "Nothing ready for payment.", hint: "Invoices come here once Finance marks them ready." },
+  paid: { title: "No paid invoices yet.", hint: "Invoices move here when their payment is recorded with its receipt." },
+};
+
+export default function InvoiceQueueView({ title, subtitle, defaultQueueType, showUploadAction = false, showKpis = false, guide = false }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const permissions = useApPermissions();
   const visibleQueueTypes = getVisibleQueueTypes(permissions);
+  const requestedQueueType = searchParams.get("queue");
   const [queueType, setQueueType] = useState(
-    visibleQueueTypes.includes(defaultQueueType) ? defaultQueueType : visibleQueueTypes[0],
+    requestedQueueType && visibleQueueTypes.includes(requestedQueueType)
+      ? requestedQueueType
+      : visibleQueueTypes.includes(defaultQueueType) ? defaultQueueType : visibleQueueTypes[0],
   );
   const { filters, setSearch, setInvoiceType, setStatus, setDateRange, setPage, resetFilters, hasActiveFilters } =
     useInvoiceFilters();
@@ -68,15 +90,25 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
         title={title}
         subtitle={subtitle}
         actions={
-          showUploadAction && permissions.canUploadInvoice ? (
-            <Button variant="primary" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>
-              Upload Invoice
-            </Button>
+          showUploadAction && (permissions.canUploadInvoice || permissions.canBulkUploadInvoices) ? (
+            <>
+              {permissions.canBulkUploadInvoices && (
+                <Button variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_BULK_UPLOAD)}>
+                  Bulk Upload
+                </Button>
+              )}
+              {permissions.canUploadInvoice && (
+                <Button variant="primary" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>
+                  Upload Invoice
+                </Button>
+              )}
+            </>
           ) : undefined
         }
       />
+      {guide && <PageGuide page="invoices" />}
 
-      {showKpis && <InvoiceKpiCards />}
+      {showKpis && <InvoiceKpiCards onSelect={handleQueueChange} visibleQueues={visibleQueueTypes} />}
 
       <InvoiceStatusTabs activeQueueType={queueType} onChange={handleQueueChange} />
 
@@ -97,10 +129,16 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
       ) : isLoading ? (
         <InvoiceTable invoices={[]} loading />
       ) : invoices.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white py-10 text-center text-sm text-gray-500">
-          {hasActiveFilters
-            ? "No invoices match your filters. Try changing your search criteria."
-            : "No invoices found."}
+        <div className="rounded-lg border border-gray-200 bg-white px-6 py-10 text-center">
+          <p className="text-sm font-medium text-gray-700">
+            {hasActiveFilters ? "No invoices match your filters." : (EMPTY_QUEUE[queueType] || EMPTY_QUEUE.all_invoices).title}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            {hasActiveFilters ? "Try changing or clearing the filters." : (EMPTY_QUEUE[queueType] || EMPTY_QUEUE.all_invoices).hint}
+          </p>
+          {!hasActiveFilters && permissions.canUploadInvoice && ["all_invoices", "ocr_review"].includes(queueType) && (
+            <Button variant="primary" className="mt-4" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>Upload Invoice</Button>
+          )}
         </div>
       ) : (
         <>

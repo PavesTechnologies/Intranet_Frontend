@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, XCircle } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -10,15 +11,19 @@ import {
   useReviewSplit,
   useRejectReport,
   useBulkApprove,
+  useApproveException,
 } from "../hooks/useApprovalWorkflow";
 import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
 import { formatMoney } from "../constants/approvalLabels";
 import { resolveQueueItem } from "../utils/approvalAmounts";
 import EmployeeLabel from "../components/EmployeeLabel";
+import SourceBadge from "../components/SourceBadge";
 import LineItemReviewPanel from "../components/LineItemReviewPanel";
 import CommentPromptModal from "../components/CommentPromptModal";
 import MyDelegateCard from "../components/MyDelegateCard";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
+import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
+import Pagination from "@/components/Pagination/pagination";
 
 const hasPolicyIssue = (relevantLines) =>
   (relevantLines || []).some((l) => (l.source?.policyViolations?.length || 0) > 0);
@@ -39,19 +44,21 @@ const merchantSummary = (relevantLines) => {
  * (lineItemService.getAll + getLineItemReviews) that only reconstructed what the queue endpoint
  * already returned.
  */
-export default function PendingApprovalsPage({ searchTerm = "", hideHeader = false, noPadding = false }) {
+export default function PendingApprovalsPage({ searchTerm = "", hideHeader = false, noPadding = false, embedded = false }) {
   const [page, setPage] = useState(0);
+  const pageSize = DEFAULT_PAGE_SIZE;
   const [expandedReportId, setExpandedReportId] = useState(null);
   const [rejectingReport, setRejectingReport] = useState(null);
   const [reviewingItem, setReviewingItem] = useState(null);
 
   useApprovalLiveSync();
 
-  const { data, isLoading, isError, refetch } = useMyQueue(page, 20);
+  const { data, isPending, isFetching, isError, refetch } = useMyQueue(page, pageSize);
   const reviewLineItem = useReviewLineItem();
   const reviewSplit = useReviewSplit();
   const rejectReport = useRejectReport();
   const bulkApprove = useBulkApprove();
+  const approveException = useApproveException();
 
   const items = data?.content || [];
 
@@ -80,7 +87,8 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
     });
   }, [resolvedItems, searchTerm]);
 
-  const isMutating = reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending;
+  const isMutating =
+    reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending || approveException.isPending;
 
   // A split-owned line fans out to one reviewSplit call per cost-center split the caller owns on
   // it (almost always exactly one); a normal-track line is a single reviewLineItem call.
@@ -105,15 +113,25 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
   };
 
   const handleApproveLine = (reportId, relevantLine) => {
-    approveLine(reportId, relevantLine).catch((err) =>
-      showStatusToast(err.response?.data?.message || "Failed to approve", "error")
-    );
+    approveLine(reportId, relevantLine)
+      .then(() => showStatusToast("Approved", "success"))
+      .catch((err) => showStatusToast(err.response?.data?.message || "Failed to approve", "error"));
   };
 
   const handleFlagLine = (reportId, relevantLine, comment) => {
     flagLine(reportId, relevantLine, comment)
       .then(() => showStatusToast("Flagged for correction", "success"))
       .catch((err) => showStatusToast(err.response?.data?.message || "Failed to flag for correction", "error"));
+  };
+
+  const handleApproveException = (reportId, lineItemId, violationId, justification) => {
+    approveException.mutate(
+      { reportId, lineItemId, violationId, justification },
+      {
+        onSuccess: () => showStatusToast("Exception authorized", "success"),
+        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to authorize exception", "error"),
+      }
+    );
   };
 
   const handleBulkApprove = (reportId) => {
@@ -151,73 +169,7 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
     );
   };
 
-  return (
-    <div className={noPadding ? "" : "p-4 sm:p-6"}>
-      {!hideHeader && (
-        <>
-          <Breadcrumb
-            items={[
-              { label: "Expense Management", to: "/expense-management/dashboard" },
-              { label: "Approvals" },
-              { label: "Pending" },
-            ]}
-          />
-          <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">Pending Approvals</h1>
-        </>
-      )}
-
-      <MyDelegateCard />
-
-      {isLoading && (
-        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16">
-          <LoadingSpinner text="Loading your queue…" />
-        </div>
-      )}
-
-      {isError && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center">
-          <AlertTriangle className="h-6 w-6 text-rose-500" />
-          <p className="text-sm text-rose-700">Failed to load your queue.</p>
-          <Button size="small" variant="outline" onClick={() => refetch()}>Retry</Button>
-        </div>
-      )}
-
-      {!isLoading && !isError && items.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
-          <Inbox className="h-8 w-8 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600">No pending approvals.</p>
-          <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>
-        </div>
-      )}
-
-      {!isLoading && !isError && items.length > 0 && filteredItems.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
-          <Inbox className="h-8 w-8 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600">No pending approvals match your search.</p>
-        </div>
-      )}
-
-      {filteredItems.length > 0 && (
-        <>
-          {/* Desktop / tablet table */}
-          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
-                  <tr>
-                    <th className="w-8 px-2.5 py-2" />
-                    <th className="px-2.5 py-2">Report</th>
-                    <th className="px-2.5 py-2">Employee</th>
-                    <th className="px-2.5 py-2">Merchant / Category</th>
-                    <th className="px-2.5 py-2">Level</th>
-                    <th className="px-2.5 py-2">Expenses</th>
-                    <th className="px-2.5 py-2">Policy</th>
-                    <th className="px-2.5 py-2">Amount for My Approval</th>
-                    <th className="px-2.5 py-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredItems.map((item, index) => {
+  const itemRows = filteredItems.map((item, index) => {
                     const isExpanded = expandedReportId === item.reportId;
                     const flagged = hasPolicyIssue(item.relevantLines);
                     const needsCorrection = item.reportStatus === "AWAITING_CORRECTION";
@@ -231,7 +183,9 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           </td>
                           <td className="px-2.5 py-1.5">
+                            <span className="mr-1.5 inline-flex items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-800">Expense</span>
                             <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
+                            <SourceBadge cashAdvanceId={item.cashAdvanceId} />
                             {needsCorrection && (
                               <span className="ml-1.5 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-800">
                                 Awaiting employee
@@ -292,13 +246,154 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                                 isBusy={isMutating}
                                 onApproveLine={(line) => handleApproveLine(item.reportId, line)}
                                 onFlagLine={(line, comment) => handleFlagLine(item.reportId, line, comment)}
+                                onApproveException={(line, violationId, justification) =>
+                                  handleApproveException(item.reportId, line.lineItemId, violationId, justification)
+                                }
                               />
                             </td>
                           </tr>
                         )}
                       </React.Fragment>
                     );
-                  })}
+                  });
+
+  const modals = createPortal(
+    <>
+      <CommentPromptModal
+        isOpen={!!rejectingReport}
+        title={`Reject report ${rejectingReport?.reportNumber ?? ""}`}
+        description="This is a terminal decision - the employee cannot resubmit this report. Use Needs Correction on individual lines instead if the report just needs a fix."
+        confirmLabel="Reject Report"
+        confirmVariant="danger"
+        isLoading={rejectReport.isPending}
+        onCancel={() => setRejectingReport(null)}
+        onConfirm={(comment) => {
+          rejectReport.mutate(
+            { reportId: rejectingReport.reportId, comment },
+            {
+              onSuccess: () => {
+                showStatusToast("Report rejected", "success");
+                setRejectingReport(null);
+              },
+              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to reject report", "error"),
+            },
+          );
+        }}
+      />
+
+      <ExpenseReviewPanel
+        isOpen={!!reviewingItem}
+        onClose={() => setReviewingItem(null)}
+        reportId={reviewingItem?.reportId}
+        mode="queue"
+        queueItem={reviewingItem}
+      />
+    </>,
+    document.body,
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {isPending && !data && (
+          <tbody>
+            <tr>
+              <td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
+            </tr>
+          </tbody>
+        )}
+        {isError && (
+          <tbody>
+            <tr>
+              <td colSpan={9} className="py-6 text-center text-xs text-rose-700">
+                Failed to load your queue. <button className="underline" onClick={() => refetch()}>Retry</button>
+              </td>
+            </tr>
+          </tbody>
+        )}
+        {filteredItems.length > 0 && (
+          <tbody className="divide-y divide-gray-100">{itemRows}</tbody>
+        )}
+        {data && (data.totalPages ?? 0) > 1 && (
+          <tbody>
+            <tr>
+              <td colSpan={9} className="py-2">
+                <div className="flex justify-center">
+                  <Pagination
+                    currentPage={page + 1}
+                    totalPages={data.totalPages ?? 0}
+                    onPrevious={() => setPage(Math.max(page - 1, 0))}
+                    onNext={() => setPage(Math.min(page + 1, (data.totalPages ?? 0) - 1))}
+                  />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        )}
+        {modals}
+      </>
+    );
+  }
+
+  return (
+    <div className={noPadding ? "" : "p-4 sm:p-6"}>
+      {!hideHeader && (
+        <>
+          <Breadcrumb
+            items={[
+              { label: "Expense Management", to: "/expense-management/dashboard" },
+              { label: "Approvals" },
+              { label: "Pending" },
+            ]}
+          />
+          <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">Pending Approvals</h1>
+        </>
+      )}
+
+      <MyDelegateCard />
+
+     {isPending && !data && (
+  <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16">
+    <LoadingSpinner text="Loading your queue…" />
+  </div>
+)}
+
+      {isError && (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center">
+          <AlertTriangle className="h-6 w-6 text-rose-500" />
+          <p className="text-sm text-rose-700">Failed to load your queue.</p>
+          <Button size="small" variant="outline" onClick={() => refetch()}>Retry</Button>
+        </div>
+      )}
+
+      {!isPending && !isError && items.length > 0 && filteredItems.length === 0 && (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
+          <Inbox className="h-8 w-8 text-gray-300" />
+          <p className="text-sm font-medium text-gray-600">No pending approvals match your search.</p>
+        </div>
+      )}
+
+      {filteredItems.length > 0 && (
+        <>
+          {/* Desktop / tablet table */}
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
+                  <tr>
+                    <th className="w-8 px-2.5 py-2" />
+                    <th className="px-2.5 py-2">Report</th>
+                    <th className="px-2.5 py-2">Employee</th>
+                    <th className="px-2.5 py-2">Merchant / Category</th>
+                    <th className="px-2.5 py-2">Level</th>
+                    <th className="px-2.5 py-2">Expenses</th>
+                    <th className="px-2.5 py-2">Policy</th>
+                    <th className="px-2.5 py-2">Amount for My Approval</th>
+                    <th className="px-2.5 py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {itemRows}
                 </tbody>
               </table>
             </div>
@@ -347,49 +442,18 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
         </>
       )}
 
-      {data && data.totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3 mt-4 text-sm text-gray-600">
-          <Button size="small" variant="outline" disabled={data.first} onClick={() => setPage((p) => p - 1)}>
-            Previous
-          </Button>
-          <span>
-            Page {data.page + 1} of {data.totalPages}
-          </span>
-          <Button size="small" variant="outline" disabled={data.last} onClick={() => setPage((p) => p + 1)}>
-            Next
-          </Button>
+      {data && (
+        <div className="mt-4 flex justify-center">
+          <Pagination
+            currentPage={page + 1}
+            totalPages={data.totalPages ?? 0}
+            onPrevious={() => setPage(Math.max(page - 1, 0))}
+            onNext={() => setPage(Math.min(page + 1, (data.totalPages ?? 0) - 1))}
+          />
         </div>
       )}
 
-      <CommentPromptModal
-        isOpen={!!rejectingReport}
-        title={`Reject report ${rejectingReport?.reportNumber ?? ""}`}
-        description="This is a terminal decision - the employee cannot resubmit this report. Use Needs Correction on individual lines instead if the report just needs a fix."
-        confirmLabel="Reject Report"
-        confirmVariant="danger"
-        isLoading={rejectReport.isPending}
-        onCancel={() => setRejectingReport(null)}
-        onConfirm={(comment) => {
-          rejectReport.mutate(
-            { reportId: rejectingReport.reportId, comment },
-            {
-              onSuccess: () => {
-                showStatusToast("Report rejected", "success");
-                setRejectingReport(null);
-              },
-              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to reject report", "error"),
-            },
-          );
-        }}
-      />
-
-      <ExpenseReviewPanel
-        isOpen={!!reviewingItem}
-        onClose={() => setReviewingItem(null)}
-        reportId={reviewingItem?.reportId}
-        mode="queue"
-        queueItem={reviewingItem}
-      />
+      {modals}
     </div>
   );
 }

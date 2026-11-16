@@ -574,3 +574,30 @@ export const getOverrideReport = async ({ campaignId, dateFrom, dateTo } = {}) =
 };
 
 
+
+// Scoring v2 (Phase 1) shadow report - HR_ADMIN only. v1 next to v2 (and an
+// optional recruiter ranking) per candidate; v2 never decides anything here.
+export const getScoringShadowReport = async (campaignId) => {
+    const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/scoring-shadow-report`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    return response.data;
+};
+
+export const saveShadowRecruiterRanking = async (campaignId, rankings, rankedByName) => {
+    const response = await api.put(`${BASE_URL}/campaigns/${campaignId}/scoring-shadow-report/recruiter-ranking`,
+        { rankings, ranked_by_name: rankedByName || null },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    return response.data;
+};
+
+// Opt this campaign in/out of v2 shadow; backfill queues v2 for candidates
+// v1 already scored (subject to the daily LLM call cap).
+export const setScoringV2Shadow = async (campaignId, enabled, backfill = false) => {
+    const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/scoring-v2-shadow`,
+        { enabled, backfill },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    return response.data;
+};

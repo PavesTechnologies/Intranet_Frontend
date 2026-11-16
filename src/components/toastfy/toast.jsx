@@ -20,12 +20,12 @@ const STATUS_CONFIG = {
   },
 };
 
-export const showStatusToast = (message = "", messageType = "info") => {
+export const showStatusToast = (message = "", messageType = "info", options = {}) => {
   const config = STATUS_CONFIG[messageType];
 
   if (config) {
-    config.toastType(message || config.defaultMessage);
+    return config.toastType(message || config.defaultMessage, options);
   } else {
-    toast(message || "Notification");
+    return toast(message || "Notification", options);
   }
 };

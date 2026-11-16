@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import api from "@/api/axiosInstance";
 import { apPaymentApi } from "@/pages/accounts-payable/services/apPaymentApi";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Wraps the existing accounts-payable apPaymentApi (GET /xms/ap-payments/queue,
@@ -12,6 +14,16 @@ import { apPaymentApi } from "@/pages/accounts-payable/services/apPaymentApi";
 
 export const AP_QUEUE_KEY = (page, size) => ["apPaymentQueue", page, size];
 export const AP_DETAILS_KEY = (reportId) => ["apPaymentDetails", reportId];
+export const AP_HISTORY_KEY = (status, page, size) => ["apPaymentHistory", status, page, size];
+
+// GET /xms/ap-payments/history has no counterpart in the accounts-payable apPaymentApi, so it is
+// called directly here (same base URL/auth as that client) rather than editing that module.
+const getApHistory = (status, page, size) =>
+  api.get("/xms/ap-payments/history", {
+    baseURL: XMS_BASE_URL,
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    params: { status, page, size },
+  });
 
 const unwrap = (res) => (res?.data?.data !== undefined ? res.data.data : res?.data);
 
@@ -34,14 +46,49 @@ export const useApPaymentDetails = (reportId) =>
     staleTime: 15_000,
   });
 
+/** PageResponse<ApPaymentQueueItemResponse> - status is any PaymentRoutingStatus other than APPROVED_FOR_PAYMENT/NONE. */
+export const useApPaymentHistory = (status, page = 0, size = 20) =>
+  useQuery({
+    queryKey: AP_HISTORY_KEY(status, page, size),
+    queryFn: () => getApHistory(status, page, size).then(unwrap),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 2,
+  });
+
+/** ApPaymentSummaryResponse - pendingCount, paidThisMonthCount, paidCount, handoffFailedCount. */
+export const useApPaymentSummary = () =>
+  useQuery({
+    queryKey: ["apPaymentSummary"],
+    queryFn: () =>
+      api
+        .get("/xms/ap-payments/summary", {
+          baseURL: XMS_BASE_URL,
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        })
+        .then(unwrap),
+    staleTime: 30_000,
+  });
+
+// AP's confirmation of the actual payment: { paymentReference, paymentMethod, paymentDate, amountPaid, remarks }.
+// Called directly (not via the accounts-payable apPaymentApi, whose completePayment sends no body).
+const completePayment = (reportId, payment) =>
+  api.post(`/xms/ap-payments/${reportId}/complete`, payment, {
+    baseURL: XMS_BASE_URL,
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+
+/** mutate({ reportId, payment }) - the report shows as paid only once the server accepts this. */
 export const useCompletePayment = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (reportId) => apPaymentApi.completePayment(reportId).then(unwrap),
+    mutationFn: ({ reportId, payment }) => completePayment(reportId, payment).then(unwrap),
     // Refresh on failure too - e.g. a duplicate-completion attempt means this row was already
     // stale (someone else completed it first), so re-fetching clears it immediately.
-    onSettled: (_data, _err, reportId) => {
+    onSettled: (_data, _err, { reportId }) => {
       qc.invalidateQueries({ queryKey: ["apPaymentQueue"] });
+      qc.invalidateQueries({ queryKey: ["apPaymentHistory"] });
+      qc.invalidateQueries({ queryKey: ["apPaymentSummary"] });
       qc.invalidateQueries({ queryKey: AP_DETAILS_KEY(reportId) });
     },
   });

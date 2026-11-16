@@ -10,15 +10,29 @@ import FlowPreview from "../components/FlowPreview";
 
 const emptyLevel = () => ({ id: crypto.randomUUID(), levelName: "", quorum: "SEQUENTIAL", levelType: "APPROVAL", approvers: [{ id: crypto.randomUUID(), sourceType: "REPORTING_MANAGER", sourceReference: "" }] });
 
+// Defense-in-depth: the backend now returns levels/approvers pre-sorted by levelOrder/entryOrder
+// (see ApprovalFlowMapper.toResponse), but this never trusts array order alone - a stable numeric
+// sort here means the UI still renders correctly even if that ever regresses. Missing/undefined
+// order values sort last rather than being coerced to 0, so they never jump ahead of real values.
+const byOrder = (a, b) => {
+  const orderA = a ?? Number.POSITIVE_INFINITY;
+  const orderB = b ?? Number.POSITIVE_INFINITY;
+  return orderA - orderB;
+};
+
 const toLocalLevels = (levels) =>
-  (levels || []).map((l) => ({
-    id: crypto.randomUUID(),
-    levelId: l.levelId,
-    levelName: l.levelName || "",
-    quorum: l.quorum,
-    levelType: l.levelType || "APPROVAL",
-    approvers: (l.approvers || []).map((a) => ({ id: crypto.randomUUID(), entryId: a.entryId, sourceType: a.sourceType, sourceReference: a.sourceReference || "" })),
-  }));
+  [...(levels || [])]
+    .sort((a, b) => byOrder(a.levelOrder, b.levelOrder))
+    .map((l) => ({
+      id: crypto.randomUUID(),
+      levelId: l.levelId,
+      levelName: l.levelName || "",
+      quorum: l.quorum,
+      levelType: l.levelType || "APPROVAL",
+      approvers: [...(l.approvers || [])]
+        .sort((a, b) => byOrder(a.entryOrder, b.entryOrder))
+        .map((a) => ({ id: crypto.randomUUID(), entryId: a.entryId, sourceType: a.sourceType, sourceReference: a.sourceReference || "" })),
+    }));
 
 /**
  * The Catch-All flow - the one flow every report falls into if nothing else matches (§ "it always
@@ -104,7 +118,7 @@ export default function CatchAllFlowPage() {
 
         <div className="lg:sticky lg:top-4">
           <h2 className="text-sm font-semibold text-gray-900 mb-2">Flow Preview</h2>
-          <FlowPreview whenLabel="Always (no other flow matched)" levels={levels} />
+          <FlowPreview whenLabel="Always (no other flow matched)" levels={levels} autoFinance={false} />
         </div>
       </div>
     </div>

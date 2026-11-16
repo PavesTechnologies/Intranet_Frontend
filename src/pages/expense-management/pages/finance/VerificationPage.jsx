@@ -53,6 +53,62 @@ export default function VerificationPage() {
   const items = data?.content || [];
   const isMutating = verifyLineItem.isPending || queryLineItem.isPending;
 
+  const lineItemsQueries = useQueries({
+    queries: items.map((item) => ({
+      queryKey: ["reportLineItems", item.reportId],
+      queryFn: async () => {
+        const res = await lineItemService.getAll(item.reportId);
+        const payload = res.data?.data;
+        return Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || [];
+      },
+      staleTime: 30_000,
+    })),
+  });
+
+  const reviewsQueries = useQueries({
+    queries: items.map((item) => ({
+      queryKey: ["financeReviews", item.reportId],
+      queryFn: async () => {
+        try {
+          const res = await financeVerificationApi.getReviews(item.reportId);
+          return res.data?.data || [];
+        } catch {
+          return [];
+        }
+      },
+      staleTime: 15_000,
+    })),
+  });
+
+  const resolvedItems = useMemo(() => {
+    return items.map((item, idx) => {
+      const queriedLines = lineItemsQueries[idx]?.data;
+      const backendLines = item.pendingLineItems || item.lineItems || item.items || item.pendingLines || [];
+      const baseLines = (queriedLines && queriedLines.length > 0) ? queriedLines : backendLines;
+      const reportReviews = reviewsQueries[idx]?.data || [];
+
+      const mergedLines = baseLines.map((line) => {
+        const qi = backendLines.find((b) => b.lineItemId === line.lineItemId) || {};
+        return { ...line, ...qi };
+      });
+
+      // A line is pending verification if it has not been verified or queried.
+      const pendingLineItems = mergedLines.filter((line) => {
+        const lineReviews = reportReviews.filter((r) => r.lineItemId === line.lineItemId);
+        const hasVerifiedOrQueried = lineReviews.some((r) => r.status === "VERIFIED" || r.status === "QUERIED");
+        return !hasVerifiedOrQueried;
+      });
+
+      const finalPending = pendingLineItems.length > 0 ? pendingLineItems : mergedLines;
+
+      return {
+        ...item,
+        pendingLineItems: finalPending,
+      };
+    });
+  }, [items, lineItemsQueries, reviewsQueries]);
+
+
   const handleVerifyLine = (reportId, lineItemId) => {
     verifyLineItem.mutate(
       { reportId, lineItemId },

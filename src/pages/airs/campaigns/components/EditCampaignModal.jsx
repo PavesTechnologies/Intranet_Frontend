@@ -71,6 +71,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             semantic_threshold: scoring?.semantic_threshold ?? "",
             ai_threshold: scoring?.ai_threshold ?? "",
             deterministic_threshold: scoring?.deterministic_threshold ?? "",
+            max_missing_core_pct: scoring?.max_missing_core_pct ?? 25,
+            max_missing_core_skills: scoring?.max_missing_core_skills ?? 3,
             prompt_template_id: info.prompt_template_id || "",
             ai_evaluate_prompt_id: info.ai_evaluate_prompt_id || "",
         });
@@ -215,7 +217,9 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             Number(form.weight_ai) !== Number(scoring.weight_ai) ||
             Number(form.semantic_threshold) !== Number(scoring.semantic_threshold) ||
             Number(form.ai_threshold) !== Number(scoring.ai_threshold) ||
-            Number(form.deterministic_threshold) !== Number(scoring.deterministic_threshold)
+            Number(form.deterministic_threshold) !== Number(scoring.deterministic_threshold) ||
+            Number(form.max_missing_core_pct) !== Number(scoring.max_missing_core_pct ?? 25) ||
+            Number(form.max_missing_core_skills) !== Number(scoring.max_missing_core_skills ?? 3)
         );
 
         if (scoringChanged) {
@@ -228,6 +232,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                 semantic_threshold: Number(form.semantic_threshold),
                 ai_threshold: Number(form.ai_threshold),
                 deterministic_threshold: Number(form.deterministic_threshold),
+                max_missing_core_pct: Number(form.max_missing_core_pct),
+                max_missing_core_skills: Number(form.max_missing_core_skills),
                 confirm_scoring_change: true,   // backend requires this on ACTIVE
             });
         }
@@ -408,6 +414,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                             <FormInput label="Relevance Threshold" name="semantic_threshold" type="number" step="0.01" value={form.semantic_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
                             <FormInput label="AI Review Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
                             <FormInput label="AI Threshold" name="ai_threshold" type="number" value={form.ai_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="Max Missing Core (%)" name="max_missing_core_pct" type="number" min="0" max="100" value={form.max_missing_core_pct} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} title="Core skills a candidate may miss and still pass: this % of the JD's core skills (rounded down), never more than the cap." />
+                            <FormInput label="Max Missing Core (cap)" name="max_missing_core_skills" type="number" min="0" max="50" value={form.max_missing_core_skills} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} title="Core skills a candidate may miss and still pass: this % of the JD's core skills (rounded down), never more than the cap." />
                         </div>
                     </>
                 )}

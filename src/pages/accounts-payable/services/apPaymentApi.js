@@ -1,6 +1,7 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -21,9 +22,10 @@ export const apPaymentApi = {
   getDetails: (reportId) =>
     api.get(`/xms/ap-payments/${reportId}`, withBase()),
 
-  // ExpenseReportResponse
-  completePayment: (reportId) =>
-    api.post(`/xms/ap-payments/${reportId}/complete`, {}, withBase()),
+  // ExpenseReportResponse. confirmation (optional FormData): disbursement mode and proof. Expense
+  // Management passes it; the AP module still calls this without one.
+  completePayment: (reportId, confirmation) =>
+    api.post(`/xms/ap-payments/${reportId}/complete`, confirmation ?? {}, withBase()),
 };
 
 export default apPaymentApi;

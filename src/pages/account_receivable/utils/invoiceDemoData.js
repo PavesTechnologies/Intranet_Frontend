@@ -72,6 +72,8 @@ export const DEMO_TERMS = {
 export const DEMO_DELIVERY_STATUS = {
   NOT_SENT: "NOT_SENT",
   SENT_TO_CLIENT: "SENT_TO_CLIENT",
+  // The backend ran the delivery workflow but no email left the server (local-demo). Never shown as sent.
+  SIMULATED: "SIMULATED",
 };
 
 /** The user identity shown for demo delivery actions. */

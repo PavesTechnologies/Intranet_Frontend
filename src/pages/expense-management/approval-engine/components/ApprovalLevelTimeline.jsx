@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, Circle, Clock } from "lucide-react";
 import { useApprovalStatus, useLineItemReviews } from "../hooks/useApprovalWorkflow";
 import { useEmployeeDirectory, resolveEmployeeName } from "../hooks/useEmployeeDirectory";
 import { formatDateTime } from "../constants/approvalLabels";
+import ApprovalProgressLevels from "./ApprovalProgressLevels";
 
 const NODE_META = {
   done: { Icon: CheckCircle2, dot: "bg-emerald-500 text-white", line: "bg-emerald-200", title: "text-emerald-800" },
@@ -44,8 +45,11 @@ export default function ApprovalLevelTimeline({ reportId, reportStatus }) {
   const { data: reviews } = useLineItemReviews(reportId);
   const { data: directory } = useEmployeeDirectory();
 
-  const isApproved = reportStatus === "APPROVED";
-  const isRejected = reportStatus === "REJECTED";
+  // Prefer the status fetched with the level data: the reportStatus prop can be a cached copy
+  // from before the last action, which would show finished levels as "Not reached".
+  const effectiveStatus = status?.reportStatus || reportStatus;
+  const isApproved = effectiveStatus === "APPROVED" || effectiveStatus === "CLOSED";
+  const isRejected = effectiveStatus === "REJECTED";
   const totalLevels = status?.totalLevels || 0;
   const currentLevelOrder = status?.currentLevelOrder;
 
@@ -57,6 +61,12 @@ export default function ApprovalLevelTimeline({ reportId, reportStatus }) {
         ))}
       </div>
     );
+  }
+
+  // Role-named levels (Reporting Manager, Cost Center Owner, Finance Verification ...) with who
+  // acted, when the backend provides them; the derivation below is the older fallback.
+  if (status?.levels?.length) {
+    return <ApprovalProgressLevels levels={status.levels} reportStatus={effectiveStatus} />;
   }
 
   if (!totalLevels && !isApproved && !isRejected) {

@@ -6,6 +6,7 @@ import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ApproverLabel from "../../system-configuration/components/ApproverLabel";
 import useDepartments from "../../system-configuration/hooks/useDepartments";
@@ -216,7 +217,9 @@ export default function InvoiceApprovalPanel({ invoice }) {
           </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Invoice Status</dt>
-            <dd className="mt-1 text-sm font-medium text-gray-900">{invoice.status}</dd>
+            <dd className="mt-1">
+              <ApStatusBadge status={invoice.status} />
+            </dd>
           </div>
         </dl>
 

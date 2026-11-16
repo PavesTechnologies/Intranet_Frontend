@@ -11,6 +11,7 @@ export const FIELD_LABELS = {
   CATEGORY: "Category",
   DEPARTMENT: "Department",
   COST_CENTER: "Cost Center",
+  HAS_POLICY_VIOLATION: "Has Policy Violation",
 };
 
 export const OPERATOR_LABELS = {
@@ -73,7 +74,14 @@ export const friendlyApprovalError = (rawMessage, fallback = "Action failed") =>
   return rawMessage || fallback;
 };
 
-const describeCriterion = (c) => `${FIELD_LABELS[c.field] || c.field} ${OPERATOR_LABELS[c.operator] || c.operator} ${c.value}`;
+// HAS_POLICY_VIOLATION ignores its value entirely (see CriteriaBuilder.jsx) - there's nothing to
+// compare a value against, so it reads as a plain yes/no condition instead of "Field Op value".
+const describeCriterion = (c) =>
+  c.field === "HAS_POLICY_VIOLATION"
+    ? c.operator === "NOT_EQUALS"
+      ? "Has No Policy Violation"
+      : "Has Policy Violation"
+    : `${FIELD_LABELS[c.field] || c.field} ${OPERATOR_LABELS[c.operator] || c.operator} ${c.value}`;
 
 /**
  * Turns { criteriaPattern, criteria } into "Amount > 50,000 AND Category = Travel" (OR-joined

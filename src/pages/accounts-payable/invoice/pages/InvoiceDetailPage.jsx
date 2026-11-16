@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Breadcrumb from "../../../../components/Breadcrumb/Breadcrumb";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
@@ -14,6 +14,7 @@ import InvoiceReviewEditor from "../components/InvoiceReviewEditor";
 import InvoiceReturnedBanner from "../components/InvoiceReturnedBanner";
 import InvoiceValidationPanel from "../components/InvoiceValidationPanel";
 import InvoiceTdsPanel from "../components/InvoiceTdsPanel";
+import InvoicePaymentTermsPanel from "../components/InvoicePaymentTermsPanel";
 import InvoiceApprovalPanel from "../components/InvoiceApprovalPanel";
 import InvoicePaymentPanel from "../components/InvoicePaymentPanel";
 import InvoiceAuditHistory from "../components/InvoiceAuditHistory";
@@ -104,7 +105,7 @@ export default function InvoiceDetailPage() {
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Status</p>
               <div className="mt-1">
-                <StatusBadge label={invoice.status} size="sm" />
+                <ApStatusBadge status={invoice.status} />
               </div>
             </div>
           </div>
@@ -124,7 +125,12 @@ export default function InvoiceDetailPage() {
           ) : (
             <InvoiceOcrReviewPanel invoice={invoice} />
           )}
-          <InvoiceTdsPanel invoice={invoice} />
+          <div id="invoice-tds" className="scroll-mt-4">
+            <InvoiceTdsPanel invoice={invoice} />
+          </div>
+          <div id="invoice-payment-terms" className="scroll-mt-4">
+            <InvoicePaymentTermsPanel invoice={invoice} />
+          </div>
           <InvoiceApprovalPanel invoice={invoice} />
           <InvoiceValidationPanel />
 

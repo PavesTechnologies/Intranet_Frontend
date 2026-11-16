@@ -3,8 +3,13 @@ import { approvalService } from "../services/approvalService";
 import { INVOICE_DETAIL_KEY } from "./useInvoiceDetail";
 import { INVOICE_HISTORY_KEY } from "./useInvoiceHistory";
 
-export const INVOICE_APPROVAL_KEY = (invoiceId) => ["accountsPayable", "invoiceApproval", invoiceId];
-export const INVOICE_APPROVAL_STEPS_KEY = (invoiceId) => ["accountsPayable", "invoiceApprovalSteps", invoiceId];
+// Normalized to a number — see useInvoiceDetail.js's INVOICE_DETAIL_KEY for why this matters.
+export const INVOICE_APPROVAL_KEY = (invoiceId) => ["accountsPayable", "invoiceApproval", Number(invoiceId)];
+export const INVOICE_APPROVAL_STEPS_KEY = (invoiceId) => [
+  "accountsPayable",
+  "invoiceApprovalSteps",
+  Number(invoiceId),
+];
 
 function invalidateApproval(queryClient, invoiceId) {
   queryClient.invalidateQueries({ queryKey: INVOICE_DETAIL_KEY(invoiceId) });

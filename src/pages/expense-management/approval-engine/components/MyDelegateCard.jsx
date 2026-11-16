@@ -5,6 +5,7 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApprovalDelegations, useSaveApprovalDelegation, useDeleteApprovalDelegation } from "../hooks/useApprovalDelegations";
 import EmployeeLabel from "./EmployeeLabel";
+import EmployeeSelect from "./EmployeeSelect";
 import { formatDate } from "../constants/approvalLabels";
 
 /**
@@ -37,14 +38,18 @@ export default function MyDelegateCard() {
   };
 
   const handleSave = () => {
-    if (!form.delegateId.trim() || !form.startDate || !form.endDate) {
+    if (!form.delegateId || !form.startDate || !form.endDate) {
       showStatusToast("Delegate, start date, and end date are all required.", "error");
+      return;
+    }
+    if (form.endDate < form.startDate) {
+      showStatusToast("End date can't be before the start date.", "error");
       return;
     }
     saveDelegation.mutate(
       {
         id: myDelegation?.delegationId,
-        payload: { delegatorId: myEmployeeId, delegateId: form.delegateId.trim(), startDate: form.startDate, endDate: form.endDate, status: "ACTIVE" },
+        payload: { delegatorId: myEmployeeId, delegateId: form.delegateId, startDate: form.startDate, endDate: form.endDate, status: "ACTIVE" },
       },
       {
         onSuccess: () => {
@@ -87,22 +92,26 @@ export default function MyDelegateCard() {
 
       {isEditing ? (
         <div className="flex flex-wrap items-end gap-2">
-          <input
-            className="text-sm border border-gray-300 rounded-md px-2 py-1.5 w-36"
-            placeholder="Delegate Employee ID"
-            value={form.delegateId}
-            onChange={(e) => setForm((f) => ({ ...f, delegateId: e.target.value }))}
-          />
+          <div className="w-72">
+            <EmployeeSelect
+              value={form.delegateId}
+              onChange={(delegateId) => setForm((f) => ({ ...f, delegateId }))}
+              excludeIds={[String(myEmployeeId)]}
+              placeholder="Search for a delegate…"
+              isDisabled={saveDelegation.isPending}
+            />
+          </div>
           <input
             type="date"
-            className="text-sm border border-gray-300 rounded-md px-2 py-1.5"
+            className="text-sm border border-gray-300 rounded-lg px-2 h-[42px]"
             value={form.startDate}
             onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
           />
           <input
             type="date"
-            className="text-sm border border-gray-300 rounded-md px-2 py-1.5"
+            className="text-sm border border-gray-300 rounded-lg px-2 h-[42px]"
             value={form.endDate}
+            min={form.startDate || undefined}
             onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
           />
           <Button size="small" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>

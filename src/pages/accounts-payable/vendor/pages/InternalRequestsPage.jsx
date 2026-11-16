@@ -36,7 +36,7 @@ const DEFAULT_FILTERS = { search: "", statusId: "", mineOnly: false };
 export default function InternalRequestsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { canViewOnboarding } = useApPermissions();
+  const { canViewOnboarding, canViewPR } = useApPermissions();
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
@@ -54,7 +54,11 @@ export default function InternalRequestsPage() {
 
   const { data: departments = [] } = useDepartments();
   const { data: categories = [] } = usePurchaseCategories();
-  const { data: purchaseRequisitions = [] } = useAllPurchaseRequisitions();
+  // Only a fallback for rows without pr_number. GET /purchase-requisitions needs PR_VIEW, which
+  // Vendor Intake doesn't hold, so it isn't called without it.
+  const { data: purchaseRequisitions = [] } = useAllPurchaseRequisitions(200, {
+    enabled: Boolean(canViewPR),
+  });
   const { vendorNameById } = useVendorOptions();
 
   const departmentName = (id) => departments.find((d) => d.id === id)?.name || "—";
@@ -70,7 +74,7 @@ export default function InternalRequestsPage() {
     if (!term) return requests;
 
     return requests.filter((request) => {
-      const prNumber = prNumberById.get(Number(request.pr_id)) || "";
+      const prNumber = request.pr_number || prNumberById.get(Number(request.pr_id)) || "";
       const vendorName =
         request.requested_vendor_name || vendorNameById?.get(Number(request.vendor_id)) || "";
 

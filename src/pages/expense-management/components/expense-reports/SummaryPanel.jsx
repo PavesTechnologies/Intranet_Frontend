@@ -2,6 +2,8 @@ import React from "react";
 import { Layers, Receipt, Landmark, Wallet } from "lucide-react";
 import StatusBadge from "@/components/status/statusbadge";
 import AnimatedNumber from "./AnimatedNumber";
+import InvoiceHandoffBadge from "./InvoiceHandoffBadge";
+import PaymentStatusBadge, { paymentStateOf } from "./PaymentStatusBadge";
 
 const formatAmount = (value) =>
   (Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -25,11 +27,22 @@ const MetricRow = ({ icon, label, value, valueClassName = "text-gray-900", suffi
  */
 export default function SummaryPanel({ report, lineItems = [] }) {
   const totalLineItems = lineItems.length;
+  const baseCurrencyCode =
+    lineItems.find((li) => li.baseCurrencyCode)?.baseCurrencyCode || report?.baseCurrencyCode || report?.currencyCode || "—";
+  // Line amounts are in each line's own currency, so they are only summed as-is when every line
+  // shares one currency. GST and net are converted with the line's rate (as baseAmount is) so
+  // they always add up in the base currency.
+  const lineCurrencies = [...new Set(lineItems.map((li) => li.currencyCode).filter(Boolean))];
+  const singleLineCurrency = lineCurrencies.length <= 1 ? lineCurrencies[0] || report?.currencyCode : null;
+  const toBase = (li, value) => (Number(value) || 0) * (Number(li.exchangeRate) || 1);
   const totalAmount = lineItems.reduce((sum, li) => sum + (Number(li.amount) || 0), 0);
-  const totalGst = lineItems.reduce((sum, li) => sum + (Number(li.taxAmount) || 0), 0);
-  const totalNet = lineItems.reduce((sum, li) => sum + (Number(li.netAmount) || 0), 0);
+  const totalGst = lineItems.reduce((sum, li) => sum + toBase(li, li.taxAmount), 0);
+  const totalNet = lineItems.reduce((sum, li) => sum + toBase(li, li.netAmount), 0);
   const totalBase = lineItems.reduce((sum, li) => sum + (Number(li.baseAmount) || 0), 0);
-  const baseCurrencyCode = lineItems.find((li) => li.baseCurrencyCode)?.baseCurrencyCode || report?.currencyCode || "—";
+  // Payment track: Awaiting payment / Paid (only after AP confirms) / Settled - no payment due.
+  const hasPaymentTrack = !!paymentStateOf(report);
+  const payment = report?.paymentConfirmation;
+  const hasInvoiceTrack = report?.invoiceHandoffStatus === "PENDING" || report?.invoiceHandoffStatus === "COMPLETED";
 
   return (
     <div className="lg:sticky lg:top-4 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -39,6 +52,14 @@ export default function SummaryPanel({ report, lineItems = [] }) {
           <span className="text-sm font-semibold text-white truncate pr-2">{report?.title || "—"}</span>
           {report?.status && <StatusBadge label={report.status} size="sm" />}
         </div>
+        {/* Two independent downstream tracks once approved: employee reimbursement (AP) and,
+            for client-billable reports, the invoice team handoff. */}
+        {(hasPaymentTrack || hasInvoiceTrack) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {hasPaymentTrack && <PaymentStatusBadge report={report} />}
+            {hasInvoiceTrack && <InvoiceHandoffBadge status={report.invoiceHandoffStatus} />}
+          </div>
+        )}
       </div>
 
       <div className="p-4">
@@ -50,19 +71,26 @@ export default function SummaryPanel({ report, lineItems = [] }) {
         <MetricRow
           icon={<Wallet size={15} />}
           label="Total Original Amount"
-          value={<AnimatedNumber value={totalAmount} format={formatAmount} />}
+          value={
+            singleLineCurrency !== null
+              ? <AnimatedNumber value={totalAmount} format={formatAmount} />
+              : `${lineCurrencies.length} currencies`
+          }
+          suffix={singleLineCurrency !== null ? singleLineCurrency : undefined}
         />
         <MetricRow
           icon={<Receipt size={15} />}
           label="Total GST"
           value={<AnimatedNumber value={totalGst} format={formatAmount} />}
           valueClassName="text-amber-600"
+          suffix={baseCurrencyCode}
         />
         <MetricRow
           icon={<Receipt size={15} />}
           label="Total Net Amount"
           value={<AnimatedNumber value={totalNet} format={formatAmount} />}
           valueClassName="text-emerald-700"
+          suffix={baseCurrencyCode}
         />
         <MetricRow
           icon={<Landmark size={15} />}
@@ -76,6 +104,21 @@ export default function SummaryPanel({ report, lineItems = [] }) {
           valueClassName="text-[#0A0082] text-base"
           suffix={baseCurrencyCode}
         />
+        {payment && (
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+            <p className="font-semibold">Payment</p>
+            <p className="mt-1">
+              {formatAmount(payment.amountPaid)} {baseCurrencyCode} paid on {payment.paymentDate || "—"}
+              {payment.paymentMethod ? ` by ${payment.paymentMethod.replace("_", " ").toLowerCase()}` : ""}
+            </p>
+            {payment.paymentReference && <p className="mt-0.5 font-mono">Ref {payment.paymentReference}</p>}
+          </div>
+        )}
+        {report?.noPaymentDue && (
+          <p className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+            Approved and fully covered by your cash advance, so no payment is due.
+          </p>
+        )}
       </div>
     </div>
   );

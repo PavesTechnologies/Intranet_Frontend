@@ -67,7 +67,6 @@ export default function CandidateScorePage() {
     decisionAt: navCandidate?.decisionAt ?? navCandidate?.decision_at,
     notice: navCandidate?.notice,
     salary: navCandidate?.salary,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [navCandidate, candidateId, location.state?.campaignId]);
 
   const { candidate: fetchedCandidate, loading, error, status, refetch } = useParsedResumeCandidate(candidateId, fallback);

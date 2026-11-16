@@ -9,23 +9,26 @@ import { toast } from "react-toastify";
 // not a shared Context provider.
 const RECONNECT_DELAYS_MS = [1500, 3000, 6000, 10000];
 
-// Per app/websocket/auth.py + router.py: the JWT is only checked once, at
-// connect time (?token=<JWT>), not on an ongoing basis. Two server-side
-// close codes matter:
+// Per app/websocket/auth.py + router.py: the JWT is checked at connect time
+// (?token=<JWT>), and the server closes an open socket when that token
+// expires. Two server-side close codes matter:
 //   1008 — auth/authz failure (missing/invalid/expired token, or the
-//          connected user's role isn't permitted on this channel, e.g.
-//          resume processing is RECRUITER-only). Retrying with the same
-//          token will fail identically, so this must NOT auto-reconnect.
+//          connected user's role isn't permitted on this channel).
+//          Retrying with the same token fails identically, so this does NOT
+//          auto-reconnect - except "Token expired" on a live session when
+//          the app has since stored a refreshed token: that one reconnects.
 //   1011 — unexpected server error. Safe to retry with backoff, same as a
 //          plain network drop.
 const AUTH_FAILURE_CLOSE_CODE = 1008;
+const TOKEN_EXPIRED_REASON = "Token expired";
+
+const currentToken = () => localStorage.getItem("token") || "";
 
 function buildAirsWsUrl(path) {
   const base = (window.__APP_CONFIG__?.AIRS_BASE_URL || "").replace(/\/+$/, "");
   if (!base) return null;
   const wsBase = base.replace(/^http/i, (m) => (m.toLowerCase() === "https" ? "wss" : "ws"));
-  const token = localStorage.getItem("token") || "";
-  return `${wsBase}${path}?token=${encodeURIComponent(token)}`;
+  return `${wsBase}${path}?token=${encodeURIComponent(currentToken())}`;
 }
 
 // path: string | null|undefined — pass null/undefined until the resource id
@@ -47,11 +50,13 @@ export default function useAirsSocket(path, { onEvent, onOpen, enabled = true } 
     let attempt = 0;
     let closedByEffect = false;
     let authFailureNotified = false;
+    let connectedToken = "";
 
     const connect = () => {
       const url = buildAirsWsUrl(path);
       if (!url) return;
 
+      connectedToken = currentToken();
       socket = new WebSocket(url);
 
       socket.onopen = () => {
@@ -79,6 +84,13 @@ export default function useAirsSocket(path, { onEvent, onOpen, enabled = true } 
         if (closedByEffect) return;
 
         if (event?.code === AUTH_FAILURE_CLOSE_CODE) {
+          const tokenRefreshed = currentToken() && currentToken() !== connectedToken;
+          if (event.reason === TOKEN_EXPIRED_REASON && tokenRefreshed) {
+            attempt += 1; // so onopen runs the consumer's reconcile
+            clearTimeout(retryTimer);
+            retryTimer = setTimeout(connect, 0);
+            return;
+          }
           console.warn(`AIRS WS auth/authz failure on ${path} — not retrying.`);
           if (!authFailureNotified) {
             authFailureNotified = true;
