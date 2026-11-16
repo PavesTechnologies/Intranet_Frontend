@@ -33,7 +33,9 @@ const formatAmount = (value, currencyCode) =>
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
-  const canManage = hasRole(["General", "Manager"]);
+  // Manager is read-only on the backend for report writes (ExpenseReportController
+  // allows only ADMIN/GENERAL to create/update/delete/submit) — don't show write actions.
+  const canManage = hasRole(["General"]);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);

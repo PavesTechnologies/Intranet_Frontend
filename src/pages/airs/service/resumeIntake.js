@@ -249,6 +249,24 @@ export const getBulkUploadJobs = async (params) => {
     }
 };
 
+// Cross-campaign bulk-upload history for the caller's own recruiter id
+// (every campaign they're assigned to, not just one) — no campaign_id
+// required, unlike getBulkUploadJobs above.
+export const getBulkUploadJobsByRecruiter = async (params) => {
+    try {
+        const response = await api.get(`${BASE_URL}/bulk-uploads/by-recruiter`, {
+            params,
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bulk upload jobs by recruiter:", error);
+        throw error;
+    }
+};
+
 export const getBulkUploadProgress = async (bulkUploadJobId) => {
     try {
         const response = await api.get(`${BASE_URL}/bulk-uploads/${bulkUploadJobId}/progress`, {

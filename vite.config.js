@@ -1,10 +1,10 @@
 
 // vite.config.js
-import { defineConfig } from 'vite';  
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-export default defineConfig({          
+export default defineConfig({
   plugins: [
     react({
       include: /\.(jsx|js)$/,
@@ -15,5 +15,11 @@ export default defineConfig({
       "@": path.resolve(process.cwd(), "./src"),
     },
   },
-  base: '/',    
+  base: '/',
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/setupTests.js'],
+    css: true,
+  },
 });

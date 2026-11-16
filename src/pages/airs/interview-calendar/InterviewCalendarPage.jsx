@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { CalendarClock } from "lucide-react";
 import FilterListbox from "@/components/filter/FilterListbox";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
@@ -43,6 +42,15 @@ export default function InterviewCalendarPage() {
 
   useEffect(() => { fetchOptions(); }, [fetchOptions]);
 
+  // Defaults to the first campaign whenever the URL doesn't already pin
+  // one — e.g. landing on /airs/interview-calendar with no ?campaign= at
+  // all — same pattern as PipelineBoardPage's own campaign selector.
+  useEffect(() => {
+    if (!loadingOptions && !campaignId && options.length > 0) {
+      setSearchParams({ campaign: options[0].value }, { replace: true });
+    }
+  }, [loadingOptions, campaignId, options, setSearchParams]);
+
   const handleSelectCampaign = (nextId) => {
     setSearchParams(nextId ? { campaign: nextId } : {}, { replace: true });
   };
@@ -51,10 +59,7 @@ export default function InterviewCalendarPage() {
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <CalendarClock className="h-5 w-5 text-slate-500" />
-            Interview Calendar
-          </h1>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Interview Calendar</h1>
           <p className="text-xs text-slate-500 mt-1">
             Every scheduled interview for a campaign, in one calendar.
           </p>

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
-import { Star, StarOff, Eye, Archive, Trash2, MessageSquare } from "lucide-react";
+import { Eye, Archive, Trash2, MessageSquare } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
@@ -13,7 +13,8 @@ import {
   renderFlags,
 } from "../utils/candidateUtils.jsx";
 import { DASH } from "../utils/candidateDataUtils";
-import { deleteCandidate } from "../../service/resumeIntake";
+import { PIPELINE_STAGE_LABEL } from "../constants/candidateConstants";
+import { deleteCampaignCandidate } from "../../campaigns/services/candidateActionsService";
 import { extractErrorMessage } from "../../resume-intake/intake/utils/intakeUtils.jsx";
 import { useAuth } from "../../../../contexts/AuthContext";
 
@@ -35,7 +36,6 @@ const renderScore = (value, multiplier = 1) => {
 export default function CandidateTable({
   candidates,
   onView,
-  onToggleStar,
   onDeleted,
   // Bulk selection
   selectable = false,
@@ -46,11 +46,12 @@ export default function CandidateTable({
   noteCounts,
   // Per-row actions, rendered after the built-in ones
   renderExtraActions,
-  // The row itself already navigates to onView on click — some callers
-  // (CampaignDetails' Candidates tab) find the Eye button redundant next
-  // to that; others (CandidateRankingPage) still want it, so this defaults
-  // to keeping existing behavior everywhere.
+  // The row itself already navigates to onView on click, so CampaignDetails'
+  // Candidates tab (the only caller) hides the redundant Eye button.
   showViewButton = true,
+  // HIRING_MANAGER gets none of the built-in actions (no delete, no
+  // renderExtraActions) — drop the whole column rather than render it empty.
+  showActionsColumn = true,
 }) {
   const { hasRole } = useAuth();
   const canDeleteCandidates = hasRole(["HR_ADMIN"]);
@@ -65,7 +66,7 @@ export default function CandidateTable({
     if (!candidateToDelete) return;
     setIsDeleting(true);
     try {
-      await deleteCandidate(candidateToDelete.candidate_id);
+      await deleteCampaignCandidate(candidateToDelete.id);
       toast.success(`${candidateToDelete.name} has been deleted.`);
       setCandidateToDelete(null);
       onDeleted?.(candidateToDelete);
@@ -85,8 +86,12 @@ export default function CandidateTable({
     );
   }
 
-  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Location", "Stage", "Risk", "Actions"];
-  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "location", "stage", "risk", "actions"];
+  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Stage", "Risk"];
+  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "stage", "risk"];
+  if (showActionsColumn) {
+    headers.push("Actions");
+    columns.push("actions");
+  }
 
   if (selectable) {
     headers.unshift(
@@ -118,15 +123,20 @@ export default function CandidateTable({
     ) : null,
     name: (
       <div className="w-full flex items-center gap-2.5 text-left">
-        <span className="w-6 text-center text-[11px] font-bold text-slate-400 shrink-0" title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}>
-          {c.rank != null ? `#${c.rank}` : "—"}
-        </span>
         <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">
           {c.initials}
         </div>
         <div className="min-w-0">
-          <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
-            <span className="truncate">{c.name}</span>
+          <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+            <span className="line-clamp-1">{c.name}</span>
+            {c.rank != null && (
+              <span
+                title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}
+                className="shrink-0 inline-flex items-center text-xs font-bold text-indigo-600"
+              >
+                #{c.rank}
+              </span>
+            )}
             {/* Only shown when there is something to see */}
             {noteCounts?.[c.id] > 0 && (
               <span
@@ -138,32 +148,35 @@ export default function CandidateTable({
               </span>
             )}
           </div>
-          <div className="text-[11px] text-slate-400 truncate">{c.role}</div>
+          <div className="text-[11px] text-slate-400 line-clamp-1">{c.role}</div>
         </div>
-        <button
-          className="shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleStar(c.id);
-          }}
-        >
-          {c.starred ? <Star size={14} className="fill-amber-500 text-amber-500" /> : <StarOff size={14} className="text-slate-300" />}
-        </button>
       </div>
     ),
     deterministic: renderScore(c.deterministic),
     ats: renderScore(c.ats),
     semantic: renderScore(c.semantic, 100),
-    composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
+    composite: <ScoreRing value={c.composite} size={32} color="#16A34A" decimals={0} />,
     aiRecommendation: renderAiRecommendationBadge(c.aiRecommendation),
-    experience: `${Number(c.experience).toFixed(1)} yrs`,
-    location: c.location,
+    experience: (
+      <div className="text-center leading-tight">
+        <div className="font-semibold text-slate-900">{Number(c.experience).toFixed(1)}</div>
+        <div className="text-[9px] uppercase text-slate-400">yrs</div>
+      </div>
+    ),
     stage: renderStageBadge(c.stage),
     // keyed `risk` to match the Risk column; c.rank is the ranking position and
     // is already shown beside the candidate's name
     risk: renderRiskBadge(c.risk),
-    actions: (
-      <div className="flex items-center gap-1">
+    // A candidate sitting in HM_REVIEW is the hiring manager's to act on —
+    // nobody else gets buttons on that row, just the stage in plain text.
+    actions: String(c.stage || "").toUpperCase() === "HM_REVIEW" ? (
+      <div className="w-full flex items-center justify-center">
+        <span className="text-[11px] font-semibold text-slate-500">
+          {PIPELINE_STAGE_LABEL.HM_REVIEW}
+        </span>
+      </div>
+    ) : (
+      <div className="w-full flex items-center justify-center gap-1">
         {showViewButton && (
           <Button
             variant="ghost"
@@ -178,6 +191,7 @@ export default function CandidateTable({
             <Eye className="h-4 w-4" />
           </Button>
         )}
+        {renderExtraActions?.(c)}
         {canDeleteCandidates && (
           <Button
             variant="ghost"
@@ -192,7 +206,6 @@ export default function CandidateTable({
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
-        {renderExtraActions?.(c)}
       </div>
     ),
   }));

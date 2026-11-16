@@ -3,63 +3,70 @@ import { useNavigate } from "react-router-dom";
 import {
   FolderKanban,
   FileText,
-  Cable,
+  Clock,
+  XCircle,
   CheckCircle2,
   Eye,
   Pencil,
   ArrowRightCircle,
   Ban,
-  XCircle,
   Trash2,
+  FilterX,
+  AlertTriangle,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import { KPICard } from "../../../components/kpi/KPI";
+import ARKPICard from "../components/common/ARKPICard";
 import Button from "../../../components/Button/Button";
 import SearchInput from "../../../components/filter/Searchbar";
-import FormSelect from "../../../components/forms/FormSelect";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import ARTable from "../components/common/ARTable";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ActionMenu from "../components/common/ActionMenu";
-import Modal from "../../../components/Modal/modal";
-import FormTextArea from "../../../components/forms/FormTextArea";
 
 import {
   fetchBillingConfigurations,
   deactivateBillingConfiguration,
-  approveBillingConfiguration,
-  rejectBillingConfiguration,
   deleteBillingConfiguration,
   getApiErrorMessage,
   getBillingConfigurationStats,
 } from "../services/billingConfigService";
+import { getBillingTypeDisplayName } from "../utils/billingType";
 
-const INITIAL_FILTERS = { search: "", status: "" };
+const INITIAL_FILTERS = { search: "" };
 const PAGE_SIZE = 6;
 
-const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Source", "Status", "Actions"];
-const TABLE_COLUMNS = ["client", "project", "billingType", "source", "status", "actions"];
+const APPROVAL_STATUS_OPTIONS = [
+  { label: "All Approval Statuses", value: "ALL" },
+  { label: "Draft", value: "DRAFT" },
+  { label: "Pending Approval", value: "PENDING_APPROVAL" },
+  { label: "Approved", value: "APPROVED" },
+  { label: "Rejected", value: "REJECTED" },
+];
 
-const SOURCE_BADGE_CLASSES = {
-  Enterprise: "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200",
-  Standalone: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200",
+const CONFIG_STATUS_OPTIONS = [
+  { label: "All Configuration Statuses", value: "ALL" },
+  { label: "Active", value: "ACTIVE" },
+  { label: "Inactive", value: "INACTIVE" },
+  { label: "Expired", value: "EXPIRED" },
+];
+
+const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Approval Status", "Configuration Status", "Actions"];
+const TABLE_COLUMNS = ["client", "project", "billingType", "approvalStatus", "configurationStatus", "actions"];
+
+const TABLE_ALIGNMENTS = {
+  client: "left",
+  project: "left",
+  billingType: "left",
+  approvalStatus: "center",
+  configurationStatus: "center",
+  actions: "center",
 };
-
-function SourceBadge({ source }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        SOURCE_BADGE_CLASSES[source] || "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200"
-      }`}
-    >
-      {source}
-    </span>
-  );
-}
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -72,16 +79,14 @@ export default function Overview() {
   const [configs, setConfigs] = useState([]);
   const [loadingConfigs, setLoadingConfigs] = useState(true);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState("ALL");
+  const [configStatusFilter, setConfigStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
-  const [approveTarget, setApproveTarget] = useState(null);
-  const [approveLoading, setApproveLoading] = useState(false);
-  const [rejectTarget, setRejectTarget] = useState(null);
-  const [rejectLoading, setRejectLoading] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
   // load configurations helper available to handlers
   const loadConfigurations = async () => {
     setLoadingStats(true);
@@ -104,37 +109,47 @@ export default function Overview() {
 
   useEffect(() => {
     let isMounted = true;
-    // initial load
     loadConfigurations();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const handleFilterChange = (event) => {
-    const { name, value } = event.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
+  const handleSearchInputChange = (event) => {
+    const nextSearch = event.target.value;
+    setFilters((prev) => {
+      if (prev.search === nextSearch) return prev;
+      return { ...prev, search: nextSearch };
+    });
     setCurrentPage(1);
   };
 
-  const handleSearch = (value) => {
-    setFilters((prev) => ({ ...prev, search: value }));
+  const handleKpiClick = (key) => {
+    if (key === "TOTAL") {
+      setApprovalStatusFilter("ALL");
+      setConfigStatusFilter("ALL");
+    } else if (key === "ACTIVE") {
+      setConfigStatusFilter((prev) => (prev === "ACTIVE" ? "ALL" : "ACTIVE"));
+      setApprovalStatusFilter("ALL");
+    } else if (key === "INACTIVE") {
+      setConfigStatusFilter((prev) => (prev === "INACTIVE" ? "ALL" : "INACTIVE"));
+      setApprovalStatusFilter("ALL");
+    } else if (key === "EXPIRED") {
+      setConfigStatusFilter((prev) => (prev === "EXPIRED" ? "ALL" : "EXPIRED"));
+      setApprovalStatusFilter("ALL");
+    } else {
+      setApprovalStatusFilter((prev) => (prev === key ? "ALL" : key));
+      setConfigStatusFilter("ALL");
+    }
     setCurrentPage(1);
   };
 
-  // Only Draft and Active configurations are ever returned by the API, so the
-  // status filter is a fixed list rather than derived from the current page of
-  // data (which could omit a status even though records with it exist).
-  const filterOptions = useMemo(
-    () => ({
-      status: [
-        { value: "", label: "All Statuses" },
-        { value: "Draft", label: "Draft" },
-        { value: "Active", label: "Active" },
-      ],
-    }),
-    []
-  );
+  const handleResetFilters = () => {
+    setFilters(INITIAL_FILTERS);
+    setApprovalStatusFilter("ALL");
+    setConfigStatusFilter("ALL");
+    setCurrentPage(1);
+  };
 
   const filteredConfigs = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
@@ -145,14 +160,33 @@ export default function Overview() {
         String(config.projectName || "").toLowerCase().includes(search) ||
         String(config.projectCode || "").toLowerCase().includes(search) ||
         String(config.client || "").toLowerCase().includes(search);
-      const matchesStatus = !filters.status || String(config.status) === String(filters.status);
 
-      return matchesSearch && matchesStatus;
+      if (!matchesSearch) return false;
+
+      if (approvalStatusFilter !== "ALL" && config.approvalStatus !== approvalStatusFilter) {
+        return false;
+      }
+
+      if (configStatusFilter !== "ALL" && config.billingStatus !== configStatusFilter) {
+        return false;
+      }
+
+      return true;
     });
-  }, [configs, filters]);
+  }, [configs, filters.search, approvalStatusFilter, configStatusFilter]);
 
-  const totalPages = Math.ceil(filteredConfigs.length / PAGE_SIZE) || 1;
-  const paginatedConfigs = filteredConfigs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filteredConfigs.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedConfigs = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredConfigs.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredConfigs, currentPage]);
 
   const handleView = (config) => {
     navigate(`/account-receivable/project-billing-setup/configurations/${config.id}?mode=view`);
@@ -180,51 +214,6 @@ export default function Overview() {
     }
   };
 
-  const handleConfirmApprove = async () => {
-    setApproveLoading(true);
-    try {
-      await approveBillingConfiguration(approveTarget.id);
-      await loadConfigurations();
-      showStatusToast("Billing configuration approved.", "success");
-      setApproveTarget(null);
-    } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to approve billing configuration."), "error");
-    } finally {
-      setApproveLoading(false);
-    }
-  };
-
-  const handleConfirmReject = async () => {
-    if (!rejectionReason.trim()) {
-      showStatusToast("Please enter a rejection reason.", "warning");
-      return;
-    }
-
-    setRejectLoading(true);
-    try {
-      await rejectBillingConfiguration(rejectTarget.id, rejectionReason.trim());
-      await loadConfigurations();
-      showStatusToast("Billing configuration rejected.", "success");
-      setRejectTarget(null);
-      setRejectionReason("");
-    } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to reject billing configuration."), "error");
-    } finally {
-      setRejectLoading(false);
-    }
-  };
-
-  const openRejectModal = (config) => {
-    setRejectTarget(config);
-    setRejectionReason("");
-  };
-
-  const closeRejectModal = () => {
-    if (rejectLoading) return;
-    setRejectTarget(null);
-    setRejectionReason("");
-  };
-
   const handleConfirmDelete = async () => {
     setDeleteLoading(true);
     try {
@@ -245,8 +234,6 @@ export default function Overview() {
     }
   };
 
-  const canApproveOrReject = (status) => !["Active", "Inactive", "Rejected", "Draft"].includes(status);
-
   const closeDeactivateModal = () => {
     if (!deactivateLoading) {
       setDeactivateTarget(null);
@@ -256,100 +243,155 @@ export default function Overview() {
   const tableRows = useMemo(
     () =>
       paginatedConfigs.map((config) => ({
-        client: config.client,
+        client: <div className="text-left font-medium text-slate-800">{config.client}</div>,
         project: (
           <div className="text-left">
             <div className="font-semibold text-slate-900">{config.projectName}</div>
             <div className="text-xs text-slate-400">{config.projectCode}</div>
           </div>
         ),
-        billingType: config.billingType,
-        source: <SourceBadge source={config.source} />,
-        status: <StatusBadge label={config.status} size="sm" />,
-        actions: (
-          <ActionMenu
-            items={[
-              { label: "View", icon: <Eye className="h-4 w-4" />, onClick: () => handleView(config) },
-              {
-                label: "Continue Draft",
-                icon: <ArrowRightCircle className="h-4 w-4" />,
-                hidden: config.status !== "Draft",
-                onClick: () => handleContinueDraft(config),
-              },
-              {
-                label: "Edit",
-                icon: <Pencil className="h-4 w-4 text-gray-600" />,
-                hidden: config.status === "Draft",
-                onClick: () => handleEdit(config),
-              },
-              {
-                label: "Approve",
-                icon: <CheckCircle2 className="h-4 w-4" />,
-                hidden: !canApproveOrReject(config.status),
-                onClick: () => setApproveTarget(config),
-              },
-              {
-                label: "Reject",
-                icon: <XCircle className="h-4 w-4" />,
-                hidden: !canApproveOrReject(config.status),
-                danger: true,
-                onClick: () => openRejectModal(config),
-              },
-              {
-                label: "Deactivate",
-                icon: <Ban className="h-4 w-4" />,
-                hidden: config.status !== "Active",
-                danger: true,
-                onClick: () => setDeactivateTarget(config),
-              },
-              {
-                label: "Delete",
-                icon: <Trash2 className="h-4 w-4" />,
-                hidden: config.status !== "Draft",
-                danger: true,
-                onClick: () => setDeleteTarget(config),
-              },
-            ]}
-          />
+        billingType: (
+          <div className="text-left">
+            {getBillingTypeDisplayName(config.billingType)}
+          </div>
         ),
-    })),
+        approvalStatus: (
+          <div className="flex items-center justify-center">
+            <StatusBadge
+              label={config.approvalStatusLabel || config.approvalStatus || "Draft"}
+              size="sm"
+            />
+          </div>
+        ),
+        configurationStatus: (
+          <div className="flex items-center justify-center">
+            <StatusBadge
+              label={config.billingStatusLabel || config.billingStatus || "Inactive"}
+              size="sm"
+            />
+          </div>
+        ),
+        actions: (
+          <div className="flex items-center justify-center">
+            <ActionMenu
+              items={[
+                { label: "View", icon: <Eye className="h-4 w-4" />, onClick: () => handleView(config) },
+                {
+                  label: "Continue Draft",
+                  icon: <ArrowRightCircle className="h-4 w-4" />,
+                  hidden: config.approvalStatus !== "DRAFT",
+                  onClick: () => handleContinueDraft(config),
+                },
+                {
+                  label: "Edit",
+                  icon: <Pencil className="h-4 w-4 text-gray-600" />,
+                  hidden: config.approvalStatus === "DRAFT",
+                  onClick: () => handleEdit(config),
+                },
+                {
+                  label: "Deactivate",
+                  icon: <Ban className="h-4 w-4" />,
+                  hidden: !(config.approvalStatus === "APPROVED" && config.billingStatus === "ACTIVE"),
+                  danger: true,
+                  onClick: () => setDeactivateTarget(config),
+                },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="h-4 w-4" />,
+                  hidden: config.approvalStatus !== "DRAFT",
+                  danger: true,
+                  onClick: () => setDeleteTarget(config),
+                },
+              ]}
+            />
+          </div>
+        ),
+      })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [paginatedConfigs]
   );
 
-  const kpiCards = [
+  const approvalKpis = [
     {
-      key: "total",
-      label: "Total Configurations",
-      value: stats?.total ?? "—",
+      key: "TOTAL",
+      label: "Total Billing",
+      subLabel: "Configurations",
+      value: stats?.total ?? configs.length,
       icon: FolderKanban,
-      color: "bg-slate-500 text-white",
+      color: "bg-[#0A0082] text-white",
+      active: approvalStatusFilter === "ALL" && configStatusFilter === "ALL" && !filters.search,
+      isTotal: true,
     },
     {
-      key: "active",
-      label: "Active Projects",
-      value: stats?.active ?? "—",
+      key: "APPROVED",
+      label: "Approved",
+      subLabel: null,
+      value: stats?.approved ?? configs.filter((c) => c.approvalStatus === "APPROVED").length,
+      icon: CheckCircle2,
+      color: "bg-teal-600 text-white",
+      active: approvalStatusFilter === "APPROVED" && configStatusFilter === "ALL",
+    },
+    {
+      key: "PENDING_APPROVAL",
+      label: "Pending Approval",
+      subLabel: null,
+      value: stats?.pending ?? configs.filter((c) => c.approvalStatus === "PENDING_APPROVAL").length,
+      icon: Clock,
+      color: "bg-amber-500 text-white",
+      active: approvalStatusFilter === "PENDING_APPROVAL" && configStatusFilter === "ALL",
+    },
+    {
+      key: "DRAFT",
+      label: "Draft",
+      subLabel: null,
+      value: stats?.draft ?? configs.filter((c) => c.approvalStatus === "DRAFT").length,
+      icon: FileText,
+      color: "bg-slate-400 text-white",
+      active: approvalStatusFilter === "DRAFT" && configStatusFilter === "ALL",
+    },
+    {
+      key: "REJECTED",
+      label: "Rejected",
+      subLabel: null,
+      value: stats?.rejected ?? configs.filter((c) => c.approvalStatus === "REJECTED").length,
+      icon: XCircle,
+      color: "bg-rose-600 text-white",
+      active: approvalStatusFilter === "REJECTED" && configStatusFilter === "ALL",
+    },
+  ];
+
+  const configurationKpis = [
+    {
+      key: "ACTIVE",
+      label: "Active",
+      subLabel: null,
+      value: stats?.active ?? configs.filter((c) => c.billingStatus === "ACTIVE").length,
       icon: CheckCircle2,
       color: "bg-emerald-600 text-white",
+      active: configStatusFilter === "ACTIVE" && approvalStatusFilter === "ALL",
     },
     {
-      key: "draft",
-      label: "Draft Configurations",
-      value: stats?.draft ?? "—",
-      icon: FileText,
-      color: "bg-amber-500 text-white",
+      key: "INACTIVE",
+      label: "Inactive",
+      subLabel: null,
+      value: stats?.inactive ?? configs.filter((c) => c.billingStatus === "INACTIVE").length,
+      icon: Ban,
+      color: "bg-slate-500 text-white",
+      active: configStatusFilter === "INACTIVE" && approvalStatusFilter === "ALL",
     },
     {
-      key: "integrated",
-      label: "Enterprise Projects",
-      value: stats?.integrated ?? "—",
-      icon: Cable,
-      color: "bg-indigo-600 text-white",
+      key: "EXPIRED",
+      label: "Expired",
+      subLabel: null,
+      value: stats?.expired ?? configs.filter((c) => c.billingStatus === "EXPIRED").length,
+      icon: AlertTriangle,
+      color: "bg-orange-600 text-white",
+      active: configStatusFilter === "EXPIRED" && approvalStatusFilter === "ALL",
     },
   ];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* 1. Page Header */}
       <PageHeader
         title="Project Billing Setup — Overview"
@@ -364,39 +406,131 @@ export default function Overview() {
         }
       />
 
-      {/* 2. KPIs Row */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {kpiCards.map((kpi) => (
-          <KPICard
-            key={kpi.key}
-            label={kpi.label}
-            value={loadingStats ? "…" : kpi.value}
-            icon={<kpi.icon className="h-5 w-5" />}
-            color={kpi.color}
-            className="h-full w-full bg-white shadow-sm"
-          />
-        ))}
+      {/* 2. KPIs Sections — divided into Approval Status and Configuration Status */}
+      <div className="space-y-3">
+        {/* Section 1: Approval Status */}
+        <div className="space-y-1.5">
+          <h3 className="text-sm font-bold text-slate-800 px-0.5 select-none">
+            Approval Status
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {approvalKpis.map((kpi) => (
+              <button
+                key={kpi.key}
+                type="button"
+                onClick={() => handleKpiClick(kpi.key)}
+                className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+              >
+                <ARKPICard
+                  label={kpi.label}
+                  subLabel={kpi.subLabel}
+                  value={loadingStats ? "…" : kpi.value}
+                  icon={<kpi.icon className="h-5 w-5" />}
+                  color={kpi.color}
+                  active={kpi.active}
+                  className={cn(
+                    "h-full w-full cursor-pointer bg-white shadow-sm transition-all hover:shadow-md",
+                    kpi.isTotal && !kpi.active && "border-indigo-200/80 bg-gradient-to-br from-indigo-50/30 to-white"
+                  )}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 2: Configuration Status */}
+        <div className="space-y-1.5">
+          <h3 className="text-sm font-bold text-slate-800 px-0.5 select-none">
+            Configuration Status
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {configurationKpis.map((kpi) => (
+              <button
+                key={kpi.key}
+                type="button"
+                onClick={() => handleKpiClick(kpi.key)}
+                className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+              >
+                <ARKPICard
+                  label={kpi.label}
+                  subLabel={kpi.subLabel}
+                  value={loadingStats ? "…" : kpi.value}
+                  icon={<kpi.icon className="h-5 w-5" />}
+                  color={kpi.color}
+                  active={kpi.active}
+                  className="h-full w-full cursor-pointer bg-white shadow-sm transition-all hover:shadow-md"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* 3. Billing Configurations */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="w-full sm:flex-[3] sm:min-w-[320px]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex-1 w-full lg:max-w-md">
               <SearchInput
                 value={filters.search}
-                onChange={handleFilterChange}
-                onSearch={handleSearch}
+                onChange={handleSearchInputChange}
                 placeholder="Search by project, code or client..."
               />
             </div>
-            <div className="w-full sm:flex-1 sm:min-w-[160px]">
-              <FormSelect
-                name="status"
-                value={filters.status}
-                onChange={handleFilterChange}
-                options={filterOptions.status}
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setApprovalStatusFilter("ALL");
+                  setConfigStatusFilter("ALL");
+                  setCurrentPage(1);
+                }}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap",
+                  approvalStatusFilter === "ALL" && configStatusFilter === "ALL" && !filters.search
+                    ? "border-blue-300 bg-blue-50 text-blue-800"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+                )}
+                title="Show all configurations"
+              >
+                All Configurations ({filteredConfigs.length})
+              </button>
+
+              <div className="w-48 sm:w-52">
+                <FilterListbox
+                  options={APPROVAL_STATUS_OPTIONS}
+                  value={approvalStatusFilter}
+                  onChange={(val) => {
+                    setApprovalStatusFilter(val);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Approval Status"
+                />
+              </div>
+
+              <div className="w-48 sm:w-52">
+                <FilterListbox
+                  options={CONFIG_STATUS_OPTIONS}
+                  value={configStatusFilter}
+                  onChange={(val) => {
+                    setConfigStatusFilter(val);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Configuration Status"
+                />
+              </div>
+
+              {(approvalStatusFilter !== "ALL" || configStatusFilter !== "ALL" || filters.search) && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  title="Clear all search and status filters"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+                >
+                  <FilterX className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Clear</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -407,7 +541,9 @@ export default function Overview() {
               </div>
               <h3 className="mb-1 text-sm font-semibold text-slate-900">No Billing Configurations Found</h3>
               <p className="text-xs text-slate-500">
-                Try adjusting your search query, or create a new billing setup.
+                {approvalStatusFilter !== "ALL" || configStatusFilter !== "ALL" || filters.search
+                  ? "Try adjusting your search or filter, or create a new billing setup."
+                  : "Try adjusting your search query, or create a new billing setup."}
               </p>
             </div>
           ) : (
@@ -416,6 +552,7 @@ export default function Overview() {
                 headers={TABLE_HEADERS}
                 columns={TABLE_COLUMNS}
                 rows={tableRows}
+                alignments={TABLE_ALIGNMENTS}
                 loading={loadingConfigs}
               />
               <Pagination
@@ -460,53 +597,6 @@ export default function Overview() {
         onCancel={closeDeleteModal}
         onConfirm={handleConfirmDelete}
       />
-
-      <ConfirmationModal
-        isOpen={Boolean(approveTarget)}
-        title="Approve Billing Configuration"
-        message={
-          approveTarget
-            ? `Approve the billing setup for ${approveTarget.projectName}?`
-            : ""
-        }
-        confirmText="Approve"
-        variant="success"
-        isLoading={approveLoading}
-        onCancel={() => !approveLoading && setApproveTarget(null)}
-        onConfirm={handleConfirmApprove}
-      />
-
-      <Modal
-        isOpen={Boolean(rejectTarget)}
-        onClose={closeRejectModal}
-        title="Reject Billing Configuration"
-        width="480px"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            {rejectTarget
-              ? `Enter the reason for rejecting ${rejectTarget.projectName}.`
-              : ""}
-          </p>
-          <FormTextArea
-            label="Rejection Reason"
-            name="rejectionReason"
-            value={rejectionReason}
-            onChange={(event) => setRejectionReason(event.target.value)}
-            placeholder="Add rejection reason"
-            rows={4}
-            disabled={rejectLoading}
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="small" onClick={closeRejectModal} disabled={rejectLoading}>
-              Cancel
-            </Button>
-            <Button variant="danger" size="small" onClick={handleConfirmReject} loading={rejectLoading} loadingText="Rejecting...">
-              Reject
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

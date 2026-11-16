@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertOctagon, ShieldAlert, UserCheck } from "lucide-react";
+import { AlertOctagon, ShieldAlert } from "lucide-react";
 import { getNavBadges } from "../services/dashboardService";
 
 // Live cross-campaign counts, refreshed every 60s without a
@@ -8,12 +8,10 @@ import { getNavBadges } from "../services/dashboardService";
 const REFRESH_MS = 60000;
 
 const BADGES = [
-  { key: "pending_reviews", label: "Pending Reviews", icon: UserCheck,
-    to: "/airs/campaigns", tone: "bg-sky-50 text-sky-700 border-sky-200" },
   { key: "fraud_review", label: "Fraud Review", icon: ShieldAlert,
-    to: "/airs/campaigns", tone: "bg-rose-50 text-rose-700 border-rose-200" },
+    to: "/ai-screening/campaigns", tone: "bg-rose-50 text-rose-700 border-rose-200" },
   { key: "ai_failures", label: "AI Failures", icon: AlertOctagon,
-    to: "/airs/campaigns", tone: "bg-amber-50 text-amber-700 border-amber-200" },
+    to: "/ai-screening/campaigns", tone: "bg-amber-50 text-amber-700 border-amber-200" },
 ];
 
 export default function NavBadges() {

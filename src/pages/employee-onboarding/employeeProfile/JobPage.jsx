@@ -35,7 +35,7 @@ export default function JobPage({ user_uuid, coreData = {}, hrData = {} }) {
       cost_center: coreData.cost_center || "NA",
       legal_entity: coreData.legal_entity || hrData.offer?.legal_entity || "NA",
       reports_to: coreData.reports_to || "NA",
-      manager: coreData.reporting_manager_uuid || "NA",
+      manager: coreData.resolved_reporting_manager_name || coreData.reporting_manager_uuid || "NA",
       direct_reports: coreData.direct_reports || "0 Employees",
     });
 

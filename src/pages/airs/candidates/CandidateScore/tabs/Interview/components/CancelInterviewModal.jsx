@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/Button/Button";
-import { formatDateLabel } from "../interviewMock";
+import { formatInterviewDate } from "../interviewMock";
 
 export default function CancelInterviewModal({ candidateName, round, isSubmitting, onClose, onConfirm }) {
   const [reason, setReason] = useState("");
@@ -20,7 +20,7 @@ export default function CancelInterviewModal({ candidateName, round, isSubmittin
       <div className="space-y-4">
         <p className="text-[12.5px] text-slate-600">
           Are you sure you want to cancel the interview with <span className="font-semibold text-slate-900">{candidateName}</span> scheduled
-          for {formatDateLabel(round.date)}?
+          for {formatInterviewDate(round.start_at)}?
         </p>
 
         <div>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, BadgeCheck, FolderGit2, Tags, Briefcase, ChevronDown } from "lucide-react";
+import { GraduationCap, BadgeCheck, FolderGit2, Tags, Briefcase, ChevronDown, FileWarning, Clock } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { getResumeMock, getResumeFromParsedData, hasRealResumeData } from "./resumeMock";
 import ResumePreview from "./components/ResumePreview";
 
@@ -26,7 +27,38 @@ function AccordionSection({ icon: Icon, title, count, defaultOpen = true, childr
   );
 }
 
-export default function ResumeTab({ candidate, onExpired }) {
+// resumeStatus/resumeLoading are optional — only CandidateScorePage passes
+// them (via useParsedResume); callers that already supply real parsed data
+// straight on `candidate` (Pipeline, Talent Pool) simply leave them
+// undefined and fall straight through to the existing real/mock branch below.
+export default function ResumeTab({ candidate, onExpired, resumeStatus, resumeLoading }) {
+  if (resumeLoading) {
+    return (
+      <div className="py-16 flex justify-center">
+        <LoadingSpinner text="Loading resume..." />
+      </div>
+    );
+  }
+
+  if (resumeStatus === "not_found") {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
+        <FileWarning className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+        <p className="text-[12.5px] font-semibold text-slate-600">No resume is linked to this candidate yet.</p>
+      </div>
+    );
+  }
+
+  if (resumeStatus === "pending") {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
+        <Clock className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+        <p className="text-[12.5px] font-semibold text-slate-600">This candidate's resume is still being parsed.</p>
+        <p className="text-[11.5px] text-slate-400 mt-1">Check back shortly.</p>
+      </div>
+    );
+  }
+
   const resume = hasRealResumeData(candidate) ? getResumeFromParsedData(candidate) : getResumeMock(candidate);
 
   return (

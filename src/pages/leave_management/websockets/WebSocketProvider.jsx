@@ -8,6 +8,7 @@ import React, {
 import { useCallback } from "react";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
+import { notifySessionExpired } from "../../../api/sessionExpiry";
 
 const WebSocketContext = createContext(null);
 export const useWebSocket = () => useContext(WebSocketContext);
@@ -36,11 +37,13 @@ export default function WebSocketProvider({ children }) {
   // Usage in your logout function:
   //   updateToken(null);       ← call this after localStorage.removeItem("token")
   // ─────────────────────────────────────────────────────────────────────
+  // Websocket state only. This deliberately does NOT remove the token from
+  // localStorage: doing so left the app rendered and "authenticated" while
+  // every subsequent request went out with no Authorization header. Clearing
+  // auth storage belongs to AuthContext.logout().
   const updateToken = (newToken) => {
     if (newToken) {
       localStorage.setItem("token", newToken);
-    } else {
-      localStorage.removeItem("token");
     }
     setToken(newToken);
   };
@@ -210,11 +213,13 @@ export default function WebSocketProvider({ children }) {
         const msg = frame.headers?.message || "";
         console.error("❌ STOMP error:", msg);
 
+        // Narrowed from a bare "Invalid"/"Missing", which also matched plenty
+        // of authorization messages the isAuthzFailure branch below exempts.
         const isAuthFailure = [
           "expired",
           "JWT",
-          "Invalid",
-          "Missing",
+          "Invalid token",
+          "Missing token",
           "Unauthenticated",
         ].some((k) => msg.includes(k));
 
@@ -227,10 +232,11 @@ export default function WebSocketProvider({ children }) {
         if (isAuthFailure) {
           console.error("❌ Auth failure — stopping WebSocket reconnect");
           client.deactivate();
+          setToken(null);
 
-          // Clear bad token — forces re-login
-          // Comment this out if you handle token refresh separately
-          updateToken(null);
+          // Route through the same session-expiry path as the HTTP layer, so
+          // the user is actually logged out rather than left half-signed-in.
+          notifySessionExpired();
         } else if (isAuthzFailure) {
           console.warn(
             "⚠️ Subscription/send not permitted for this user — leaving session intact:",

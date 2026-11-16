@@ -21,6 +21,27 @@ export function formatCurrency(amount, currencySymbol = "₹") {
 }
 
 /**
+ * Several AP backend timestamp columns (e.g. ap.audit_log.changed_at) are Postgres "timestamp
+ * without time zone", populated from datetime.now(timezone.utc)/now() and returned by the API as
+ * an ISO string with no "Z"/offset suffix (e.g. "2026-09-17T13:48:00"). New Date() on a
+ * timezone-less ISO string is interpreted as local time per the JS spec, not converted from
+ * UTC — so a naive-but-actually-UTC value renders several hours off from the real local time,
+ * with no error to signal it. The value genuinely is UTC (every write site in this backend uses
+ * datetime.now(timezone.utc)), so treat any datetime string lacking a timezone designator as UTC
+ * by appending "Z" before parsing, rather than letting the browser silently mis-time it as local.
+ * A bare date ("2026-08-07", no "T") is left untouched — that's a real Date column, not a
+ * timestamp, and has no time-of-day to get wrong.
+ * @param {string} isoString
+ * @returns {Date}
+ */
+function parseBackendDateTime(isoString) {
+  const hasTimeComponent = isoString.includes("T");
+  const hasTimezoneDesignator = /Z$|[+-]\d{2}:?\d{2}$/.test(isoString);
+  const normalized = hasTimeComponent && !hasTimezoneDesignator ? `${isoString}Z` : isoString;
+  return new Date(normalized);
+}
+
+/**
  * Formats an ISO date string for display, e.g. "2026-08-07" -> "07 Aug 2026".
  * Returns a placeholder rather than "Invalid Date" for empty/unparsable input.
  * @param {string|null|undefined} isoDate
@@ -29,9 +50,45 @@ export function formatCurrency(amount, currencySymbol = "₹") {
  */
 export function formatDate(isoDate, placeholder = "—") {
   if (!isoDate) return placeholder;
-  const date = new Date(isoDate);
+  const date = parseBackendDateTime(isoDate);
   if (Number.isNaN(date.getTime())) return placeholder;
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/**
+ * Formats an ISO datetime string for display, e.g. "2026-08-07T14:05:00Z" -> "07 Aug 2026, 2:05 pm".
+ * Returns a placeholder rather than "Invalid Date" for empty/unparsable input.
+ * @param {string|null|undefined} isoDateTime
+ * @param {string} [placeholder="—"]
+ * @returns {string}
+ */
+export function formatDateTime(isoDateTime, placeholder = "—") {
+  if (!isoDateTime) return placeholder;
+  const date = parseBackendDateTime(isoDateTime);
+  if (Number.isNaN(date.getTime())) return placeholder;
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+/**
+ * Formats an ISO datetime string as just the time-of-day, e.g. "2026-08-07T14:05:00" -> "2:05 pm".
+ * Same UTC-normalization as formatDateTime — use this instead of `new
+ * Date(x).toLocaleTimeString()` directly wherever only the time portion is needed.
+ * @param {string|null|undefined} isoDateTime
+ * @param {string} [placeholder="—"]
+ * @returns {string}
+ */
+export function formatTime(isoDateTime, placeholder = "—") {
+  if (!isoDateTime) return placeholder;
+  const date = parseBackendDateTime(isoDateTime);
+  if (Number.isNaN(date.getTime())) return placeholder;
+  return date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
 
 /**

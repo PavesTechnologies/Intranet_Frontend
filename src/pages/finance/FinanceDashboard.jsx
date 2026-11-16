@@ -5,7 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import AppCard from "../../components/Cards/AppCard";
 import ApModuleIcon from "../../components/icons/ApModuleIcon";
 import ArModuleIcon from "../../components/icons/ArModuleIcon";
-import { XMS_EVERYONE } from "../../config/sidebarConfig";
+import { XMS_EVERYONE, AR_MAKER_ROLES, AR_CHECKER_ROLES } from "../../config/sidebarConfig";
 import { AP_ALL_ROLES } from "../accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../accounts-payable/constants/routes";
 import { isFinanceEnabled } from "../../utils/applicationRoutes";
@@ -24,6 +24,15 @@ const FinanceDashboard = () => {
   if (!isFinanceEnabled()) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  // AR is split Maker (Finance Executive)/Checker (Finance Manager) — Super
+  // Admin satisfies both. A pure Checker must land on Billing Approvals, not
+  // the Maker dashboard (AR_MAKER_ROLES-gated, would 403 them) — see
+  // AR_MAKER_ROLES/AR_CHECKER_ROLES in sidebarConfig.js and the matching
+  // route guards in App.jsx / menu split in Sidebar.jsx.
+  const isFinanceExecutive = hasRole(["Finance_Executive", "FINANCE_EXECUTIVE"]);
+  const canSeeArMaker = hasRole(AR_MAKER_ROLES);
+  const canSeeArChecker = hasRole(AR_CHECKER_ROLES) && !isFinanceExecutive;
 
   const modules = [
     {
@@ -53,8 +62,8 @@ const FinanceDashboard = () => {
       icon: <ArModuleIcon className="h-5 w-5" />,
       iconBg: "bg-teal-50",
       iconColor: "text-teal-700",
-      to: "/account-receivable/dashboard",
-      visible: hasRole(["SUPER_ADMIN"]),
+      to: canSeeArMaker || isFinanceExecutive ? "/account-receivable/dashboard" : "/account-receivable/billing-approvals",
+      visible: canSeeArMaker || canSeeArChecker || isFinanceExecutive,
     },
   ].filter((module) => module.visible);
 

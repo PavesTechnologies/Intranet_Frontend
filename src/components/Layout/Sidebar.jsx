@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../../contexts/AuthContext";
-import { EO_SUBMENU, XMS_SUBMENU, AP_SUBMENU } from "../../config/sidebarConfig";
+import { EO_SUBMENU, XMS_SUBMENU, AP_SUBMENU, AR_MAKER_ROLES, AR_CHECKER_ROLES } from "../../config/sidebarConfig";
 import { filterMenuByRole } from "../../utils/sidebarPermissions";
 import ArModuleIcon from "../icons/ArModuleIcon";
 import ApModuleIcon from "../icons/ApModuleIcon";
@@ -84,55 +84,84 @@ const accountReceivableSubmenu = [
     ],
   },
   {
+    label: "Billing Approvals",
+    to: "/account-receivable/billing-approvals",
+  },
+  {
     label: "Billing Data Acquisition",
-    to: "/account-receivable/billing-data-acquisition",
-    children: [
-      {
-        label: "Overview",
-        to: "/account-receivable/billing-data-acquisition",
-      },
-      {
-        label: "Acquisition Workspace",
-        to: "/account-receivable/billing-data-acquisition/workspace",
-      },
-    ],
+    to: "/account-receivable/billing-data-acquisition/workspace",
   },
   {
     label: "Tax Calculation",
     to: "/account-receivable/tax-calculation",
   },
   {
+    label: "Invoice Generation",
+    to: "/account-receivable/invoice-generation",
+  },
+  {
+    label: "Invoice Approval",
+    to: "/account-receivable/invoice-approval",
+  },
+  {
     label: "Configurations",
     to: "/account-receivable/master-data",
+    children: [
+      {
+        label: "Configurations Overview",
+        to: "/account-receivable/master-data",
+      },
+      {
+        label: "Seller Information / Company Profile",
+        to: "/account-receivable/master-data/company-profile",
+      },
+    ],
   },
 ];
 
+// Maker-Checker split of the AR submenu above. Super Admin keeps the full,
+// unchanged accountReceivableSubmenu (existing AR access must not change);
+// Finance Executive (Maker) only gets the create/draft items — no Billing
+// Approvals; Finance Manager (Checker) only gets Billing Approvals — no
+// create/draft/edit/submit items. Derived by filtering the same source array
+// rather than hand-duplicated, so the two variants can never drift from it.
+const accountReceivableMakerSubmenu = accountReceivableSubmenu.filter(
+  (item) => item.label !== "Billing Approvals",
+);
+const accountReceivableCheckerSubmenu = accountReceivableSubmenu.filter(
+  (item) => item.label === "Billing Approvals" || item.label === "Invoice Approval",
+);
+
 const airsSubmenu = [
-  { label: "Dashboard", to: "/airs/dashboard" },
-  { label: "JD Management", to: "/airs/jds" },
-  { label: "Campaigns", to: "/airs/campaigns" },
-  { label: "Resume Intake", to: "/airs/resume-intake" },
-  { label: "Pipeline", to: "/airs/pipeline" },
-  { label: "Candidates", to: "/airs/candidates" },
-  { label: "Skill Ontology", to: "/airs/skill-ontology" },
-  { label: "Talent Pool", to: "/airs/talent-pool" },
-  { label: "Analytics", to: "/airs/analytics" },
-  { label: "Settings", to: "/airs/settings" },
+  { label: "Dashboard", to: "/ai-screening/dashboard" },
+  { label: "JD Management", to: "/ai-screening/jds" },
+  { label: "Campaigns", to: "/ai-screening/campaigns" },
+  { label: "Resume Intake", to: "/ai-screening/resume-intake" },
+  { label: "Pipeline", to: "/ai-screening/pipeline" },
+  { label: "Skill Ontology", to: "/ai-screening/skill-ontology" },
+  { label: "Talent Pool", to: "/ai-screening/talent-pool" },
+  // `roles` = only shown to users with one of these roles, whichever
+  // per-role menu below they get (enforced by the final filter in the
+  // component). /ai-screening/settings is HR_ADMIN-only in App.jsx.
+  { label: "Settings", to: "/ai-screening/settings", roles: ["HR_ADMIN"] },
 ];
 
-// Interview Calendar (/airs/interview-calendar) is HR_ADMIN/RECRUITER only
+// Interview Calendar (/ai-screening/interview-calendar) is HR_ADMIN/RECRUITER only
 // — same roles the tab it replaced was gated to — so like Prompt Templates
 // below, it's added directly to those two submenus rather than to the
 // shared airsSubmenu, which would leak it into the HIRING_MANAGER/HR
 // fallback menu further down.
-const interviewCalendarItem = { label: "Interview Calendar", to: "/airs/interview-calendar" };
+const interviewCalendarItem = { label: "Interview Calendar", to: "/ai-screening/interview-calendar" };
 
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
-// Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
+// Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu)
+// and Settings (/ai-screening/settings is HR_ADMIN-only in App.jsx).
 const hrAdminAirsSubmenu = [
-  ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Skill Ontology", "Campaigns", "Pipeline", "Talent Pool"].includes(item.label)),
+  ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Campaigns", "Pipeline"].includes(item.label)),
+  ...airsSubmenu.filter((item) => ["Talent Pool", "Skill Ontology"].includes(item.label)),
   interviewCalendarItem,
-  { label: "Prompt Templates", to: "/airs/prompt-templates" },
+  { label: "Prompt Templates", to: "/ai-screening/prompt-templates" },
+  ...airsSubmenu.filter((item) => item.label === "Settings"),
 ];
 
 // RECRUITER gets a trimmed-down AIRS menu — only these items.
@@ -141,6 +170,14 @@ const recruiterAirsSubmenu = [
     ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
   ),
   interviewCalendarItem,
+];
+
+// HIRING_MANAGER gets a trimmed-down AIRS menu — only these items.
+const hiringManagerAirsSubmenu = [
+  ...airsSubmenu.filter((item) => ["Campaigns", "Pipeline"].includes(item.label)),
+  interviewCalendarItem,
+  // /ai-screening/hm-review is HIRING_MANAGER-only (see App.jsx ProtectedRoute).
+  { label: "HM Review", to: "/ai-screening/hm-review" },
 ];
 
 
@@ -158,7 +195,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const isIntranet = activeApplication === APPLICATIONS.INTRANET;
   const isFinance = activeApplication === APPLICATIONS.FINANCE;
   const location = useLocation();
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, hasAnyPermission } = useAuth();
 
   // Filter main navigation based on allowedRoles
   const filteredNavigation = navigation.filter((item) => {
@@ -190,16 +227,29 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   // Role-filtered Expense Management (XMS) submenu
   const filteredXmsSubmenu = filterMenuByRole(XMS_SUBMENU, hasRole);
 
-  // Role-filtered Accounts Payable (AP) submenu
-  const filteredApSubmenu = filterMenuByRole(AP_SUBMENU, hasRole);
+  // Role- and permission-filtered Accounts Payable (AP) submenu — Invoice Management/Payments
+  // additionally require INVOICE_VIEW (see sidebarConfig.js), the rest are role-only.
+  const filteredApSubmenu = filterMenuByRole(AP_SUBMENU, hasRole, hasAnyPermission);
 
   // Role checks
   const isAdmin = hasRole(["ADMIN"]);
   const isSuperAdmin = hasRole(["SUPER_ADMIN"]);
+  const isFinanceExecutive = hasRole(["Finance_Executive", "FINANCE_EXECUTIVE"]);
+  const canSeeArMaker = hasRole(AR_MAKER_ROLES);
+  const canSeeArChecker = hasRole(AR_CHECKER_ROLES) && !isFinanceExecutive;
+  const canSeeAr = canSeeArMaker || canSeeArChecker;
+  // Super Admin (who is not specifically a Finance Executive): full unchanged submenu.
+  // Finance Executive (Maker): create/draft items only — no Billing Approvals.
+  // Finance Manager (Checker): Billing Approvals only.
+  const arSubmenu = (isSuperAdmin && !isFinanceExecutive)
+    ? accountReceivableSubmenu
+    : canSeeArMaker
+      ? accountReceivableMakerSubmenu
+      : accountReceivableCheckerSubmenu;
   // Whole-module gate: unlike EO/XMS (which have no top-level gate because at least one of
   // their items has no allowedRoles), AP must stay fully invisible outside AP_ALL_ROLES —
   // same requirement as Account Receivable's isSuperAdmin gate below.
-  const isApUser = hasRole(["AP_Executive", "Admin", "Super_Admin"]);
+  const isApUser = hasRole(AP_ALL_ROLES);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);
@@ -210,14 +260,22 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const isRecruiter = hasRole(["RECRUITER"]);
-  // Everyone else (HIRING_MANAGER, HR) falls through to the full menu, which
-  // must not offer Dashboard — /airs/dashboard is HR_ADMIN/RECRUITER only, so
-  // the link would lead straight to the unauthorized page.
-  const filteredAirsSubmenu = isHrAdmin
+  const isHiringManager = hasRole(["HIRING_MANAGER"]);
+  // Everyone else (plain HR) falls through to the full menu, which must not
+  // offer Dashboard or Settings — /ai-screening/dashboard is HR_ADMIN/RECRUITER
+  // only and /ai-screening/settings is HR_ADMIN only, so either link would
+  // lead straight to the unauthorized page.
+  const roleAirsSubmenu = isHrAdmin
     ? hrAdminAirsSubmenu
     : isRecruiter
       ? recruiterAirsSubmenu
-      : airsSubmenu.filter((item) => item.label !== "Dashboard");
+      : isHiringManager
+        ? hiringManagerAirsSubmenu
+        : airsSubmenu.filter((item) => item.label !== "Dashboard");
+  // Final guard: an item that declares `roles` (e.g. Settings -> HR_ADMIN)
+  // never appears for anyone without one of them, even if a per-role list
+  // above is edited to include it.
+  const filteredAirsSubmenu = roleAirsSubmenu.filter((item) => !item.roles || hasRole(item.roles));
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
@@ -531,7 +589,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
               onMouseLeave={handleAirsMouseLeave}
             >
               <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/airs")
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/ai-screening")
                   ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                   : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
                   }`}
@@ -942,8 +1000,9 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                 </li>
               )}
 
-              {/* Accounts Receivable (Super Admin only) */}
-              {isSuperAdmin && (
+              {/* Accounts Receivable — Super Admin (full), Finance Executive
+                  (Maker items only), Finance Manager (Billing Approvals only) */}
+              {canSeeAr && (
                 <li
                   ref={arRef}
                   className="relative"
@@ -984,7 +1043,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                         scheduleClose();
                       }}
                     >
-                      {accountReceivableSubmenu.map((item) => (
+                      {arSubmenu.map((item) => (
                         <li
                           key={item.label}
                           className="group relative"

@@ -35,6 +35,7 @@ export const buildTaskPayload = (d, fallbackSprint) => ({
   statusId: Number(d.statusId),
   priority: d.priority || "MEDIUM",
   storyPoints: Number(d.storyPoints) || 0,
+  estimatedHours: Number(d.estimatedHours) || 0,
   startDate: toISODate(d.startDate),
   dueDate: toISODate(d.dueDate),
   projectId: Number(d.projectId),

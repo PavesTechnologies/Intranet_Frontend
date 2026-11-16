@@ -53,8 +53,8 @@ export const PROMPT_TEMPLATE_PAGE_SIZE = 10;
 
 export const PROMPT_NAME_MAX_LENGTH = 150;
 export const PROMPT_TEMPLATE_MIN_LENGTH = 20;
-export const PROMPT_TEMPLATE_MAX_LENGTH = 50000;
-export const NOTES_MAX_LENGTH = 1000;
+export const PROMPT_TEMPLATE_MAX_LENGTH = 5000;
+export const NOTES_MAX_LENGTH = 100;
 
 // Blank/default shape for the Create/Edit Prompt Template form.
 export const EMPTY_PROMPT_TEMPLATE_FORM = {

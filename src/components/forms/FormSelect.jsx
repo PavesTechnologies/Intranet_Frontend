@@ -34,6 +34,10 @@ const FormSelect = ({
   // and the message rendered below the control. Purely presentational — does
   // not run or replace any validation logic.
   error = "",
+  // Sizing for an option row's inner flex. The default lets the row follow the
+  // trigger width and truncate; pass something wider (e.g. "min-w-[12rem]")
+  // where the panel should overhang a narrow button instead.
+  optionRowClassName = "w-full min-w-0 pr-6",
 }) => {
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -132,7 +136,12 @@ const FormSelect = ({
                   }
                 >
                   {({ selected }) => (
-                    <div className="flex justify-between items-center gap-2 w-full min-w-0 pr-6">
+                    <div
+                      className={classNames(
+                        "flex justify-between items-center gap-2",
+                        optionRowClassName,
+                      )}
+                    >
                       <span className="truncate">{option.label}</span>
                       {selected && <Check className="w-4 h-4 text-blue-600" />}
                     </div>

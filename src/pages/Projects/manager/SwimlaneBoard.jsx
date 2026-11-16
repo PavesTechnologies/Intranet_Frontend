@@ -39,6 +39,8 @@ import Avatar from "../../../components/Board/Avatar";
 import StoryRowHeader from "./SwimlaneBoard/StoryRowHeader";
 import TaskCard from "../../../components/Board/TaskCard";
 import UnassignedRowHeader from "./SwimlaneBoard/UnassignedRowHeader";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateSummaryCache } from "../Summary/Summary";
 
 const STORY_HEX = [
   "#6366f1", "#0ea5e9", "#10b981", "#f59e0b",
@@ -62,6 +64,11 @@ const StatusColHeader = ({
   setOpenColumnMenu,
   handleDeleteClick,
   dragHandleProps,
+  searchOpen,
+  searchQuery,
+  hasSearchQuery,
+  onToggleSearch,
+  onSearchChange,
 }) => {
   const { accent, badge } = getStatusColors(status.name ?? status.statusName, idx);
   return (
@@ -103,6 +110,15 @@ const StatusColHeader = ({
           ) : (
             <>
               <button
+                title="Search tasks in this column"
+                onClick={(e) => { e.stopPropagation(); onToggleSearch(status.id); }}
+                className={`p-1 rounded hover:bg-slate-100 transition-colors ${
+                  searchOpen || hasSearchQuery ? "text-indigo-600 bg-indigo-50" : "text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                <SearchIcon className="w-3 h-3" />
+              </button>
+              <button
                 title="Rename column"
                 onClick={(e) => { e.stopPropagation(); startRename(status); }}
                 className="p-1 rounded hover:bg-slate-100 text-gray-400 hover:text-gray-600 transition-colors"
@@ -139,6 +155,30 @@ const StatusColHeader = ({
           )}
         </div>
       </div>
+      {/* Per-column search by name */}
+      {searchOpen && (
+        <div className="px-3 pb-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 border rounded-md px-2 py-1 bg-slate-50 focus-within:ring-2 focus-within:ring-indigo-300">
+            <SearchIcon className="w-3 h-3 text-gray-400 shrink-0" />
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => onSearchChange(status.id, e.target.value)}
+              placeholder="Search by name..."
+              className="w-full text-[11px] bg-transparent outline-none"
+            />
+            {searchQuery && (
+              <button
+                title="Clear search"
+                onClick={() => onSearchChange(status.id, "")}
+                className="text-gray-400 hover:text-gray-600 shrink-0 text-[11px] leading-none"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -161,6 +201,16 @@ const SwimlaneBoard = ({
   const [loading,        setLoading]        = useState(true);
   const [activeSprintId, setActiveSprintId] = useState(null);
 
+  // My Work (React Query) and the Summary tab (its own module-level cache)
+  // both hold snapshots of this project's tasks/stories, so a mutation made
+  // here needs to invalidate both or they show stale data for up to a minute.
+  const qc = useQueryClient();
+  const notifyWorkDataChanged = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["myWork"] });
+    qc.invalidateQueries({ queryKey: ["myWorkCompleted"] });
+    invalidateSummaryCache(projectId);
+  }, [qc, projectId]);
+
   // column management
   const [showAddInput,    setShowAddInput]    = useState(false);
   const [newStatusName,   setNewStatusName]   = useState("");
@@ -171,6 +221,10 @@ const SwimlaneBoard = ({
   const [statusToDelete,    setStatusToDelete]    = useState(null);
   const [deleteModalOtherStatuses, setDeleteModalOtherStatuses] = useState([]);
   const [openColumnMenu, setOpenColumnMenu] = useState(null);
+
+  // per-column "search by name" (Kanban swimlane columns)
+  const [columnSearchOpen, setColumnSearchOpen] = useState(null);
+  const [columnSearchQueries, setColumnSearchQueries] = useState({});
 
   // row collapse
   const [collapsedRows, setCollapsedRows] = useState({});
@@ -295,6 +349,13 @@ const SwimlaneBoard = ({
     return () => document.removeEventListener("click", close);
   }, [openColumnMenu]);
 
+  // Close column search box on outside click (keeps the query active)
+  useEffect(() => {
+    const close = () => setColumnSearchOpen(null);
+    if (columnSearchOpen != null) document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [columnSearchOpen]);
+
   // Close filter panel on outside click (standalone only)
   useEffect(() => {
     const handler = (e) => {
@@ -352,6 +413,23 @@ const SwimlaneBoard = ({
     return g;
   }, [safeTasks, storyRows, statuses, applyFilters]);
 
+  const matchesColumnSearch = useCallback(
+    (task, statusId) => {
+      const q = (columnSearchQueries[statusId] || "").trim().toLowerCase();
+      if (!q) return true;
+      const name = (task.title ?? task.name ?? "").toLowerCase();
+      return name.includes(q);
+    },
+    [columnSearchQueries]
+  );
+
+  const toggleColumnSearch = (statusId) => {
+    setColumnSearchOpen((prev) => (prev === statusId ? null : statusId));
+  };
+  const setColumnSearchQuery = (statusId, value) => {
+    setColumnSearchQueries((prev) => ({ ...prev, [statusId]: value }));
+  };
+
   const doneStatusId = useMemo(
     () => (statuses.length ? statuses[statuses.length - 1].id : null),
     [statuses]
@@ -385,6 +463,7 @@ const SwimlaneBoard = ({
           { headers: headersWithToken() }
         );
         showStatusToast("Task moved", "success");
+        notifyWorkDataChanged();
       }
     } catch (err) {
       console.error(err);
@@ -429,6 +508,7 @@ const SwimlaneBoard = ({
       showStatusToast("Column deleted", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusId));
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Delete failed", "error");
@@ -446,6 +526,7 @@ const SwimlaneBoard = ({
       setStatuses((prev) => prev.filter((s) => s.id !== statusToDelete.id));
       setIsDeleteModalOpen(false); setStatusToDelete(null);
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Delete/migrate failed", "error");
@@ -487,6 +568,7 @@ const SwimlaneBoard = ({
       showStatusToast("Sprint finished", "success");
       setSprintPopup(null);
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Failed to finish sprint", "error");
@@ -705,7 +787,9 @@ const SwimlaneBoard = ({
                     </th>
 
                     {statuses.map((status, idx) => {
-                      const totalInCol = safeTasks.filter((t) => t.statusId === status.id).length;
+                      const totalInCol = safeTasks.filter(
+                        (t) => t.statusId === status.id && matchesColumnSearch(t, status.id)
+                      ).length;
                       return (
                         <Draggable
                           key={String(status.id)}
@@ -734,6 +818,11 @@ const SwimlaneBoard = ({
                                 setOpenColumnMenu={setOpenColumnMenu}
                                 handleDeleteClick={handleDeleteClick}
                                 dragHandleProps={dragProv.dragHandleProps}
+                                searchOpen={columnSearchOpen === status.id}
+                                searchQuery={columnSearchQueries[status.id] || ""}
+                                hasSearchQuery={!!(columnSearchQueries[status.id] || "").trim()}
+                                onToggleSearch={toggleColumnSearch}
+                                onSearchChange={setColumnSearchQuery}
                               />
                             </th>
                           )}
@@ -774,7 +863,9 @@ const SwimlaneBoard = ({
                           <div style={{ borderLeft: `3px solid ${hex}30`, minHeight: 72, marginLeft: 4, height: "100%" }} />
                         </td>
                         {statuses.map((status) => {
-                          const cellTasks = grid[String(story.id)]?.[String(status.id)] ?? [];
+                          const cellTasks = (grid[String(story.id)]?.[String(status.id)] ?? []).filter((t) =>
+                            matchesColumnSearch(t, status.id)
+                          );
                           const wipWarn   = cellTasks.length > WIP_WARNING_THRESHOLD;
                           return (
                             <td key={status.id} className="align-top bg-white border border-slate-100 rounded" style={{ verticalAlign: "top" }}>
@@ -885,7 +976,9 @@ const SwimlaneBoard = ({
                         <div style={{ borderLeft: "3px solid #94a3b830", minHeight: 72, marginLeft: 4, height: "100%" }} />
                       </td>
                       {statuses.map((status) => {
-                        const cellTasks = grid["__unassigned__"]?.[String(status.id)] ?? [];
+                        const cellTasks = (grid["__unassigned__"]?.[String(status.id)] ?? []).filter((t) =>
+                          matchesColumnSearch(t, status.id)
+                        );
                         return (
                           <td key={status.id} className="align-top bg-white border border-slate-100 rounded">
                             <Droppable droppableId={`${status.id}____unassigned__`} type="ITEM">
@@ -939,7 +1032,7 @@ const SwimlaneBoard = ({
         onClose={() => setIsCreateOpen(false)}
         defaultStatusId={createDefaultStatusId}
         projectId={projectId}
-        onCreated={async (created) => { setTasks((prev) => [...prev, created]); await loadBoard(); }}
+        onCreated={async (created) => { setTasks((prev) => [...prev, created]); await loadBoard(); notifyWorkDataChanged(); }}
       />
       <RightSidePanel
         isOpen={isTaskPanelOpen}
@@ -951,7 +1044,7 @@ const SwimlaneBoard = ({
             taskId={selectedTask.id}
             projectId={projectId}
             onClose={() => { setIsTaskPanelOpen(false); setSelectedTask(null); }}
-            onUpdated={async () => { await loadBoard(); setIsTaskPanelOpen(false); }}
+            onUpdated={async () => { await loadBoard(); notifyWorkDataChanged(); setIsTaskPanelOpen(false); }}
           />
         )}
       </RightSidePanel>
@@ -1001,6 +1094,7 @@ const SwimlaneBoard = ({
               setOpenCreateTaskModal(null);
               setTasks((prev) => [...prev, created]);
               try { await loadBoard(); } catch (e) { console.error(e); }
+              notifyWorkDataChanged();
             }}
           />
         </div>

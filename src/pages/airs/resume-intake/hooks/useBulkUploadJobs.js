@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { getBulkUploadJobs, getBulkUploadProgress } from "../../service/resumeIntake";
+import { getBulkUploadJobsByRecruiter, getBulkUploadProgress } from "../../service/resumeIntake";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -24,10 +24,11 @@ export default function useBulkUploadJobs({ campaignFilter, enabled = true } = {
   const timerRef = useRef(null);
   const isMountedRef = useRef(true);
 
-  // GET /bulk-uploads requires campaign_id (unlike GET /resumes, where it's
-  // optional) — there is no "all campaigns" bulk-upload listing on the
-  // backend, so this tab can't run without a specific campaign selected.
-  const canFetch = enabled && Boolean(campaignFilter);
+  // GET /bulk-uploads/by-recruiter is cross-campaign (every campaign this
+  // recruiter is assigned to) — campaignFilter, when set, only narrows the
+  // already-fetched list client-side (see the filter below), it's never
+  // sent to the backend.
+  const canFetch = enabled;
 
   const fetchJobsWithProgress = useCallback(
     async (isFirstLoad = false) => {
@@ -38,11 +39,15 @@ export default function useBulkUploadJobs({ campaignFilter, enabled = true } = {
       if (isFirstLoad) setIsLoading(true);
 
       try {
-        const res = await getBulkUploadJobs({ campaign_id: campaignFilter });
+        const res = await getBulkUploadJobsByRecruiter();
         if (!isMountedRef.current) return;
 
         const rawJobs = res?.data?.items || res?.data || (Array.isArray(res) ? res : []);
-        const jobList = Array.isArray(rawJobs) ? rawJobs : [];
+        const allJobs = Array.isArray(rawJobs) ? rawJobs : [];
+        // cross-campaign response — narrow to the selected campaign client-side
+        const jobList = campaignFilter
+          ? allJobs.filter((j) => j.campaign_id === campaignFilter)
+          : allJobs;
 
         // Fetch progress in parallel for any active/in-flight job
         const updatedJobs = await Promise.all(
@@ -72,7 +77,10 @@ export default function useBulkUploadJobs({ campaignFilter, enabled = true } = {
         if (!isMountedRef.current) return;
 
         setJobs(updatedJobs);
-        setTotalResults(res?.data?.total || updatedJobs.length);
+        // res?.data?.total is the unfiltered cross-campaign count — once a
+        // campaignFilter narrows the list client-side, the visible count is
+        // the only one that still means anything.
+        setTotalResults(campaignFilter ? updatedJobs.length : (res?.data?.total || updatedJobs.length));
 
         // Schedule next poll ONLY after response returns, only while this tab
         // is actually the active one, AND only if there are jobs in-flight.

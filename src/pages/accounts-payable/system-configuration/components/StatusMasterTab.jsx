@@ -1,130 +1,82 @@
-import { useState, useMemo } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Eye } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import SearchInput from "../../../../components/filter/Searchbar";
 import FormSelect from "../../../../components/forms/FormSelect";
 import Modal from "../../../../components/Modal/modal";
-import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
-import FormInput from "../../../../components/forms/FormInput";
-import useLocalCrudList from "../hooks/useLocalCrudList";
-import { STATUS_MASTER_MOCK, STATUS_MODULE_OPTIONS } from "../mocks/systemConfigMockData";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { getApiErrorMessage } from "../../utils/apiError";
+import useStatusMasters from "../hooks/useStatusMasters";
+import useStatusMasterDetail from "../hooks/useStatusMasterDetail";
 
-const emptyForm = (module) => ({ module, statusCode: "", statusName: "", displayOrder: "" });
+const ALL_MODULES = "";
+
+const toTitleCase = (value) =>
+  value
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 
 export default function StatusMasterTab() {
-  const { items, add, update, remove } = useLocalCrudList(STATUS_MASTER_MOCK);
-  const [moduleFilter, setModuleFilter] = useState(STATUS_MODULE_OPTIONS[0].value);
+  const { data, isLoading, isError, error } = useStatusMasters();
+  const statuses = data || [];
+
+  const [moduleFilter, setModuleFilter] = useState(ALL_MODULES);
   const [search, setSearch] = useState("");
+  const [viewStatusId, setViewStatusId] = useState(null);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentItem, setCurrentItem] = useState(null);
-  const [form, setForm] = useState(emptyForm(STATUS_MODULE_OPTIONS[0].value));
-  const [errors, setErrors] = useState({});
-
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const moduleOptions = useMemo(() => {
+    const modules = [...new Set(statuses.map((item) => item.module_name))].sort();
+    return [
+      { value: ALL_MODULES, label: "All Modules" },
+      ...modules.map((module) => ({ value: module, label: toTitleCase(module) })),
+    ];
+  }, [statuses]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return items
-      .filter((item) => item.module === moduleFilter)
+    return statuses
+      .filter((item) => !moduleFilter || item.module_name === moduleFilter)
       .filter(
         (item) =>
           !q ||
-          item.statusCode.toLowerCase().includes(q) ||
-          item.statusName.toLowerCase().includes(q)
+          item.status_code.toLowerCase().includes(q) ||
+          item.status_name.toLowerCase().includes(q)
       )
-      .sort((a, b) => a.displayOrder - b.displayOrder);
-  }, [items, moduleFilter, search]);
+      .sort(
+        (a, b) =>
+          a.module_name.localeCompare(b.module_name) || a.display_order - b.display_order
+      );
+  }, [statuses, moduleFilter, search]);
 
-  const handleFieldChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
-  };
+  const {
+    data: viewStatus,
+    isLoading: isViewLoading,
+    isError: isViewError,
+    error: viewError,
+  } = useStatusMasterDetail(viewStatusId);
 
-  const validate = () => {
-    const nextErrors = {};
-    if (!form.statusCode.trim()) nextErrors.statusCode = "Status code is required.";
-    if (!form.statusName.trim()) nextErrors.statusName = "Status name is required.";
-    if (form.displayOrder === "" || Number(form.displayOrder) <= 0) {
-      nextErrors.displayOrder = "Display order must be a positive number.";
-    }
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  };
-
-  const openAddModal = () => {
-    setCurrentItem(null);
-    setForm(emptyForm(moduleFilter));
-    setErrors({});
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (item) => {
-    setCurrentItem(item);
-    setForm({
-      module: item.module,
-      statusCode: item.statusCode,
-      statusName: item.statusName,
-      displayOrder: String(item.displayOrder),
-    });
-    setErrors({});
-    setIsModalOpen(true);
-  };
-
-  const handleSave = (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    const payload = {
-      module: form.module,
-      statusCode: form.statusCode.trim().toUpperCase(),
-      statusName: form.statusName.trim(),
-      displayOrder: Number(form.displayOrder),
-    };
-    if (currentItem) {
-      update(currentItem.id, payload);
-    } else {
-      add(payload);
-    }
-    setIsModalOpen(false);
-  };
-
-  const handleDeleteConfirm = () => {
-    if (!deleteTarget) return;
-    remove(deleteTarget.id);
-    setDeleteTarget(null);
-  };
-
-  const headers = ["Status Code", "Status Name", "Display Order", "Actions"];
-  const columns = ["statusCode", "statusName", "displayOrder", "actions"];
+  const headers = ["Module", "Status Code", "Status Name", "Display Order", "Actions"];
+  const columns = ["module", "statusCode", "statusName", "displayOrder", "actions"];
 
   const rows = filteredItems.map((item) => ({
-    statusCode: <span className="font-mono text-xs font-semibold text-gray-700">{item.statusCode}</span>,
-    statusName: <span className="font-medium text-gray-900">{item.statusName}</span>,
-    displayOrder: item.displayOrder,
+    module: <span className="text-gray-700">{toTitleCase(item.module_name)}</span>,
+    statusCode: <span className="font-mono text-xs font-semibold text-gray-700">{item.status_code}</span>,
+    statusName: <span className="font-medium text-gray-900">{item.status_name}</span>,
+    displayOrder: item.display_order,
     actions: (
-      <div className="flex items-center gap-2 justify-center">
+      <div className="flex items-center justify-center">
         <Button
           type="button"
           variant="link"
           size="icon"
-          title="Edit Status"
+          title="View Status"
           className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
-          onClick={() => openEditModal(item)}
+          onClick={() => setViewStatusId(item.status_id)}
         >
-          <Pencil size={16} />
-        </Button>
-        <Button
-          type="button"
-          variant="link"
-          size="icon"
-          title="Delete Status"
-          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
-          onClick={() => setDeleteTarget(item)}
-        >
-          <Trash2 size={16} />
+          <Eye size={16} />
         </Button>
       </div>
     ),
@@ -140,90 +92,54 @@ export default function StatusMasterTab() {
               name="module"
               value={moduleFilter}
               onChange={(e) => setModuleFilter(e.target.value)}
-              options={STATUS_MODULE_OPTIONS}
+              options={moduleOptions}
             />
           </div>
           <div className="w-full sm:w-64">
             <SearchInput onSearch={setSearch} placeholder="Search by status code or name..." />
           </div>
         </div>
-        <Button variant="primary" onClick={openAddModal} className="whitespace-nowrap">
-          <Plus size={16} />
-          Add Status
-        </Button>
       </div>
 
-      <div className="w-full overflow-x-auto rounded-lg">
-        <GenericTable headers={headers} rows={rows} columns={columns} />
-      </div>
+      {isError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {getApiErrorMessage(error, "Failed to load statuses.")}
+        </div>
+      ) : isLoading ? (
+        <LoadingSpinner text="Loading statuses..." />
+      ) : (
+        <div className="w-full overflow-x-auto rounded-lg">
+          <GenericTable headers={headers} rows={rows} columns={columns} />
+        </div>
+      )}
 
       <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={currentItem ? "Edit Status" : "Add Status"}
-        subtitle={`Define a status used within the ${form.module} module.`}
+        isOpen={viewStatusId != null}
+        onClose={() => setViewStatusId(null)}
+        title="Status Details"
         size="md"
-        closeOnBackdrop={false}
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">
-              Cancel
-            </Button>
-            <Button type="submit" form="status-master-form" variant="primary" className="w-full sm:w-auto">
-              Save Status
-            </Button>
-          </div>
-        }
       >
-        <form id="status-master-form" onSubmit={handleSave} className="space-y-4 py-2">
-          <FormSelect
-            label="Module"
-            name="module"
-            value={form.module}
-            onChange={handleFieldChange}
-            options={STATUS_MODULE_OPTIONS}
-          />
-          <FormInput
-            label="Status Code"
-            name="statusCode"
-            placeholder="e.g. PENDING_APPROVAL"
-            value={form.statusCode}
-            onChange={handleFieldChange}
-            requiredMark
-            error={errors.statusCode}
-          />
-          <FormInput
-            label="Status Name"
-            name="statusName"
-            placeholder="e.g. Pending Approval"
-            value={form.statusName}
-            onChange={handleFieldChange}
-            requiredMark
-            error={errors.statusName}
-          />
-          <FormInput
-            label="Display Order"
-            name="displayOrder"
-            type="number"
-            min="1"
-            value={form.displayOrder}
-            onChange={handleFieldChange}
-            requiredMark
-            error={errors.displayOrder}
-          />
-        </form>
+        {isViewLoading ? (
+          <LoadingSpinner text="Loading status details..." />
+        ) : isViewError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {getApiErrorMessage(viewError, "Failed to load status details.")}
+          </div>
+        ) : viewStatus ? (
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 py-2 text-sm">
+            <dt className="text-gray-500">Status ID</dt>
+            <dd className="font-medium text-gray-900">{viewStatus.status_id}</dd>
+            <dt className="text-gray-500">Module</dt>
+            <dd className="font-medium text-gray-900">{toTitleCase(viewStatus.module_name)}</dd>
+            <dt className="text-gray-500">Status Code</dt>
+            <dd className="font-mono text-xs font-semibold text-gray-700">{viewStatus.status_code}</dd>
+            <dt className="text-gray-500">Status Name</dt>
+            <dd className="font-medium text-gray-900">{viewStatus.status_name}</dd>
+            <dt className="text-gray-500">Display Order</dt>
+            <dd className="font-medium text-gray-900">{viewStatus.display_order}</dd>
+          </dl>
+        ) : null}
       </Modal>
-
-      <ConfirmationModal
-        isOpen={!!deleteTarget}
-        title="Delete Status"
-        message={`Are you sure you want to delete the status "${deleteTarget?.statusName}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeleteTarget(null)}
-        variant="danger"
-      />
     </div>
   );
 }

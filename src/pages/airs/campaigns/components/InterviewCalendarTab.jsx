@@ -1,47 +1,60 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import { ChevronLeft, ChevronRight, Users, CalendarX, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Users, Video, Webcam, MonitorPlay, Phone } from "lucide-react";
 import Button from "@/components/Button/Button";
 import { Badge } from "@/components/ui/badge";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { getCampaignInterviews } from "../services/campaignservice";
 // Reuses the Interview tab's own status-tone-map — deliberately not the
 // app-wide statusbadge.jsx, whose keyword heuristics don't fit this
 // vocabulary (same reasoning as the round cards themselves).
-import { STATUS_TONE, STATUS_LABEL } from "../../candidates/CandidateScore/tabs/Interview/interviewMock";
+import { STATUS_LABEL } from "../../candidates/CandidateScore/tabs/Interview/interviewMock";
 
 const STATUS_OPTIONS = ["PENDING", "SCHEDULED", "RESCHEDULED", "COMPLETED", "CANCELLED"];
 
-// STATUS_TONE's colors are pastel badge fills — good for a badge, too
-// washed-out for a left-border accent bar. Same color families (amber/
-// blue/violet/emerald/rose), stronger shade, used for both the chip
-// accent and the legend dot so the two stay unmistakably the same mapping.
-const STATUS_ACCENT = {
-  PENDING: { border: "border-l-amber-400", dot: "bg-amber-400" },
-  SCHEDULED: { border: "border-l-blue-500", dot: "bg-blue-500" },
-  RESCHEDULED: { border: "border-l-violet-500", dot: "bg-violet-500" },
-  COMPLETED: { border: "border-l-emerald-500", dot: "bg-emerald-500" },
-  CANCELLED: { border: "border-l-rose-500", dot: "bg-rose-500" },
+// For the Status FilterListbox — single-select, "" = every status.
+const STATUS_FILTER_OPTIONS = [
+  { value: "", label: "All Statuses" },
+  ...STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABEL[s] })),
+];
+
+// One color family per status — a strong left bar, a near-white pastel
+// fill, a bold colored title, and a softer/lighter shade of the same hue
+// for the time line underneath. Matches the reference scheduling-app
+// cards (solid accent stripe + tinted card + colored typography, no
+// visible border on the other 3 sides) instead of a bordered badge chip.
+// CANCELLED stays visible (muted rose), never hidden — just struck through.
+const STATUS_CARD_STYLE = {
+  PENDING: { bar: "border-amber-500", bg: "bg-amber-100", title: "text-amber-800", time: "text-amber-600", dot: "bg-amber-400" },
+  SCHEDULED: { bar: "border-sky-500", bg: "bg-sky-100", title: "text-sky-800", time: "text-sky-600", dot: "bg-sky-400" },
+  RESCHEDULED: { bar: "border-violet-600", bg: "bg-violet-100", title: "text-violet-800", time: "text-violet-600", dot: "bg-violet-500" },
+  COMPLETED: { bar: "border-emerald-500", bg: "bg-emerald-100", title: "text-emerald-800", time: "text-emerald-600", dot: "bg-emerald-400" },
+  CANCELLED: { bar: "border-rose-500", bg: "bg-rose-100", title: "text-rose-700", time: "text-rose-500", dot: "bg-rose-400" },
 };
 
-// Week/Day blocks get their own full-border-plus-tint style (same color
-// families as STATUS_ACCENT/STATUS_TONE, so the legend still means the same
-// thing everywhere) — Month's cells are too small for anything beyond a
-// left-border strip, but timeGrid gives each event real width and height to
-// read as a proper colored block, closer to a personal-calendar look.
-const STATUS_BLOCK_STYLE = {
-  PENDING: "bg-amber-50 border-amber-400 text-amber-800",
-  SCHEDULED: "bg-blue-50 border-blue-400 text-blue-800",
-  RESCHEDULED: "bg-violet-50 border-violet-400 text-violet-800",
-  COMPLETED: "bg-emerald-50 border-emerald-400 text-emerald-800",
-  CANCELLED: "bg-rose-50 border-rose-400 text-rose-800",
-};
+// Distinct icon per platform instead of one generic "video call" glyph for
+// all three — real per-platform recognition, not just decoration.
+const PLATFORM_ICON = { MEET: Video, ZOOM: Webcam, TEAMS: MonitorPlay, PHONE: Phone };
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
+
+// start_at/end_at are documented as UTC instants, but this endpoint has
+// been seen sending them with no trailing "Z"/offset (unlike the candidate
+// detail page's interview endpoint, which always includes one) — a bare
+// "2026-09-18T06:01:00" is parsed by `new Date()` as the *viewer's own
+// local* time instead of UTC, silently reinterpreting the instant instead
+// of leaving it needing conversion. Every place this calendar parses
+// start_at/end_at goes through this instead of a raw `new Date(iso)`, so
+// it's still correct even when the zone designator is missing. Each entry
+// also carries a `timezone` field, but that's only the zone the scheduler
+// happened to pick when creating the interview — informational, never
+// used here to pick a display zone.
+function parseInstant(iso) {
+  if (!iso) return null;
+  const hasZoneDesignator = /Z$|[+-]\d{2}:?\d{2}$/.test(iso);
+  return new Date(hasZoneDesignator ? iso : `${iso}Z`);
+}
 
 function toDateOnly(date) {
   const y = date.getFullYear();
@@ -50,90 +63,183 @@ function toDateOnly(date) {
   return `${y}-${m}-${d}`;
 }
 
-function formatChipTime(isoStart) {
-  if (!isoStart) return null;
-  return new Date(isoStart).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
 }
 
-function buildTooltip(entry) {
-  const time = entry.start_at
-    ? new Date(entry.start_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-    : "Not scheduled";
-  const interviewerNames = (entry.interviewers || []).map((i) => i.name).join(", ") || "—";
-  return [
-    entry.candidate_name,
-    `Round ${entry.round_number}${entry.interview_type ? ` · ${entry.interview_type}` : ""}`,
-    time,
-    `Interviewers: ${interviewerNames}`,
-    `Status: ${STATUS_LABEL[entry.status] || entry.status}`,
-  ].join("\n");
+function isSameDate(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-// Week/Day (timeGrid) events get a full-bordered, tinted block — each event
-// already has real width/height on those views, proportional to its
-// duration, so it reads like a personal-calendar entry rather than a
-// cramped list row.
-//
-// Top-aligned, not centered: a short (e.g. 15-30 min) interview gets very
-// little height here, and centering 2-3 stacked lines inside a box shorter
-// than their combined height clips the *top* line along with the bottom —
-// candidate name included — leaving nothing readable. Top-aligning means
-// the box always clips from the bottom down, so the name (line 1, the one
-// thing that must stay legible) survives even when there's no room for
-// anything else.
-function TimeGridEventChip({ entry }) {
-  const style = STATUS_BLOCK_STYLE[entry.status] || STATUS_BLOCK_STYLE.PENDING;
-  const interviewerCount = entry.interviewers?.length || 0;
+// Monday-start week, matching the reference layout's Mon..Sun columns.
+function startOfWeek(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0 (Sun) .. 6 (Sat)
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
 
+// "Aug 24 - Aug 30, 2026" (or "Aug 28 - Sep 3, 2026" across a month boundary).
+function formatWeekRangeTitle(weekStart) {
+  const weekEnd = addDays(weekStart, 6);
+  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+  const startStr = weekStart.toLocaleDateString([], { month: "short", day: "numeric" });
+  const endStr = weekEnd.toLocaleDateString([], sameMonth ? { day: "numeric" } : { month: "short", day: "numeric" });
+  return `${startStr} - ${endStr}, ${weekEnd.getFullYear()}`;
+}
+
+// ISO-8601 week number, for the "Week N" badge next to the toolbar title.
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
+
+// "9am", "12pm", "1pm" — the time-axis label format.
+function formatHourLabel(hour) {
+  const period = hour >= 12 ? "pm" : "am";
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h}${period}`;
+}
+
+// "09:30 AM" — always zero-padded, matching the meeting-card reference.
+function formatClockTime(date) {
+  let h = date.getHours();
+  const m = date.getMinutes();
+  const period = h >= 12 ? "PM" : "AM";
+  h = h % 12 === 0 ? 12 : h % 12;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+// Simple greedy interval-graph layout: events that overlap in time within
+// the same day get placed in side-by-side columns instead of stacking on
+// top of each other. Not a full "recombine trailing gaps" packer — good
+// enough for the handful of same-slot interviews this calendar sees.
+function layoutDayEvents(dayEntries) {
+  const sorted = [...dayEntries].sort((a, b) => parseInstant(a.start_at) - parseInstant(b.start_at));
+  const columnEnds = [];
+  const placed = sorted.map((entry) => {
+    const start = parseInstant(entry.start_at);
+    const end = parseInstant(entry.end_at);
+    let colIndex = columnEnds.findIndex((endTime) => endTime <= start);
+    if (colIndex === -1) {
+      colIndex = columnEnds.length;
+      columnEnds.push(end);
+    } else {
+      columnEnds[colIndex] = end;
+    }
+    return { entry, colIndex };
+  });
+  const totalCols = columnEnds.length || 1;
+  return placed.map((p) => ({ ...p, totalCols }));
+}
+
+const HOUR_ROW_PX = 76;
+const DEFAULT_START_HOUR = 7;
+const DEFAULT_END_HOUR = 21;
+const TIME_COL_PX = 56;
+const DAY_COL_MIN_PX = 110;
+
+// Two-line day header — small uppercase weekday over a large bold date
+// number, today's picked out with a filled blue circle.
+function DayHeaderCell({ date, isToday }) {
+  const weekday = date.toLocaleDateString([], { weekday: "short" }).toUpperCase();
   return (
-    <div
-      title={buildTooltip(entry)}
-      className={`w-full h-full border-2 rounded-lg px-1.5 py-0.5 flex flex-col justify-start overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${style}`}
-    >
-      <div className="flex items-center gap-1 w-full">
-        <span className="text-[11.5px] font-bold leading-tight truncate flex-1 min-w-0">{entry.candidate_name}</span>
-        {interviewerCount > 1 && (
-          <span className="shrink-0 flex items-center gap-0.5 text-[9.5px] font-bold opacity-70">
-            <Users size={9} /> {interviewerCount}
-          </span>
-        )}
-      </div>
-      <span className="text-[10px] font-medium leading-tight truncate w-full opacity-80">
-        Round {entry.round_number}
-        {entry.interview_type ? ` · ${entry.interview_type}` : ""}
+    <div className={`flex flex-col items-center justify-center py-2.5 gap-1 border-l border-slate-300 ${isToday ? "bg-blue-50/60" : ""}`}>
+      <span className="text-[10px] font-bold tracking-wide text-slate-400">{weekday}</span>
+      <span
+        className={`flex items-center justify-center h-6 w-6 rounded-full text-[13px] font-bold ${
+          isToday ? "bg-blue-600 text-white" : "text-slate-700"
+        }`}
+      >
+        {date.getDate()}
       </span>
     </div>
   );
 }
 
-function EventChip({ entry, viewType }) {
-  if (viewType && viewType !== "dayGridMonth") return <TimeGridEventChip entry={entry} />;
-
-  const accent = STATUS_ACCENT[entry.status] || STATUS_ACCENT.PENDING;
-  const time = formatChipTime(entry.start_at);
-  const interviewerCount = entry.interviewers?.length || 0;
+// The meeting card — solid colored left bar, near-white pastel fill, no
+// rounded corners, bold colored title, lighter-shade time line — plus the
+// extra fields the backend actually sends (round/interview type,
+// platform, interviewer names). Collapsed by default to just the
+// candidate's name; hovering it expands the card in place to hold every
+// field that has data, wrapping instead of clipping — the card's own
+// height grows (`minHeight` off the duration-based slot as a floor while
+// collapsed) to fully contain that content rather than truncating it or
+// floating a fixed-size copy over its neighbors. Full detail (every
+// interviewer + status) is always in the tooltip regardless.
+// CANCELLED stays visible (never hidden) — just muted + struck through.
+function MeetingCard({ entry, style, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  const tone = STATUS_CARD_STYLE[entry.status] || STATUS_CARD_STYLE.PENDING;
+  const interviewerNames = (entry.interviewers || []).map((i) => i.name).filter(Boolean);
+  const hasDetails = entry.platform || entry.round_number != null;
+  const hasNames = interviewerNames.length > 0;
+  const PlatformIcon = entry.platform && PLATFORM_ICON[entry.platform];
 
   return (
-    <div
-      title={buildTooltip(entry)}
-      className={`w-full h-full bg-white border border-slate-200 border-l-4 ${accent.border} rounded-md px-2 py-1 text-[12px] leading-tight overflow-hidden shadow-sm hover:shadow-md hover:bg-slate-50 transition-all cursor-pointer`}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick(entry);
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        top: style.top,
+        left: style.left,
+        // A bit wider while hovered/expanded — still growing from this
+        // card's own left edge (unchanged above), not jumping to a fixed
+        // size, so it doesn't shift where the card visually starts.
+        width: hovered ? `calc(${style.width} + 40px)` : style.width,
+        // The real, duration-based height is only a floor while collapsed;
+        // hovering lets the card grow past it to fit every field instead
+        // of clipping.
+        minHeight: hovered ? undefined : style.height,
+        zIndex: hovered ? 30 : undefined,
+      }}
+      className={`absolute text-left rounded-r-md border-l-8 ${tone.bg} ${tone.bar} flex flex-col justify-center gap-0.5 px-3 py-1.5 ${
+        hovered ? "shadow-lg" : "overflow-hidden shadow-sm hover:shadow-md"
+      } transition-[width,box-shadow]`}
     >
-      <div className="flex items-center justify-between gap-1">
-        <span className="font-semibold text-slate-900 truncate">{entry.candidate_name}</span>
-        {interviewerCount > 1 && (
-          <span className="shrink-0 flex items-center gap-0.5 text-[10.5px] font-bold text-slate-400">
-            <Users size={10} /> {interviewerCount}
-          </span>
-        )}
+      <div className={`text-[12px] font-bold leading-snug ${hovered ? "" : "truncate"} ${tone.title}`}>
+        {entry.candidate_name}
       </div>
-      <div className="flex items-center gap-1 text-[11px] text-slate-500 truncate">
-        {time && <span className="font-medium text-slate-600 shrink-0">{time}</span>}
-        <span className="truncate">
-          {time && "· "}Round {entry.round_number}
-          {entry.interview_type ? ` · ${entry.interview_type}` : ""}
-        </span>
-      </div>
-    </div>
+      {hovered && (
+        <>
+          <div className={`text-[10.5px] font-medium ${tone.time}`}>
+            {formatClockTime(parseInstant(entry.start_at))} - {formatClockTime(parseInstant(entry.end_at))}
+          </div>
+          {hasDetails && (
+            <div className={`flex items-center gap-2 flex-wrap text-[9.5px] font-semibold opacity-75 ${tone.time}`}>
+              <span>
+                Round {entry.round_number}
+                {entry.interview_type ? ` · ${entry.interview_type}` : ""}
+              </span>
+              {entry.platform && (
+                <span className="flex items-center gap-0.5 shrink-0">
+                  {PlatformIcon && <PlatformIcon size={9} />}
+                  {entry.platform}
+                </span>
+              )}
+            </div>
+          )}
+          {hasNames && (
+            <div className={`flex items-start gap-1 text-[9.5px] font-medium opacity-70 ${tone.time}`}>
+              <Users size={9} className="shrink-0 mt-0.5" />
+              <span>{interviewerNames.join(", ")}</span>
+            </div>
+          )}
+        </>
+      )}
+    </button>
   );
 }
 
@@ -142,7 +248,7 @@ function StatusLegend() {
     <div className="flex items-center flex-wrap gap-x-4 gap-y-1.5 text-[11.5px] text-slate-600">
       {STATUS_OPTIONS.map((status) => (
         <span key={status} className="flex items-center gap-1.5">
-          <span className={`h-2 w-2 rounded-full ${STATUS_ACCENT[status].dot}`} />
+          <span className={`h-2 w-2 rounded-full ${STATUS_CARD_STYLE[status].dot}`} />
           {STATUS_LABEL[status]}
         </span>
       ))}
@@ -150,62 +256,70 @@ function StatusLegend() {
   );
 }
 
-const VIEW_OPTIONS = [
-  { id: "dayGridMonth", label: "Month" },
-  { id: "timeGridWeek", label: "Week" },
-  { id: "timeGridDay", label: "Day" },
-];
-
-// Same rounded-full-pill convention as the status filter buttons above —
-// an exclusive 3-way toggle, so "active" here means "is the current view"
-// rather than "is included in the filter".
-function ViewSwitcher({ currentView, onChangeView }) {
+function CalendarToolbar({
+  title,
+  weekNumber,
+  onPrev,
+  onNext,
+  onToday,
+  statusFilter,
+  onStatusFilterChange,
+  interviewerEmailInput,
+  onInterviewerEmailInputChange,
+  onApplyInterviewerEmail,
+}) {
   return (
-    <div className="flex items-center gap-1.5">
-      {VIEW_OPTIONS.map((view) => (
+    <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-0.5">
         <button
-          key={view.id}
           type="button"
-          onClick={() => onChangeView(view.id)}
-          className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition-colors ${
-            currentView === view.id
-              ? "bg-slate-900 text-white border-slate-900"
-              : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
-          }`}
+          onClick={onPrev}
+          aria-label="Previous week"
+          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
         >
-          {view.label}
+          <ChevronLeft size={16} />
         </button>
-      ))}
-    </div>
-  );
-}
+        <button
+          type="button"
+          onClick={onNext}
+          aria-label="Next week"
+          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onToday}
+        className="text-[11.5px] font-semibold text-slate-500 border border-slate-200 rounded-md px-2 py-1 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+      >
+        Today
+      </button>
+      <span className="text-[14px] font-bold text-slate-900">{title}</span>
+      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 rounded-full px-2.5 py-1">Week {weekNumber}</span>
 
-function CalendarToolbar({ title, onPrev, onNext, onToday, currentView, onChangeView }) {
-  return (
-    <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="small" onClick={onPrev} aria-label="Previous" className="!px-2">
-          <ChevronLeft size={15} />
-        </Button>
-        <Button variant="outline" size="small" onClick={onNext} aria-label="Next" className="!px-2">
-          <ChevronRight size={15} />
-        </Button>
-        <Button variant="outline" size="small" onClick={onToday}>
-          Today
+      {/* — status + interviewer email, pushed to the far right */}
+      <div className="ml-auto flex items-center gap-2">
+        <div className="w-40">
+          <FilterListbox
+            options={STATUS_FILTER_OPTIONS}
+            value={statusFilter}
+            onChange={onStatusFilterChange}
+            buttonClassName="w-full cursor-default rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-left text-[12px] shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <input
+          type="text"
+          value={interviewerEmailInput}
+          onChange={(e) => onInterviewerEmailInputChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onApplyInterviewerEmail()}
+          placeholder="interviewer@company.com"
+          className="w-48 px-3 py-1.5 rounded-lg border border-slate-200 text-[12px] outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <Button variant="outline" size="small" onClick={onApplyInterviewerEmail}>
+          Search
         </Button>
       </div>
-      <span className="text-[13.5px] font-bold text-slate-900">{title}</span>
-      <ViewSwitcher currentView={currentView} onChangeView={onChangeView} />
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="text-center py-16">
-      <CalendarX className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-      <p className="text-[13px] font-bold text-slate-700">No interviews scheduled in this range</p>
-      <p className="text-[11.5px] text-slate-400 mt-1">Try a different month or adjust the filters above.</p>
     </div>
   );
 }
@@ -213,181 +327,173 @@ function EmptyState() {
 // Campaign-wide interview calendar — every candidate's rounds in one
 // campaign, not one candidate's. No pagination on the backend endpoint;
 // the calendar's own visible range (start_date/end_date) is what bounds
-// the result size, so only a range change re-fetches. Status/interviewer
+// the result size, so only a week change re-fetches. Status/interviewer
 // filters narrow that same fetched set client-side (see filteredEntries)
 // instead of each triggering their own re-fetch.
+//
+// Custom-built weekly grid — no FullCalendar dependency. Only the
+// visual/layout is custom here; campaign filtering, the interview fetch,
+// and the click-through to a candidate's Interview tab are all unchanged
+// from before.
 export default function InterviewCalendarTab({ campaignId }) {
   const navigate = useNavigate();
-  const calendarRef = useRef(null);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [range, setRange] = useState(null); // {startDate, endDate} — the calendar's current visible window
-  const [calendarTitle, setCalendarTitle] = useState("");
-  const [currentView, setCurrentView] = useState("dayGridMonth");
-  const [statusFilter, setStatusFilter] = useState([]); // [] = no filter, matches every status
+  // Anchored to the viewer's own local time throughout — "today"/week
+  // boundaries and the now-line must land on the same local day/hour the
+  // event cards themselves are drawn in (see the module-level comment above).
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [now, setNow] = useState(() => new Date());
+  const [statusFilter, setStatusFilter] = useState(""); // "" = no filter, matches every status
   const [interviewerEmailInput, setInterviewerEmailInput] = useState(""); // draft, bound to the input
   const [appliedInterviewerEmail, setAppliedInterviewerEmail] = useState(""); // last value actually sent to the backend
+
+  // Ticks the "now" line forward once a minute — not tied to any fetch.
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  // Exclusive end, same convention the old FullCalendar-driven fetch used
+  // (arg.end was always the day *after* the last visible day).
+  const range = useMemo(
+    () => ({ startDate: toDateOnly(weekStart), endDate: toDateOnly(addDays(weekStart, 7)) }),
+    [weekStart]
+  );
 
   // Only the date range is ever sent to the backend — per this endpoint's
   // own contract there's no pagination, the whole visible range comes back
   // in one shot, so status/interviewer-email narrow that same in-memory
   // set (see filteredEntries below) rather than triggering a re-fetch.
-  // Fetching pre-filtered by status would also break widening a filter
-  // back out later (e.g. re-checking CANCELLED after unchecking it) since
-  // whatever was excluded from a filtered fetch was never in `entries` to
-  // begin with — always fetching the full range sidesteps that entirely.
-  const fetchEntries = useCallback(
-    async (nextRange) => {
-      if (!nextRange) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await getCampaignInterviews(campaignId, {
-          startDate: nextRange.startDate,
-          endDate: nextRange.endDate,
-        });
-        const items = unwrap(res);
-        setEntries(Array.isArray(items) ? items : []);
-      } catch (err) {
-        setError(err);
-        setEntries([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [campaignId]
-  );
+  const fetchEntries = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getCampaignInterviews(campaignId, {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      });
+      const items = unwrap(res);
+      setEntries(Array.isArray(items) ? items : []);
+    } catch (err) {
+      setError(err);
+      setEntries([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId, range]);
 
-  // FullCalendar calls this on first render and on every navigation
-  // (prev/next/today, switching month/week) — the single trigger for a
-  // fresh fetch with the newly-visible start_date/end_date.
-  const handleDatesSet = (arg) => {
-    const nextRange = { startDate: toDateOnly(arg.start), endDate: toDateOnly(arg.end) };
-    setRange(nextRange);
-    setCalendarTitle(arg.view.title);
-    setCurrentView(arg.view.type);
-    fetchEntries(nextRange);
-  };
-
-  // Switching campaigns (InterviewCalendarPage's own selector, a level up)
-  // changes this prop without changing the calendar's visible date range,
-  // so FullCalendar never calls datesSet for it — nothing else here reacts
-  // to campaignId on its own. Guarded on `range` so this is a no-op on the
-  // very first render (before datesSet has fired even once); every change
-  // after that re-fetches whatever range is already on screen, for the
-  // newly selected campaign.
+  // Re-fetches on week navigation AND on campaign switch (InterviewCalendarPage's
+  // own selector, a level up) — no full page reload, just this one call.
   useEffect(() => {
-    if (range) fetchEntries(range);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignId]);
+    fetchEntries();
+  }, [fetchEntries]);
 
-  const changeView = (viewName) => calendarApi()?.changeView(viewName);
-
-  // Purely local state changes now — no re-fetch, see fetchEntries above.
-  const toggleStatus = (status) => {
-    setStatusFilter((prev) => (prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]));
-  };
+  const goPrevWeek = () => setWeekStart((w) => addDays(w, -7));
+  const goNextWeek = () => setWeekStart((w) => addDays(w, 7));
+  const goToday = () => setWeekStart(startOfWeek(new Date()));
 
   const applyInterviewerEmail = () => setAppliedInterviewerEmail(interviewerEmailInput.trim());
 
   const clearAllFilters = () => {
-    setStatusFilter([]);
+    setStatusFilter("");
     setInterviewerEmailInput("");
     setAppliedInterviewerEmail("");
   };
 
-  const activeFilterCount = statusFilter.length + (appliedInterviewerEmail ? 1 : 0);
+  const activeFilterCount = (statusFilter ? 1 : 0) + (appliedInterviewerEmail ? 1 : 0);
 
   // Status + interviewer-email filters, applied client-side to whatever
-  // the current date range already fetched.
+  // the current week already fetched.
   const filteredEntries = useMemo(() => {
     const email = appliedInterviewerEmail.toLowerCase();
     return entries.filter((e) => {
-      if (statusFilter.length && !statusFilter.includes(e.status)) return false;
+      if (statusFilter && e.status !== statusFilter) return false;
       if (email && !(e.interviewers || []).some((i) => (i.email || "").toLowerCase().includes(email))) return false;
       return true;
     });
   }, [entries, statusFilter, appliedInterviewerEmail]);
 
-  // PENDING rounds have no start_at/end_at — they can't be placed on a
-  // date grid, so they're listed separately below instead of silently
-  // dropped.
+  // PENDING rounds have no start_at/end_at — they can't be placed on the
+  // grid, so they're listed separately below instead of silently dropped.
   const scheduledEntries = useMemo(() => filteredEntries.filter((e) => e.start_at && e.end_at), [filteredEntries]);
   const pendingEntries = useMemo(() => filteredEntries.filter((e) => !e.start_at || !e.end_at), [filteredEntries]);
 
-  const events = useMemo(
-    () => scheduledEntries.map((e) => ({ id: e.id, start: e.start_at, end: e.end_at, extendedProps: { entry: e } })),
-    [scheduledEntries]
-  );
+  // parseInstant() (see module-level comment above) — the current viewer's
+  // own local getters then read the grid position and label out correctly
+  // regardless of whether start_at/end_at carried a zone designator.
+  const { minHour, maxHour } = useMemo(() => {
+    let min = DEFAULT_START_HOUR;
+    let max = DEFAULT_END_HOUR;
+    scheduledEntries.forEach((e) => {
+      const s = parseInstant(e.start_at);
+      const en = parseInstant(e.end_at);
+      min = Math.min(min, s.getHours());
+      const endHour = en.getMinutes() > 0 ? en.getHours() + 1 : en.getHours();
+      max = Math.max(max, endHour);
+    });
+    if (max <= min) max = min + 1;
+    return { minHour: min, maxHour: max };
+  }, [scheduledEntries]);
+
+  const hours = useMemo(() => Array.from({ length: maxHour - minHour }, (_, i) => minHour + i), [minHour, maxHour]);
+  const gridHeight = hours.length * HOUR_ROW_PX;
+
+  const entriesByDay = useMemo(() => {
+    const buckets = weekDays.map(() => []);
+    scheduledEntries.forEach((e) => {
+      const idx = weekDays.findIndex((d) => isSameDate(d, parseInstant(e.start_at)));
+      if (idx >= 0) buckets[idx].push(e);
+    });
+    return buckets.map(layoutDayEvents);
+  }, [scheduledEntries, weekDays]);
+
+  const todayIdx = weekDays.findIndex((d) => isSameDate(d, now));
+  const nowInRange = todayIdx >= 0 && now.getHours() >= minHour && now.getHours() < maxHour;
+  const nowTop = nowInRange ? (((now.getHours() - minHour) * 60 + now.getMinutes()) / 60) * HOUR_ROW_PX : null;
 
   // This is a summary view only (no notes/meeting_link/history here by
   // design), so clicking through goes straight to the candidate's own
   // Interview tab via CandidateScorePage's ?tab= deep-link, rather than
   // landing on its default Summary tab and requiring one more click.
-  // (There's still no deep-link to a specific *round* within that tab.)
-  const goToCandidate = (entry) => navigate(`/airs/candidates/${entry.campaign_candidate_id}?tab=interview`);
+  const goToCandidate = (entry) => navigate(`/ai-screening/candidates/${entry.campaign_candidate_id}?tab=interview`, {
+    state: { candidate: entry, campaignId },
+  });
 
-  const calendarApi = () => calendarRef.current?.getApi();
+  const gridMinWidth = TIME_COL_PX + 7 * DAY_COL_MIN_PX;
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <div className="flex flex-wrap gap-5">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 mb-1.5">Status</div>
-            <div className="flex flex-wrap gap-1.5">
-              {STATUS_OPTIONS.map((status) => {
-                const active = statusFilter.includes(status);
-                return (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => toggleStatus(status)}
-                    className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition-colors ${
-                      active ? STATUS_TONE[status] : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    {STATUS_LABEL[status]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="w-px bg-slate-100 self-stretch" />
-
-          <div className="flex-1 min-w-[240px]">
-            <div className="text-[11px] font-semibold text-slate-500 mb-1.5">Interviewer email</div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={interviewerEmailInput}
-                onChange={(e) => setInterviewerEmailInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applyInterviewerEmail()}
-                placeholder="interviewer@company.com"
-                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-[12.5px] outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Button variant="outline" size="small" onClick={applyInterviewerEmail}>
-                Search
-              </Button>
-            </div>
-          </div>
-        </div>
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden divide-y divide-slate-200">
+      {/* — calendar */}
+      <div className="p-4">
+        <CalendarToolbar
+          title={formatWeekRangeTitle(weekStart)}
+          weekNumber={getISOWeek(weekStart)}
+          onPrev={goPrevWeek}
+          onNext={goNextWeek}
+          onToday={goToday}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          interviewerEmailInput={interviewerEmailInput}
+          onInterviewerEmailInputChange={setInterviewerEmailInput}
+          onApplyInterviewerEmail={applyInterviewerEmail}
+        />
 
         {activeFilterCount > 0 && (
           <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-slate-100">
             <span className="text-[11.5px] text-slate-500">
               {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""} active
             </span>
-            {statusFilter.map((status) => (
-              <Badge key={status} className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-[11px] gap-1.5">
-                {STATUS_LABEL[status]}
-                <button type="button" onClick={() => toggleStatus(status)} className="hover:text-slate-950" aria-label={`Remove ${STATUS_LABEL[status]} filter`}>
+            {statusFilter && (
+              <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-[11px] gap-1.5">
+                {STATUS_LABEL[statusFilter]}
+                <button type="button" onClick={() => setStatusFilter("")} className="hover:text-slate-950" aria-label={`Remove ${STATUS_LABEL[statusFilter]} filter`}>
                   <X size={10} />
                 </button>
               </Badge>
-            ))}
+            )}
             {appliedInterviewerEmail && (
               <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-[11px] gap-1.5">
                 {appliedInterviewerEmail}
@@ -409,22 +515,14 @@ export default function InterviewCalendarTab({ campaignId }) {
             </button>
           </div>
         )}
-      </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <CalendarToolbar
-          title={calendarTitle}
-          onPrev={() => calendarApi()?.prev()}
-          onNext={() => calendarApi()?.next()}
-          onToday={() => calendarApi()?.today()}
-          currentView={currentView}
-          onChangeView={changeView}
-        />
-        <StatusLegend />
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <StatusLegend />
+        </div>
 
         <div className="relative mt-3">
           {loading && (
-            <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-xl z-10">
+            <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-xl z-30">
               <LoadingSpinner text="Loading interviews..." />
             </div>
           )}
@@ -433,42 +531,111 @@ export default function InterviewCalendarTab({ campaignId }) {
             <div className="py-16 text-center text-[12.5px] text-slate-500">Couldn't load the interview calendar. Please try again.</div>
           ) : (
             <>
-              <FullCalendar
-                ref={calendarRef}
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                initialView="dayGridMonth"
-                height="auto"
-                headerToolbar={false}
-                // Week/Day views only — dayGrid ignores these. Keeps the
-                // hour grid to a business-hours window instead of the
-                // default full 00:00-24:00, which at height="auto" would
-                // otherwise render as one very tall page.
-                slotMinTime="07:00:00"
-                slotMaxTime="21:00:00"
-                events={events}
-                datesSet={handleDatesSet}
-                eventContent={(arg) => <EventChip entry={arg.event.extendedProps.entry} viewType={arg.view.type} />}
-                eventClick={(arg) => goToCandidate(arg.event.extendedProps.entry)}
-                // Without this, a 15-interview day would stack all 15 chips
-                // in one cell, growing it far taller than its neighbors in
-                // the same week row. `true` lets FullCalendar auto-fit
-                // however many chips the cell's actual height allows, and
-                // caps the rest behind a "+N more" link — a client-side
-                // reveal, not a new fetch, since the whole visible range's
-                // data is already loaded. The popover it opens reuses this
-                // same eventContent renderer, so the extra events look
-                // identical to the ones already on the grid.
-                dayMaxEvents={true}
-                moreLinkClassNames="!text-[11px] !font-semibold !text-blue-600 hover:!underline"
-              />
-              {!loading && filteredEntries.length === 0 && <EmptyState />}
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <div style={{ minWidth: gridMinWidth }}>
+                  {/* One continuous grid for header + body, header pinned via
+                      sticky rather than split into a separate outer grid —
+                      two independent grids drift out of alignment the moment
+                      the body's own scrollbar gutter (overflow-y-auto below)
+                      shaves a few px off its available width that the header
+                      never accounted for. This way every column — the day
+                      headers, the hour gridlines, every meeting card — shares
+                      the exact same track sizes, always. */}
+                  <div className="max-h-[680px] overflow-y-auto">
+                    <div className="grid" style={{ gridTemplateColumns: `${TIME_COL_PX}px repeat(7, minmax(${DAY_COL_MIN_PX}px, 1fr))` }}>
+                      {/* header row */}
+                      <div className="sticky top-0 z-20 bg-white border-b border-slate-300" />
+                      {weekDays.map((d, i) => (
+                        <div key={`h${i}`} className="sticky top-0 z-20 bg-white border-b border-slate-300">
+                          <DayHeaderCell date={d} isToday={isSameDate(d, now)} />
+                        </div>
+                      ))}
+
+                      {/* time axis column */}
+                      <div className="relative" style={{ height: gridHeight }}>
+                        {hours.map((h, i) => (
+                          <span
+                            key={h}
+                            className="absolute right-2 -translate-y-1/2 text-[10px] font-medium text-slate-400"
+                            style={{ top: i * HOUR_ROW_PX }}
+                          >
+                            {formatHourLabel(h)}
+                          </span>
+                        ))}
+                        {nowTop != null && (
+                          <span
+                            className="absolute right-2 -translate-y-1/2 text-[9.5px] font-bold text-red-500"
+                            style={{ top: nowTop }}
+                          >
+                            {formatClockTime(now)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* day columns — each carries its own hour gridlines
+                          and (for today) its own now-line segment, so they
+                          never depend on a separately-sized overlay. */}
+                      {weekDays.map((d, di) => {
+                        const isToday = isSameDate(d, now);
+                        return (
+                          <div key={`c${di}`} className={`relative border-l border-slate-300 ${isToday ? "bg-blue-50/40" : ""}`} style={{ height: gridHeight }}>
+                            {hours.map((h, i) => (
+                              <div key={h} className="absolute left-0 right-0 border-t border-slate-300" style={{ top: i * HOUR_ROW_PX }} />
+                            ))}
+
+                            {isToday && nowTop != null && (
+                              <div className="absolute left-0 right-0 z-20 flex items-center pointer-events-none" style={{ top: nowTop }}>
+                                <span className="h-2 w-2 rounded-full bg-red-500 -ml-1 shadow" />
+                                <span className="flex-1 h-px bg-red-500" />
+                              </div>
+                            )}
+
+                            {entriesByDay[di].map(({ entry, colIndex, totalCols }) => {
+                              // The viewer's own local hour/minute for this
+                              // instant — same reasoning as minHour/maxHour above.
+                              const localStart = parseInstant(entry.start_at);
+                              const top = (((localStart.getHours() - minHour) * 60 + localStart.getMinutes()) / 60) * HOUR_ROW_PX;
+                              // Real proportional height — MeetingCard treats
+                              // this as a floor (minHeight) only, growing
+                              // taller than its time slot when its content
+                              // needs more room.
+                              const durationMin = Math.max(5, (parseInstant(entry.end_at) - parseInstant(entry.start_at)) / 60000);
+                              // -2px so back-to-back meetings (one ends
+                              // exactly when the next starts) get a small
+                              // visible gap instead of their edges touching
+                              // and reading as one merged block.
+                              const height = Math.max((durationMin / 60) * HOUR_ROW_PX - 2, 28);
+                              const widthPct = 100 / totalCols;
+                              const leftPct = colIndex * widthPct;
+                              return (
+                                <MeetingCard
+                                  key={entry.id}
+                                  entry={entry}
+                                  onClick={goToCandidate}
+                                  style={{
+                                    top,
+                                    height,
+                                    left: `calc(${leftPct}% + 6px)`,
+                                    width: `calc(${widthPct}% - 14px)`,
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </div>
       </div>
 
+      {/* — not yet scheduled */}
       {pendingEntries.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div>
           <div className="text-[12.5px] font-bold text-slate-900 px-4 pt-4 pb-3">Not yet scheduled ({pendingEntries.length})</div>
           <ul className="divide-y divide-slate-100">
             {pendingEntries.map((e) => (

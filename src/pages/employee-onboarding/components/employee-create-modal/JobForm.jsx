@@ -41,6 +41,7 @@ export default function JobForm({
           value: d.department_uuid,
           label: d.department_name,
         }))}
+        required
       />
 
       <FormSelect
@@ -53,6 +54,7 @@ export default function JobForm({
           value: d.designation_uuid,
           label: d.designation_name,
         }))}
+        required
       />
 
       <FormSelect
@@ -61,7 +63,7 @@ export default function JobForm({
         value={form.employeeType || ""}
         onChange={handleChange}
         options={employeeTypeOptions}
-        
+        required
       />
 
       <FormSelect
@@ -85,7 +87,7 @@ export default function JobForm({
         name="joiningDate"
         value={form.joiningDate || ""}
         onChange={handleChange}
-        
+        required
       />
 
       <FormSelect
@@ -102,7 +104,7 @@ export default function JobForm({
         value={form.employmentStatus || ""}
         onChange={handleChange}
         options={employeeStatus}
-        
+        required
       />
 
       <FormSelect

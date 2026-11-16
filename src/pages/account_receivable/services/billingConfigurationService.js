@@ -11,7 +11,7 @@ const BILLING_RECURRING_URL = `${BASE_URL}/api/billing-recurring`;
 const TM_RATE_CARDS_URL = `${BASE_URL}/api/billing-tm-rate-card`;
 const BILLING_FIXED_PRICE_URL = `${BASE_URL}/api/billing-fixed-price`;
 
-const unwrapData = (response) => {
+export const unwrapData = (response) => {
   const payload = response?.data;
 
   if (Array.isArray(payload)) return payload;
@@ -25,7 +25,7 @@ const unwrapData = (response) => {
   return payload?.data ?? payload ?? null;
 };
 
-const asArray = (value) => {
+export const asArray = (value) => {
   if (Array.isArray(value)) return value;
   if (value && typeof value === "object") {
     if (Array.isArray(value.data)) return value.data;
@@ -70,26 +70,15 @@ const formatDate = (value) => {
   });
 };
 
-const normalizeStatus = (status) => {
-  const normalized = labelize(status);
-  if (normalized === "Approved") return "Active";
-  return normalized || "Draft";
-};
-
-// Only Draft configurations, and Active (Approved + isActive) configurations should ever
-// reach the UI. Rejected, deactivated (Approved + isActive === false), and any other
-// inactive records are filtered out of the raw API response before normalization.
-const shouldDisplayBillingConfiguration = (config = {}) => {
-  const status = String(
-    config.status || config.approvalStatus || config.configurationStatus || ""
-  )
-    .trim()
-    .toUpperCase();
-
-  if (status === "DRAFT") return true;
-  if (status === "APPROVED") return config.isActive === true;
-  return false;
-};
+// The backend's BillingConfigurationResponseDto carries two independent
+// statuses (see billingApprovalService.js, which is built the same way for
+// the Checker's queue): approvalStatus (DRAFT / PENDING_APPROVAL / APPROVED /
+// REJECTED) tracks the Maker-Checker workflow; billingStatus (INACTIVE /
+// ACTIVE / EXPIRED) is derived by the backend from effectiveFrom/effectiveTo
+// and is never set by the frontend. The old single "status" + "isActive"
+// fields no longer exist on the response and must never be read.
+const normalizeApprovalStatusValue = (value) => String(value || "").trim().toUpperCase() || "DRAFT";
+const normalizeBillingStatusValue = (value) => String(value || "").trim().toUpperCase() || "INACTIVE";
 
 const getConfigId = (config) =>
   config?.billingConfigurationId ||
@@ -213,14 +202,18 @@ const normalizeFixedPriceConfig = (record = {}) => ({
     firstPresent(record.totalContractValue, record.contractValue, record.manualContractValue, record.pmsBudget) ?? "",
   contractValueSource: fromApiContractValueSource(record.contractValueSource),
   pmsProjectBudget: firstPresent(record.pmsProjectBudget, record.pmsBudget) ?? "",
-  retentionPercent: firstPresent(record.retentionPercent, record.retentionPercentage) ?? "",
+  // retentionPercentage is the canonical backend field name (RetentionPercentDto);
+  // retentionPercent is only kept as a fallback for any older response shape.
+  retentionPercent: firstPresent(record.retentionPercentage, record.retentionPercent) ?? "",
   advanceReceived: firstPresent(record.advanceReceived, record.advanceAmount) ?? "",
   effectiveFrom: toLocalDateString(firstPresent(record.effectiveFrom, record.validFrom)) || "",
   effectiveTo: toLocalDateString(firstPresent(record.effectiveTo, record.validTo)) || "",
   remarks: record.remarks || "",
   retentionAmount: firstPresent(record.retentionAmount, record.retentionAmt) ?? "",
   billableAmount: firstPresent(record.billableAmount, record.billableAmt) ?? "",
-  remainingAmount: firstPresent(record.remainingAmount, record.remainingReceivable, record.remainingAmt) ?? "",
+  // remainingReceivable is the canonical backend field name; remainingAmount/remainingAmt
+  // are only kept as fallbacks for older response shapes.
+  remainingAmount: firstPresent(record.remainingReceivable, record.remainingAmount, record.remainingAmt) ?? "",
 });
 
 const normalizeBoolean = (value, fallback = false) => {
@@ -259,7 +252,8 @@ export const normalizeBillingConfiguration = (config = {}) => {
   const toolBilling = getToolBilling(config);
   const controls = getControls(config);
   const setupMode = config.setupMode || projectInfo.setupMode || (config.source === "Standalone" ? "STANDALONE" : "EXISTING");
-  const status = normalizeStatus(config.status || config.approvalStatus || config.configurationStatus);
+  const approvalStatus = normalizeApprovalStatusValue(config.approvalStatus);
+  const billingStatus = normalizeBillingStatusValue(config.billingStatus);
   const billingTypeObject =
     config.billingType && typeof config.billingType === "object"
       ? config.billingType
@@ -315,7 +309,10 @@ export const normalizeBillingConfiguration = (config = {}) => {
     billingFrequencyName: billingFrequencyName || "",
     source: config.source || (setupMode === "STANDALONE" ? "Standalone" : "Enterprise"),
     setupMode,
-    status,
+    approvalStatus,
+    approvalStatusLabel: labelize(approvalStatus),
+    billingStatus,
+    billingStatusLabel: labelize(billingStatus),
     toolBillingEnabled:
       config.toolBillingEnabled ??
       toolBilling.enableToolBilling ??
@@ -323,7 +320,7 @@ export const normalizeBillingConfiguration = (config = {}) => {
       false,
     lastUpdated: formatDate(config.lastUpdated || config.updatedAt || config.modifiedAt || config.createdAt),
     updatedBy: config.updatedBy || config.modifiedBy || config.createdBy || "",
-    currentStep: config.currentStep || (status === "Draft" ? 1 : 6),
+    currentStep: config.currentStep || (approvalStatus === "DRAFT" ? 1 : 6),
   };
 };
 
@@ -533,11 +530,20 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
       config.rateModel,
     ),
   );
+  // The GET .../{id} response is a flat BillingConfigurationResponseDto — the
+  // currency lives at the top level as projectBudgetCurrency/currencyCode, not
+  // nested under a projectInfo/billingConfig object (those only exist once this
+  // function's own output round-trips back through here) — config.currency
+  // itself is frequently null on that DTO. Without these two fallbacks, a
+  // freshly created/viewed configuration would show no currency at all even
+  // though projectBudgetCurrency was populated by the backend.
   const currency = normalizeCurrencyCode(
     rawProjectInfo.projectBudgetCurrency,
     rawProjectInfo.currency,
     config.currency,
     rawBillingConfig.currency,
+    config.projectBudgetCurrency,
+    config.currencyCode,
   );
   const effectiveFrom = toLocalDateString(
     firstPresent(rawBillingConfig.effectiveFrom, config.effectiveFrom, rawProjectInfo.startDate),
@@ -574,6 +580,11 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
       projectId: firstPresent(rawProjectInfo.projectId, config.projectId, rawProjectInfo.id) || "",
       projectName: firstPresent(rawProjectInfo.projectName, config.projectName, rawProjectInfo.name, normalized.projectName) || "",
       projectCode: firstPresent(rawProjectInfo.projectCode, config.projectCode, rawProjectInfo.code, normalized.projectCode) || "",
+      // The flat GET .../{id} DTO carries this at the top level (config.primaryLocation),
+      // not nested under projectInfo/project — without this fallback, editing an existing
+      // configuration always showed a blank Primary Location even though the backend
+      // returned it, since the spread above only pulls from rawProjectInfo.
+      primaryLocation: firstPresent(rawProjectInfo.primaryLocation, config.primaryLocation, rawProjectInfo.location, config.location) || "",
       projectBudget: firstPresent(rawProjectInfo.projectBudget, config.projectBudget, rawProjectInfo.budget, rawProjectInfo.budgetAmount) || "",
       projectBudgetCurrency: currency,
       currency,
@@ -628,15 +639,29 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
           ) || "",
         advanceReceived:
           firstPresent(rawBillingConfig.fixedPrice?.advanceReceived, rawBillingConfig.advanceReceived, config.advanceReceived) || "",
+        // retentionPercentage is the canonical backend field name — it was missing
+        // here entirely, so editing an existing Fixed Price config silently dropped
+        // the retention value (fell through to "" even though the API returned it).
         retentionPercent:
-          firstPresent(rawBillingConfig.fixedPrice?.retentionPercent, rawBillingConfig.retentionPercent, config.retentionPercent) || "",
+          firstPresent(
+            rawBillingConfig.fixedPrice?.retentionPercentage,
+            rawBillingConfig.fixedPrice?.retentionPercent,
+            rawBillingConfig.retentionPercentage,
+            rawBillingConfig.retentionPercent,
+            config.retentionPercentage,
+            config.retentionPercent,
+          ) ?? "",
         effectiveFrom: toLocalDateString(firstPresent(rawBillingConfig.fixedPrice?.effectiveFrom, rawBillingConfig.fixedPriceEffectiveFrom)) || "",
         effectiveTo: toLocalDateString(firstPresent(rawBillingConfig.fixedPrice?.effectiveTo, rawBillingConfig.fixedPriceEffectiveTo)) || "",
         remarks: firstPresent(rawBillingConfig.fixedPrice?.remarks, rawBillingConfig.fixedPriceRemarks) || "",
         pmsProjectBudget: firstPresent(rawBillingConfig.fixedPrice?.pmsProjectBudget) ?? "",
         retentionAmount: firstPresent(rawBillingConfig.fixedPrice?.retentionAmount) ?? "",
         billableAmount: firstPresent(rawBillingConfig.fixedPrice?.billableAmount) ?? "",
-        remainingAmount: firstPresent(rawBillingConfig.fixedPrice?.remainingAmount) ?? "",
+        // Backend field is "remainingReceivable", not "remainingAmount" — without this
+        // fallback, editing an existing Fixed Price config always showed a blank
+        // Remaining Receivable even though the API returned the correct value.
+        remainingAmount:
+          firstPresent(rawBillingConfig.fixedPrice?.remainingReceivable, rawBillingConfig.fixedPrice?.remainingAmount) ?? "",
       },
       milestones: rawBillingConfig.milestones || config.milestones || [],
       milestoneSettings: rawBillingConfig.milestoneSettings || config.milestoneSettings || {},
@@ -698,6 +723,11 @@ export const normalizeProject = (project = {}) => {
     projectDuration,
     projectBudget,
     projectBudgetCurrency,
+    // RMS-sourced client contact fields carried straight through from the
+    // available-projects response — never re-derived or hardcoded here.
+    countryCode: project.countryCode || "",
+    email: project.email || "",
+    phoneNumber: project.phoneNumber || "",
     // Normalized to a plain yyyy-mm-dd (never a raw datetime/timestamp string) —
     // every date-range check downstream (Recurring's Billing Start/End Date
     // validation, Fixed Price's Effective From/To) does lexical string
@@ -724,12 +754,17 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong. Plea
   return rawMsg || fallback;
 };
 
+// Returns every configuration the Finance Executive (Maker) can see —
+// Draft, Pending Approval, Approved, and Rejected alike — so they can track
+// a submission through the whole approval workflow from their own Overview,
+// not just the ones already approved. (Previously this filtered out anything
+// that wasn't Draft or Approved+isActive; the old "isActive" gate no longer
+// applies since billingStatus is now a computed, date-derived field rather
+// than a manual visibility flag.)
 export const getBillingConfigurations = async () => {
   try {
     const response = await api.get(BILLING_CONFIGURATIONS_URL);
-    return asArray(unwrapData(response))
-      .filter(shouldDisplayBillingConfiguration)
-      .map(normalizeBillingConfiguration);
+    return asArray(unwrapData(response)).map(normalizeBillingConfiguration);
   } catch (error) {
     console.warn("[billingConfigurationService] GET /api/billing-configurations failed, attempting active fallback:", error);
     try {
@@ -817,11 +852,13 @@ export const getApprovedConfigurationByProject = async (projectId) => {
 
 // Creating the parent Billing Configuration always goes through the /draft
 // endpoint — the backend only ever creates configurations in Draft status.
-// Updating an existing one splits by intent: a non-finalizing Save Draft is a
-// PUT to /api/billing-configurations/{id}/draft (see
-// updateBillingConfigurationDraft), while finalizing is a PUT to
+// Updating an existing one splits by intent: a Save Draft is a PUT to
+// /api/billing-configurations/{id}/draft (see updateBillingConfigurationDraft),
+// while persisting a non-draft record's own fields is a PUT to
 // /api/billing-configurations/{id} (see updateBillingConfiguration) — never a
-// second POST.
+// second POST. Neither of these ever changes approvalStatus — see
+// submitBillingConfigurationForApproval below for the DRAFT -> PENDING_APPROVAL
+// transition, which is the only thing that does.
 export const createBillingConfiguration = async (payload) => {
   // [2] Immediately before POST /api/billing-configurations/draft.
   console.log("[billingConfigurationService] POST .../draft payload:", payload);
@@ -836,8 +873,8 @@ export const updateBillingConfiguration = async (billingConfigurationId, payload
   return unwrapData(response);
 };
 
-// Used to persist a Save Draft (non-finalizing) update on an existing billing
-// configuration — finalizing an existing one still goes through
+// Used to persist a Save Draft update on an existing billing configuration —
+// persisting a non-draft record's own fields still goes through
 // updateBillingConfiguration's plain PUT (see saveBillingConfiguration/
 // saveBillingConfigurationRecord).
 export const updateBillingConfigurationDraft = async (billingConfigurationId, payload) => {
@@ -845,9 +882,21 @@ export const updateBillingConfigurationDraft = async (billingConfigurationId, pa
   return unwrapData(response);
 };
 
-export const approveBillingConfiguration = async (billingConfigurationId) => {
-  // Compatibility shim: use the activate endpoint instead of the old /approve path
-  return activateBillingConfiguration(billingConfigurationId);
+// PUT /api/billing-configurations/{id}/submit — the only action that moves a
+// configuration from DRAFT to PENDING_APPROVAL. This is the Maker's "Submit
+// for Approval" step; it never activates anything and never touches
+// billingStatus. Approve/Reject (PENDING_APPROVAL -> APPROVED/REJECTED) are
+// Finance Manager (Checker) actions and live in billingApprovalService.js —
+// this Maker-side service must never call /approve, /reject, or the removed
+// /activate endpoint.
+export const submitBillingConfigurationForApproval = async (billingConfigurationId) => {
+  const id = extractBillingConfigurationId(billingConfigurationId);
+  if (!id) {
+    return Promise.reject(new Error("Missing billingConfigurationId — unable to resolve an id from the provided value."));
+  }
+
+  const response = await api.put(`${BILLING_CONFIGURATIONS_URL}/${id}/submit`);
+  return unwrapData(response);
 };
 
 export const rejectBillingConfiguration = async (billingConfigurationId, rejectionReason) => {
@@ -857,6 +906,9 @@ export const rejectBillingConfiguration = async (billingConfigurationId, rejecti
   return unwrapData(response);
 };
 
+// Deactivation is date-independent — it does not delete the record or touch
+// approvalStatus, it just forces billingStatus back to INACTIVE (e.g. to stop
+// billing on a still-approved, still-in-effective-period configuration).
 export const deactivateBillingConfiguration = async (billingConfigurationId) => {
   const response = await api.patch(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}/deactivate`);
   return unwrapData(response);
@@ -864,16 +916,6 @@ export const deactivateBillingConfiguration = async (billingConfigurationId) => 
 
 export const deleteBillingConfiguration = async (billingConfigurationId) => {
   const response = await api.delete(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`);
-  return unwrapData(response);
-};
-
-export const activateBillingConfiguration = async (billingConfigurationId) => {
-  const id = extractBillingConfigurationId(billingConfigurationId);
-  if (!id) {
-    return Promise.reject(new Error("Missing billingConfigurationId — unable to resolve an id from the provided value."));
-  }
-
-  const response = await api.put(`${BILLING_CONFIGURATIONS_URL}/${id}/activate`);
   return unwrapData(response);
 };
 
@@ -994,6 +1036,11 @@ export const normalizeBillingSchedulePeriod = (record = {}) => ({
   remarks: record.remarks || "",
 });
 
+export const previewBillingSchedule = async (payload) => {
+  const response = await api.post(`${BILLING_CONFIGURATIONS_URL}/preview-schedule`, payload);
+  return asArray(unwrapData(response)).map(normalizeBillingSchedulePeriod);
+};
+
 // Maps a BillingRecurringConfiguration API record (GET /api/billing-recurring/...)
 // onto the wizard's internal Recurring Billing form-state shape (mirrors
 // normalizeFixedPriceConfig above). The normal Recurring flow has no
@@ -1020,6 +1067,19 @@ export const normalizeRecurringConfig = (record = {}) => ({
 
 export const getBillingConfigurationProjectsByClient = async (clientId) => {
   const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/projects/${clientId}`);
+  return asArray(unwrapData(response)).map(normalizeProject);
+};
+
+// Returns only the projects eligible for a NEW billing configuration for this
+// client — the backend already excludes projects that are Draft, Pending
+// Approval, or Active (Approved + billingStatus ACTIVE), and includes
+// Rejected/Expired/never-configured projects. The frontend must not
+// re-implement or layer any of that eligibility logic on top of this list.
+export const getAvailableProjectsForBillingConfiguration = async (clientId) => {
+  if (!clientId) return [];
+  const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/available-projects`, {
+    params: { clientId },
+  });
   return asArray(unwrapData(response)).map(normalizeProject);
 };
 
@@ -1154,7 +1214,9 @@ const buildFixedPriceRequestPayload = (fixedPrice = {}) => ({
   // contractValueSource is an optional enum — map the UI's "PMS"/"MANUAL" to the
   // backend's PMS_BUDGET/MANUAL values, sending null (not "" and not "PMS") when unset.
   contractValueSource: toApiContractValueSource(fixedPrice.contractValueSource),
-  retentionPercent: isBlank(fixedPrice.retentionPercent) ? null : Number(fixedPrice.retentionPercent),
+  // Backend field is "retentionPercentage" (RetentionPercentDto), not
+  // "retentionPercent" — that's only the internal form/state field name.
+  retentionPercentage: isBlank(fixedPrice.retentionPercent) ? null : Number(fixedPrice.retentionPercent),
   advanceReceived: isBlank(fixedPrice.advanceReceived) ? null : Number(fixedPrice.advanceReceived),
   effectiveFrom: toLocalDateString(fixedPrice.effectiveFrom) || "",
   effectiveTo: toLocalDateString(fixedPrice.effectiveTo) || "",
@@ -1252,12 +1314,13 @@ const normalizeCurrencyCode = (...values) => {
   return "";
 };
 
-// `options.finalize` maps to the backend's BillingConfigurationRequestDto.finalize —
-// true flips the record to ACTIVE/isActive=true on PUT; omitted/false leaves it a
-// normal save (stays DRAFT). Only the final "Create Billing Setup" submit should
-// ever pass { finalize: true } — draft creation, Save Draft, TM rate-card saves, and
-// Fixed Price saves all call this without options and must never include the field.
-export const buildBillingConfigurationRequestPayload = (wizardPayload = {}, options = {}) => {
+// Builds the plain BillingConfigurationRequestDto body — no status-transition
+// fields belong here. Draft creation, Save Draft, the final "Create Billing
+// Setup" save, TM rate-card saves, and Fixed Price saves all call this
+// identically; the DRAFT -> PENDING_APPROVAL transition is a separate call to
+// submitBillingConfigurationForApproval (PUT .../submit), never a flag on this
+// payload.
+export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   const projectInfo = wizardPayload.projectInfo || {};
   const billingConfig = wizardPayload.billingConfig || {};
   const controls = wizardPayload.controls || {};
@@ -1321,10 +1384,6 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}, opti
     requestPayload.effectiveTo = effectiveTo;
   }
 
-  if (options.finalize === true) {
-    requestPayload.finalize = true;
-  }
-
   return requestPayload;
 };
 
@@ -1345,6 +1404,22 @@ export const ensureBillingConfigurationDraft = async (payload) => {
   // [4] Extracted billingConfigurationId from the (already unwrapped) ApiResponse data.
   console.log("[billingConfigurationService] extracted billingConfigurationId:", extractedId);
   return extractedId;
+};
+
+// Re-syncs the parent billing configuration's own fields (billingTypeId,
+// billingFrequencyId, etc.) onto a DRAFT record that already exists, via PUT
+// .../draft. The initial draft is created (ensureBillingConfigurationDraft,
+// above) as soon as billingTypeId alone is known — typically before the user
+// has picked a Billing Frequency — so billingFrequencyId can still be empty
+// on the parent record afterward. Sub-configuration create calls (Fixed
+// Price, Recurring) require billingFrequencyId to already be set on the
+// parent, so callers should await this immediately before them to push the
+// current wizard selection first.
+export const syncBillingConfigurationDraft = async (payload, billingConfigurationId) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+  assertBillingConfigurationPayload(requestPayload);
+  const configResponse = await updateBillingConfigurationDraft(billingConfigurationId, requestPayload);
+  return extractBillingConfigurationId(configResponse) || billingConfigurationId;
 };
 
 const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
@@ -1424,12 +1499,17 @@ const saveTmRateCards = async (payload, billingConfigurationId) => {
   );
 };
 
+// options.isDraftSave (default true) picks which endpoint persists the
+// record: true -> PUT .../draft (Save Draft, still a work-in-progress DRAFT
+// record), false -> plain PUT .../{id} (persisting a record that is being
+// finalized or that is already past DRAFT). This never changes approvalStatus
+// itself — call submitBillingConfigurationForApproval separately for that.
 export const saveBillingConfiguration = async (payload, billingConfigurationId, options = {}) => {
-  const requestPayload = buildBillingConfigurationRequestPayload(payload, options);
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
   assertBillingConfigurationPayload(requestPayload);
 
   const configResponse = billingConfigurationId
-    ? options.finalize === true
+    ? options.isDraftSave === false
       ? await updateBillingConfiguration(billingConfigurationId, requestPayload)
       : await updateBillingConfigurationDraft(billingConfigurationId, requestPayload)
     : await createBillingConfiguration(requestPayload);
@@ -1482,14 +1562,17 @@ export const saveBillingConfiguration = async (payload, billingConfigurationId, 
 };
 
 // Persists only the Billing Configuration record itself (POST when creating, PUT
-// when updating) — no Fixed Price / TM rate card / subscription side effects and no
-// activation call. Fixed Price details are saved independently and immediately by
-// the "Save Fixed Price Details" button (see FixedPriceForm.saveFixedPriceConfig),
-// so the Fixed Price create flow's final submit only needs to persist this record.
+// when updating) — no Fixed Price / TM rate card / subscription side effects and
+// no submit/approve call. Fixed Price details are saved independently and
+// immediately by the "Save Fixed Price Details" button (see
+// FixedPriceForm.saveFixedPriceConfig), so the Fixed Price create flow's final
+// submit only needs to persist this record (the caller submits for approval
+// separately — see submitBillingConfigurationForApproval). See
+// saveBillingConfiguration above for what options.isDraftSave selects.
 export const saveBillingConfigurationRecord = async (wizardPayload, billingConfigurationId, options = {}) => {
-  const requestPayload = buildBillingConfigurationRequestPayload(wizardPayload, options);
+  const requestPayload = buildBillingConfigurationRequestPayload(wizardPayload);
   const configResponse = billingConfigurationId
-    ? options.finalize === true
+    ? options.isDraftSave === false
       ? await updateBillingConfiguration(billingConfigurationId, requestPayload)
       : await updateBillingConfigurationDraft(billingConfigurationId, requestPayload)
     : await createBillingConfiguration(requestPayload);
@@ -1506,8 +1589,16 @@ export const getBillingConfigurationStats = async () => {
 
   return {
     total: configurations.length,
-    active: configurations.filter((config) => config.status === "Active").length,
-    draft: configurations.filter((config) => config.status === "Draft").length,
+    active: configurations.filter(
+      (config) => config.billingStatus === "ACTIVE",
+    ).length,
+    inactive: configurations.filter(
+      (config) => config.billingStatus === "INACTIVE",
+    ).length,
+    approved: configurations.filter((config) => config.approvalStatus === "APPROVED").length,
+    draft: configurations.filter((config) => config.approvalStatus === "DRAFT").length,
+    pending: configurations.filter((config) => config.approvalStatus === "PENDING_APPROVAL").length,
+    rejected: configurations.filter((config) => config.approvalStatus === "REJECTED").length,
     integrated: configurations.filter((config) => config.setupMode === "EXISTING").length,
     manual: configurations.filter((config) => config.setupMode === "STANDALONE").length,
     toolBillingEnabled: configurations.filter((config) => config.toolBillingEnabled).length,
@@ -1522,7 +1613,7 @@ export const getBillingConfigurationActivity = async () => {
     .slice(0, 6)
     .map((config) => ({
       configId: config.id,
-      action: `${config.status} Configuration`,
+      action: `${config.approvalStatusLabel} Configuration`,
       user: config.updatedBy || "System",
       time: config.lastUpdated,
     }));

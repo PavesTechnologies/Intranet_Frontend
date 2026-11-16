@@ -22,10 +22,13 @@ const authHeaders = () => ({
 const withBase = (extra) => ({ baseURL: EXPENSE_API_BASE, headers: authHeaders(), ...extra });
 
 export const approvalWorkflowApi = {
-  // ApprovalQueueItemResponse: reportId, reportNumber, employeeId, totalAmount,
-  // currencyCode, currentLevelOrder, pendingLineItems[], eligibleForBulkApprove.
+  // ApprovalQueueItemResponse: reportId, reportNumber, employeeId, totalAmount, currencyCode,
+  // costCenterName, reportStatus, submittedAt, levelOrder, pendingLineItems[], pendingSplits[],
+  // eligibleForBulkApprove.
   // pendingLineItems[]: lineItemId, reviewId, categoryName, merchantName, description,
   // expenseDate, amount, currencyCode, policyViolations[].
+  // pendingSplits[] (the caller's OWN split allocations only — see approvalAmounts.js):
+  // splitId, reviewId, lineItemId, costCenterId, costCenterCode, costCenterName, allocatedAmount.
   getMyQueue: (page = 0, size = 20) =>
     api.get("/xms/approvals/my-queue", withBase({ params: { page, size } })),
 
@@ -52,6 +55,12 @@ export const approvalWorkflowApi = {
   // decision: "APPROVED" | "NEEDS_CORRECTION"; comment required for NEEDS_CORRECTION.
   reviewLineItem: (reportId, lineItemId, decision, comment) =>
     api.post(`/xms/approvals/${reportId}/line-items/${lineItemId}/review`, { decision, comment }, withBase()),
+
+  // Split-aware sibling of reviewLineItem — the only way a Cost Center Owner can act on their own
+  // ExpenseSplit allocation (ApprovalQueueItemResponse.pendingSplits[].reviewId/splitId). Same
+  // request shape: decision "APPROVED" | "NEEDS_CORRECTION", comment required for the latter.
+  reviewSplit: (reportId, splitId, decision, comment) =>
+    api.post(`/xms/approvals/${reportId}/splits/${splitId}/review`, { decision, comment }, withBase()),
 
   rejectReport: (reportId, comment) =>
     api.post(`/xms/approvals/${reportId}/reject`, { comment }, withBase()),

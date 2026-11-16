@@ -7,6 +7,7 @@ import {
   Coins,
   FileText,
   CalendarClock,
+  Building2,
   Layers,
   CheckCircle2,
   XCircle,
@@ -21,6 +22,7 @@ import { getBillingTypes } from "../../services/billingTypeService";
 import { getBillingFrequencies } from "../../services/billingFrequencyService";
 import { getPaymentTerms } from "../../services/paymentTermsService";
 import { getTaxRegions } from "../../services/taxRegionService";
+import { getActiveCompanyProfile } from "../../services/companyProfileService";
 
 const formatDateValue = (val) => {
   if (!val) return null;
@@ -46,6 +48,15 @@ const latestTimestamp = (records) => {
 };
 
 const MASTER_DEFINITIONS = [
+  {
+    key: "company-profile",
+    title: "Seller Information / Company Profile",
+    description: "Configure the legal seller identity, address and contact information used for AR invoices.",
+    icon: <Building2 className="h-5 w-5" />,
+    implemented: true,
+    route: "/account-receivable/master-data/company-profile",
+    dataKey: "companyProfile",
+  },
   {
     key: "tax-regions",
     title: "Tax Configuration",
@@ -108,6 +119,7 @@ export default function MasterDataOverview() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState({
+    companyProfile: null,
     taxRegions: [],
     paymentTerms: [],
     billingTypes: [],
@@ -120,18 +132,22 @@ export default function MasterDataOverview() {
 
     const load = async () => {
       setLoading(true);
-      const [billingTypes, billingFrequencies, paymentTerms, taxRegions] = await Promise.allSettled([
+      const [billingTypes, billingFrequencies, paymentTerms, taxRegions, companyProfile] = await Promise.allSettled([
         getBillingTypes(),
         getBillingFrequencies(),
         getPaymentTerms(),
         getTaxRegions(),
+        getActiveCompanyProfile(),
       ]);
       if (!mounted) return;
 
-      const results = { billingTypes, billingFrequencies, paymentTerms, taxRegions };
-      const failed = Object.keys(results).filter((key) => results[key].status === "rejected");
+      const results = { billingTypes, billingFrequencies, paymentTerms, taxRegions, companyProfile };
+      const failed = Object.keys(results).filter(
+        (key) => key !== "companyProfile" && results[key].status === "rejected"
+      );
 
       setRecords({
+        companyProfile: companyProfile.status === "fulfilled" ? companyProfile.value : null,
         billingTypes: billingTypes.status === "fulfilled" ? billingTypes.value : [],
         billingFrequencies: billingFrequencies.status === "fulfilled" ? billingFrequencies.value : [],
         paymentTerms: paymentTerms.status === "fulfilled" ? paymentTerms.value : [],
@@ -156,14 +172,22 @@ export default function MasterDataOverview() {
   );
 
   const globalStats = useMemo(() => {
-    const activeMasters = implementedMasters.length;
+    const hasCompanyProfile = Boolean(records.companyProfile);
+    const otherActiveCount = implementedMasters
+      .filter((m) => m.key !== "company-profile")
+      .filter((m) => {
+        const items = records[m.dataKey] || [];
+        return items.some((r) => r.isActive);
+      }).length;
+
+    const activeMasters = otherActiveCount + (hasCompanyProfile ? 1 : 0);
 
     return {
       totalMasters: TOTAL_MASTERS,
       activeMasters,
       inactiveMasters: TOTAL_MASTERS - activeMasters,
     };
-  }, [implementedMasters]);
+  }, [implementedMasters, records]);
 
   const handleManage = (master) => {
     if (master.implemented) {
@@ -215,6 +239,23 @@ export default function MasterDataOverview() {
                   title={master.title}
                   description={master.description}
                   pending
+                  onManage={() => handleManage(master)}
+                />
+              );
+            }
+
+            if (master.key === "company-profile") {
+              const profile = records.companyProfile;
+              const hasProfile = Boolean(profile);
+              return (
+                <MasterModuleCard
+                  key={master.key}
+                  icon={master.icon}
+                  title={master.title}
+                  description={master.description}
+                  badgeLabel={hasProfile ? "Active Profile" : "No Profile Configured"}
+                  badgeTone={hasProfile ? "success" : "warning"}
+                  stats={hasProfile ? { total: 1, active: 1, inactive: 0 } : null}
                   onManage={() => handleManage(master)}
                 />
               );

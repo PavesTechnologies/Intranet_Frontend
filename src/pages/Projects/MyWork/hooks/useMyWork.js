@@ -61,11 +61,11 @@ export const useUpdateStatus = (userId) => {
     mutationFn: ({ type, id, statusId, status }) => {
       if (type === "TASK")  return updateTaskStatus({ taskId: id, statusId });
       if (type === "STORY") return updateStoryStatus({ storyId: id, statusId });
-      // if (type === "BUG")   return updateBugStatus({ bugId: id, status });
+      if (type === "BUG")   return updateBugStatus({ bugId: id, status });
     },
 
     // Optimistic: update the cached data immediately before server responds
-    onMutate: async ({ type, id, statusId, status, statusName, bugStatus }) => {
+    onMutate: async ({ type, id, statusId, status, statusName }) => {
       await qc.cancelQueries({ queryKey: MY_WORK_KEY(userId) });
       const prev = qc.getQueryData(MY_WORK_KEY(userId));
 
@@ -81,7 +81,7 @@ export const useUpdateStatus = (userId) => {
                     ...item,
                     statusId:   statusId ?? item.statusId,
                     statusName: statusName ?? item.statusName,
-                    bugStatus:  bugStatus ?? item.bugStatus,
+                    bugStatus:  type === "BUG" ? (status ?? item.bugStatus) : item.bugStatus,
                   }
                 : item
             ),
@@ -114,7 +114,7 @@ export const useMarkDone = (userId) => {
     mutationFn: ({ type, id, doneStatusId, doneStatus }) => {
       if (type === "TASK")  return updateTaskStatus({ taskId: id, statusId: doneStatusId });
       if (type === "STORY") return updateStoryStatus({ storyId: id, statusId: doneStatusId });
-      // if (type === "BUG")   return updateBugStatus({ bugId: id, status: doneStatus || "CLOSED" });
+      if (type === "BUG")   return updateBugStatus({ bugId: id, status: doneStatus || "CLOSED" });
     },
 
     onMutate: async ({ type, id }) => {

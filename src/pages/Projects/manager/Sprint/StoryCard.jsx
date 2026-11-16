@@ -22,11 +22,15 @@ const StoryCard = ({
   projectId,
   navigate,
   readOnly = false,
+  // Moving a story into/between sprints (drag-and-drop and the "..." menu)
+  // is a Project Manager-only action — distinct from `readOnly`, which locks
+  // the whole card down for other reasons (e.g. a completed sprint).
+  canMoveSprint = false,
 }) => {
   const [{ isDragging }, dragRef] = useDrag({
     type: "STORY",
     item: { id: story.id, type: "STORY" },
-    canDrag: !readOnly,
+    canDrag: !readOnly && canMoveSprint,
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
@@ -56,6 +60,20 @@ const StoryCard = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // The dropdowns are portaled with `position: fixed` at a coordinate
+  // captured once on open, so they don't track the trigger button through a
+  // scroll — close them on any scroll (capture phase catches scrolling on
+  // the backlog list, not just the window) instead of drifting away from it.
+  useEffect(() => {
+    if (!showMenu && !showEpicList) return;
+    const handleScroll = () => {
+      setShowMenu(false);
+      setShowEpicList(false);
+    };
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [showMenu, showEpicList]);
 
   const handleToggleMenu = () => {
     if (menuBtnRef.current) {
@@ -92,7 +110,7 @@ const StoryCard = ({
 
   return (
     <div
-      ref={readOnly ? undefined : dragRef}
+      ref={readOnly || !canMoveSprint ? undefined : dragRef}
       onClick={() => !readOnly && onClick?.()}
       className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm flex items-start gap-3 transition-all w-full shrink-0 ${
         readOnly ? "cursor-default opacity-80" : "hover:border-indigo-300 cursor-pointer"
@@ -144,23 +162,26 @@ const StoryCard = ({
         <ViewIcon size={16} />
       </button>
 
-      {/* Menu */}
-      <div
-        ref={menuRef}
-        className="shrink-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          ref={menuBtnRef}
-          onClick={handleToggleMenu}
-          className="p-1 text-gray-400 hover:text-gray-800 rounded"
+      {/* Menu — the only action here is "Move to Sprint", a Project
+          Manager-only capability */}
+      {canMoveSprint && (
+        <div
+          ref={menuRef}
+          className="shrink-0"
+          onClick={(e) => e.stopPropagation()}
         >
-          <MoreHorizontalIcon size={16} />
-        </button>
-      </div>
+          <button
+            ref={menuBtnRef}
+            onClick={handleToggleMenu}
+            className="p-1 text-gray-400 hover:text-gray-800 rounded"
+          >
+            <MoreHorizontalIcon size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Sprint dropdown — fixed portal to escape overflow containers */}
-      {showMenu && ReactDOM.createPortal(
+      {canMoveSprint && showMenu && ReactDOM.createPortal(
         <div
           ref={sprintDropdownRef}
           style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}

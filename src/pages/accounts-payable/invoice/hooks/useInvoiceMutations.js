@@ -59,15 +59,8 @@ export function useCreateInvoiceMutation() {
   });
 }
 
-/**
- * Direct status transition via PUT /apm/invoice/status-update/{invoice_id}?status_id={status_id}.
- * Used by the Invoice Management row action that moves an invoice from OCR Review Pending to
- * Pending Approval without going through the OCR Review Queue's field-correction flow.
- */
-export function useUpdateInvoiceStatusMutation() {
-  const queryClient = useQueryClient();
+export function useConfirmExtractionSectionMutation() {
   return useMutation({
-    mutationFn: ({ invoiceId, statusId }) => invoiceService.updateInvoiceStatus(invoiceId, statusId),
-    onSuccess: (_data, { invoiceId }) => invalidateInvoices(queryClient, invoiceId),
+    mutationFn: ({ extractionId, section }) => invoiceService.confirmExtractionSection(extractionId, section),
   });
 }

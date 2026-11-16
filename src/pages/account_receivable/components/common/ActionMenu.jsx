@@ -73,7 +73,10 @@ export default function ActionMenu({ items }) {
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((prev) => !prev);
+        }}
         className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -97,7 +100,8 @@ export default function ActionMenu({ items }) {
                 type="button"
                 role="menuitem"
                 disabled={item.disabled}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (item.disabled) return;
                   setOpen(false);
                   item.onClick?.();

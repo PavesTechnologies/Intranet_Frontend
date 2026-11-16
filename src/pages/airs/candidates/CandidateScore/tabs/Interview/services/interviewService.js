@@ -27,60 +27,48 @@ const toApiTime = (hhmm) => (hhmm && hhmm.length === 5 ? `${hhmm}:00` : hhmm);
 
 const mapInterviewersForApi = (interviewers) => (interviewers || []).map((i) => ({ name: i.name, email: i.email }));
 
-// Urgent backend contract addition: schedule/reschedule now require an
-// IANA zone name (e.g. "Asia/Kolkata") in the request body — 422 without
-// it. Additive only: date/start_time/end_time keep being sent as UTC
-// exactly as before (see localToUtcParts below); this is a new required
-// field alongside them, not a change to what those values mean.
+// Schedule/reschedule require an IANA zone name (e.g. "Asia/Kolkata") in
+// the request body — 422 without it. The backend does the one and only
+// UTC conversion itself, from this zone + the raw date/start_time/end_time
+// below; the frontend must send the picked values exactly as entered, not
+// pre-converted, or the offset gets applied twice (see scheduleInterview/
+// rescheduleInterview below).
 const getBrowserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-// The backend has no server-side timezone concept — it stores whatever
-// date/start_time/end_time it's given as-is, as UTC, by design. The UI
-// only ever collects/displays local wall-clock time, so every value has to
-// cross that boundary exactly once, at the two functions below, rather
-// than at each call site. Everything else in this module (formatTimeLabel,
-// hasRoundStarted, the schedule modal's pre-fill logic) keeps treating
-// date/start_time/end_time as plain local values — that's still true,
-// it's just true on both sides of a conversion that happens right here.
-
-// Local date "YYYY-MM-DD" + local time "HH:MM" -> the UTC equivalents,
-// for sending. New Date(y, m, d, h, min) is constructed in the browser's
-// own timezone; toISOString() always renders UTC.
-function localToUtcParts(dateStr, timeStr) {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const [hour, minute] = timeStr.split(":").map(Number);
-  const localInstant = new Date(year, month - 1, day, hour, minute);
-  return { date: localInstant.toISOString().slice(0, 10), time: localInstant.toISOString().slice(11, 16) };
-}
-
-// The reverse, for display: UTC date + UTC time (HH:MM or HH:MM:SS, the
-// trailing :SS is simply ignored by the two-element destructure below) ->
-// local date + local time. Date.UTC gives the instant; the plain getters
-// then read it back in whichever timezone the viewer's browser is in.
-function utcToLocalParts(dateStr, timeStr) {
-  if (!dateStr || !timeStr) return { date: dateStr, time: timeStr };
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const [hour, minute] = timeStr.split(":").map(Number);
-  const instant = new Date(Date.UTC(year, month - 1, day, hour, minute));
+// raw.start_at/raw.end_at are real UTC instants ("...Z") straight from the
+// backend. `new Date(iso)` parses that correctly; its plain getters
+// (getFullYear, getHours, ...) then read it back in whichever timezone the
+// current viewer's own browser is in — never raw.timezone (the scheduler's
+// zone, informational only) and never raw.date/start_time/end_time (which
+// are relative to *that* zone, not the viewer's). This is what the date/
+// time inputs below get pre-filled from on reschedule, and it's also what
+// hasRoundStarted/hasRoundEnded in interviewMock.js compare against.
+function isoToLocalParts(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return { date: null, time: null };
   const pad = (n) => String(n).padStart(2, "0");
   return {
-    date: `${instant.getFullYear()}-${pad(instant.getMonth() + 1)}-${pad(instant.getDate())}`,
-    time: `${pad(instant.getHours())}:${pad(instant.getMinutes())}`,
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
   };
 }
 
 const mapApiInterviewToInternal = (raw) => {
-  // Both derived from the round's single `date` + their own time — in the
-  // (unlikely, business-hours-only) case a round's start/end straddle a
-  // UTC calendar-day boundary, the schema's one date field can only hold
-  // one of the two; start's date wins, matching what's sent on the way up.
-  const start = utcToLocalParts(raw.date, raw.start_time);
-  const end = utcToLocalParts(raw.date, raw.end_time);
+  const start = isoToLocalParts(raw.start_at);
+  const end = isoToLocalParts(raw.end_at);
   return {
     id: raw.id,
     campaign_candidate_id: raw.campaign_candidate_id,
     interview_type: raw.interview_type,
     status: raw.status,
+    // The true UTC instants — every genuine *display* of this round's
+    // date/time should format these directly (formatInterviewDate/
+    // formatInterviewTime in interviewMock.js), not the local fields below.
+    start_at: raw.start_at,
+    end_at: raw.end_at,
+    // Viewer-local wall-clock, derived from start_at/end_at above — only
+    // for pre-filling the reschedule form's Date/Start Time/End Time
+    // inputs, which need plain local values to bind to.
     date: start.date,
     start_time: start.time,
     end_time: end.time,
@@ -120,16 +108,17 @@ export const getInterviews = async (campaignCandidateId) => {
 // reason} — maps 1:1 onto the request body below, just camelCase -> snake_case.
 export const scheduleInterview = async (campaignCandidateId, payload) => {
   try {
-    const startUtc = localToUtcParts(payload.date, payload.startTime);
-    const endUtc = localToUtcParts(payload.date, payload.endTime);
     const response = await api.post(
       `${BASE_URL}/campaign-candidates/${campaignCandidateId}/interviews`,
       {
         interview_type: payload.interviewType,
         interviewers: mapInterviewersForApi(payload.interviewers),
-        date: startUtc.date,
-        start_time: toApiTime(startUtc.time),
-        end_time: toApiTime(endUtc.time),
+        // Raw picked values, unconverted — the backend converts these to
+        // UTC itself using `timezone` below; converting here too would
+        // double-apply the offset.
+        date: payload.date,
+        start_time: toApiTime(payload.startTime),
+        end_time: toApiTime(payload.endTime),
         duration_minutes: payload.durationMinutes,
         platform: payload.platform,
         location: payload.location,
@@ -147,15 +136,14 @@ export const scheduleInterview = async (campaignCandidateId, payload) => {
 
 export const rescheduleInterview = async (interviewId, payload) => {
   try {
-    const startUtc = localToUtcParts(payload.date, payload.startTime);
-    const endUtc = localToUtcParts(payload.date, payload.endTime);
     const response = await api.patch(
       `${BASE_URL}/interviews/${interviewId}/reschedule`,
       {
         interviewers: mapInterviewersForApi(payload.interviewers),
-        date: startUtc.date,
-        start_time: toApiTime(startUtc.time),
-        end_time: toApiTime(endUtc.time),
+        // Raw picked values, unconverted — see scheduleInterview above.
+        date: payload.date,
+        start_time: toApiTime(payload.startTime),
+        end_time: toApiTime(payload.endTime),
         duration_minutes: payload.durationMinutes,
         platform: payload.platform,
         location: payload.location,

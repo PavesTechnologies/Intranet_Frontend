@@ -18,6 +18,20 @@ const customSelectStyles = {
   menu: (base) => ({ ...base, zIndex: 9999 }),
 };
 
+// Mirrors the backend's expense-report.business-purpose.min-length config
+// (application.properties, default 10 — see ExpenseReportServiceImpl.assertBusinessPurposeLongEnough).
+export const BUSINESS_PURPOSE_MIN_LENGTH = 10;
+
+/** Shared validation rule so Create/Edit Report forms agree with the backend before submitting. */
+export function validateBusinessPurpose(value) {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "Business purpose is required.";
+  if (trimmed.length < BUSINESS_PURPOSE_MIN_LENGTH) {
+    return `Business purpose must be at least ${BUSINESS_PURPOSE_MIN_LENGTH} characters long.`;
+  }
+  return "";
+}
+
 /**
  * Shared Title / Business Purpose / Cost Center / Report Currency fields —
  * used by CreateExpensePage, MyExpensesPage's edit modal, and
@@ -56,6 +70,8 @@ export default function ReportFormFields({
         value={formData.businessPurpose}
         onChange={onInputChange}
         disabled={disabled}
+        requiredMark
+        error={formErrors.businessPurpose}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

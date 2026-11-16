@@ -18,8 +18,9 @@ import {
   fetchBillingConfigurationById,
   getApiErrorMessage,
   saveDraftConfiguration,
-  activateConfiguration,
+  submitConfigurationForApproval,
   ensureBillingConfigurationDraft,
+  syncBillingConfigurationDraft,
   saveBillingConfigurationRecord,
 } from "../services/billingConfigService";
 import { getActiveCurrencies } from "../services/toolPricingService";
@@ -100,7 +101,7 @@ const STEPS = [
   { id: 1, label: "Project Selection", shortLabel: "Project", desc: "Select project and basic info", icon: <FolderKanban className="h-5 w-5" /> },
   { id: 2, label: "Commercial Configuration", shortLabel: "Commercial", desc: "Define pricing and rate details", icon: <Coins className="h-5 w-5" /> },
   { id: 3, label: "Invoice Preferences", shortLabel: "Invoice", desc: "Configure billing rules and terms", icon: <Receipt className="h-5 w-5" /> },
-  { id: 4, label: "Review & Activate", shortLabel: "Review", desc: "Verify setup before activating", icon: <ShieldCheck className="h-5 w-5" /> },
+  { id: 4, label: "Review & Submit", shortLabel: "Review", desc: "Verify setup before submitting for approval", icon: <ShieldCheck className="h-5 w-5" /> },
 ];
 
 const CONFIGURATIONS_PATH = "/account-receivable/project-billing-setup/configurations";
@@ -285,17 +286,17 @@ export default function NewConfigurationWizard() {
   const [loadingExisting, setLoadingExisting] = useState(Boolean(configId));
   const [viewOnly, setViewOnly] = useState(initialMode === "view");
   const [saving, setSaving] = useState(false);
-  const [activating, setActivating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [savedConfigId, setSavedConfigId] = useState(extractBillingConfigurationId(configId));
-  const [configStatus, setConfigStatus] = useState(null);
+  const [approvalStatus, setApprovalStatus] = useState(null);
   const [creatingDraft, setCreatingDraft] = useState(false);
   // Currency master list (real UUID currencyId per currency code) — the only
   // currency master source in this codebase, see toolPricingService.getActiveCurrencies.
   const [currencyMasterList, setCurrencyMasterList] = useState([]);
 
-  // Editing an already-created (non-Draft) configuration should only ever
-  // update that record, never re-run the create/activate flow.
-  const isEditingExisting = Boolean(configId) && Boolean(configStatus) && configStatus !== "Draft";
+  // Editing an already-submitted (non-Draft) configuration should only ever
+  // update that record, never re-run the create/submit-for-approval flow.
+  const isEditingExisting = Boolean(configId) && Boolean(approvalStatus) && approvalStatus !== "DRAFT";
 
   useEffect(() => {
     if (!configId) return;
@@ -308,11 +309,23 @@ export default function NewConfigurationWizard() {
 
         const { summary, detail } = result;
         if (detail) {
-          setWizardData((prev) => ({ ...prev, ...detail }));
+          // The existing project may be excluded from the available-projects
+          // list (it's already configured), so its projectCode isn't always
+          // present on the raw detail response. Some backends key the PMS
+          // project by its projectId with no separate code — fall back to the
+          // existing projectId so Project Summary/validation never see a
+          // blank code for a project that's already selected.
+          const projectInfo = detail.projectInfo || {};
+          const projectCode = projectInfo.projectCode || (projectInfo.projectId ? String(projectInfo.projectId) : "");
+          setWizardData((prev) => ({
+            ...prev,
+            ...detail,
+            projectInfo: { ...projectInfo, projectCode },
+          }));
         }
         setSavedConfigId(summary.id || configId);
-        setConfigStatus(summary.status || null);
-        setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
+        setApprovalStatus(summary.approvalStatus || null);
+        setCurrentStep(summary.approvalStatus === "DRAFT" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
       } catch (error) {
         if (!isMounted) return;
         showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration."), "error");
@@ -486,7 +499,15 @@ export default function NewConfigurationWizard() {
   // rate card row (and deletes any absent from wizard state), which would race with
   // the single-row create/update the rate card button is about to perform itself.
   const ensureBillingConfigurationId = async () => {
-    if (savedConfigId) return savedConfigId;
+    if (savedConfigId) {
+      // The draft may have been created (below) before billingFrequencyId —
+      // or a later billingTypeId change — was known; re-push the current
+      // wizard selection onto the already-created parent record so it's
+      // never stale by the time a sub-configuration (Fixed Price, Recurring,
+      // TM rate card) is created against it.
+      const syncedId = await syncBillingConfigurationDraft(wizardData, savedConfigId);
+      return applyBillingConfigurationId(syncedId) || savedConfigId;
+    }
     const guardMessage = getDraftGuardMessage(wizardData);
     if (guardMessage) {
       showStatusToast(guardMessage, "warning");
@@ -578,18 +599,18 @@ export default function NewConfigurationWizard() {
     // saved (immediately, via the "Save Fixed Price Details" button on the Fixed
     // Price screen) before the user can even reach this step — see the
     // fixedPriceConfigurationId check in getMissingFields. So final submit here only
-    // persists the Billing Configuration record; it never calls the Fixed Price API
-    // or the Activate API. Editing an already-active config (isEditingExisting) keeps
-    // the original save+activate flow below unchanged.
+    // persists the Billing Configuration record; it never calls the Fixed Price API.
+    // Editing an already-submitted config (isEditingExisting) just persists the
+    // update in place — it never re-submits for approval.
     const isFixedPriceCreate = wizardData.billingConfig?.billingType === "FIXED_PRICE" && !isEditingExisting;
 
-    setActivating(true);
+    setSubmitting(true);
     try {
       if (isFixedPriceCreate) {
-        // finalize: true tells the backend to flip status to ACTIVE/isActive=true on
-        // this same PUT — this is the only call site that should ever send it.
+        // isDraftSave: false persists via the plain PUT .../{id} (not
+        // .../draft) — this is the final save before submitting for approval.
         const { configResponse, configId } = await saveBillingConfigurationRecord(wizardData, savedConfigId, {
-          finalize: true,
+          isDraftSave: false,
         });
         const billingConfigurationId =
           configId ||
@@ -612,7 +633,17 @@ export default function NewConfigurationWizard() {
           },
         }));
 
-        showStatusToast("Billing setup created successfully.", "success");
+        // A brand-new configuration still starts in DRAFT — submit it for
+        // Finance Manager approval. Editing an already-submitted/approved one
+        // only persists the update and does not re-trigger the workflow.
+        if (!isEditingExisting) {
+          await submitConfigurationForApproval(billingConfigurationId);
+        }
+
+        showStatusToast(
+          isEditingExisting ? "Billing setup updated successfully." : "Billing setup submitted for approval successfully.",
+          "success"
+        );
         navigate(CONFIGURATIONS_PATH);
         return;
       }
@@ -620,9 +651,9 @@ export default function NewConfigurationWizard() {
       // Let a real save failure (e.g. a backend validation error) surface as-is via
       // the outer catch below — swallowing it here and falling through to the
       // "missing configuration id" message would hide the actual error from the user.
-      // finalize: true tells the backend to flip status to ACTIVE/isActive=true on
-      // this same PUT — this is the only call site that should ever send it.
-      const saveResult = await saveDraftConfiguration(wizardData, savedConfigId, { finalize: true });
+      // isDraftSave: false persists via the plain PUT .../{id} (not .../draft) —
+      // this is the final save before submitting for approval.
+      const saveResult = await saveDraftConfiguration(wizardData, savedConfigId, { isDraftSave: false });
       const billingConfigurationId =
         extractBillingConfigurationId(saveResult) ||
         extractBillingConfigurationId(wizardData.billingConfigurationId) ||
@@ -642,27 +673,35 @@ export default function NewConfigurationWizard() {
           id: billingConfigurationId,
         },
       }));
-      await activateConfiguration(billingConfigurationId);
+
+      // A brand-new configuration still starts in DRAFT — submit it for
+      // Finance Manager approval (PUT .../submit). There is no activation step
+      // on the frontend: the backend alone decides billingStatus once a
+      // Finance Manager approves. Editing an already-submitted/approved config
+      // only persists the update and does not re-trigger the workflow.
+      if (!isEditingExisting) {
+        await submitConfigurationForApproval(billingConfigurationId);
+      }
 
       showStatusToast(
-        isEditingExisting ? "Billing setup updated successfully." : "Billing setup created successfully.",
+        isEditingExisting ? "Billing setup updated successfully." : "Billing setup submitted for approval successfully.",
         "success"
       );
       navigate(CONFIGURATIONS_PATH);
     } catch (error) {
       const fallbackMessage = isFixedPriceCreate
         ? "Failed to create billing configuration."
-        : `Failed to ${isEditingExisting ? "update" : "activate"} billing configuration.`;
+        : `Failed to ${isEditingExisting ? "update" : "submit"} billing configuration.`;
       showStatusToast(getApiErrorMessage(error, fallbackMessage), "error");
     } finally {
-      setActivating(false);
+      setSubmitting(false);
     }
   };
 
   const isLastStep = currentStep === STEPS.length;
   // Native `disabled` only reflects an in-flight request — a step with missing
   // fields stays clickable so onNext can explain what's missing via toast.
-  const nextDisabled = (isLastStep && activating) || creatingDraft;
+  const nextDisabled = (isLastStep && submitting) || creatingDraft;
   const nextIncomplete = !isLastStep && !isStepValid(currentStep, wizardData);
 
   if (loadingExisting) {
@@ -675,16 +714,19 @@ export default function NewConfigurationWizard() {
 
   if (viewOnly) {
     return (
-      <div className="space-y-3 p-4 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Billing Setups" />
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-              {wizardData.projectInfo?.projectName || "Billing Configuration"}
-            </h1>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex items-center gap-3">
+            <BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Overview" />
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Billing Setup Record</span>
+              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                {wizardData.projectInfo?.projectName || "Billing Configuration"}
+              </h1>
+            </div>
           </div>
-          <Button variant="outline" size="small" onClick={() => setViewOnly(false)}>
-            <Pencil className="h-4 w-4" /> Edit Configuration
+          <Button variant="primary" size="small" onClick={() => setViewOnly(false)}>
+            <Pencil className="mr-1 h-4 w-4" /> Edit Configuration
           </Button>
         </div>
 
@@ -694,62 +736,90 @@ export default function NewConfigurationWizard() {
   }
 
   return (
-    <div className="space-y-3">
-      {/* Minimal Header */}
-      <div>
-        <div className="mb-1 flex items-center gap-2">
-          <BackIconButton onClick={handleCancel} label="Back to Billing Setups" />
-          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-            {configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
-          </h1>
-        </div>
-        <p className="mt-0.5 text-sm text-slate-500">Configure billing details for a project</p>
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
+  {/* Header */}
+  <div className="space-y-2">
+    <div className="flex items-center gap-3">
+      <BackIconButton
+        onClick={handleCancel}
+        label="Back to Billing Setups"
+      />
+
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+          {configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
+        </h1>
+
+        <p className="mt-1 ml-0.5 text-sm leading-6 text-slate-500 sm:ml-1 sm:text-[15px]">
+          Configure billing details for a project
+        </p>
       </div>
-
-      <WizardStepper steps={STEPS} currentStep={currentStep} onStepClick={handleStepClick} />
-
-      {/* Active Form Step Container */}
-      <PageCard className="border-slate-200/80 shadow-sm rounded-2xl">
-        <PageCardContent className="p-4 sm:p-6 space-y-4">
-          {currentStep === 1 && (
-            <ProjectStep value={wizardData.projectInfo} onChange={handleProjectInfoChange} />
-          )}
-
-          {currentStep === 2 && (
-            <BillingConfigurationStep
-              value={wizardData.billingConfig}
-              onChange={handleBillingConfigChange}
-              setupMode={wizardData.setupMode}
-              projectInfo={wizardData.projectInfo}
-              onProjectInfoChange={handleProjectInfoChange}
-              ensureBillingConfigurationId={ensureBillingConfigurationId}
-            />
-          )}
-
-          {currentStep === 3 && (
-            <BillingControlsStep value={wizardData.controls} onChange={handleControlsChange} />
-          )}
-
-          {currentStep === 4 && <ReviewActivateStep wizardData={wizardData} onEditStep={handleStepClick} />}
-
-          <div className="border-t border-slate-100 pt-4">
-            <WizardNavigation
-              isFirstStep={currentStep === 1}
-              isLastStep={isLastStep}
-              nextDisabled={nextDisabled}
-              nextIncomplete={nextIncomplete}
-              finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
-              finalLoadingText={isEditingExisting ? "Updating..." : "Creating..."}
-              showSaveDraft={currentStep > 1}
-              saving={saving}
-              activating={activating || creatingDraft}
-              onBack={handleBack}
-              onNext={isLastStep ? handleFinalSubmit : handleNext}
-              onSaveDraft={handleSaveDraft}
-            />
-          </div>
-        </PageCardContent>
-      </PageCard>
     </div>
+  </div>
+
+  {/* Wizard Stepper */}
+  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6">
+    <WizardStepper
+      steps={STEPS}
+      currentStep={currentStep}
+      onStepClick={handleStepClick}
+    />
+  </div>
+
+  {/* Active Form Step Container */}
+  <PageCard className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <PageCardContent className="space-y-6 p-5 sm:p-6 lg:p-8">
+      {currentStep === 1 && (
+        <ProjectStep
+          value={wizardData.projectInfo}
+          onChange={handleProjectInfoChange}
+        />
+      )}
+
+      {currentStep === 2 && (
+        <BillingConfigurationStep
+          value={wizardData.billingConfig}
+          onChange={handleBillingConfigChange}
+          setupMode={wizardData.setupMode}
+          projectInfo={wizardData.projectInfo}
+          onProjectInfoChange={handleProjectInfoChange}
+          ensureBillingConfigurationId={ensureBillingConfigurationId}
+        />
+      )}
+
+      {currentStep === 3 && (
+        <BillingControlsStep
+          value={wizardData.controls}
+          onChange={handleControlsChange}
+        />
+      )}
+
+      {currentStep === 4 && (
+        <ReviewActivateStep
+          wizardData={wizardData}
+          onEditStep={handleStepClick}
+        />
+      )}
+
+      {/* Navigation — existing component and props unchanged */}
+      <div className="mt-2 border-t border-slate-200 pt-5">
+        <WizardNavigation
+          isFirstStep={currentStep === 1}
+          isLastStep={isLastStep}
+          nextDisabled={nextDisabled}
+          nextIncomplete={nextIncomplete}
+          finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
+          finalLoadingText={isEditingExisting ? "Updating..." : "Submitting..."}
+          showSaveDraft={currentStep > 1}
+          saving={saving}
+          activating={submitting || creatingDraft}
+          onBack={handleBack}
+          onNext={isLastStep ? handleFinalSubmit : handleNext}
+          onSaveDraft={handleSaveDraft}
+        />
+      </div>
+    </PageCardContent>
+  </PageCard>
+</div>
   );
 }

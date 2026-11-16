@@ -20,6 +20,7 @@ import { getTaxRegionById, getApiErrorMessage as getRegionErrorMessage } from ".
 import {
   getTaxRateConfigurationsByTaxRegion,
   deactivateTaxRateConfiguration,
+  getActiveTaxTypes,
   getApiErrorMessage as getRuleErrorMessage,
 } from "../../services/taxRateConfigurationService";
 
@@ -54,6 +55,7 @@ export default function TaxConfigurationRegionDetailPage() {
 
   const [region, setRegion] = useState(null);
   const [configs, setConfigs] = useState([]);
+  const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -72,9 +74,13 @@ export default function TaxConfigurationRegionDetailPage() {
     setPermissionError(false);
     setNotFound(false);
     try {
-      const [regionData, configsData] = await Promise.all([
+      const [regionData, configsData, taxTypesData] = await Promise.all([
         getTaxRegionById(taxRegionId),
         getTaxRateConfigurationsByTaxRegion(taxRegionId),
+        getActiveTaxTypes().catch((err) => {
+          console.warn("[TaxConfigurationRegionDetail] Could not load tax types:", err?.message);
+          return [];
+        }),
       ]);
       if (!regionData || !regionData.taxRegionId) {
         setNotFound(true);
@@ -82,6 +88,7 @@ export default function TaxConfigurationRegionDetailPage() {
         setRegion(regionData);
       }
       setConfigs(configsData);
+      setTaxTypes(taxTypesData || []);
     } catch (error) {
       if (error?.response?.status === 403) {
         setPermissionError(true);
@@ -348,6 +355,7 @@ export default function TaxConfigurationRegionDetailPage() {
         onClose={() => setIsRuleFormOpen(false)}
         region={region}
         editingConfig={editingRuleConfig}
+        taxTypes={taxTypes}
         onSaved={handleRuleSaved}
       />
 

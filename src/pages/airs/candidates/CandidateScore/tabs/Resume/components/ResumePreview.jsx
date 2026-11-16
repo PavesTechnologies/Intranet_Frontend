@@ -18,14 +18,20 @@ export default function ResumePreview({ file, onExpired }) {
 
   const isPdf = file.format?.toUpperCase() === "PDF" || file.name?.toLowerCase().endsWith(".pdf");
   const isDocx = file.format?.toUpperCase() === "DOCX" || file.name?.toLowerCase().endsWith(".docx");
+  // Legacy binary .doc (pre-2007 Word format) — docx-preview only understands
+  // the OOXML .docx zip format, so a real .doc can't be rendered inline here.
+  // Handled as its own case (download-only) rather than lumped in with isDocx,
+  // which would otherwise hand it to renderAsync and fail with a confusing error.
+  const isDoc = !isDocx && (file.format?.toUpperCase() === "DOC" || file.name?.toLowerCase().endsWith(".doc"));
 
-  // Reset loading and error when URL changes
+  // Reset loading and error when URL changes. .doc has no inline preview to
+  // wait on, so it never enters the loading state at all.
   useEffect(() => {
-    setLoading(true);
+    setLoading(!isDoc);
     setError(null);
     setDocxBlob(null);
     setPageNumber(1);
-  }, [file.url]);
+  }, [file.url, isDoc]);
 
   // Handle DOCX loading and fetching
   useEffect(() => {
@@ -182,6 +188,21 @@ export default function ResumePreview({ file, onExpired }) {
             />
           </div>
         )}
+
+        {/* Legacy .doc — no inline renderer available for the binary format,
+            so this offers the download instead of a broken/empty preview. */}
+        {isDoc && !error && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <FileText className="text-slate-400 mb-2" size={32} />
+            <span className="text-[13px] font-semibold text-slate-800 mb-1">Preview not available for .doc files</span>
+            <p className="text-[11.5px] text-slate-500 max-w-[280px] mb-4">
+              Download the file to view it in Word or another compatible app.
+            </p>
+            <Button variant="outline" size="small" onClick={handleDownload}>
+              <Download className="h-3.5 w-3.5 mr-1" /> Download
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Footer Navigation (only for PDF) */}
@@ -212,10 +233,10 @@ export default function ResumePreview({ file, onExpired }) {
         </div>
       )}
 
-      {/* Footer for DOCX or single-page PDF */}
+      {/* Footer for DOCX/.doc or single-page PDF */}
       {(!isPdf || numPages <= 1) && !error && (
         <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 font-medium">
-          {file.sizeKb} KB · Continuous flow
+          {file.sizeKb} KB {isDoc ? "" : "· Continuous flow"}
         </div>
       )}
     </div>

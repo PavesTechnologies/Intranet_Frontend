@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Plus, Pencil, Trash2, Loader2, Landmark } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -20,7 +20,12 @@ import {
   CONTRACT_VALUE_SOURCE_OPTIONS,
 } from "../../data/wizardOptions";
 import { formatCurrency, formatDisplayDate } from "../../utils/format";
-import { getRecurringDateErrors, hasRecurringDateErrors, toDateOnly } from "../../utils/recurringBillingSchedule";
+import { getBillingTypeDisplayName } from "../../utils/billingType";
+import {
+  getRecurringDateErrors,
+  hasRecurringDateErrors,
+  toDateOnly,
+} from "../../utils/recurringBillingSchedule";
 import {
   getActiveBillingTypes,
   getActiveBillingFrequencies,
@@ -42,6 +47,7 @@ import {
   buildRecurringRequestPayload,
   getBillingRecurringSchedule,
   getBillingRecurringScheduleByBillingConfigurationId,
+  previewBillingSchedule,
 } from "../../services/billingConfigurationService";
 
 let milestoneSeq = 0;
@@ -66,8 +72,8 @@ function getPricingModelOptions(billingType) {
   }
 }
 
-// Half-Yearly is only offered for Recurring (see getBillingFrequencyOptions);
-// display order is fixed regardless of backend order.
+// Half-Yearly is offered for Recurring and Fixed Price (see
+// getBillingFrequencyOptions); display order is fixed regardless of backend order.
 const BILLING_FREQUENCY_ORDER = [
   "WEEKLY",
   "BI_WEEKLY",
@@ -84,6 +90,7 @@ const FIXED_PRICE_FREQUENCY_ORDER = [
   "BI_WEEKLY",
   "MONTHLY",
   "QUARTERLY",
+  "HALF_YEARLY",
   "ANNUALLY",
 ];
 const BILLING_TYPE_ORDER = [
@@ -94,15 +101,29 @@ const BILLING_TYPE_ORDER = [
 ];
 
 function sortByOrder(options, order, key = "value") {
+  const getKey = typeof key === "function" ? key : (item) => item[key];
   return [...options].sort((a, b) => {
-    const aIndex = order.indexOf(a[key]);
-    const bIndex = order.indexOf(b[key]);
+    const aIndex = order.indexOf(getKey(a));
+    const bIndex = order.indexOf(getKey(b));
     return (
       (aIndex === -1 ? order.length : aIndex) -
       (bIndex === -1 ? order.length : bIndex)
     );
   });
 }
+
+// Billing Frequency options come back from the master-data API with `value`
+// set to the record's database UUID (see normalizeBillingFrequency), not a
+// semantic code — sorting/filtering against BILLING_FREQUENCY_ORDER (or the
+// "ONE_TIME"/"HALF_YEARLY" literals below) by `.value` would never match
+// anything. Derive a stable code from the display label instead
+// ("Bi-Weekly" -> "BI_WEEKLY") so both the fixed display order and the
+// One-Time/Half-Yearly exclusions actually take effect.
+const frequencyCode = (option) =>
+  String(option?.label || option?.billingFrequencyName || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
 
 function getBillingFrequencyOptions(billingType, frequencies = []) {
   if (billingType === "RECURRING") {
@@ -111,24 +132,25 @@ function getBillingFrequencyOptions(billingType, frequencies = []) {
     // One-Time is excluded, since that's a single lump sum with no recurring
     // schedule and only ever applies to Fixed Price.
     return sortByOrder(
-      frequencies.filter((option) => option.value !== "ONE_TIME"),
+      frequencies.filter((option) => frequencyCode(option) !== "ONE_TIME"),
       BILLING_FREQUENCY_ORDER,
+      frequencyCode,
     );
   }
 
-  const withoutHalfYearly = frequencies.filter(
-    (option) => option.value !== "HALF_YEARLY",
-  );
-
   if (billingType === "FIXED_PRICE") {
-    return sortByOrder(withoutHalfYearly, FIXED_PRICE_FREQUENCY_ORDER);
+    return sortByOrder(frequencies, FIXED_PRICE_FREQUENCY_ORDER, frequencyCode);
   }
 
-  // One-Time only makes sense against a single lump-sum contract value, so every
-  // other billing type (T&M, Milestone) never offers it, even if master data does.
+  // One-Time and Half-Yearly only make sense against Fixed Price/Recurring, so
+  // every other billing type (T&M, Milestone) never offers them, even if master
+  // data does.
   return sortByOrder(
-    withoutHalfYearly.filter((option) => option.value !== "ONE_TIME"),
+    frequencies.filter(
+      (option) => !["ONE_TIME", "HALF_YEARLY"].includes(frequencyCode(option)),
+    ),
     BILLING_FREQUENCY_ORDER,
+    frequencyCode,
   );
 }
 
@@ -181,6 +203,23 @@ const EMPTY_RATE_CARD = {
   isSaved: false,
 };
 
+// TM rate card dates come back from the backend as Java LocalDate arrays
+// ([year, month, day], e.g. [2026, 9, 11]) rather than "yyyy-mm-dd" strings.
+// Left as-is, that array is truthy so it flows straight into the native date
+// input's value (which silently renders blank) and into string date
+// comparisons (where "2026,9,11" sorts lexically differently than
+// "2026-09-11", producing bogus before/after-project-date errors even for a
+// date equal to the boundary). Normalize to the zero-padded string every
+// other date field already uses; strings pass through unchanged.
+function normalizeRateCardDate(date) {
+  if (Array.isArray(date)) {
+    const [year, month, day] = date;
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  return date || "";
+}
+
 const mapRateCard = (card = {}, includeRole = true) => ({
   ...(includeRole
     ? { role: card.roleName || card.role || card.name || "" }
@@ -188,8 +227,8 @@ const mapRateCard = (card = {}, includeRole = true) => ({
   roleName: card.roleName || card.role || card.name || "",
   rate: card.rate ?? card.amount ?? "",
   ratePeriod: card.ratePeriod || card.period || "HOURLY",
-  effectiveFrom: card.effectiveFrom || card.validFrom || "",
-  effectiveTo: card.effectiveTo || card.validTo || "",
+  effectiveFrom: normalizeRateCardDate(card.effectiveFrom || card.validFrom),
+  effectiveTo: normalizeRateCardDate(card.effectiveTo || card.validTo),
   rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
   isSaved: Boolean(card.id || card.rateCardId || card.tmRateCardId),
 });
@@ -226,7 +265,7 @@ function normalizeBillingType(type) {
   return {
     ...type,
     value,
-    label: value === "RECURRING" ? "Recurring" : name,
+    label: value === "RECURRING" ? "Recurring" : getBillingTypeDisplayName(name),
     billingTypeId: type.billingTypeId,
   };
 }
@@ -324,6 +363,12 @@ function TimeAndMaterialForm({
 }) {
   const update = (patch) => onChange({ ...value, ...patch });
   const isOneTime = isOneTimeFrequency(billingFrequency);
+  // Project dates can arrive as a full timestamp depending on which backend
+  // lookup supplied them; the date input's min/max (and every comparison
+  // below) need a plain yyyy-mm-dd, same normalization FixedPriceForm/
+  // RecurringBillingForm already apply to these same props.
+  const projectStartDateOnly = toDateOnly(projectStartDate);
+  const projectEndDateOnly = toDateOnly(projectEndDate);
   const standardRate = {
     ...EMPTY_RATE_CARD,
     rate: value.rate || "",
@@ -333,13 +378,15 @@ function TimeAndMaterialForm({
     rateCardId: value.rateCardId || null,
     isSaved: Boolean(value.rateCardId),
   };
+  // Effective From/To on Timesheet-based (Time & Material) rates must fall
+  // within the project's own start/end date, same as Fixed Price/Recurring.
   const standardDateErrors = isOneTime
     ? { effectiveFrom: "", effectiveTo: "" }
     : getEffectiveDateErrors({
         effectiveFrom: standardRate.effectiveFrom,
         effectiveTo: standardRate.effectiveTo,
-        projectStartDate,
-        projectEndDate,
+        projectStartDate: projectStartDateOnly,
+        projectEndDate: projectEndDateOnly,
       });
 
   const [rows, setRows] = useState(() =>
@@ -436,6 +483,36 @@ function TimeAndMaterialForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOneTime]);
 
+  // If the project duration shrinks, a previously valid Effective From/To can
+  // fall outside the new range — clear it (not just show the inline error)
+  // rather than let a now-invalid date sit in state or reach the payload.
+  useEffect(() => {
+    if (isOneTime) return;
+    const isOutOfRange = (date) =>
+      Boolean(
+        date &&
+          ((projectStartDateOnly && date < projectStartDateOnly) ||
+            (projectEndDateOnly && date > projectEndDateOnly)),
+      );
+
+    if (isOutOfRange(standardRate.effectiveFrom) || isOutOfRange(standardRate.effectiveTo)) {
+      update({
+        effectiveFrom: isOutOfRange(standardRate.effectiveFrom) ? "" : standardRate.effectiveFrom,
+        effectiveTo: isOutOfRange(standardRate.effectiveTo) ? "" : standardRate.effectiveTo,
+      });
+    }
+    if (rows.some((row) => isOutOfRange(row.effectiveFrom) || isOutOfRange(row.effectiveTo))) {
+      syncParent(
+        rows.map((row) => ({
+          ...row,
+          effectiveFrom: isOutOfRange(row.effectiveFrom) ? "" : row.effectiveFrom,
+          effectiveTo: isOutOfRange(row.effectiveTo) ? "" : row.effectiveTo,
+        })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOneTime, projectStartDateOnly, projectEndDateOnly]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -523,7 +600,18 @@ function TimeAndMaterialForm({
       const payload = buildTmRateCardPayload(standardRate, resolvedConfigId);
       const saved = await saveTmRateCard(resolvedConfigId, payload);
 
-      update(mapRateCard(saved, false));
+      const mappedSaved = mapRateCard(saved, false);
+      update({
+        ...mappedSaved,
+        // The save response doesn't always echo back effectiveFrom/effectiveTo,
+        // so mapRateCard would otherwise blank out the dates the user just
+        // entered (and that were just persisted) — fall back to what's already
+        // in state. mappedSaved's dates are already normalized to "yyyy-mm-dd"
+        // (see normalizeRateCardDate), so this must not read saved.effectiveFrom/
+        // effectiveTo directly — those are still raw LocalDate arrays.
+        effectiveFrom: mappedSaved.effectiveFrom || standardRate.effectiveFrom,
+        effectiveTo: mappedSaved.effectiveTo || standardRate.effectiveTo,
+      });
       showStatusToast("Rate card saved", "success");
     } catch (error) {
       showStatusToast(
@@ -566,8 +654,6 @@ function TimeAndMaterialForm({
         getEffectiveDateErrors({
           effectiveFrom: row.effectiveFrom,
           effectiveTo: row.effectiveTo,
-          projectStartDate,
-          projectEndDate,
         }),
       )
     ) {
@@ -654,8 +740,8 @@ function TimeAndMaterialForm({
                   onChange={(event) =>
                     update({ effectiveFrom: event.target.value })
                   }
-                  min={projectStartDate || undefined}
-                  max={projectEndDate || undefined}
+                  min={projectStartDateOnly || undefined}
+                  max={projectEndDateOnly || undefined}
                   error={standardDateErrors.effectiveFrom}
                 />
                 <FormDatePicker
@@ -663,8 +749,8 @@ function TimeAndMaterialForm({
                   name="effectiveTo"
                   value={standardRate.effectiveTo}
                   onChange={(event) => update({ effectiveTo: event.target.value })}
-                  min={projectStartDate || undefined}
-                  max={projectEndDate || undefined}
+                  min={standardRate.effectiveFrom || projectStartDateOnly || undefined}
+                  max={projectEndDateOnly || undefined}
                   error={standardDateErrors.effectiveTo}
                 />
               </>
@@ -732,8 +818,8 @@ function TimeAndMaterialForm({
                         : getEffectiveDateErrors({
                             effectiveFrom: item.effectiveFrom,
                             effectiveTo: item.effectiveTo,
-                            projectStartDate,
-                            projectEndDate,
+                            projectStartDate: projectStartDateOnly,
+                            projectEndDate: projectEndDateOnly,
                           });
                       return (
                       <tr
@@ -787,8 +873,8 @@ function TimeAndMaterialForm({
                                     e.target.value,
                                   )
                                 }
-                                min={projectStartDate || undefined}
-                                max={projectEndDate || undefined}
+                                min={projectStartDateOnly || undefined}
+                                max={projectEndDateOnly || undefined}
                                 error={roleDateErrors.effectiveFrom}
                               />
                             </td>
@@ -802,8 +888,8 @@ function TimeAndMaterialForm({
                                     e.target.value,
                                   )
                                 }
-                                min={projectStartDate || undefined}
-                                max={projectEndDate || undefined}
+                                min={item.effectiveFrom || projectStartDateOnly || undefined}
+                                max={projectEndDateOnly || undefined}
                                 error={roleDateErrors.effectiveTo}
                               />
                             </td>
@@ -873,6 +959,43 @@ function ContractValueSourceBadge({ source }) {
   return null;
 }
 
+function EnterpriseBudgetSourceSelector({ value, onChange, projectBudget, currency }) {
+  const isPms = value === "PMS" || value === "PMS_BUDGET";
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2">
+      <span className="text-xs font-semibold text-slate-700">Contract Value Source:</span>
+      <div className="flex items-center gap-1 rounded-lg bg-slate-200/60 p-0.5">
+        <button
+          type="button"
+          onClick={() => onChange("PMS")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all ${
+            isPms
+              ? "bg-white text-[#0A0082] shadow-sm font-semibold"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Landmark className="h-3.5 w-3.5" />
+          <span>Project Budget {projectBudget ? `(${currency || ""} ${projectBudget})` : ""}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onChange("MANUAL")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all ${
+            !isPms
+              ? "bg-white text-[#0A0082] shadow-sm font-semibold"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          <span>Manual Input</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Fixed Price billing must be driven by the actual client-agreed commercial value,
 // which can legitimately differ from the PMS Project Budget in either direction —
 // so Contract Value only seeds from the budget once and is freely editable after.
@@ -882,8 +1005,11 @@ function FixedPriceForm({
   currency,
   projectBudget,
   billingFrequency,
+  billingFrequencyId,
   billingFrequencyLabel,
+  billingFrequencyOption,
   billingConfigurationId,
+  ensureBillingConfigurationId,
   projectStartDate,
   projectEndDate,
 }) {
@@ -892,8 +1018,50 @@ function FixedPriceForm({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [schedulePreview, setSchedulePreview] = useState([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
   const fetchedRef = useRef(false);
   const isOneTime = isOneTimeFrequency(billingFrequency);
+
+  // Fetches backend-calculated schedule preview for Fixed Price via
+  // POST /api/billing-configurations/preview-schedule.
+  const loadSchedulePreview = async (overrideValues) => {
+    const current = overrideValues || value;
+    const freqId =
+      billingFrequencyId ||
+      billingFrequencyOption?.billingFrequencyId ||
+      billingFrequencyOption?.id;
+    const rawContractValue = current.totalContractValue ?? current.contractValue;
+    const contractValueNum = Number(rawContractValue);
+    const effFrom =
+      toDateOnly(current.effectiveFrom) || (isOneTime ? toDateOnly(projectStartDate) : "") || "";
+    const effTo =
+      toDateOnly(current.effectiveTo) || (isOneTime ? toDateOnly(projectEndDate) : "") || "";
+
+    if (!freqId || !contractValueNum || (!isOneTime && (!effFrom || !effTo))) {
+      return;
+    }
+
+    setLoadingSchedule(true);
+    setScheduleError("");
+    try {
+      const periods = await previewBillingSchedule({
+        billingType: "FIXED_PRICE",
+        billingFrequencyId: freqId,
+        effectiveFrom: effFrom,
+        effectiveTo: effTo,
+        contractValue: contractValueNum,
+      });
+      setSchedulePreview(periods);
+    } catch (error) {
+      const errorMsg = getApiErrorMessage(error, "Unable to generate billing schedule preview.");
+      setScheduleError(errorMsg);
+      setSchedulePreview([]);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
 
   // [6] billingConfigurationId received by FixedPriceForm.
   useEffect(() => {
@@ -931,21 +1099,27 @@ function FixedPriceForm({
       try {
         const record = await getFixedPriceByBillingConfiguration(billingConfigurationId);
         if (!mounted || !record) return;
-        update({
+        const loadedRecord = {
           fixedPriceConfigurationId: record.fixedPriceConfigurationId || record.id || null,
           totalContractValue:
             record.totalContractValue ?? record.contractValue ?? value.totalContractValue ?? "",
           contractValueSource: value.contractValueSource || "MANUAL",
           pmsProjectBudget: record.pmsProjectBudget ?? "",
-          retentionPercent: record.retentionPercent ?? record.retentionPercentage ?? "",
+          // retentionPercentage is the canonical backend field name — check it first.
+          retentionPercent: record.retentionPercentage ?? record.retentionPercent ?? "",
           advanceReceived: record.advanceReceived ?? "",
           effectiveFrom: record.effectiveFrom || "",
           effectiveTo: record.effectiveTo || "",
           remarks: record.remarks || "",
           retentionAmount: record.retentionAmount ?? "",
           billableAmount: record.billableAmount ?? "",
-          remainingAmount: record.remainingAmount ?? record.remainingReceivable ?? "",
-        });
+          // remainingReceivable is the canonical backend field name — check it first.
+          remainingAmount: record.remainingReceivable ?? record.remainingAmount ?? "",
+        };
+        update(loadedRecord);
+        if (loadedRecord.totalContractValue) {
+          loadSchedulePreview(loadedRecord);
+        }
       } catch (error) {
         showStatusToast(
           getApiErrorMessage(error, "Unable to load fixed price configuration."),
@@ -1018,7 +1192,10 @@ function FixedPriceForm({
     const apiContractValueSource = toApiContractValueSource(value.contractValueSource);
     const sharedFields = {
       contractValueSource: apiContractValueSource,
-      retentionPercent:
+      // Backend field is "retentionPercentage" (RetentionPercentDto) — "retentionPercent"
+      // is only the internal form/state field name, kept as-is to avoid churning every
+      // read/validation/calc site below that already references value.retentionPercent.
+      retentionPercentage:
         value.retentionPercent === "" || value.retentionPercent === null || value.retentionPercent === undefined
           ? null
           : Number(value.retentionPercent),
@@ -1060,10 +1237,6 @@ function FixedPriceForm({
       return;
     }
 
-    // This button only ever reads billingConfigurationId — it never creates the
-    // parent draft itself. The draft is created once, up front, when the wizard is
-    // first entered (see ensureBillingConfigurationId in NewConfigurationWizard), so
-    // by the time the user reaches this step the id is already in state.
     if (!billingConfigurationId) {
       showStatusToast(
         "Unable to save fixed price configuration: billing configuration id is missing. Please reload and try again.",
@@ -1074,6 +1247,17 @@ function FixedPriceForm({
 
     setSaving(true);
     try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected (it's auto-created as soon as Billing
+      // Type is known), so it can still be missing billingFrequencyId here.
+      // Re-sync the parent with the current selection first — the Fixed
+      // Price API requires billingFrequencyId to already be set on it.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
       const payload = buildFixedPricePayload();
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
@@ -1084,23 +1268,31 @@ function FixedPriceForm({
       // load effect (above) hasn't resolved yet — re-check the backend directly so a
       // record that already exists is updated, never re-created as a duplicate.
       let existingId = value.fixedPriceConfigurationId;
-      if (!existingId && billingConfigurationId) {
-        const existingRecord = await getFixedPriceByBillingConfiguration(billingConfigurationId);
+      if (!existingId && resolvedConfigId) {
+        const existingRecord = await getFixedPriceByBillingConfiguration(resolvedConfigId);
         existingId = existingRecord?.fixedPriceConfigurationId || existingRecord?.id || null;
       }
 
       const saved = existingId
         ? await updateFixedPriceConfiguration(existingId, payload)
-        : await createFixedPriceConfiguration(billingConfigurationId, payload);
+        : await createFixedPriceConfiguration(resolvedConfigId, payload);
 
       update({
         fixedPriceConfigurationId:
           saved?.fixedPriceConfigurationId || saved?.id || value.fixedPriceConfigurationId || null,
+        // Reconcile with the backend's canonical retentionPercentage so the field
+        // reflects exactly what was persisted (falls back to what was just typed
+        // if the response happens not to echo it back).
+        retentionPercent: saved?.retentionPercentage ?? saved?.retentionPercent ?? value.retentionPercent ?? "",
         retentionAmount: saved?.retentionAmount ?? value.retentionAmount ?? "",
         billableAmount: saved?.billableAmount ?? value.billableAmount ?? "",
-        remainingAmount: saved?.remainingAmount ?? value.remainingAmount ?? "",
+        // Backend field is "remainingReceivable", not "remainingAmount" — without this
+        // fallback the freshly-saved value was dropped and the summary kept showing
+        // the stale pre-save number (or blank on first create).
+        remainingAmount: saved?.remainingReceivable ?? saved?.remainingAmount ?? value.remainingAmount ?? "",
       });
       showStatusToast("Fixed price configuration saved", "success");
+      await loadSchedulePreview();
     } catch (error) {
       showStatusToast(
         getApiErrorMessage(error, "Unable to save fixed price configuration."),
@@ -1123,6 +1315,8 @@ function FixedPriceForm({
         effectiveTo: "",
         remarks: "",
       });
+      setSchedulePreview([]);
+      setScheduleError("");
       return;
     }
     setConfirmingDelete(true);
@@ -1152,6 +1346,8 @@ function FixedPriceForm({
         billableAmount: "",
         remainingAmount: "",
       });
+      setSchedulePreview([]);
+      setScheduleError("");
       showStatusToast("Rate deleted successfully.", "success");
       setConfirmingDelete(false);
     } catch (error) {
@@ -1169,6 +1365,23 @@ function FixedPriceForm({
       <h2 className={Fonts.heading4}>Fixed Price Billing Configuration</h2>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <EnterpriseBudgetSourceSelector
+          value={value.contractValueSource || (value.totalContractValue === projectBudget ? "PMS" : "MANUAL")}
+          onChange={(nextSource) => {
+            if (nextSource === "PMS") {
+              update({
+                contractValueSource: "PMS",
+                totalContractValue: projectBudget || "",
+                pmsProjectBudget: projectBudget || "",
+              });
+            } else {
+              update({ contractValueSource: "MANUAL" });
+            }
+          }}
+          projectBudget={projectBudget}
+          currency={currency}
+        />
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-2">
             <FormInput
@@ -1304,6 +1517,71 @@ function FixedPriceForm({
             )}
           </div>
         )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-slate-900">Billing Schedule (Preview)</h3>
+          <span className="text-xs text-slate-400">Generated by the system — not editable.</span>
+        </div>
+
+        {loadingSchedule ? (
+          <p className="text-sm text-slate-500">Loading billing schedule…</p>
+        ) : scheduleError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm text-red-600">
+            {scheduleError}
+          </p>
+        ) : schedulePreview.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500">
+            No billing schedule has been generated yet.
+          </p>
+        ) : (
+          <div className="max-h-96 w-full overflow-y-auto overflow-x-auto rounded-lg border border-slate-100">
+            <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Period</th>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">From</th>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">To</th>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Amount</th>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Partial Period</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {schedulePreview.map((period, index) => (
+                  <tr key={period.periodNumber ?? index}>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      Period {period.periodNumber ?? index + 1}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {formatDisplayDate(period.periodStartDate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {formatDisplayDate(period.periodEndDate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle font-medium text-slate-900">
+                      {period.billingAmount || period.billingAmount === 0
+                        ? formatCurrency(period.billingAmount, currency)
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {period.isPartialPeriod ? "Yes" : "No"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+          <span className="text-sm font-semibold text-slate-900">Total Contract Value</span>
+          <span className="text-sm font-semibold text-slate-900">
+            {value.totalContractValue || value.totalContractValue === 0
+              ? formatCurrency(value.totalContractValue, currency)
+              : "—"}
+          </span>
+        </div>
       </div>
 
       <ConfirmationModal
@@ -1546,8 +1824,10 @@ function RecurringBillingForm({
   onChange,
   currency,
   projectBudget,
+  billingFrequencyId,
   billingFrequencyOption,
   billingConfigurationId,
+  ensureBillingConfigurationId,
   projectStartDate,
   projectEndDate,
 }) {
@@ -1558,7 +1838,47 @@ function RecurringBillingForm({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [schedule, setSchedule] = useState([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
   const fetchedRef = useRef(false);
+
+  // Fetches backend-calculated schedule preview for Recurring via
+  // POST /api/billing-configurations/preview-schedule.
+  const loadSchedulePreview = async (overrideValues) => {
+    const current = overrideValues || value;
+    const freqId =
+      billingFrequencyId ||
+      billingFrequencyOption?.billingFrequencyId ||
+      billingFrequencyOption?.id;
+    const contractVal = Number(current.contractValue);
+    const effFrom =
+      toDateOnly(current.recurringStartDate || current.effectiveFrom) || "";
+    const effTo =
+      toDateOnly(current.recurringEndDate || current.effectiveTo) || "";
+
+    if (!freqId || !contractVal || !effFrom || !effTo) {
+      return;
+    }
+
+    setLoadingSchedule(true);
+    setScheduleError("");
+    try {
+      const periods = await previewBillingSchedule({
+        billingType: "RECURRING",
+        billingFrequencyId: freqId,
+        effectiveFrom: effFrom,
+        effectiveTo: effTo,
+        contractValue: contractVal,
+      });
+      setSchedule(periods);
+    } catch (error) {
+      const errorMsg = getApiErrorMessage(error, "Unable to generate billing schedule preview.");
+      setScheduleError(errorMsg);
+      showStatusToast(errorMsg, "error");
+      setSchedule([]);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
 
   const contractValueSource = value.contractValueSource || "";
   const isPmsSource = contractValueSource === "PMS_BUDGET";
@@ -1663,6 +1983,8 @@ function RecurringBillingForm({
     projectEndDate: projectEndDateOnly,
   });
 
+  const displaySchedule = schedule;
+
   // Fires only when the user actually picks a complete date (native <input
   // type="date"> onChange never fires while browsing calendar months, only
   // once a full date is selected) — so no error ever appears mid-navigation.
@@ -1742,6 +2064,17 @@ function RecurringBillingForm({
 
     setSaving(true);
     try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected (it's auto-created as soon as Billing
+      // Type is known), so it can still be missing billingFrequencyId here.
+      // Re-sync the parent with the current selection first — the Recurring
+      // API requires billingFrequencyId to already be set on it.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
       const payload = buildRecurringRequestPayload(value, billingFrequencyOption.billingFrequencyId);
 
       // value.recurringConfigurationId can still be unset here if the
@@ -1749,18 +2082,18 @@ function RecurringBillingForm({
       // backend directly so an existing record is updated, never duplicated.
       let existingId = value.recurringConfigurationId;
       if (!existingId) {
-        const existingRecord = await getBillingRecurringByBillingConfigurationId(billingConfigurationId);
+        const existingRecord = await getBillingRecurringByBillingConfigurationId(resolvedConfigId);
         existingId = existingRecord?.recurringConfigurationId || existingRecord?.subscriptionConfigurationId || existingRecord?.id || null;
       }
 
       const saved = existingId
         ? await updateBillingRecurring(existingId, payload)
-        : await createBillingRecurring(billingConfigurationId, payload);
+        : await createBillingRecurring(resolvedConfigId, payload);
       const savedId = saved?.recurringConfigurationId || saved?.subscriptionConfigurationId || saved?.id || existingId;
 
       update({ recurringConfigurationId: savedId || value.recurringConfigurationId || null });
       showStatusToast("Recurring configuration saved.", "success");
-      await loadSchedule(savedId, billingConfigurationId);
+      await loadSchedulePreview();
     } catch (error) {
       showStatusToast(
         getApiErrorMessage(error, "Unable to save recurring configuration."),
@@ -1775,6 +2108,7 @@ function RecurringBillingForm({
     if (!value.recurringConfigurationId) {
       onChange({});
       setSchedule([]);
+      setScheduleError("");
       return;
     }
     setConfirmingDelete(true);
@@ -1786,6 +2120,7 @@ function RecurringBillingForm({
       await deleteBillingRecurring(value.recurringConfigurationId);
       onChange({});
       setSchedule([]);
+      setScheduleError("");
       showStatusToast("Recurring configuration removed.", "success");
       setConfirmingDelete(false);
     } catch (error) {
@@ -1803,27 +2138,22 @@ function RecurringBillingForm({
       <h2 className={Fonts.heading4}>Recurring Billing Configuration</h2>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700">
-            Contract Value Source <span className="text-red-500">*</span>
-          </label>
-          <PillSelectGroup
-            name="contractValueSource"
-            options={CONTRACT_VALUE_SOURCE_OPTIONS}
-            value={contractValueSource}
-            onChange={(next) =>
-              update(
-                next === "PMS_BUDGET"
-                  ? {
-                      contractValueSource: next,
-                      contractValue: hasProjectBudget ? Number(projectBudget) : "",
-                      pmsProjectBudget: hasProjectBudget ? Number(projectBudget) : "",
-                    }
-                  : { contractValueSource: next },
-              )
+        <EnterpriseBudgetSourceSelector
+          value={contractValueSource}
+          onChange={(nextSource) => {
+            if (nextSource === "PMS" || nextSource === "PMS_BUDGET") {
+              update({
+                contractValueSource: "PMS_BUDGET",
+                contractValue: hasProjectBudget ? Number(projectBudget) : "",
+                pmsProjectBudget: hasProjectBudget ? Number(projectBudget) : "",
+              });
+            } else {
+              update({ contractValueSource: "MANUAL" });
             }
-          />
-        </div>
+          }}
+          projectBudget={projectBudget}
+          currency={currency}
+        />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
@@ -1836,58 +2166,82 @@ function RecurringBillingForm({
               }
               name="contractValue"
               type="number"
+              min="0"
               value={value.contractValue ?? ""}
-              onChange={(event) => update({ contractValue: event.target.value })}
-              placeholder={`e.g. 25000 (${currency})`}
-              disabled={isPmsSource}
+              onChange={(e) =>
+                update({
+                  contractValue: e.target.value,
+                  contractValueSource: "MANUAL",
+                })
+              }
+              placeholder={`e.g. 45678 (${currency})`}
               error={contractValueError}
             />
-            {isPmsSource && (
-              <p className="mt-1 text-xs text-slate-500">
-                Synced from the current project budget. Switch to Manual to enter a different value.
-              </p>
-            )}
           </div>
 
-          <ReadOnlyField label="Billing Frequency" value={billingFrequencyLabel || "—"} />
+          <div>
+            <FormInput
+              label="Billing Frequency"
+              name="recurringBillingFrequencyDisplay"
+              value={billingFrequencyLabel || "—"}
+              readOnly
+            />
+          </div>
 
-          <FormDatePicker
-            label="Billing Start Date *"
-            name="recurringStartDate"
-            value={value.recurringStartDate || ""}
-            onChange={(event) =>
-              handleDateFieldChange("recurringStartDate", "Billing Start Date", event.target.value)
-            }
-            min={projectStartDateOnly || undefined}
-            max={projectEndDateOnly || undefined}
-            error={dateErrors.recurringStartDate}
-          />
-          <FormDatePicker
-            label="Billing End Date *"
-            name="recurringEndDate"
-            value={value.recurringEndDate || ""}
-            onChange={(event) =>
-              handleDateFieldChange("recurringEndDate", "Billing End Date", event.target.value)
-            }
-            min={projectStartDateOnly || undefined}
-            max={projectEndDateOnly || undefined}
-            error={dateErrors.recurringEndDate}
-          />
+          <div>
+            <FormDatePicker
+              label="Billing Start Date"
+              requiredMark
+              name="recurringStartDate"
+              value={value.recurringStartDate || ""}
+              onChange={(e) =>
+                handleDateFieldChange(
+                  "recurringStartDate",
+                  "Billing Start Date",
+                  e.target.value,
+                )
+              }
+              min={projectStartDateOnly || undefined}
+              max={projectEndDateOnly || undefined}
+              error={dateErrors.recurringStartDate}
+            />
+          </div>
+
+          <div>
+            <FormDatePicker
+              label="Billing End Date"
+              requiredMark
+              name="recurringEndDate"
+              value={value.recurringEndDate || ""}
+              onChange={(e) =>
+                handleDateFieldChange(
+                  "recurringEndDate",
+                  "Billing End Date",
+                  e.target.value,
+                )
+              }
+              min={projectStartDateOnly || undefined}
+              max={projectEndDateOnly || undefined}
+              error={dateErrors.recurringEndDate}
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <FormTextArea
+              label="Remarks"
+              name="recurringRemarks"
+              value={value.remarks || ""}
+              onChange={(e) => update({ remarks: e.target.value })}
+              placeholder="Any additional notes about this recurring billing setup"
+              rows={3}
+            />
+          </div>
         </div>
-
-        <FormTextArea
-          label="Remarks"
-          name="recurringRemarks"
-          value={value.remarks || ""}
-          onChange={(event) => update({ remarks: event.target.value })}
-          placeholder="Any additional notes about this recurring arrangement"
-          rows={3}
-        />
 
         {loadingConfig ? (
           <p className="text-sm text-slate-500">Loading saved recurring configuration…</p>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="small"
@@ -1896,7 +2250,9 @@ function RecurringBillingForm({
               loadingText="Saving..."
             >
               <Check className="h-4 w-4" />
-              {value.recurringConfigurationId ? "Update Recurring Configuration" : "Save Recurring Configuration"}
+              {value.recurringConfigurationId
+                ? "Update Recurring Configuration"
+                : "Save Recurring Configuration"}
             </Button>
             {value.recurringConfigurationId && (
               <Button
@@ -1921,11 +2277,13 @@ function RecurringBillingForm({
 
         {loadingSchedule ? (
           <p className="text-sm text-slate-500">Loading billing schedule…</p>
-        ) : schedule.length === 0 ? (
+        ) : scheduleError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm text-red-600">
+            {scheduleError}
+          </p>
+        ) : displaySchedule.length === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500">
-            {value.recurringConfigurationId
-              ? "No billing schedule has been generated yet."
-              : "Save the recurring configuration to generate the billing schedule."}
+            No billing schedule has been generated yet.
           </p>
         ) : (
           <div className="max-h-96 w-full overflow-y-auto overflow-x-auto rounded-lg border border-slate-100">
@@ -1941,7 +2299,7 @@ function RecurringBillingForm({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {schedule.map((period, index) => (
+                {displaySchedule.map((period, index) => (
                   <tr key={period.periodNumber ?? index}>
                     <td className="px-3 py-2.5 text-center align-middle text-slate-700">
                       Period {period.periodNumber ?? index + 1}
@@ -2263,6 +2621,10 @@ export default function BillingConfigurationStep({
                   selectedFrequency?.billingFrequencyId ||
                   selectedFrequency?.id ||
                   "",
+                billingFrequencyName:
+                  selectedFrequency?.label ||
+                  selectedFrequency?.billingFrequencyName ||
+                  "",
               });
             }}
           />
@@ -2316,8 +2678,13 @@ export default function BillingConfigurationStep({
                 currency={currency}
                 projectBudget={projectInfo.projectBudget}
                 billingFrequency={billingFrequency}
+                billingFrequencyId={billingFrequencyId}
                 billingFrequencyLabel={frequencyLabel(billingFrequency)}
+                billingFrequencyOption={activeBillingFrequencyOptions.find(
+                  (option) => String(option.billingFrequencyId) === String(billingFrequencyId),
+                )}
                 billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}
                 projectEndDate={projectInfo.endDate}
               />
@@ -2338,10 +2705,12 @@ export default function BillingConfigurationStep({
                 onChange={(next) => updateSection("recurring", next)}
                 currency={currency}
                 projectBudget={projectInfo.projectBudget}
+                billingFrequencyId={billingFrequencyId}
                 billingFrequencyOption={activeBillingFrequencyOptions.find(
                   (option) => String(option.billingFrequencyId) === String(billingFrequencyId),
                 )}
                 billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}
                 projectEndDate={projectInfo.endDate}
               />

@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function ScoreRing({ value, size = 44, color = "#2563EB", label }) {
+export default function ScoreRing({ value, size = 44, color = "#2563EB", label, decimals = 1 }) {
   const r = (size - 6) / 2;
   const c = 2 * Math.PI * r;
 
@@ -20,7 +20,7 @@ export default function ScoreRing({ value, size = 44, color = "#2563EB", label }
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute text-[11px] font-bold text-slate-900">{Number(value).toFixed(1)}</span>
+      <span className="absolute text-[11px] font-bold text-slate-900">{Number(value).toFixed(decimals)}</span>
       {label && <span className="absolute -bottom-4 text-[9px] font-medium text-slate-400">{label}</span>}
     </div>
   );

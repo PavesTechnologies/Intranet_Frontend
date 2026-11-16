@@ -24,8 +24,8 @@ export default function CandidateHeader({ profile, onBack, onAdded }) {
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 mb-4">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-        <div className="flex items-center gap-4 flex-1 min-w-0">
+      <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4 flex-1 min-w-0">
           <button
             onClick={onBack}
             className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
@@ -35,7 +35,7 @@ export default function CandidateHeader({ profile, onBack, onAdded }) {
           <div className="w-[54px] h-[54px] rounded-full flex items-center justify-center text-lg font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">
             {initialsOf(candidate.full_name)}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-[15px] font-bold text-slate-900">{candidate.full_name || "Unknown Candidate"}</span>
               <Badge
@@ -56,6 +56,13 @@ export default function CandidateHeader({ profile, onBack, onAdded }) {
               >
                 {consent.consent_given ? "Consent Given" : "Consent Missing"}
               </Badge>
+
+              <ActionButtons
+                candidateId={candidate.candidate_id}
+                candidateName={candidate.full_name}
+                resumeId={resume.resume_id}
+                onAdded={onAdded}
+              />
             </div>
             <div className="text-[12.5px] text-slate-500 font-medium mb-1">{candidate.designation || "—"}</div>
             <div className="text-[12px] flex items-center gap-3 flex-wrap text-slate-400">
@@ -89,15 +96,6 @@ export default function CandidateHeader({ profile, onBack, onAdded }) {
               )}
             </div>
           </div>
-        </div>
-
-        <div className="flex flex-col items-start lg:items-end gap-3 shrink-0">
-          <ActionButtons
-            candidateId={candidate.candidate_id}
-            candidateName={candidate.full_name}
-            resumeId={resume.resume_id}
-            onAdded={onAdded}
-          />
         </div>
       </div>
     </div>

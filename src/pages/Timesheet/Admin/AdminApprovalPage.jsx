@@ -13,8 +13,12 @@ import { toast } from "react-toastify";
 import { CheckCircle, XCircle } from "lucide-react";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import useMonthScope from "../components/useMonthScope";
 
-const AdminApprovalPage = () => {
+// `monthScope` / `onLoadingChange` are supplied by TSAdminPannel, which renders this
+// view's month control in its own toolbar (left of Reviewed Logs). The local hook is
+// the fallback for any other mounting context.
+const AdminApprovalPage = ({ monthScope, onLoadingChange }) => {
   const navigate = useNavigate();
   const [groupedTimesheets, setGroupedTimesheets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +36,14 @@ const AdminApprovalPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
 
+  // `loading` gates the full-page spinner and so is only for the first paint;
+  // `reloading` covers month switches, which must not unmount the dropdown.
+  const [reloading, setReloading] = useState(false);
+
+  // Month scope — current or previous month. Not cleared by the Reset button.
+  const ownMonthScope = useMonthScope();
+  const { month, year, label: monthLabel, monthKey } = monthScope ?? ownMonthScope;
+
   const entriesTableRef = useRef(null);
 
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -42,19 +54,23 @@ const AdminApprovalPage = () => {
 
   // ✅ Fetch Timesheets
   const fetchGroupedTimesheets = async () => {
+    setReloading(true);
     try {
       const response = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/internal/summary`,
+        { params: { month, year } },
       );
 
-      const data = response.data;
-      setGroupedTimesheets(data);
-      setFilteredTimesheets(data);
-      setLoading(false);
+      setGroupedTimesheets(
+        Array.isArray(response.data) ? response.data : [],
+      );
     } catch (error) {
       console.error("Error fetching timesheets:", error);
+      setGroupedTimesheets([]);
+    } finally {
       setLoading(false);
+      setReloading(false);
     }
   };
   // const fetchDashboardData = async () => {
@@ -99,12 +115,18 @@ const AdminApprovalPage = () => {
     fetchEmailUsers();
   }, []);
 
+  // Re-fetches whenever the month scope changes (and on mount).
   useEffect(() => {
-    const loadInitialData = async () => {
-      await Promise.all([fetchGroupedTimesheets()]); //, fetchDashboardData()]);
-    };
-    loadInitialData();
-  }, []);
+    fetchGroupedTimesheets();
+  }, [monthKey]);
+
+  // Lets TSAdminPannel disable the month control while a refetch is in flight.
+  useEffect(() => {
+    onLoadingChange?.(reloading);
+  }, [reloading, onLoadingChange]);
+
+  // Switching views mid-request would otherwise leave the panel's flag stuck on.
+  useEffect(() => () => onLoadingChange?.(false), [onLoadingChange]);
 
   // ✅ Apply filters for deeply nested structureimport { useMemo } from "react";
 
@@ -232,6 +254,8 @@ const AdminApprovalPage = () => {
 
   // ✅ Add this function inside ManagerApprovalPage component, before return()
   const handleTableRefresh = async () => {
+    // Month-aware without any argument: fetchGroupedTimesheets is re-created each
+    // render, so it closes over the currently selected month/year.
     fetchGroupedTimesheets(); // refresh approval table
     //fetchDashboardData(); // refresh dashboard summary
   };
@@ -413,11 +437,16 @@ const AdminApprovalPage = () => {
 
       {/* ✅ Timesheet Table */}
       <AdminApprovalTable
-        loading={loading}
+        loading={loading || reloading}
         groupedData={filteredTimesheets}
         statusFilter={statusFilter}
         ref={entriesTableRef}
         onRefresh={handleTableRefresh}
+        emptyMessage={
+          groupedTimesheets.length === 0
+            ? `No timesheets were submitted for ${monthLabel}.`
+            : `Every timesheet for ${monthLabel} has already been approved.`
+        }
       />
     </div>
   );

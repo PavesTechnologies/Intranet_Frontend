@@ -7,7 +7,7 @@ export const MY_HISTORY_KEY = (outcome, page, size) => ["approvalMyHistory", out
 export const APPROVAL_STATUS_KEY = (reportId) => ["approvalStatus", reportId];
 export const LINE_ITEM_REVIEWS_KEY = (reportId) => ["approvalLineItemReviews", reportId];
 
-const unwrap = (res) => res.data?.data;
+const unwrap = (res) => (res?.data?.data !== undefined ? res.data.data : res?.data);
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -96,6 +96,17 @@ export const useReviewLineItem = () => {
     // Refresh on failure too, not just success: a rejection here (e.g. the level has already moved
     // on to Finance Verification since this queue was last fetched) means the row shown was already
     // stale - re-fetching immediately clears it instead of leaving it sitting there to be retried.
+    onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
+  });
+};
+
+export const useReviewSplit = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, splitId, decision, comment }) =>
+      approvalWorkflowApi.reviewSplit(reportId, splitId, decision, comment).then(unwrap),
+    // Same rationale as useReviewLineItem: refresh on failure too, since a rejection here usually
+    // means the row shown was already stale (level moved on since the queue was last fetched).
     onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
   });
 };

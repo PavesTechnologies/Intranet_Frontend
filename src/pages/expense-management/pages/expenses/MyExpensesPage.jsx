@@ -15,8 +15,13 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
-import { expenseReportService, lookupService } from "@/pages/expense-management/api/expenseReportsApi";
-import ReportFormFields from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import {
+  expenseReportService,
+  lookupService,
+  REPORT_EDITABLE_STATUSES,
+  REPORT_DELETABLE_STATUSES,
+} from "@/pages/expense-management/api/expenseReportsApi";
+import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -46,7 +51,9 @@ const emptyReportForm = {
 export default function MyExpensesPage() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
-  const canManage = hasRole(["General", "Manager"]);
+  // Manager is read-only on the backend for report writes (ExpenseReportController
+  // allows only ADMIN/GENERAL to create/update/delete/submit) — don't show write actions.
+  const canManage = hasRole(["General"]);
 
   const [reports, setReports] = useState([]);
   const [isServerPaginated, setIsServerPaginated] = useState(false);
@@ -62,6 +69,7 @@ export default function MyExpensesPage() {
   const [currencies, setCurrencies] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState("create"); // "create" or "edit"
   const [currentReport, setCurrentReport] = useState(null);
   const [formData, setFormData] = useState(emptyReportForm);
   const [formErrors, setFormErrors] = useState({});
@@ -93,6 +101,9 @@ export default function MyExpensesPage() {
         limit: ITEMS_PER_PAGE,
         search: searchTerm || undefined,
         status: statusFilter || undefined,
+        sort: "createdAt,desc",
+        sortBy: "createdAt",
+        sortDirection: "desc",
       };
       const res = await expenseReportService.getAll(params);
 
@@ -101,11 +112,21 @@ export default function MyExpensesPage() {
       if (payload && typeof payload === "object" && !Array.isArray(payload)) {
         const items = payload.reports || payload.expenseReports || payload.content || payload.data || [];
         const total = payload.total !== undefined ? payload.total : payload.totalElements ?? items.length ?? 0;
-        setReports(items);
+        const sortedItems = [...items].sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        setReports(sortedItems);
         setTotalItems(total);
         setIsServerPaginated(true);
       } else if (Array.isArray(payload)) {
-        setReports(payload);
+        const sortedItems = [...payload].sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        setReports(sortedItems);
         setIsServerPaginated(false);
       } else {
         setReports([]);
@@ -192,11 +213,22 @@ export default function MyExpensesPage() {
     }
     if (!formData.costCenterId) errors.costCenterId = "Cost center is required.";
     if (!formData.currencyId) errors.currencyId = "Report currency is required.";
+    const businessPurposeError = validateBusinessPurpose(formData.businessPurpose);
+    if (businessPurposeError) errors.businessPurpose = businessPurposeError;
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
+  const handleCreateClick = () => {
+    setDrawerMode("create");
+    setCurrentReport(null);
+    setFormData(emptyReportForm);
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
+
   const handleEditClick = (report) => {
+    setDrawerMode("edit");
     setCurrentReport(report);
     setFormData({
       title: report.title || "",
@@ -221,13 +253,25 @@ export default function MyExpensesPage() {
 
     try {
       setSubmitting(true);
-      await expenseReportService.update(currentReport.reportId, payload);
-      showStatusToast("Expense report updated successfully!", "success");
-      setIsModalOpen(false);
-      fetchReports();
+      if (drawerMode === "create") {
+        const res = await expenseReportService.create(payload);
+        showStatusToast("Expense report details saved successfully!", "success");
+        setIsModalOpen(false);
+        const newReportId = res.data?.data?.reportId || res.data?.reportId || res.data?.data?.id || res.data?.id;
+        if (newReportId) {
+          navigate(`/expense-management/expenses/reports/${newReportId}`);
+        } else {
+          showStatusToast("Failed to retrieve report ID.", "error");
+        }
+      } else {
+        await expenseReportService.update(currentReport.reportId, payload);
+        showStatusToast("Expense report updated successfully!", "success");
+        setIsModalOpen(false);
+        fetchReports();
+      }
     } catch (err) {
-      console.error("Error updating expense report:", err);
-      const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to update expense report.";
+      console.error(`Error ${drawerMode === "create" ? "creating" : "updating"} expense report:`, err);
+      const errMsg = err.response?.data?.message || err.response?.data?.detail || `Failed to ${drawerMode === "create" ? "create" : "update"} expense report.`;
       showStatusToast(errMsg, "error");
     } finally {
       setSubmitting(false);
@@ -296,35 +340,35 @@ export default function MyExpensesPage() {
         >
           <Eye size={14} />
         </Button>
-        {canManage && (
-          <>
-            <Button
-              type="button"
-              variant="link"
-              size="icon"
-              title="Edit Report"
-              className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditClick(r);
-              }}
-            >
-              <Pencil size={14} />
-            </Button>
-            <Button
-              type="button"
-              variant="link"
-              size="icon"
-              title="Delete Report"
-              className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteClick(r);
-              }}
-            >
-              <Trash2 size={14} />
-            </Button>
-          </>
+        {canManage && REPORT_EDITABLE_STATUSES.includes(r.reportStatus) && (
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
+            title="Edit Report"
+            className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditClick(r);
+            }}
+          >
+            <Pencil size={14} />
+          </Button>
+        )}
+        {canManage && REPORT_DELETABLE_STATUSES.includes(r.reportStatus) && (
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
+            title="Delete Report"
+            className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteClick(r);
+            }}
+          >
+            <Trash2 size={14} />
+          </Button>
         )}
       </div>
     ),
@@ -333,9 +377,16 @@ export default function MyExpensesPage() {
   const statusFilterOptions = [
     { label: "All Statuses", value: "" },
     { label: "Draft", value: "DRAFT" },
-    { label: "Submitted", value: "SUBMITTED" },
+    { label: "Pending Approval", value: "PENDING_APPROVAL" },
+    { label: "Pending Finance Verification", value: "PENDING_FINANCE_VERIFICATION" },
+    { label: "Awaiting Correction", value: "AWAITING_CORRECTION" },
+    { label: "Query Raised", value: "QUERY_RAISED" },
     { label: "Approved", value: "APPROVED" },
     { label: "Rejected", value: "REJECTED" },
+    { label: "Cancelled", value: "CANCELLED" },
+    { label: "Policy Rejected", value: "POLICY_REJECTED" },
+    { label: "Reimbursed", value: "REIMBURSED" },
+    { label: "Closed", value: "CLOSED" },
   ];
 
   return (
@@ -350,7 +401,7 @@ export default function MyExpensesPage() {
 
         {canManage && (
           <Button
-            onClick={() => navigate("/expense-management/expenses/create")}
+            onClick={handleCreateClick}
             variant="primary"
             size="small"
             className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
@@ -477,8 +528,14 @@ export default function MyExpensesPage() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
               <div>
-                <h2 className="text-base font-bold text-gray-900">Edit Expense Report</h2>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">Modify the selected expense report's properties.</p>
+                <h2 className="text-base font-bold text-gray-900">
+                  {drawerMode === "create" ? "Create Expense Report" : "Edit Expense Report"}
+                </h2>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">
+                  {drawerMode === "create"
+                    ? "Start a new expense report, then add individual line items with receipts."
+                    : "Modify the selected expense report's properties."}
+                </p>
               </div>
               <button
                 type="button"
@@ -510,7 +567,7 @@ export default function MyExpensesPage() {
                 Cancel
               </Button>
               <Button type="submit" form="report-edit-form" variant="primary" loading={submitting} loadingText="Saving..." disabled={submitting} className="w-full sm:w-auto">
-                Save Changes
+                {drawerMode === "create" ? "Create Expense Report" : "Save Changes"}
               </Button>
             </div>
           </div>

@@ -9,6 +9,19 @@ const authHeaders = () => ({
 
 // ── stage moves ──────────────────────────────────────────
 
+// The moves that are actually legal from this candidate's current stage, as
+// the state machine sees it — the Move dialog is populated from this rather
+// than from a hardcoded stage list, so the user is never offered a transition
+// the server will refuse. Each entry carries its own `requires_reason` and a
+// `notes` line explaining what the move does.
+export const getAllowedTransitions = async (campaignId, campaignCandidateId) => {
+  const response = await api.get(
+    `${ROOT}/campaigns/${campaignId}/candidates/${campaignCandidateId}/allowed-transitions`,
+    { headers: authHeaders() },
+  );
+  return response.data?.data || null;
+};
+
 // One candidate. Reason is mandatory server-side (min 10 chars).
 export const moveCandidateStage = async (campaignId, campaignCandidateId, targetStage, reason) => {
   const response = await api.post(
@@ -123,4 +136,17 @@ export const applyHrOverride = async (campaignCandidateId, overrideReason) => {
     { headers: authHeaders() },
   );
   return response.data?.data || null;
+};
+
+// ── delete campaign candidate ────────────────────────
+
+// Also under /campaign-candidates, keyed by campaign_candidate_id — not
+// /candidates/{candidate_id}, which deletes the candidate globally rather
+// than just this campaign's row for them.
+export const deleteCampaignCandidate = async (campaignCandidateId) => {
+  const response = await api.delete(
+    `${BASE_URL}/campaign-candidates/${campaignCandidateId}`,
+    { headers: authHeaders() },
+  );
+  return response.data;
 };

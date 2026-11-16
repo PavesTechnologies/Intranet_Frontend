@@ -3,12 +3,16 @@ import { paymentService } from "../services/paymentService";
 import { PAYMENT_DETAIL_KEY } from "./usePaymentDetail";
 import { INVOICE_DETAIL_KEY } from "../../invoice/hooks/useInvoiceDetail";
 import { INVOICE_SUMMARY_KEY } from "../../invoice/hooks/useInvoiceSummary";
+import { INVOICE_HISTORY_KEY } from "../../invoice/hooks/useInvoiceHistory";
 
 function invalidatePaymentsAndInvoices(queryClient, invoiceIds = []) {
   queryClient.invalidateQueries({ queryKey: ["accountsPayable", "payments"] });
   queryClient.invalidateQueries({ queryKey: ["accountsPayable", "invoices"] });
   queryClient.invalidateQueries({ queryKey: INVOICE_SUMMARY_KEY });
-  invoiceIds.forEach((id) => queryClient.invalidateQueries({ queryKey: INVOICE_DETAIL_KEY(id) }));
+  invoiceIds.forEach((id) => {
+    queryClient.invalidateQueries({ queryKey: INVOICE_DETAIL_KEY(id) });
+    queryClient.invalidateQueries({ queryKey: INVOICE_HISTORY_KEY(id) });
+  });
 }
 
 /** @param {Object} payload - PaymentCreateRequest */
@@ -32,5 +36,14 @@ export function useUpdatePaymentStatusMutation() {
       queryClient.invalidateQueries({ queryKey: ["accountsPayable", "payments"] });
       queryClient.invalidateQueries({ queryKey: PAYMENT_DETAIL_KEY(variables.paymentId) });
     },
+  });
+}
+
+/** @param {string|number} invoiceId */
+export function useMarkReadyForPaymentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (invoiceId) => paymentService.markInvoiceReadyForPayment(invoiceId),
+    onSuccess: (_, invoiceId) => invalidatePaymentsAndInvoices(queryClient, [invoiceId]),
   });
 }

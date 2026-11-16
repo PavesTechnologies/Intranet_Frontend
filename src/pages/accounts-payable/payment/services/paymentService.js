@@ -47,6 +47,18 @@ export const paymentService = {
     const response = await api.patch(`${AP_BASE_URL}/payment/${Number(paymentId)}/status`, payload);
     return response.data;
   },
+
+  /**
+   * APPROVED -> READY_FOR_PAYMENT — the explicit Finance action that gates whether an invoice
+   * can receive a payment at all (PaymentService._INVOICE_PAYABLE_STATUSES on the backend). Not
+   * automatic on approval — see invoiceStatus.js.
+   * @param {string|number} invoiceId
+   * @returns {Promise<{invoice_id: number, status_code: string, message: string}>}
+   */
+  async markInvoiceReadyForPayment(invoiceId) {
+    const response = await api.post(`${AP_BASE_URL}/payment/invoice/${Number(invoiceId)}/ready-for-payment`);
+    return response.data;
+  },
 };
 
 export default paymentService;

@@ -16,13 +16,13 @@ export const TYPE_CONFIG = {
     border:"border-emerald-200",
     dot:   "bg-emerald-500",
   },
-  // BUG: {
-  //   label: "Bug",
-  //   color: "text-red-700",
-  //   bg:    "bg-red-50",
-  //   border:"border-red-200",
-  //   dot:   "bg-red-500",
-  // },
+  BUG: {
+    label: "Bug",
+    color: "text-red-700",
+    bg:    "bg-red-50",
+    border:"border-red-200",
+    dot:   "bg-red-500",
+  },
   TEST_RUN: {
     label: "Run",
     color: "text-violet-700",
@@ -104,48 +104,66 @@ export const isStale = (item) => {
 };
 
 // ── Client-side filtering ─────────────────────────────────────────────────────
+// Applies to both `data.projects` (assignee-scoped items, pre-grouped by
+// project) and `data.project_MANAGERItems` (a flat list — every item in a
+// project this user manages, regardless of assignee) so the chip/project/
+// type/priority filters behave the same in both "As Member" and "As Project
+// Manager" view.
 export const applyFilters = (data, { selectedProjects, selectedTypes, selectedPriorities, activeChip }) => {
-  if (!data?.projects) return data;
+  if (!data) return data;
 
-  let filteredProjects = data.projects;
+  const chipUrgencyMap = {
+    overdue:     "OVERDUE",
+    dueToday:    "DUE_TODAY",
+    dueThisWeek: "DUE_THIS_WEEK",
+    blocked:     "BLOCKED",
+  };
+  const urgency = activeChip ? chipUrgencyMap[activeChip] : null;
 
-  // Chip filter — flatten across all projects
-  if (activeChip) {
-    const chipUrgencyMap = {
-      overdue:     "OVERDUE",
-      dueToday:    "DUE_TODAY",
-      dueThisWeek: "DUE_THIS_WEEK",
-      blocked:     "BLOCKED",
-    };
-    const urgency = chipUrgencyMap[activeChip];
-    filteredProjects = filteredProjects.map((group) => ({
-      ...group,
-      items: group.items.filter((item) =>
-        urgency === "BLOCKED"
-          ? (item.statusName || "").toLowerCase().includes("block")
-          : item.urgency === urgency
-      ),
-    })).filter((group) => group.items.length > 0);
-  }
+  const itemMatches = (item) => {
+    if (urgency) {
+      const ok = urgency === "BLOCKED"
+        ? (item.statusName || "").toLowerCase().includes("block")
+        : item.urgency === urgency;
+      if (!ok) return false;
+    }
+    if (selectedProjects.length > 0 && !selectedProjects.includes(item.projectId)) return false;
+    if (selectedTypes.length > 0 && !selectedTypes.includes(item.type)) return false;
+    if (selectedPriorities.length > 0 && !selectedPriorities.includes(item.priority)) return false;
+    return true;
+  };
 
-  // Project filter
-  if (selectedProjects.length > 0) {
-    filteredProjects = filteredProjects.filter((g) =>
-      selectedProjects.includes(g.projectId)
-    );
-  }
+  const filteredProjects = (data.projects || [])
+    .map((group) => ({ ...group, items: group.items.filter(itemMatches) }))
+    .filter((group) => group.items.length > 0);
 
-  // Type + Priority filters (applied per item)
-  if (selectedTypes.length > 0 || selectedPriorities.length > 0) {
-    filteredProjects = filteredProjects.map((group) => ({
-      ...group,
-      items: group.items.filter((item) => {
-        const typeOk     = selectedTypes.length === 0 || selectedTypes.includes(item.type);
-        const priorityOk = selectedPriorities.length === 0 || selectedPriorities.includes(item.priority);
-        return typeOk && priorityOk;
-      }),
-    })).filter((group) => group.items.length > 0);
-  }
+  const filteredManagerItems = (data.project_MANAGERItems || []).filter(itemMatches);
 
-  return { ...data, projects: filteredProjects };
+  return { ...data, projects: filteredProjects, project_MANAGERItems: filteredManagerItems };
+};
+
+// ── Group the flat manager-scoped item list by project ────────────────────────
+// `data.project_MANAGERItems` isn't pre-grouped like `data.projects` is, so
+// build the same { projectId, projectName, urgencyFlag, overdueCount,
+// dueTodayCount, items } shape ProjectGroup expects.
+export const groupManagerItems = (items) => {
+  const byProject = new Map();
+  (items || []).forEach((item) => {
+    const key = item.projectId;
+    if (!byProject.has(key)) {
+      byProject.set(key, {
+        projectId:   item.projectId,
+        projectName: item.projectName,
+        items:       [],
+      });
+    }
+    byProject.get(key).items.push(item);
+  });
+
+  return Array.from(byProject.values()).map((group) => {
+    const overdueCount  = group.items.filter((i) => i.urgency === "OVERDUE").length;
+    const dueTodayCount = group.items.filter((i) => i.urgency === "DUE_TODAY").length;
+    const urgencyFlag   = overdueCount > 0 ? "OVERDUE" : dueTodayCount > 0 ? "DUE_TODAY" : "NONE";
+    return { ...group, urgencyFlag, overdueCount, dueTodayCount };
+  });
 };

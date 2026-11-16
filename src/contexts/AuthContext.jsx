@@ -12,6 +12,10 @@ import { showStatusToast } from "../components/toastfy/toast";
 import axios from "axios";
 import { useWebSocket } from "../pages/leave_management/websockets/WebSocketProvider";
 import { useApprovalWebSocket } from "../pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
+import {
+  setSessionExpiredHandler,
+  resetSessionExpiry,
+} from "../api/sessionExpiry";
 
 const AuthContext = createContext(undefined);
 
@@ -56,6 +60,9 @@ export const AuthProvider = ({ children }) => {
     // store access token — axiosInstance reads this key
     localStorage.setItem("token", token);
 
+    // a new session re-arms the expiry bridge
+    resetSessionExpiry();
+
     loadUser(token);
     updateApprovalToken?.(token);
   };
@@ -64,8 +71,12 @@ export const AuthProvider = ({ children }) => {
     if (isLoggingOut.current) return;
     isLoggingOut.current = true;
 
+    // Captured before any clearing: the websocket path can remove the token
+    // first, which would otherwise silently skip the blacklist call below.
+    const tokenAtLogout = localStorage.getItem("token");
+
 // blacklist both tokens on backend
-    if (localStorage.getItem("token")) {
+    if (tokenAtLogout) {
 
       axios.post(
       `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
@@ -73,7 +84,7 @@ export const AuthProvider = ({ children }) => {
       {
         withCredentials: true,
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${tokenAtLogout}`,
         },
       },
     )
@@ -88,7 +99,7 @@ export const AuthProvider = ({ children }) => {
     // localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
     localStorage.removeItem("lastPath");
-    updateToken(null);
+    updateToken?.(null);
     updateApprovalToken?.(null);
 
     if (localStorage.getItem("isfirsttlogin")) {
@@ -107,6 +118,28 @@ export const AuthProvider = ({ children }) => {
       isLoggingOut.current = false;
     }, 2000);
   };
+
+  // `logout` is recreated every render and closes over navigate / updateToken /
+  // updateApprovalToken, so the handler registered once on mount reads it
+  // through a ref to always invoke the current closure.
+  const logoutRef = useRef(logout);
+  logoutRef.current = logout;
+
+  // The axios interceptor is a plain module with no access to React state.
+  // This is its only channel in: when a session can no longer be renewed it
+  // calls the handler registered here.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      // Nothing left to tear down — a late in-flight rejection landing after
+      // logout, or a 401 while already sitting on the login page.
+      if (!localStorage.getItem("token")) return;
+
+      showStatusToast("Session expired. Please login again.", "warning");
+      logoutRef.current(true);
+    });
+
+    return () => setSessionExpiredHandler(null);
+  }, []);
 
   // ✅ single useEffect on mount — restore session from localStorage
   // also sets expiry timer (interceptor handles actual refresh)
@@ -156,9 +189,46 @@ export const AuthProvider = ({ children }) => {
     return allowedRoles.some((role) => userRoles.includes(role.toUpperCase()));
   };
 
+  // Permissions are a separate JWT claim from roles — UMS is the source of truth for which
+  // permissions a role maps to, so the frontend never encodes that mapping itself; it only
+  // reads whatever flat permission-code array (e.g. "PR_VIEW", "PR_APPROVE") the token carries.
+  const getUserPermissions = () => {
+    if (!user) return [];
+    const permissions = user.permissions || [];
+    if (!Array.isArray(permissions)) return [];
+    return permissions.map((p) => String(p).toUpperCase());
+  };
+
+  const hasPermission = (permission) => {
+    if (!permission) return true;
+    return getUserPermissions().includes(String(permission).toUpperCase());
+  };
+
+  const hasAnyPermission = (permissions = []) => {
+    if (!permissions || permissions.length === 0) return true;
+    const userPermissions = getUserPermissions();
+    return permissions.some((p) => userPermissions.includes(String(p).toUpperCase()));
+  };
+
+  const hasAllPermissions = (permissions = []) => {
+    if (!permissions || permissions.length === 0) return true;
+    const userPermissions = getUserPermissions();
+    return permissions.every((p) => userPermissions.includes(String(p).toUpperCase()));
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, login, logout, isfirsttlogin, hasRole }}
+      value={{
+        user,
+        isAuthenticated,
+        login,
+        logout,
+        isfirsttlogin,
+        hasRole,
+        hasPermission,
+        hasAnyPermission,
+        hasAllPermissions,
+      }}
     >
       {children}
     </AuthContext.Provider>

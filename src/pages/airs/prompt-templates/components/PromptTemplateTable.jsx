@@ -1,33 +1,14 @@
 import React from "react";
-import { Eye, PencilIcon, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Eye, PencilIcon, Trash2 } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import EmptyState from "./EmptyState";
 import { renderStatusPill, getTaskTypeLabel, formatDateTime } from "../utils/promptTemplateUtils.jsx";
-import { SORTABLE_FIELDS } from "../constants/promptTemplateConstants";
-
-function SortableHeader({ label, field, sortBy, sortOrder, onSort }) {
-  const isActive = sortBy === field;
-  const Icon = isActive ? (sortOrder === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
-  return (
-    <button
-      type="button"
-      onClick={() => onSort(field)}
-      className={`flex items-center gap-1 font-semibold ${isActive ? "text-white" : "text-white/80"} hover:text-white transition`}
-    >
-      {label}
-      <Icon className="h-3.5 w-3.5" />
-    </button>
-  );
-}
 
 export default function PromptTemplateTable({
   promptTemplates,
   isLoading,
-  sortBy,
-  sortOrder,
-  onSort,
   onView,
   onEdit,
   onDelete,
@@ -42,15 +23,7 @@ export default function PromptTemplateTable({
 
   if (promptTemplates.length === 0) return <EmptyState />;
 
-  const headers = [
-    "Prompt Name",
-    <SortableHeader label="Task Type" field={SORTABLE_FIELDS.TASK_TYPE} sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />,
-    "Status",
-    <SortableHeader label="Last Updated" field={SORTABLE_FIELDS.UPDATED_AT} sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />,
-    "Updated By",
-    <SortableHeader label="Created At" field={SORTABLE_FIELDS.CREATED_AT} sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />,
-    "Actions",
-  ];
+  const headers = ["Prompt Name", "Task Type", "Status", "Last Updated", "Updated By", "Created At", "Actions"];
 
   const columns = ["name", "taskType", "status", "updatedAt", "updatedBy", "createdAt", "actions"];
 

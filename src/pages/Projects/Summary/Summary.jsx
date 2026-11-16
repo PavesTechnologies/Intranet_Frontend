@@ -23,16 +23,42 @@ const PriorityDistribution = lazy(
 );
 const EpicProgress = lazy(() => import("../../../components/Summary/widgets/EpicProgress"));
 
+// Summary unmounts whenever the user switches project tabs (Summary/Backlog/
+// Board), so without a cache every return trip re-ran all 5 fetches (project
+// stage, epics, stories, tasks, statuses, members) from scratch, flashing
+// every skeleton before anything appeared. This module-level, per-project
+// cache lets a revisit render the last known snapshot instantly while a
+// background refetch keeps it current — stale-while-revalidate, scoped to
+// the browser session.
+const summaryCache = new Map();
+const SUMMARY_CACHE_TTL_MS = 60_000;
+const getCachedSummarySnapshot = (projectId) => summaryCache.get(projectId) || null;
+const saveSummaryCache = (projectId, data) => {
+  if (!projectId) return;
+  summaryCache.set(projectId, { data, timestamp: Date.now() });
+};
+
+// Called by Board/Backlog/IssueTracker after a task/story/bug mutation so the
+// Summary tab doesn't show a stale snapshot for up to SUMMARY_CACHE_TTL_MS
+// when the user switches over right after editing elsewhere.
+export const invalidateSummaryCache = (projectId) => {
+  if (projectId) summaryCache.delete(projectId);
+};
+
+const EMPTY_PROJECT_DATA = {
+  epics: null,
+  stories: null,
+  tasks: null,
+  // bugs: null,
+  statuses: null,
+  users: null,
+  stage: null,
+};
+
 const Summary = ({ projectId, projectName }) => {
-  const [projectData, setProjectData] = useState({
-    epics: null,
-    stories: null,
-    tasks: null,
-    // bugs: null,
-    statuses: null,
-    users: null,
-    stage: null,
-  });
+  const [projectData, setProjectData] = useState(
+    () => getCachedSummarySnapshot(projectId)?.data || EMPTY_PROJECT_DATA,
+  );
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -43,7 +69,17 @@ const Summary = ({ projectId, projectName }) => {
   }, []);
 
   useEffect(() => {
+    if (!projectId) return;
+    const cached = getCachedSummarySnapshot(projectId);
+    if (cached) setProjectData(cached.data);
+  }, [projectId]);
+
+  useEffect(() => {
     if (!projectId || !token) return;
+    const cached = getCachedSummarySnapshot(projectId);
+    const isFresh = cached && Date.now() - cached.timestamp < SUMMARY_CACHE_TTL_MS;
+    if (isFresh) return;
+
     const base = window.__APP_CONFIG__.PMS_BASE_URL;
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -85,7 +121,11 @@ const Summary = ({ projectId, projectName }) => {
           Object.assign(merged, result.value);
         }
       });
-      setProjectData((prev) => ({ ...prev, ...merged }));
+      setProjectData((prev) => {
+        const next = { ...prev, ...merged };
+        saveSummaryCache(projectId, next);
+        return next;
+      });
     });
   }, [projectId, token]);
 
@@ -104,14 +144,17 @@ const Summary = ({ projectId, projectName }) => {
 
     return [
       ...(projectData.tasks || []).map(t => ({
+        ...t,
         status: { name: t.statusName || "UNKNOWN" }
       })),
 
       ...(projectData.stories || []).map(s => ({
+        ...s,
         status: { name: s.statusName || "UNKNOWN" }
       })),
 
       // ...(projectData.bugs || []).map(b => ({
+      //   ...b,
       //   status: { name: b.status || "UNKNOWN" }
       // })),
     ];

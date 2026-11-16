@@ -46,6 +46,10 @@ export const PARSE_STATUS_BADGE_TONE = {
   PARSING: "bg-amber-50 text-amber-700 border-amber-200",
   PARSED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   FAILED: "bg-rose-50 text-rose-700 border-rose-200",
+  // A failure that still has attempts left in its retry budget — distinct
+  // from FAILED, which is terminal.
+  RETRY: "bg-orange-50 text-orange-700 border-orange-200",
+  DEAD: "bg-rose-100 text-rose-800 border-rose-200",
 };
 
 export const PARSE_STATUS_LABEL = {
@@ -53,6 +57,8 @@ export const PARSE_STATUS_LABEL = {
   PARSING: "Parsing",
   PARSED: "Parsed",
   FAILED: "Failed",
+  RETRY: "Retrying",
+  DEAD: "Dead",
 };
 
 export const STAGE_STATUS_STYLE = {

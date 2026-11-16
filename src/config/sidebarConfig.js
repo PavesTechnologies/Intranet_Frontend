@@ -1,5 +1,6 @@
 import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
+import { INVOICE_PERMISSIONS } from "../pages/accounts-payable/constants/invoicePermissions";
 
 /**
  * Canonical role identifiers.
@@ -19,6 +20,14 @@ export const ROLES = {
   // Expense Management (XMS) roles
   MANAGER:           "Manager",
   FINANCE:           "Finance",
+  // Accounts Receivable (AR) Maker-Checker roles.
+  // FINANCE_EXECUTIVE mirrors the ad-hoc "Finance_Executive" literal already used
+  // by XMS_FINANCE/XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
+  // backend role, now also exposed as a named constant for AR's own use.
+  // FINANCE_MANAGER is AR's Checker role (approve/reject billing configurations);
+  // it does not exist anywhere else in the app.
+  FINANCE_EXECUTIVE: "Finance_Executive",
+  FINANCE_MANAGER:   "Finance_Manager",
 };
 
 const ADMIN_ROLES      = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
@@ -33,19 +42,45 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
 const XMS_FINANCE    = [ROLES.FINANCE, "Finance_Executive"];
+// Finance Verification's own action surface requires exactly FINANCE_EXECUTIVE on the backend
+// (FinanceVerificationController's @PreAuthorize) — unlike XMS_FINANCE above (used by Client
+// Billing, a read/placeholder area), the generic "Finance" viewing role does NOT satisfy this
+// controller, so including it here would let a Finance-role user into a page where every action
+// 403s. Kept separate from XMS_FINANCE so Client Billing's own role list is unaffected.
+const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 
 /**
+ * Accounts Receivable (AR) Maker-Checker role groups.
+ *
+ * AR_MAKER_ROLES   — Finance Executive: create/save-draft/edit-draft/submit
+ *                    the Project Billing Setup wizard. Super Admin keeps this
+ *                    too (existing AR access is unchanged for Super Admin).
+ * AR_CHECKER_ROLES — Finance Manager: review/approve/reject submitted billing
+ *                    configurations (Billing Approvals). Super Admin keeps
+ *                    this too, same reasoning.
+ *
+ * Deliberately two separate exports (not one shared AR_ALL_ROLES) — routes and
+ * sidebar menus for Maker screens must allow only AR_MAKER_ROLES, and Checker
+ * screens only AR_CHECKER_ROLES, so a Finance Executive can never reach
+ * Billing Approvals and a Finance Manager can never reach the create/edit
+ * wizard. See App.jsx route guards and Sidebar.jsx's AR submenu split.
+ */
+export const AR_MAKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_EXECUTIVE];
+export const AR_CHECKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_MANAGER];
+export const AR_ALL_ROLES = [...new Set([...AR_MAKER_ROLES, ...AR_CHECKER_ROLES])];
+
+/**
  * Union of every role that can see at least one Finance Management module
  * (Expense Management, Accounts Payable, Accounts Receivable). Composed from
  * each module's own existing role set — not a new authorization mechanism —
- * so it stays correct as long as XMS_EVERYONE / AP_ALL_ROLES / the AR
- * SUPER_ADMIN gate (see Sidebar.jsx / App.jsx) stay in sync.
+ * so it stays correct as long as XMS_EVERYONE / AP_ALL_ROLES / AR_ALL_ROLES
+ * (see Sidebar.jsx / App.jsx) stay in sync.
  */
 export const FINANCE_ALL_ROLES = [
-  ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ROLES.SUPER_ADMIN]),
+  ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ...AR_ALL_ROLES, ROLES.SUPER_ADMIN]),
 ];
 
 /**
@@ -186,7 +221,7 @@ export const XMS_SUBMENU = [
   {
     label: "Finance",
     to: "/expense-management/finance/verification",
-    allowedRoles: XMS_FINANCE,
+    allowedRoles: XMS_FINANCE_VERIFICATION,
     children: [
       { label: "Verification",    to: "/expense-management/finance/verification" },
       { label: "Reimbursements",  to: "/expense-management/finance/reimbursements" },
@@ -293,10 +328,19 @@ export const XMS_SUBMENU = [
  * is deferred to the business-logic phases — see constants/permissions.js's
  * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
  */
+// Invoice Management and Payments both ultimately read invoice data (invoice-details_route.py's
+// GET endpoints, which every Payment page also calls to show what it's paying) — gated on
+// INVOICE_VIEW alone, not a role list, since a pure Approver or Finance user need not hold any
+// of Admin/AP_Executive/Finance_Executive to legitimately belong here. INVOICE_VIEW is the one
+// permission every real AP Invoice group (Intake/Approver/Finance) carries by design, so a user
+// missing it shouldn't see a nav item whose page will just 403 on its own data.
+const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
+
 export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
   { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
+  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
+  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
+  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
   { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
 ];

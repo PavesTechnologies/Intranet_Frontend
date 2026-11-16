@@ -1,5 +1,5 @@
 import React from "react";
-import { FolderKanban, Play, CheckCircle2, Clock } from "lucide-react";
+import { FolderKanban, Play, CheckCircle2, FileCheck, Receipt } from "lucide-react";
 import { KPICard } from "../../../../components/kpi/KPI";
 import { getAcquisitionKpis } from "../../services/billingDataAcquisitionService";
 
@@ -29,20 +29,28 @@ export default function AcquisitionMetrics({
       tooltip: "Active setups where source snapshot acquisition has not been initiated",
     },
     {
-      key: "NEEDS_APPROVAL",
-      label: "Needs Approval",
-      value: kpiData.needsApproval,
-      icon: Clock,
-      color: "bg-amber-500 text-white",
-      tooltip: "Projects with pending or partially approved timesheets blocking billing readiness",
-    },
-    {
-      key: "READY",
-      label: "Ready",
-      value: kpiData.ready,
+      key: "READY_FOR_TAX",
+      label: "Ready for Tax",
+      value: kpiData.readyForTax,
       icon: CheckCircle2,
       color: "bg-emerald-600 text-white",
-      tooltip: "Projects with 100% required timesheet approval ready for tax calculation",
+      tooltip: "Acquired billing snapshots ready for tax calculation",
+    },
+    {
+      key: "TAX_COMPLETED",
+      label: "Tax Completed",
+      value: kpiData.taxCompleted,
+      icon: FileCheck,
+      color: "bg-blue-600 text-white",
+      tooltip: "Snapshots with completed tax calculation ready for invoice generation",
+    },
+    {
+      key: "INVOICED",
+      label: "Invoiced",
+      value: kpiData.invoiced,
+      icon: Receipt,
+      color: "bg-indigo-600 text-white",
+      tooltip: "Snapshots that have been successfully billed and invoiced",
     },
   ];
 
@@ -57,33 +65,31 @@ export default function AcquisitionMetrics({
   };
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {kpis.map((kpi) => {
         const isActive =
           selectedStatusFilter === kpi.key ||
           (selectedStatusFilter === "ALL" && kpi.key === "ALL");
 
         return (
-          <div
-            key={kpi.key}
-            onClick={() => handleCardClick(kpi.key)}
-            title={kpi.tooltip}
-            className={`cursor-pointer transition-all duration-150 rounded-xl ${
-              isActive
-                ? "ring-2 ring-indigo-500 ring-offset-2 scale-[1.02] shadow-md"
-                : "hover:border-slate-300 hover:shadow-sm opacity-90 hover:opacity-100"
-            }`}
-          >
-            <KPICard
-              label={kpi.label}
-              value={loading ? "…" : kpi.value}
-              icon={<kpi.icon className="h-5 w-5" />}
-              color={kpi.color}
-              className={`h-full w-full bg-white shadow-sm border ${
-                isActive ? "border-indigo-400 bg-indigo-50/20" : "border-slate-200"
-              }`}
-            />
-          </div>
+<button
+  key={kpi.key}
+  type="button"
+  onClick={() => handleCardClick(kpi.key)}
+  title={kpi.tooltip}
+  className="text-left rounded-xl border-0 outline-none transition-transform active:scale-[0.99] focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 active:ring-0 active:outline-none appearance-none"
+  style={{ outline: "none", boxShadow: "none" }}
+>
+  <KPICard
+    label={kpi.label}
+    value={loading ? "…" : kpi.value}
+    icon={<kpi.icon className="h-5 w-5" />}
+    color={kpi.color}
+    active={isActive}
+    className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md !outline-none !ring-0 !ring-offset-0 focus:!outline-none focus:!ring-0 focus:!ring-offset-0 focus-visible:!outline-none focus-visible:!ring-0 focus-visible:!ring-offset-0 active:!ring-0 active:!outline-none"
+    style={{ outline: "none", boxShadow: "none" }}
+  />
+</button>
         );
       })}
     </div>

@@ -18,6 +18,7 @@ const CreateTaskModal = ({ onTaskCreated }) => {
     statusId: "",
     priority: "LOW",
     storyPoints: 0,
+    estimatedHours: 0,
     dueDate: "",
     projectId: "",
     reporterId: "",
@@ -96,6 +97,7 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       const payload = {
         ...formData,
         storyPoints: Number(formData.storyPoints),
+        estimatedHours: Number(formData.estimatedHours) || 0,
         projectId: Number(formData.projectId),
         reporterId: Number(formData.reporterId),
         assigneeId: formData.assigneeId ? Number(formData.assigneeId) : null,
@@ -207,6 +209,17 @@ const CreateTaskModal = ({ onTaskCreated }) => {
           className="w-full border rounded px-4 py-2"
         />
       </div>
+
+      {/* Estimated Hours */}
+      <input
+        type="number"
+        name="estimatedHours"
+        min="0"
+        value={formData.estimatedHours}
+        onChange={handleChange}
+        placeholder="Estimated Hours"
+        className="w-full border rounded px-4 py-2"
+      />
 
       {/* Reporter */}
       <FilterListbox

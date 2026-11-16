@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   X,
   Check,
@@ -10,7 +10,6 @@ import {
   Wallet,
   User,
   Layers,
-  ArrowRight,
 } from "lucide-react";
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
@@ -22,16 +21,16 @@ import LineReviewStatusBadge, { deriveLineReviewState } from "./LineReviewStatus
 import ApprovalLevelTimeline from "./ApprovalLevelTimeline";
 import ReceiptViewer from "./ReceiptViewer";
 import CommentPromptModal from "./CommentPromptModal";
-import { useApprovalStatus, useLineItemReviews, useReviewLineItem, useRejectReport, useBulkApprove } from "../hooks/useApprovalWorkflow";
-import { formatMoney, formatDate, formatDateTime, friendlyApprovalError } from "../constants/approvalLabels";
-
-/**
- * The only report statuses in which an APPROVAL-stage action still makes sense here. Anything else
- * (PENDING_FINANCE_VERIFICATION, APPROVED, REJECTED, CANCELLED, ...) means the report has already
- * moved past this approver's stage - most commonly because the report open in this exact panel was
- * itself the final approval, or a co-approver under ANY_OF/ALL_OF quorum completed it first.
- */
-const APPROVAL_ACTIVE_STATUSES = new Set(["PENDING_APPROVAL", "AWAITING_CORRECTION"]);
+import {
+  useApprovalStatus,
+  useLineItemReviews,
+  useReviewLineItem,
+  useReviewSplit,
+  useRejectReport,
+  useBulkApprove,
+} from "../hooks/useApprovalWorkflow";
+import { resolveApproverRelevantLines } from "../utils/approvalAmounts";
+import { formatMoney, formatDate, formatDateTime } from "../constants/approvalLabels";
 
 const normalizeViolations = (line) => {
   if (Array.isArray(line?.policyWarnings)) return line.policyWarnings;
@@ -77,10 +76,10 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
   const [flaggingLine, setFlaggingLine] = useState(null);
   const [isRejecting, setIsRejecting] = useState(false);
 
-  const queryClient = useQueryClient();
   const { data: approvalStatus } = useApprovalStatus(isOpen ? reportId : null);
   const { data: lineItemReviews } = useLineItemReviews(isOpen ? reportId : null);
   const reviewLineItem = useReviewLineItem();
+  const reviewSplit = useReviewSplit();
   const rejectReport = useRejectReport();
   const bulkApprove = useBulkApprove();
 
@@ -104,20 +103,20 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
     staleTime: 30_000,
   });
 
-  // fullReport is the one source here that's actually refetched after every action below (see
-  // refetchReviewData) - queueItem/historyItem are point-in-time snapshots from when this panel was
-  // opened and never update again, so they're only a same-render fallback until fullReport loads.
-  const reportStatus = fullReport?.reportStatus || queueItem?.reportStatus || historyItem?.reportStatus;
+  const reportStatus = historyItem?.reportStatus || fullReport?.reportStatus;
   const isQueueMode = mode === "queue";
-  const hasMovedPastApproval = isQueueMode && !!reportStatus && !APPROVAL_ACTIVE_STATUSES.has(reportStatus);
 
-  /** Every approval action below can move the report out of this approver's stage entirely - re-pull the two locally-owned queries too, not just the shared approval-workflow caches, so this exact open panel reflects it immediately instead of showing stale action buttons. */
-  const refetchReviewData = () => {
-    queryClient.invalidateQueries({ queryKey: ["expenseReviewReport", reportId] });
-    queryClient.invalidateQueries({ queryKey: ["expenseReviewLineItems", reportId] });
-  };
+  const lineItems = fullLineItems?.length ? fullLineItems : queueItem?.pendingLineItems || queueItem?.lineItems || queueItem?.items || queueItem?.pendingLines || [];
 
-  const lineItems = fullLineItems?.length ? fullLineItems : queueItem?.pendingLineItems || [];
+  // Split-aware amounts (queue mode only — history mode has no pendingSplits, so every line
+  // resolves as a normal, full-amount line, unchanged from before). No extra API call: derived
+  // entirely from queueItem.pendingSplits, already returned by the my-queue endpoint.
+  const relevantByLineItem = useMemo(() => {
+    const { relevantLines } = resolveApproverRelevantLines(lineItems, queueItem?.pendingSplits, queueItem?.costCenterName);
+    const map = new Map();
+    relevantLines.forEach((l) => map.set(l.lineItemId, l));
+    return map;
+  }, [lineItems, queueItem]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -156,6 +155,9 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
   const selectedLine = lineItems.find((l) => l.lineItemId === selectedLineItemId) || null;
   const selectedReview = selectedLine ? reviewsByLineItem.get(selectedLine.lineItemId) : null;
   const selectedViolations = normalizeViolations(selectedLine);
+  // null when this line isn't the caller's responsibility at all (e.g. a different Cost Center
+  // Owner's normal-track line) — the sticky action bar disables Approve/Needs Correction for it.
+  const selectedRelevant = selectedLine ? relevantByLineItem.get(selectedLine.lineItemId) || null : null;
 
   const needsCorrectionLines = (lineItemReviews || []).filter((r) => r.status === "NEEDS_CORRECTION");
 
@@ -163,57 +165,38 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
   const reportNumber = queueItem?.reportNumber || historyItem?.reportNumber || fullReport?.reportNumber;
   const title = historyItem?.title || fullReport?.title;
   const businessPurpose = historyItem?.businessPurpose || fullReport?.businessPurpose;
-  const costCenterName = queueItem?.costCenterName || historyItem?.costCenterName || fullReport?.costCenterName;
-  const submittedAt = queueItem?.submittedAt || historyItem?.createdAt || fullReport?.createdAt;
+  const costCenterName = queueItem?.costCenterName || queueItem?.costCenter || queueItem?.costCenterCode || queueItem?.departmentName || historyItem?.costCenterName || historyItem?.costCenter || fullReport?.costCenterName || fullReport?.costCenter;
+  const submittedAt = queueItem?.submittedAt || queueItem?.createdAt || queueItem?.submittedDate || historyItem?.submittedAt || historyItem?.createdAt || fullReport?.submittedAt || fullReport?.createdAt;
   const totalAmount = queueItem?.totalAmount ?? historyItem?.totalAmount ?? fullReport?.totalAmount;
   const currencyCode = queueItem?.currencyCode || historyItem?.currencyCode || fullReport?.currencyCode;
 
-  const isMutating = reviewLineItem.isPending || rejectReport.isPending || bulkApprove.isPending;
-  const canAct = isQueueMode && APPROVAL_ACTIVE_STATUSES.has(reportStatus);
+  const isMutating = reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending;
+  const canAct = isQueueMode && reportStatus !== "APPROVED" && reportStatus !== "REJECTED";
+  // Not this caller's line at all (see selectedRelevant above) → nothing to act on, even though
+  // canAct is true for the report as a whole.
+  const canActOnSelected = canAct && !!selectedRelevant;
 
   if (!isOpen) return null;
 
   const handleApprove = () => {
-    if (!selectedLine) return;
-    reviewLineItem.mutate(
-      { reportId, lineItemId: selectedLine.lineItemId, decision: "APPROVED" },
-      {
-        // The mutation response is the freshest possible signal - reading reportStatus straight off
-        // it (rather than waiting on a refetch) means a final approval closes this exact panel
-        // immediately, instead of leaving stale Approve/Reject buttons showing until some other
-        // render happens to re-check the (by-then-invalidated) caches.
-        onSuccess: (data) => {
-          refetchReviewData();
-          if (data?.reportStatus && !APPROVAL_ACTIVE_STATUSES.has(data.reportStatus)) {
-            showStatusToast(
-              data.reportStatus === "PENDING_FINANCE_VERIFICATION"
-                ? "Final approval complete - this report has moved to Finance Verification."
-                : "This report has moved past the approval stage.",
-              "success",
-            );
-            onClose();
-          }
-        },
-        onError: (err) => {
-          refetchReviewData();
-          showStatusToast(friendlyApprovalError(err.response?.data?.message, "Failed to approve line item"), "error");
-        },
-      },
-    );
+    if (!selectedRelevant) return;
+    const onError = (err) => showStatusToast(err.response?.data?.message || "Failed to approve", "error");
+    if (selectedRelevant.isSplit) {
+      Promise.all(
+        selectedRelevant.mySplits.map((s) => reviewSplit.mutateAsync({ reportId, splitId: s.splitId, decision: "APPROVED" }))
+      ).catch(onError);
+      return;
+    }
+    reviewLineItem.mutate({ reportId, lineItemId: selectedRelevant.lineItemId, decision: "APPROVED" }, { onError });
   };
 
   const handleBulkApprove = () => {
     bulkApprove.mutate(reportId, {
       onSuccess: () => {
-        refetchReviewData();
         showStatusToast("Report bulk-approved", "success");
         onClose();
       },
-      onError: (err) => {
-        refetchReviewData();
-        showStatusToast(friendlyApprovalError(err.response?.data?.message, "Bulk approve failed"), "error");
-        if (err.response?.data?.message?.includes("use the Finance Verification API")) onClose();
-      },
+      onError: (err) => showStatusToast(err.response?.data?.message || "Bulk approve failed", "error"),
     });
   };
 
@@ -231,22 +214,6 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
           <X className="h-5 w-5" />
         </button>
       </header>
-
-      {hasMovedPastApproval && (
-        <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-4 py-3 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-blue-800">
-              <ArrowRight className="h-4 w-4" />
-              {reportStatus === "PENDING_FINANCE_VERIFICATION"
-                ? "This report has moved on to Finance Verification - no further approval action is possible here."
-                : "This report is no longer awaiting your approval."}
-            </p>
-            <Button size="small" variant="outline" onClick={onClose}>
-              Back to Approval Queue
-            </Button>
-          </div>
-        </div>
-      )}
 
       {needsCorrectionLines.length > 0 && (
         <div className="shrink-0 border-b border-orange-200 bg-orange-50 px-4 py-3 sm:px-6">
@@ -281,6 +248,8 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                     const review = reviewsByLineItem.get(line.lineItemId);
                     const state = deriveLineReviewState(review, normalizeViolations(line).length > 0);
                     const isSelected = line.lineItemId === selectedLineItemId;
+                    const relevant = relevantByLineItem.get(line.lineItemId) || null;
+                    const isNotMine = isQueueMode && !relevant;
                     return (
                       <button
                         key={line.lineItemId}
@@ -288,13 +257,20 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                         onClick={() => setSelectedLineItemId(line.lineItemId)}
                         className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
                           isSelected ? "border-[#0A0082] bg-indigo-50" : "border-gray-200 hover:bg-gray-50"
-                        }`}
+                        } ${isNotMine ? "opacity-60" : ""}`}
                       >
                         <span className="min-w-0 truncate font-medium text-gray-800">
                           {line.merchantName || line.categoryName || "Line item"}
+                          {relevant?.isSplit && (
+                            <span className="ml-1.5 inline-flex items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                              Split
+                            </span>
+                          )}
                         </span>
                         <span className="flex shrink-0 items-center gap-2">
-                          <span className="text-xs text-gray-500">{formatMoney(line.amount, line.currencyCode)}</span>
+                          <span className="text-xs text-gray-500">
+                            {formatMoney(relevant ? relevant.myAmount : line.amount, line.currencyCode)}
+                          </span>
                           <LineReviewStatusBadge state={state} />
                         </span>
                       </button>
@@ -338,11 +314,36 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                 </Section>
 
                 <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Amount">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <Field label="Line Amount" value={formatMoney(selectedLine.amount, selectedLine.currencyCode)} />
-                    {selectedLine.taxAmount != null && <Field label="Tax / GST" value={formatMoney(selectedLine.taxAmount, selectedLine.currencyCode)} />}
-                    <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
-                  </div>
+                  {selectedRelevant?.isSplit ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Field label="Full Expense Amount" value={formatMoney(selectedRelevant.lineAmount, selectedLine.currencyCode)} />
+                        <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
+                      </div>
+                      <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+                        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-indigo-800">
+                          <Layers className="h-3.5 w-3.5" /> Split Allocation
+                        </p>
+                        {selectedRelevant.mySplits.map((s) => (
+                          <p key={s.splitId} className="text-sm font-semibold text-indigo-700">
+                            {s.costCenterName} — {formatMoney(s.allocatedAmount, selectedLine.currencyCode)}{" "}
+                            <span className="text-xs font-normal text-indigo-500">(your allocation)</span>
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <Field label="Line Amount" value={formatMoney(selectedLine.amount, selectedLine.currencyCode)} />
+                      {selectedLine.taxAmount != null && <Field label="Tax / GST" value={formatMoney(selectedLine.taxAmount, selectedLine.currencyCode)} />}
+                      <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
+                    </div>
+                  )}
+                  {isQueueMode && !selectedRelevant && (
+                    <p className="mt-2 text-xs text-gray-400">
+                      This line isn't part of your approval — shown for context only.
+                    </p>
+                  )}
                 </Section>
 
                 {selectedViolations.length > 0 && (
@@ -367,11 +368,16 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                   <Check className="h-4 w-4" /> Bulk Approve Report
                 </Button>
               )}
-              <Button variant="outline" disabled={isMutating || !selectedLine} onClick={() => setFlaggingLine(selectedLine)}>
+              <Button variant="outline" disabled={isMutating || !canActOnSelected} onClick={() => setFlaggingLine(selectedRelevant)}>
                 <MessageSquareWarning className="h-4 w-4" /> Request Correction
               </Button>
-              <Button variant="success" disabled={isMutating || !selectedLine} loading={reviewLineItem.isPending} onClick={handleApprove}>
-                <Check className="h-4 w-4" /> Approve Line
+              <Button
+                variant="success"
+                disabled={isMutating || !canActOnSelected}
+                loading={reviewLineItem.isPending || reviewSplit.isPending}
+                onClick={handleApprove}
+              >
+                <Check className="h-4 w-4" /> {selectedRelevant?.isSplit ? "Approve My Allocation" : "Approve Line"}
               </Button>
               <Button variant="danger" disabled={isMutating} onClick={() => setIsRejecting(true)}>
                 <XCircle className="h-4 w-4" /> Reject Report
@@ -385,25 +391,33 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
         isOpen={!!flaggingLine}
         title="Request correction"
         description="The employee will see this comment and can fix just this line, without restarting the whole approval."
-        contextLabel={flaggingLine ? `Correcting: ${flaggingLine.merchantName || flaggingLine.categoryName || "Line item"} — ${formatMoney(flaggingLine.amount, flaggingLine.currencyCode)}` : ""}
+        contextLabel={
+          flaggingLine
+            ? `Correcting: ${flaggingLine.source?.merchantName || flaggingLine.source?.categoryName || "Line item"} — ${formatMoney(
+                flaggingLine.myAmount,
+                flaggingLine.currencyCode
+              )}${flaggingLine.isSplit ? " (your allocation)" : ""}`
+            : ""
+        }
         confirmLabel="Request Correction"
         confirmVariant="danger"
-        isLoading={reviewLineItem.isPending}
+        isLoading={reviewLineItem.isPending || reviewSplit.isPending}
         onCancel={() => setFlaggingLine(null)}
         onConfirm={(comment) => {
-          reviewLineItem.mutate(
-            { reportId, lineItemId: flaggingLine.lineItemId, decision: "NEEDS_CORRECTION", comment },
-            {
-              onSuccess: () => {
-                refetchReviewData();
-                showStatusToast("Line item flagged for correction", "success");
-              },
-              onError: (err) => {
-                refetchReviewData();
-                showStatusToast(friendlyApprovalError(err.response?.data?.message, "Failed to flag line item"), "error");
-              },
-            },
-          );
+          const onSuccess = () => {
+            showStatusToast("Flagged for correction", "success");
+            onClose();
+          };
+          const onError = (err) => showStatusToast(err.response?.data?.message || "Failed to flag for correction", "error");
+          if (flaggingLine.isSplit) {
+            Promise.all(
+              flaggingLine.mySplits.map((s) =>
+                reviewSplit.mutateAsync({ reportId, splitId: s.splitId, decision: "NEEDS_CORRECTION", comment })
+              )
+            ).then(onSuccess).catch(onError);
+          } else {
+            reviewLineItem.mutate({ reportId, lineItemId: flaggingLine.lineItemId, decision: "NEEDS_CORRECTION", comment }, { onSuccess, onError });
+          }
           setFlaggingLine(null);
         }}
       />
@@ -421,15 +435,11 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
             { reportId, comment },
             {
               onSuccess: () => {
-                refetchReviewData();
                 showStatusToast("Report rejected", "success");
                 setIsRejecting(false);
                 onClose();
               },
-              onError: (err) => {
-                refetchReviewData();
-                showStatusToast(friendlyApprovalError(err.response?.data?.message, "Failed to reject report"), "error");
-              },
+              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to reject report", "error"),
             },
           );
         }}

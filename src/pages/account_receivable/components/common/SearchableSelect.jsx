@@ -3,6 +3,11 @@ import { Combobox } from "@headlessui/react";
 import { Check, ChevronDown } from "lucide-react";
 import classNames from "classnames";
 
+// `anchor` opts into Headless UI's floating/portal-based panel positioning
+// (renders the options panel into a portal instead of a `relative` ancestor),
+// which is what lets the panel escape an `overflow-hidden` parent instead of
+// being clipped by it. Existing callers that don't pass `anchor` keep the
+// original in-flow `absolute` panel behavior untouched.
 export default function SearchableSelect({
   label,
   options,
@@ -12,6 +17,9 @@ export default function SearchableSelect({
   placeholder = "Search...",
   disabled = false,
   requiredMark = false,
+  anchor = false,
+  emptyState,
+  noMatchesMessage = "No matches found.",
 }) {
   const [query, setQuery] = useState("");
   const selectedOption = options.find((option) => option.value === value) || null;
@@ -20,6 +28,11 @@ export default function SearchableSelect({
     query === ""
       ? options
       : options.filter((option) => option.label.toLowerCase().includes(query.toLowerCase()));
+
+  const optionsPanelClassName = classNames(
+    "z-50 max-h-[300px] overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+    anchor ? "w-[var(--input-width)] [--anchor-gap:4px]" : "absolute mt-1 w-max min-w-full"
+  );
 
   return (
     <div className="space-y-1 w-full min-w-0">
@@ -46,9 +59,16 @@ export default function SearchableSelect({
             <ChevronDown className="w-4 h-4 text-gray-500" />
           </Combobox.Button>
 
-          <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-max min-w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+          <Combobox.Options
+            {...(anchor ? { anchor: "bottom start" } : {})}
+            className={optionsPanelClassName}
+          >
             {filteredOptions.length === 0 ? (
-              <div className="px-4 py-2 text-sm text-gray-500">No matches found.</div>
+              typeof emptyState === "function" ? (
+                emptyState(query)
+              ) : (
+                emptyState || <div className="px-4 py-2 text-sm text-gray-500">{noMatchesMessage}</div>
+              )
             ) : (
               filteredOptions.map((option) => (
                 <Combobox.Option

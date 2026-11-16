@@ -8,10 +8,13 @@ export default function FormSelect({
   onChange,
   options = [],
   disabled = false,
+  required = false,
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className={Fonts.label}>{label}</label>
+      <label className={Fonts.label}>
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
 
       <select
         name={name}

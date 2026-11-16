@@ -47,11 +47,12 @@ function formatWeight(value) {
 }
 
 function ComponentScoreCard({ label, score, weight, colorKey }) {
-  const roundedScore = Math.round(numberOr(score, 0) * 10) / 10;
+  // Whole numbers, the way every other score in the scorecard is shown.
+  const roundedScore = Math.round(numberOr(score, 0));
 
   return (
     <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 flex items-center gap-3">
-      <ScoreRing value={roundedScore} size={52} color={COMPONENT_COLOR[colorKey] || "#2563EB"} />
+      <ScoreRing value={roundedScore} size={52} decimals={0} color={COMPONENT_COLOR[colorKey] || "#2563EB"} />
       <div className="min-w-0">
         <div className="text-[11px] font-semibold text-slate-500 truncate">{label}</div>
         <div className="mt-1 inline-block text-[10px] font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-2 py-0.5">
@@ -133,7 +134,7 @@ export default function FinalStatusTab({ candidate }) {
               <ScoreRing value={compositeScore} size={74} color={tone.ring} />
               <div>
                 <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-slate-900 mb-1.5">
-                  <Award size={15} className="text-amber-500" /> Final Status
+                  <Award size={15} className="text-amber-500" /> Overall Score
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {hasStage && renderStageBadge(stage)}

@@ -6,6 +6,18 @@ import ct from "countries-and-timezones";
 import { createClient, updateClient, getProjectsByClient } from "../services/clientservice";
 import { notify } from "../utils/notify";
 import Button from "../../../components/Button/Button";
+import {
+  getCountryByCode,
+  findCountryForDialCode,
+  searchCountries,
+  formatCountryLabel,
+  extractDialCode,
+} from "../constants/countryCodes";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_DIGITS_REGEX = /^\d+$/;
+const PHONE_MIN_LENGTH = 6;
+const PHONE_MAX_LENGTH = 15;
 
 // Updated CustomListbox to accept an 'error' prop
 const CustomListbox = ({
@@ -15,6 +27,7 @@ const CustomListbox = ({
   options,
   disabled = false,
   error = false, // Added error prop
+  placeholder = "Default time zone (editable)",
 }) => {
   return (
     <div className="w-full">
@@ -24,12 +37,12 @@ const CustomListbox = ({
       <Listbox value={value} onChange={onChange} disabled={disabled}>
         <div className="relative mt-1">
           <Listbox.Button
-            className={`relative w-full cursor-default rounded-md border py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 sm:text-sm 
-            ${error ? "border-red-500 ring-1 ring-red-500" : "border-gray-300 focus:ring-blue-500"} 
+            className={`relative w-full cursor-default rounded-md border py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 sm:text-sm
+            ${error ? "border-red-500 ring-1 ring-red-500" : "border-gray-300 focus:ring-blue-500"}
             ${disabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white text-gray-900"}`}
           >
             <span className="block truncate">
-              {value || "Default time zone (editable)"}
+              {value || placeholder}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <ChevronDownIcon
@@ -170,6 +183,76 @@ const SearchableCombobox = ({
 
 
 
+// Searchable Country Code selector: shows flag + name + dial code, and
+// falls back to displaying a raw/ambiguous stored dial code (e.g. "+1"
+// with no resolvable country) as plain text instead of guessing a country.
+const CountryCodeCombobox = ({ value, fallbackText, onChange, error = false }) => {
+  const [query, setQuery] = useState("");
+  const filteredCountries = useMemo(() => searchCountries(query), [query]);
+
+  return (
+    <Combobox value={value} onChange={onChange}>
+      <div className="relative">
+        <div
+          className={`relative w-full cursor-default overflow-hidden rounded-md border bg-white text-left shadow-sm focus:outline-none sm:text-sm ${error ? "border-red-500 ring-1 ring-red-500" : "border-gray-300"}`}
+        >
+          <Combobox.Input
+            className="w-full border-none py-2 pl-3 pr-8 text-sm leading-5 text-gray-900 focus:ring-0 focus:outline-none"
+            displayValue={(country) =>
+              country ? formatCountryLabel(country) : fallbackText || ""
+            }
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search country..."
+            aria-label="Search country code"
+          />
+          <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+            <ChevronDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+          </Combobox.Button>
+        </div>
+        <Transition
+          as={Fragment}
+          leave="transition ease-in duration-100"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+          afterLeave={() => setQuery("")}
+        >
+          <Combobox.Options className="absolute mt-1 max-h-60 w-full min-w-[16rem] overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm z-50">
+            {filteredCountries.length === 0 ? (
+              <div className="relative cursor-default select-none py-2 px-4 text-gray-500">
+                No countries found
+              </div>
+            ) : (
+              filteredCountries.map((country) => (
+                <Combobox.Option
+                  key={country.code}
+                  className={({ active }) =>
+                    `relative cursor-default select-none py-2 pl-3 pr-4 ${active ? "bg-blue-100 text-blue-900" : "text-gray-900"}`
+                  }
+                  value={country}
+                >
+                  {({ selected }) => (
+                    <div className="flex items-center justify-between gap-3">
+                      <span
+                        className={`flex items-center gap-2 truncate ${selected ? "font-medium" : "font-normal"}`}
+                      >
+                        <span aria-hidden="true">{country.flag}</span>
+                        <span className="truncate">{country.name}</span>
+                      </span>
+                      <span className="text-gray-500 shrink-0">
+                        {country.dialCode}
+                      </span>
+                    </div>
+                  )}
+                </Combobox.Option>
+              ))
+            )}
+          </Combobox.Options>
+        </Transition>
+      </div>
+    </Combobox>
+  );
+};
+
 const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
   const { getEnumValues } = useEnums();
   const CLIENT_TYPES = getEnumValues("ClientType");
@@ -192,6 +275,10 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
     status: "ACTIVE",
     country_name: "",
     default_timezone: "",
+    email: "",
+    countryCode: "",
+    countryIso: "", // display-only: resolved ISO code for the selected/hydrated dial code, never sent to the API
+    phoneNumber: "",
     SLA: false,
     compliance: false,
     escalationContact: true,
@@ -200,6 +287,11 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
 
   useEffect(() => {
     if (mode === "edit" && initialData) {
+      const hydratedDialCode = initialData.countryCode || "";
+      // A dial code like "+1" can belong to many countries (US, Canada, ...);
+      // only resolve it to a country when it's unambiguous, otherwise keep
+      // showing the raw stored value instead of guessing.
+      const matchedCountry = findCountryForDialCode(hydratedDialCode);
       setFormData({
         clientId: initialData.clientId,
         client_name: initialData.client_name,
@@ -209,6 +301,10 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
         country_name: initialData.country_name,
         default_timezone: initialData.default_timezone,
         status: initialData.status,
+        email: initialData.email || "",
+        countryCode: hydratedDialCode,
+        countryIso: matchedCountry ? matchedCountry.code : "",
+        phoneNumber: initialData.phoneNumber || "",
         SLA: initialData.SLA,
         compliance: initialData.compliance,
         escalationContact: initialData.escalationContact,
@@ -220,16 +316,41 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
   const [timezoneOptions, setTimezoneOptions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState([]); // Array to store names of invalid fields
+  const [fieldErrorMessages, setFieldErrorMessages] = useState({}); // Inline messages for email/phone/countryCode
+
+  const clearFieldErrorMessage = (name) => {
+    setFieldErrorMessages((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors.includes(name)) setErrors(errors.filter((f) => f !== name)); // Clear error on type
+    clearFieldErrorMessage(name);
   };
 
   const handleGenericListboxChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors.includes(field)) setErrors(errors.filter((f) => f !== field));
+    clearFieldErrorMessage(field);
+  };
+
+  const handleCountryCodeChange = (country) => {
+    if (!country) return;
+    setFormData((prev) => ({
+      ...prev,
+      countryCode: country.dialCode,
+      countryIso: country.code,
+    }));
+    if (errors.includes("countryCode")) {
+      setErrors(errors.filter((f) => f !== "countryCode"));
+    }
+    clearFieldErrorMessage("countryCode");
   };
 
   const handleCountryChange = (selectedCountryName) => {
@@ -275,6 +396,46 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
     ];
 
     const newErrors = mandatoryFields.filter((field) => !formData[field]);
+    const newFieldErrorMessages = {};
+
+    // Email: mandatory, must be a valid format
+    const trimmedEmail = (formData.email || "").trim();
+    if (!trimmedEmail) {
+      newErrors.push("email");
+      newFieldErrorMessages.email = "Email is required";
+    } else if (!EMAIL_REGEX.test(trimmedEmail)) {
+      newErrors.push("email");
+      newFieldErrorMessages.email = "Please enter a valid email address";
+    }
+
+    // Phone: optional; country code becomes required only if a phone number is entered
+    const cleanedPhone = (formData.phoneNumber || "")
+      .trim()
+      .replace(/[\s\-()]/g, "");
+    const dialCode = extractDialCode(formData.countryCode);
+
+    if (cleanedPhone) {
+      if (!PHONE_DIGITS_REGEX.test(cleanedPhone)) {
+        newErrors.push("phoneNumber");
+        newFieldErrorMessages.phoneNumber =
+          "Phone number must contain digits only";
+      } else if (
+        cleanedPhone.length < PHONE_MIN_LENGTH ||
+        cleanedPhone.length > PHONE_MAX_LENGTH
+      ) {
+        newErrors.push("phoneNumber");
+        newFieldErrorMessages.phoneNumber =
+          "Please enter a valid phone number";
+      }
+
+      if (!dialCode) {
+        newErrors.push("countryCode");
+        newFieldErrorMessages.countryCode =
+          "Country code is required when phone number is provided";
+      }
+    }
+
+    setFieldErrorMessages(newFieldErrorMessages);
 
     if (newErrors.length > 0) {
       setErrors(newErrors);
@@ -283,6 +444,16 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
     }
 
     setIsSubmitting(true);
+
+    // eslint-disable-next-line no-unused-vars
+    const { countryIso, ...formDataForApi } = formData; // countryIso is UI-only; never sent to the backend
+    const payload = {
+      ...formDataForApi,
+      client_name: formData.client_name.trim(),
+      email: trimmedEmail.toLowerCase(),
+      phoneNumber: cleanedPhone || null,
+      countryCode: cleanedPhone ? dialCode : null,
+    };
 
     // If changing status from ACTIVE to INACTIVE, check for active projects
     // if (mode === "edit" && formData.status === "INACTIVE" && initialData.status === "ACTIVE") {
@@ -309,8 +480,8 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
     try {
       const clientCreation =
         mode === "create"
-          ? await createClient(formData)
-          : await updateClient(formData);
+          ? await createClient(payload)
+          : await updateClient(payload);
       notify.success(
         clientCreation.message ||
         (mode === "create"
@@ -346,6 +517,56 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
             className={`mt-2 block w-full border rounded-md p-2 focus:ring-blue-500 shadow-sm ${errors.includes("client_name") ? "border-red-500 ring-1 ring-red-500" : "border-gray-300 focus:border-blue-500"}`}
             placeholder="Enter client name"
           />
+        </div>
+
+        <div className="col-span-1 md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            className={`mt-2 block w-full border rounded-md p-2 focus:ring-blue-500 shadow-sm ${errors.includes("email") ? "border-red-500 ring-1 ring-red-500" : "border-gray-300 focus:border-blue-500"}`}
+            placeholder="contact@example.com"
+          />
+          {fieldErrorMessages.email && (
+            <p className="mt-1 text-xs text-red-500">
+              {fieldErrorMessages.email}
+            </p>
+          )}
+        </div>
+
+        <div className="col-span-1 md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Phone Number{" "}
+            <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <div className="mt-2 flex gap-2">
+            <div className="w-1/2 sm:w-2/5">
+              <CountryCodeCombobox
+                value={getCountryByCode(formData.countryIso)}
+                fallbackText={formData.countryCode}
+                onChange={handleCountryCodeChange}
+                error={errors.includes("countryCode")}
+              />
+            </div>
+            <input
+              type="text"
+              name="phoneNumber"
+              value={formData.phoneNumber}
+              onChange={handleInputChange}
+              className={`flex-1 block w-full border rounded-md p-2 focus:ring-blue-500 shadow-sm ${errors.includes("phoneNumber") ? "border-red-500 ring-1 ring-red-500" : "border-gray-300 focus:border-blue-500"}`}
+              placeholder="9876543210"
+            />
+          </div>
+          {(fieldErrorMessages.phoneNumber ||
+            fieldErrorMessages.countryCode) && (
+            <p className="mt-1 text-xs text-red-500">
+              {fieldErrorMessages.phoneNumber || fieldErrorMessages.countryCode}
+            </p>
+          )}
         </div>
 
         <CustomListbox

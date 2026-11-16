@@ -13,6 +13,14 @@ const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
 });
 
+// Mirrors the backend's ReportStatus.isEditable()/isDeletable() sets exactly
+// (expense-management-service enums/ReportStatus.java). Report-level Edit and
+// every line-item add/edit/delete must only be offered while the report is in
+// one of the editable statuses; Delete (the report itself) only while DRAFT.
+// Keep these two arrays in sync if the backend's rule ever changes.
+export const REPORT_EDITABLE_STATUSES = ["DRAFT", "POLICY_REJECTED", "QUERY_RAISED", "AWAITING_CORRECTION"];
+export const REPORT_DELETABLE_STATUSES = ["DRAFT"];
+
 export const expenseReportService = {
   getAll: (params) =>
     api.get("/xms/employee/expense-reports", {
@@ -73,6 +81,22 @@ export const lineItemService = {
   // need a fresh/reloaded violation list independent of a line-item fetch.
   getPolicyWarnings: (reportId, lineItemId) =>
     api.get(`/xms/employee/expense-reports/${reportId}/line-items/${lineItemId}/policy-warnings`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+};
+
+// Whole-set replace, not per-row CRUD — PUT always sends the complete split list for the line
+// item (see ExpenseSplitController/ExpenseSplitServiceImpl). An empty `splits` array reverts the
+// line item to a normal, unsplit allocation; any other size below 2 is rejected by the backend.
+export const splitService = {
+  getAll: (lineItemId) =>
+    api.get(`/xms/employee/expense-line-items/${lineItemId}/splits`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  replace: (lineItemId, payload) =>
+    api.put(`/xms/employee/expense-line-items/${lineItemId}/splits`, payload, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
