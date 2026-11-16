@@ -5,15 +5,19 @@ import { formatCurrency, formatDate, calculateBalance, isOverdue } from "../../u
 import { AP_ROUTES } from "../../constants/routes";
 import { INVOICE_TYPE_LABELS } from "../../constants/invoiceTypes";
 import InvoiceRowActions from "./InvoiceRowActions";
+import InvoiceTdsStatusCell from "./InvoiceTdsStatusCell";
 
 const HEADERS = ["Invoice #", "Vendor", "Invoice Date", "Due Date", "Type", "Net Amount", "Paid", "Balance", "Status", "Actions"];
 const COLUMNS = ["invoiceNumber", "vendor", "invoiceDate", "dueDate", "type", "netAmount", "paid", "balance", "status", "actions"];
+// TDS Status tab: the TDS verification state sits right after the invoice status.
+const TDS_HEADERS = [...HEADERS.slice(0, 9), "TDS Status", ...HEADERS.slice(9)];
+const TDS_COLUMNS = [...COLUMNS.slice(0, 9), "tdsStatus", ...COLUMNS.slice(9)];
 
 /**
  * Reusable across Invoice Management, OCR Review, and Validation views — never fed raw
  * database IDs (vendor is shown by name, currency by its own display fields, etc.).
  */
-export default function InvoiceTable({ invoices, loading }) {
+export default function InvoiceTable({ invoices, loading, showTdsStatus = false }) {
   const rows = invoices.map((invoice) => {
     const balance = calculateBalance(invoice.netAmount, invoice.amountPaid);
     const overdue = isOverdue(invoice.dueDate, invoice.netAmount, invoice.amountPaid);
@@ -54,9 +58,17 @@ export default function InvoiceTable({ invoices, loading }) {
         </span>
       ),
       status: <ApStatusBadge status={invoice.status} />,
+      ...(showTdsStatus && { tdsStatus: <InvoiceTdsStatusCell invoiceId={invoice.id} /> }),
       actions: <InvoiceRowActions invoice={invoice} />,
     };
   });
 
-  return <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={loading} />;
+  return (
+    <GenericTable
+      headers={showTdsStatus ? TDS_HEADERS : HEADERS}
+      columns={showTdsStatus ? TDS_COLUMNS : COLUMNS}
+      rows={rows}
+      loading={loading}
+    />
+  );
 }

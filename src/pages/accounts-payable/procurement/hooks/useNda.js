@@ -4,6 +4,7 @@ import { asId } from "../constants/vendorOnboarding";
 import { PR_DETAIL_KEY } from "./usePurchaseRequisitionDetail";
 import { ONBOARDING_REQUESTS_KEY, ONBOARDING_REQUEST_KEY } from "./useVendorOnboarding";
 import { RFQ_ELIGIBILITY_KEY } from "./useRfqEligibility";
+import { VENDOR_NDAS_KEY } from "../../vendor/hooks/useVendorCollections";
 
 export const NDA_KEY = ["accountsPayable", "procurement", "nda"];
 
@@ -16,6 +17,9 @@ export const VENDOR_NDA_KEY = (vendorId, departmentId, purchaseCategoryId) => [
 ];
 
 export const NDA_DETAIL_KEY = (ndaId) => [...NDA_KEY, "detail", asId(ndaId)];
+
+// Under NDA_KEY so every NDA transition (invalidateNdaGraph) refreshes the history too.
+export const VENDOR_NDA_HISTORY_KEY = (vendorId) => [...NDA_KEY, "history", asId(vendorId)];
 
 /**
  * Existing-NDA lookup for a vendor in one department/category scope
@@ -37,6 +41,20 @@ export const useNdaDetail = (ndaId) =>
     queryKey: NDA_DETAIL_KEY(ndaId),
     queryFn: () => ndaService.getNda(ndaId),
     enabled: Boolean(ndaId),
+    staleTime: 0,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+
+/**
+ * Every NDA version on file for a vendor, across scopes (GET /apm/nda/vendor/{id}/history).
+ * Which record is active, and its status, are the backend's — the UI only lays them out.
+ */
+export const useVendorNdaHistory = (vendorId, { enabled = true } = {}) =>
+  useQuery({
+    queryKey: VENDOR_NDA_HISTORY_KEY(vendorId),
+    queryFn: () => ndaService.getVendorNdaHistory(vendorId),
+    enabled: Boolean(vendorId) && enabled,
     staleTime: 0,
     gcTime: 5 * 60_000,
     retry: 1,
@@ -89,6 +107,24 @@ export const useUploadSignedNda = ({ prId, requestId } = {}) => {
 };
 
 /**
+ * PUT /apm/nda/{nda_id}/signed-document — replaces the signed PDF on file.
+ *
+ * Besides the NDA graph, the vendor's own NDA list (Vendor Detail > NDA) is refreshed, so the
+ * new version and the SIGNED status show there as well as on the RFQ.
+ */
+export const useReplaceSignedNda = ({ prId, requestId } = {}) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ndaId, vendorId, file, reason }) =>
+      ndaService.replaceSignedDocument(ndaId, { file, vendorId, reason }),
+    onSuccess: (_result, { vendorId }) => {
+      invalidateNdaGraph(qc, { prId, requestId });
+      if (vendorId) qc.invalidateQueries({ queryKey: VENDOR_NDAS_KEY(vendorId) });
+    },
+  });
+};
+
+/**
  * PUT /apm/nda/{nda_id}/content.
  *
  * Only the NDA's own detail query is invalidated: saving the body changes neither the NDA's
@@ -106,6 +142,22 @@ export const useUpdateNdaContent = () => {
     onSuccess: (_result, { ndaId }) => {
       qc.invalidateQueries({ queryKey: NDA_DETAIL_KEY(ndaId) });
     },
+  });
+};
+
+/**
+ * POST /apm/nda/vendor/{vendor_id}/replace.
+ *
+ * Like the signed upload, nothing is updated optimistically: the new version, the old one's
+ * deactivation and the resulting RFQ eligibility all come back through the invalidated
+ * queries, so a failed replacement leaves the UI exactly as it was.
+ */
+export const useReplaceNda = ({ prId, requestId } = {}) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ vendorId, onUploadProgress, ...payload }) =>
+      ndaService.replaceNda(vendorId, payload, { onUploadProgress }),
+    onSuccess: () => invalidateNdaGraph(qc, { prId, requestId }),
   });
 };
 

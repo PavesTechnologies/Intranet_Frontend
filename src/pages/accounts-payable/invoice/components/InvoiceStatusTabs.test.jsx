@@ -60,6 +60,17 @@ describe("InvoiceStatusTabs — permission-driven visibility", () => {
     expect(screen.getByRole("button", { name: "Paid" })).toBeInTheDocument();
   });
 
+  it("Finance Executive with TDS verify: TDS Status tab sits right before Approval", () => {
+    renderTabs({ canVerifyTds: true, canViewInvoiceApproval: true, canMarkPaid: true, canViewPayment: true });
+    const labels = screen.getAllByRole("button").map((b) => b.textContent);
+    expect(labels).toEqual(["TDS Status", "Approval", "Approved", "Ready for Payment", "Paid"]);
+  });
+
+  it("no TDS Status tab without the TDS verify permission", () => {
+    renderTabs({ canMarkPaid: true, canViewPayment: true });
+    expect(screen.queryByRole("button", { name: "TDS Status" })).not.toBeInTheDocument();
+  });
+
   it("a user with no invoice-module permissions still sees Approved (common to every group)", () => {
     renderTabs({});
     expect(screen.getByRole("button", { name: "Approved" })).toBeInTheDocument();

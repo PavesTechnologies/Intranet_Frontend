@@ -59,7 +59,7 @@ const XMS_MANAGER    = [ROLES.MANAGER];
 const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
-const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
+export const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 
 /**
  * Accounts Receivable (AR) Maker-Checker role groups.
@@ -90,6 +90,21 @@ export const AR_ALL_ROLES = [...new Set([...AR_MAKER_ROLES, ...AR_CHECKER_ROLES]
  */
 export const FINANCE_ALL_ROLES = [
   ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ...AR_ALL_ROLES, ROLES.SUPER_ADMIN]),
+];
+
+/**
+ * Roles allowed to see the company-wide consolidated figures on the Finance
+ * Management landing page (KPIs, cash flow, GST/TDS, action center, activity).
+ * Deliberately narrower than FINANCE_ALL_ROLES: an ordinary employee (General)
+ * or a people Manager reaches /finance/dashboard for their Expense module card,
+ * but must not see organisation-wide receivables/payables. Composed only from
+ * existing role constants — no new roles.
+ */
+export const FINANCE_OVERVIEW_ROLES = [
+  ROLES.FINANCE,
+  ROLES.FINANCE_EXECUTIVE,
+  ROLES.FINANCE_MANAGER,
+  ...ADMIN_ROLES,
 ];
 
 /**

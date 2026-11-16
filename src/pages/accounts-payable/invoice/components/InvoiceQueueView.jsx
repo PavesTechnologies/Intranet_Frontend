@@ -10,7 +10,7 @@ import InvoiceTable from "./InvoiceTable";
 import InvoiceKpiCards from "./InvoiceKpiCards";
 import { useInvoices } from "../hooks/useInvoices";
 import { useInvoiceFilters } from "../hooks/useInvoiceFilters";
-import { QUEUE_STATUS_FILTERS, getVisibleQueueTypes } from "../../constants/queueTypes";
+import { QUEUE_TYPES, QUEUE_STATUS_FILTERS, getVisibleQueueTypes } from "../../constants/queueTypes";
 import { AP_ROUTES } from "../../constants/routes";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { useApPermissions } from "../../hooks/useApPermissions";
@@ -43,6 +43,7 @@ const EMPTY_QUEUE = {
   all_invoices: { title: "No invoices yet.", hint: "Upload an invoice, or let the mailbox / SharePoint pickup bring them in." },
   ocr_review: { title: "Nothing to review.", hint: "New invoices land here after upload - their details are read for you to check." },
   approval: { title: "Nothing waiting for approval.", hint: "Invoices come here when an AP Executive sends them for approval." },
+  tds_status: { title: "No invoices awaiting TDS verification.", hint: "Approved invoices appear here so Finance can verify their TDS before marking them ready for payment." },
   approved: { title: "No approved invoices waiting.", hint: "Approved invoices wait here until Finance verifies TDS and marks them ready for payment." },
   ready_for_payment: { title: "Nothing ready for payment.", hint: "Invoices come here once Finance marks them ready." },
   paid: { title: "No paid invoices yet.", hint: "Invoices move here when their payment is recorded with its receipt." },
@@ -59,8 +60,18 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
       ? requestedQueueType
       : visibleQueueTypes.includes(defaultQueueType) ? defaultQueueType : visibleQueueTypes[0],
   );
-  const { filters, setSearch, setInvoiceType, setStatus, setDateRange, setPage, resetFilters, hasActiveFilters } =
-    useInvoiceFilters();
+  const {
+    filters,
+    setSearch,
+    setInvoiceType,
+    setStatus,
+    setDateRange,
+    setPage,
+    clearFilters,
+    resetFilters,
+    hasActiveFilters,
+    hasActiveCriteria,
+  } = useInvoiceFilters();
 
   // The permission set can go from "not yet loaded" to real values between the first render and
   // the auth context settling (see AuthContext's mount-time token decode) — if that changes
@@ -118,8 +129,9 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
         onInvoiceTypeChange={setInvoiceType}
         onStatusChange={setStatus}
         onDateRangeChange={setDateRange}
-        onReset={resetFilters}
+        onReset={clearFilters}
         hasActiveFilters={hasActiveFilters}
+        tabStatuses={QUEUE_STATUS_FILTERS[queueType] || null}
       />
 
       {isError ? (
@@ -127,22 +139,22 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
           {getApiErrorMessage(error, "Unable to load invoices right now.")}
         </div>
       ) : isLoading ? (
-        <InvoiceTable invoices={[]} loading />
+        <InvoiceTable invoices={[]} loading showTdsStatus={queueType === QUEUE_TYPES.TDS_STATUS} />
       ) : invoices.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white px-6 py-10 text-center">
           <p className="text-sm font-medium text-gray-700">
-            {hasActiveFilters ? "No invoices match your filters." : (EMPTY_QUEUE[queueType] || EMPTY_QUEUE.all_invoices).title}
+            {hasActiveCriteria ? "No invoices match your search or filters." : (EMPTY_QUEUE[queueType] || EMPTY_QUEUE.all_invoices).title}
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            {hasActiveFilters ? "Try changing or clearing the filters." : (EMPTY_QUEUE[queueType] || EMPTY_QUEUE.all_invoices).hint}
+            {hasActiveCriteria ? "Try changing the search or clearing the filters." : (EMPTY_QUEUE[queueType] || EMPTY_QUEUE.all_invoices).hint}
           </p>
-          {!hasActiveFilters && permissions.canUploadInvoice && ["all_invoices", "ocr_review"].includes(queueType) && (
+          {!hasActiveCriteria && permissions.canUploadInvoice && ["all_invoices", "ocr_review"].includes(queueType) && (
             <Button variant="primary" className="mt-4" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>Upload Invoice</Button>
           )}
         </div>
       ) : (
         <>
-          <InvoiceTable invoices={invoices} loading={false} />
+          <InvoiceTable invoices={invoices} loading={false} showTdsStatus={queueType === QUEUE_TYPES.TDS_STATUS} />
           <Pagination
             currentPage={page}
             totalPages={totalPages}

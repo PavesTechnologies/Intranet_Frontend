@@ -297,15 +297,6 @@ export default function VendorDetailPage() {
                 />
 
                 <DetailRow
-                  label="MSME (Udyam)"
-                  value={
-                    vendor.msme_registered
-                      ? `${vendor.msme_category || "MSME"} — ${vendor.udyam_number || "no Udyam no."}`
-                      : "Not registered"
-                  }
-                />
-
-                <DetailRow
                   label="PAN Number"
                   value={vendor.pan_number}
                 />
