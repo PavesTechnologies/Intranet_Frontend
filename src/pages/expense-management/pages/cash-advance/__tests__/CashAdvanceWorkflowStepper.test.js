@@ -29,6 +29,10 @@ describe("getStageIndex", () => {
     expect(getStageIndex("APPROVED_REQUEST")).toBe(2);
   });
 
+  it("keeps a deferred request at the manager's review stage, not at disbursement", () => {
+    expect(getStageIndex("DEFERRED")).toBe(1);
+  });
+
   it("returns -1 for rejected and cancelled advances", () => {
     expect(getStageIndex("REJECTED")).toBe(-1);
     expect(getStageIndex("CANCELLED")).toBe(-1);

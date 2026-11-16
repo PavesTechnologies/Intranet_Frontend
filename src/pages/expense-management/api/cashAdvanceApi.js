@@ -31,6 +31,7 @@ const multipartConfig = () => ({
  * - POST /xms/employee/cash-advances/{advanceId}/submit
  * - POST /xms/employee/cash-advances/{advanceId}/approve
  * - POST /xms/employee/cash-advances/{advanceId}/reject
+ * - POST /xms/employee/cash-advances/{advanceId}/manager-decision
  * - POST /xms/employee/cash-advances/{advanceId}/disburse
  * - POST /xms/employee/cash-advances/{advanceId}/cancel
  * - GET /xms/employee/cash-advances/my-advances
@@ -69,6 +70,48 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // Calculation preview for the request form. The server calculates it; the browser only displays it.
+  preview: (payload) =>
+    api.post("/xms/employee/cash-advances/preview", payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
+  // The signed-in employee's identity for the request form (read-only).
+  myProfile: () =>
+    api.get("/xms/employee/cash-advances/my-profile", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
+  // Supporting documents on a request. Upload and removal are allowed only while the request is a draft (the server checks).
+  listDocuments: (advanceId) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/documents`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
+  uploadDocument: (advanceId, category, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("category", category);
+    return api.post(`/xms/employee/cash-advances/${advanceId}/documents`, formData, multipartConfig())
+      .then((res) => res.data?.data ?? res.data);
+  },
+
+  // A short-lived link to view ("view") or download ("download") a document.
+  documentLink: (advanceId, documentId, kind) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/documents/${documentId}/${kind}`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
+  deleteDocument: (advanceId, documentId) =>
+    api.delete(`/xms/employee/cash-advances/${advanceId}/documents/${documentId}`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
   update: (advanceId, payload) =>
     api.put(`/xms/employee/cash-advances/${advanceId}`, payload, {
       baseURL: EXPENSE_API_BASE,
@@ -87,11 +130,22 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // The employee's other open advances and what each still owes, shown to the approver before deciding.
+  approvalBalance: (advanceId) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/approval-balance`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }).then((res) => res.data?.data ?? res.data),
+
   approve: (advanceId) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/approve`, null, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+
+  // The manager's decision: APPROVE_FULL, APPROVE_REDUCED, SET_OFF, DEFER or REJECT. The server re-checks every rule.
+  managerDecision: (advanceId, body) =>
+    api.post(`/xms/employee/cash-advances/${advanceId}/manager-decision`, body),
 
   reject: (advanceId, reason) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/reject`, null, {
@@ -111,6 +165,15 @@ export const cashAdvanceApi = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+
+  // Reads a payment screenshot (UPI or bank) and returns the fields it shows. Used to fill the payment form.
+  extractPaymentProof: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api
+      .post("/xms/finance/payment-proofs/extract", formData, multipartConfig())
+      .then((res) => res?.data?.data ?? res?.data ?? null);
+  },
 
   // A stored payment proof, as a blob, so the login token is sent. Path comes from the settlement record.
   getProofFile: (path) =>
@@ -139,14 +202,6 @@ export const cashAdvanceApi = {
   // once this succeeds and the server has verified the payment details.
   repay: (advanceId, formData) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, formData, multipartConfig()),
-
-  // EP04-S4: apply verified expense amount against outstanding cash advance
-  // REST contract: POST /xms/api/v1/expense-reports/{id}/apply-advance-offset
-  applyAdvanceOffset: (expenseReportId, payload = {}) =>
-    api.post(`/xms/api/v1/expense-reports/${expenseReportId}/apply-advance-offset`, payload, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
 
   // Settlement / Reimbursement Adjustment Endpoints (/xms/finance/reimbursements)
   getReimbursementAdjustments: (params) =>

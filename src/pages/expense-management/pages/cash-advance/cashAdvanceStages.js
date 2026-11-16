@@ -36,6 +36,7 @@ export const getStageIndex = (statusStr) => {
       return 5;
     case "EXPENSE_VERIFIED":
     case "EXPENSE VERIFIED":
+    case "AWAITING_REIMBURSEMENT":
     case "SETTLEMENT_PENDING":
     case "SETTLEMENT PENDING":
     case "PARTIALLY_SETTLED":
@@ -49,6 +50,9 @@ export const getStageIndex = (statusStr) => {
     case "REJECTED":
     case "CANCELLED":
       return -1;
+    // Deferred requests wait at the manager's review until the employee sends them again.
+    case "DEFERRED":
+      return 1;
     default:
       return 3;
   }

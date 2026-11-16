@@ -18,7 +18,7 @@ import {
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
-import { formatMoney, formatDate, getCostCenterValue, getStatusBadge } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
+import { formatMoney, formatDate, getCostCenterValue, getStatusBadge, hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
@@ -26,6 +26,7 @@ import FormSelect from "@/components/forms/FormSelect";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import Pagination from "@/components/Pagination/pagination";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
@@ -41,6 +42,8 @@ const LINKABLE_EXPENSE_STATUSES = [
   "PARTIALLY_ADJUSTED",
   "PARTIALLY_SETTLED",
 ];
+
+const PAGE_SIZE = 10;
 
 const canSubmitLinkedExpenses = (adv) =>
   LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
@@ -94,6 +97,9 @@ export default function MyAdvancesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  // Closed and cancelled records are hidden under "All Statuses" unless this is ticked.
+  const [showClosed, setShowClosed] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modals state
   const [editingAdvance, setEditingAdvance] = useState(null); // Edit modal
@@ -204,13 +210,34 @@ export default function MyAdvancesPage() {
 
       const advStatus = (adv.status || "").toUpperCase();
       const matchStatus =
-        statusFilter === "ALL" ||
+        (statusFilter === "ALL" && (showClosed || !["CLOSED", "CANCELLED"].includes(advStatus))) ||
         (statusFilter === "PENDING" && (advStatus === "SUBMITTED" || advStatus === "PENDING" || advStatus === "PENDING_APPROVAL")) ||
         advStatus === statusFilter;
 
       return matchSearch && matchStatus;
     });
-  }, [advances, searchTerm, statusFilter]);
+  }, [advances, searchTerm, statusFilter, showClosed]);
+
+  // Newest first, so the latest request is on the first page and older ones move to the last pages
+  const sortedAdvances = useMemo(() => {
+    const createdTime = (adv) => {
+      const time = new Date(adv.createdAt || adv.createdDate || adv.created_at).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+    return [...filteredAdvances].sort((a, b) => createdTime(b) - createdTime(a));
+  }, [filteredAdvances]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedAdvances.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pagedAdvances = useMemo(
+    () => sortedAdvances.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE),
+    [sortedAdvances, safeCurrentPage]
+  );
+
+  // Go back to page 1 whenever the search or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -441,6 +468,16 @@ export default function MyAdvancesPage() {
             className="[&>label]:text-xs [&>label]:mb-1"
             buttonClassName="!py-1.5 !px-3 !text-xs"
           />
+          {statusFilter === "ALL" && (
+            <label className="flex items-center gap-2 text-xs text-gray-600 whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showClosed}
+                onChange={(e) => setShowClosed(e.target.checked)}
+              />
+              Show closed and cancelled
+            </label>
+          )}
         </div>
       </div>
 
@@ -476,18 +513,17 @@ export default function MyAdvancesPage() {
               <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                 <tr>
                   <th className="py-3 px-4">S.No</th>
-                  <th className="py-3 px-4">Report #</th>
                   <th className="py-3 px-4">Title</th>
                   <th className="py-3 px-4">Cost Center</th>
                   <th className="py-3 px-4">Currency</th>
                   <th className="py-3 px-4">Needed By</th>
                   <th className="py-3 px-4 text-right">Outstanding</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="sticky right-0 bg-gray-50 py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredAdvances.map((adv, idx) => {
+                {pagedAdvances.map((adv, idx) => {
                   const advId = adv.advanceId || adv.id || "N/A";
                   const statusUpper = (adv.status || "").toUpperCase();
                   const isDraft = statusUpper === "DRAFT";
@@ -496,38 +532,45 @@ export default function MyAdvancesPage() {
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
                       <td className="py-3 px-4 font-medium text-gray-600">
-                        {idx + 1}
-                      </td>
-                      <td className="py-3 px-4 font-mono font-medium text-blue-700">
-                        #{String(advId).slice(0, 8)}
+                        {(safeCurrentPage - 1) * PAGE_SIZE + idx + 1}
                       </td>
                       <td className="py-3 px-4 max-w-xs">
                         <p className="font-semibold text-gray-900 truncate">{adv.title || "Cash Advance"}</p>
                         {adv.purpose && <p className="text-[11px] text-gray-500 truncate mt-0.5">{adv.purpose}</p>}
                       </td>
-                      <td className="py-3 px-4 font-medium text-gray-700 whitespace-nowrap">
+                      <td className="py-3 px-4 font-medium text-gray-700">
                         {getCostCenterValue(adv)}
                       </td>
-                      <td className="py-3 px-4 font-bold text-gray-900 whitespace-nowrap">
+                      <td className="py-3 px-4 font-bold text-gray-900">
                         {formatMoney(adv.amount, adv.currencyCode || "INR")}
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-gray-600">
+                      <td className="py-3 px-4 text-gray-600">
                         {formatDate(getNeededByDateValue(adv))}
                       </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap font-semibold">
+                      <td className="py-3 px-4 text-right font-semibold">
                         <span className={isOverdue(adv) ? "text-rose-600" : "text-amber-600"}>
                           {formatMoney(adv.outstandingBalance, adv.currencyCode || "INR")}
                         </span>
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4">
                         {isOverdue(adv) ? getStatusBadge("OVERDUE") : getStatusBadge(adv.status)}
                         {isOverdue(adv) && (
                           <p className="text-[10px] text-rose-600 mt-1 font-medium">{getAgingDays(adv)} day(s) overdue</p>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <td className="sticky right-0 bg-white py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* View Detail Action */}
+                          {canSubmitLinkedExpenses(adv) && (
+                            <button
+                              onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
+                              disabled={hasSubmittedLinkedReport(adv)}
+                              title={hasSubmittedLinkedReport(adv) ? "An expense report is already submitted for this advance" : "Submit linked expenses"}
+                              className={`p-1.5 rounded transition ${hasSubmittedLinkedReport(adv) ? "text-gray-300 cursor-not-allowed" : "text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"}`}
+                            >
+                              <Receipt size={15} />
+                            </button>
+                          )}
                           <button
                             onClick={() => navigate(`/expense-management/cash-advance/${adv.advanceId || adv.id}`)}
                             title="View details"
@@ -537,15 +580,6 @@ export default function MyAdvancesPage() {
                           </button>
 
                           {/* Submit linked expenses (same action as the detail page's Stage 4 button) */}
-                          {canSubmitLinkedExpenses(adv) && (
-                            <button
-                              onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
-                              title="Submit linked expenses"
-                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition"
-                            >
-                              <Receipt size={15} />
-                            </button>
-                          )}
 
                           {/* Draft Actions */}
                           {isDraft && (
@@ -593,6 +627,13 @@ export default function MyAdvancesPage() {
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+              onNext={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))}
+              className="border-t border-gray-100"
+            />
           </div>
         )}
       </div>

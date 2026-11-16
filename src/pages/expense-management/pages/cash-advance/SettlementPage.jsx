@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { loadSettlementLock, SETTLEMENT_LOCK } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
 import { DollarSign, CheckCircle2, RefreshCw, Eye, Receipt, CheckCircle, Clock, FileText, AlertCircle, Layers, ArrowUpRight, ArrowDownLeft, CreditCard, XCircle, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -12,6 +13,7 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import SettlementModal, { toSettlementAdvance } from "@/components/settlement/SettlementModal";
 import { getSettlementBlockReason } from "@/pages/expense-management/api/adjustmentRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
+import { hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
@@ -86,9 +88,12 @@ const LINKABLE_EXPENSE_STATUSES = [
 ];
 
 // The button is for the advance's own employee only. The backend checks this again when the report is created.
+// The login token carries the employee id as employee_id; accept the camelCase form too.
+const signedInEmployeeId = (user) => user?.employeeId ?? user?.employee_id ?? "";
+
 const canOpenExpenseFor = (adv, user) =>
-  Boolean(user?.employeeId) &&
-  String(adv.employeeId ?? "").trim().toLowerCase() === String(user.employeeId).trim().toLowerCase() &&
+  Boolean(signedInEmployeeId(user)) &&
+  String(adv.employeeId ?? "").trim().toLowerCase() === String(signedInEmployeeId(user)).trim().toLowerCase() &&
   LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
   Number(adv.outstandingBalance ?? 0) > 0;
 
@@ -97,9 +102,12 @@ export default function SettlementPage() {
   const { data: directory } = useEmployeeDirectory();
   const navigate = useNavigate();
   const [advances, setAdvances] = useState([]);
+  // Per advance: what has already been done with the balance (carry-forward or salary request), if anything.
+  const [settlementLocks, setSettlementLocks] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  // Open items (not yet settled or closed) are the working queue; closed records are shown only when asked for.
+  const [statusFilter, setStatusFilter] = useState("OPEN");
 
   const isFinanceExecutive = useMemo(() => {
     if (typeof hasRole === "function") {
@@ -238,6 +246,19 @@ export default function SettlementPage() {
     }
   };
 
+  // Lock state for every advance on the list, so a settled-by-action advance cannot be settled again.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = advances.map((a) => a.advanceId || a.id).filter(Boolean);
+    Promise.all(ids.map((id) => loadSettlementLock(id).then((lock) => [id, lock]).catch(() => [id, { kind: null }])))
+      .then((pairs) => {
+        if (!cancelled) setSettlementLocks(Object.fromEntries(pairs));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [advances]);
+
   useEffect(() => {
     fetchSettlementAdvances();
   }, [isFinanceExecutive]);
@@ -247,7 +268,9 @@ export default function SettlementPage() {
       const statusUpper = (adv.status || "").toUpperCase();
 
       let matchStatus = true;
-      if (statusFilter === "APPROVED") {
+      if (statusFilter === "OPEN") {
+        matchStatus = !["SETTLED", "CLOSED"].includes(statusUpper);
+      } else if (statusFilter === "APPROVED") {
         matchStatus = ["APPROVED"].includes(statusUpper);
       } else if (statusFilter === "DISBURSED" || statusFilter === "IN_PROGRESS") {
         matchStatus = [
@@ -301,7 +324,9 @@ export default function SettlementPage() {
 
     setSubmitting(true);
     try {
-      await cashAdvanceApi.disburse(advanceId, buildDisbursementFormData(values));
+      // Fully covered by carried-in balance: there is no payment to describe, so nothing is sent with the request.
+      const noPaymentDue = Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) <= 0;
+      await cashAdvanceApi.disburse(advanceId, noPaymentDue ? null : buildDisbursementFormData(values));
       showStatusToast(`Cash advance #${String(advanceId).slice(0, 8)} disbursed successfully!`, "success");
       setDisbursing(null);
       fetchSettlementAdvances();
@@ -420,11 +445,25 @@ export default function SettlementPage() {
   ];
 
   const statusOptions = [
-    { label: "All Advances", value: "ALL" },
+    { label: "Open (needs action)", value: "OPEN" },
+    { label: "All Advances (incl. closed)", value: "ALL" },
     { label: "Approved (Awaiting Disbursement)", value: "APPROVED" },
     { label: "Disbursed / Outstanding", value: "DISBURSED" },
-    { label: "Fully Settled", value: "SETTLED" },
+    { label: "Closed (Fully Settled)", value: "SETTLED" },
   ];
+
+  // Shown in the header so the user can see which role this session is working under.
+  const roleLabel = useMemo(() => {
+    const roles = Array.isArray(user?.roles)
+      ? user.roles.map((r) => String(r).toUpperCase())
+      : typeof user?.role === "string"
+      ? [user.role.toUpperCase()]
+      : [];
+    if (roles.some((r) => ["FINANCE EXECUTIVE", "FINANCE_EXECUTIVE", "FINANCE"].includes(r))) return "Finance Executive";
+    if (roles.some((r) => ["ADMIN", "SUPER_ADMIN"].includes(r))) return "Administrator";
+    if (roles.some((r) => r.includes("MANAGER"))) return "Manager";
+    return "Employee";
+  }, [user]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
@@ -434,6 +473,9 @@ export default function SettlementPage() {
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#0a174e]">Cash Advance Settlement & Closure</h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Signed in as <span className="font-semibold text-gray-700">{roleLabel}</span>
+          </p>
           <p className="text-xs text-gray-500 mt-0.5">
             Settle outstanding cash advance balances against submitted expenses, record repayments/reimbursements, and achieve zero-balance closure.
           </p>
@@ -524,7 +566,6 @@ export default function SettlementPage() {
             <table className="w-full text-left text-xs text-gray-700">
               <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                 <tr>
-                  <th className="py-3 px-4">Ref #</th>
                   {isFinanceExecutive && <th className="py-3 px-4">Employee Name</th>}
                   <th className="py-3 px-4">Title & Purpose</th>
                   <th className="py-3 px-4 text-right">Advance Disbursed</th>
@@ -542,9 +583,6 @@ export default function SettlementPage() {
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
-                      <td className="py-3 px-4 font-mono font-medium text-blue-700">
-                        #{String(advId).slice(0, 8)}
-                      </td>
                       {isFinanceExecutive && (
                         <td className="py-3 px-4 font-medium text-gray-900 whitespace-nowrap">
                           {getEmployeeName(adv, directory)}
@@ -608,10 +646,12 @@ export default function SettlementPage() {
                           {canOpenExpenseFor(adv, user) && (
                             <button
                               onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
-                              title="Create an expense report for this cash advance"
-                              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
+                              disabled={hasSubmittedLinkedReport(adv)}
+                              title={hasSubmittedLinkedReport(adv) ? "An expense report is already submitted for this advance" : "Create an expense report for this cash advance"}
+                              aria-label="Cash Advance Expense"
+                              className={`inline-flex items-center rounded-md border p-1.5 ${hasSubmittedLinkedReport(adv) ? "border-gray-200 text-gray-400 cursor-not-allowed" : "border-indigo-200 text-indigo-700 hover:bg-indigo-50"}`}
                             >
-                              <Receipt size={13} /> Cash Advance Expense
+                              <Receipt size={15} />
                             </button>
                           )}
 
@@ -630,16 +670,28 @@ export default function SettlementPage() {
                                   Disburse
                                 </Button>
                               )}
-                              {!isSettled && statusUpper !== "APPROVED" && (
-                                <Button
-                                  size="sm"
-                                  variant="primary"
-                                  onClick={() => handleOpenSettle(adv)}
-                                  className="!py-1 !px-2.5 !text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
-                                >
-                                  Settle Advance
-                                </Button>
-                              )}
+                              {!isSettled && statusUpper !== "APPROVED" && (() => {
+                                const lockKind = settlementLocks[adv.advanceId || adv.id]?.kind;
+                                const locked = Boolean(lockKind);
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="primary"
+                                    onClick={() => handleOpenSettle(adv)}
+                                    disabled={locked}
+                                    title={
+                                      lockKind === SETTLEMENT_LOCK.CARRY_FORWARD
+                                        ? "Carry-forward is already set for this advance"
+                                        : lockKind === SETTLEMENT_LOCK.SALARY
+                                          ? "A salary deduction is already requested for this advance"
+                                          : undefined
+                                    }
+                                    className={`!py-1 !px-2.5 !text-[11px] text-white ${locked ? "bg-gray-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"}`}
+                                  >
+                                    Settle Advance
+                                  </Button>
+                                );
+                              })()}
                             </>
                           )}
                         </div>
@@ -660,6 +712,7 @@ export default function SettlementPage() {
         <RecordDisbursementModal
           title="Disburse Cash Advance"
           submitLabel="Confirm Disburse"
+          paymentRequired={Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) > 0}
           isSubmitting={submitting}
           onCancel={() => setDisbursing(null)}
           onSubmit={handleConfirmDisburse}
@@ -680,12 +733,26 @@ export default function SettlementPage() {
                   <span className="text-xs font-medium text-gray-600">Outstanding Balance:</span>
                   <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.outstandingBalance || disbursing.amount, disbursing.currencyCode || "INR")}</span>
                 </div>
+                {Number(disbursing.carriedInAmount) > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-medium text-gray-600">Carried in (already with the employee):</span>
+                      <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.carriedInAmount, disbursing.currencyCode || "INR")}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-200 pt-2">
+                      <span className="text-xs font-medium text-gray-600">Pay to employee now:</span>
+                      <span className="text-sm font-bold text-emerald-700">{formatMoney(Number(disbursing.amount) - Number(disbursing.carriedInAmount), disbursing.currencyCode || "INR")}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="text-xs text-gray-600 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
-                <p className="font-medium text-amber-900 mb-1">Payment will be initiated to:</p>
-                <p className="text-amber-800">{disbursing.employeeName || `Employee ID: ${disbursing.employeeId || disbursing.employee_id}`}</p>
-              </div>
+              {Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) > 0 && (
+                <div className="text-xs text-gray-600 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="font-medium text-amber-900 mb-1">Payment will be initiated to:</p>
+                  <p className="text-amber-800">{disbursing.employeeName || `Employee ID: ${disbursing.employeeId || disbursing.employee_id}`}</p>
+                </div>
+              )}
             </>
           }
         />

@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { DISBURSEMENT_MODE, DISBURSEMENT_MODE_OPTIONS } from "./disbursementConfirmation";
 
 const inputClass =
@@ -40,9 +41,43 @@ export default function DisbursementConfirmationFields({
   errors = {},
   onFieldChange,
   modes = [DISBURSEMENT_MODE.CASH, DISBURSEMENT_MODE.BANK_TRANSFER, DISBURSEMENT_MODE.UPI],
+  // Called with the fields read from a payment screenshot (for example, to fill the amount).
+  onScreenshotRead,
 }) {
+  const [screenshotState, setScreenshotState] = useState({ busy: false, message: "" });
   const modeOptions = DISBURSEMENT_MODE_OPTIONS.filter((opt) => modes.includes(opt.value));
   const set = (key) => (e) => onFieldChange(key, e.target.value);
+
+  // Reads the screenshot and fills the fields that are still empty. Anything typed stays as it is.
+  const readScreenshot = async (file) => {
+    if (!file) return;
+    setScreenshotState({ busy: true, message: "" });
+    try {
+      const fields = await cashAdvanceApi.extractPaymentProof(file);
+      const filled = [];
+      const fill = (key, value, label) => {
+        if (value && !values[key]) {
+          onFieldChange(key, value);
+          filled.push(label);
+        }
+      };
+      fill("upiTransactionId", fields?.reference, "transaction ID");
+      fill("payeeUpiId", fields?.payeeUpiId, "payee UPI ID");
+      fill("transferDate", fields?.transferDate, "payment date");
+      onScreenshotRead?.(fields);
+      setScreenshotState({
+        busy: false,
+        message: filled.length
+          ? `Filled from the screenshot: ${filled.join(", ")}. Check them against the screenshot before confirming.`
+          : "Could not read these details from the screenshot. Enter them below.",
+      });
+    } catch (err) {
+      setScreenshotState({
+        busy: false,
+        message: err.response?.data?.message || "Could not read the screenshot. Enter the details below.",
+      });
+    }
+  };
   const isCash = values.mode === DISBURSEMENT_MODE.CASH;
   const isBank = values.mode === DISBURSEMENT_MODE.BANK_TRANSFER;
   const isUpi = values.mode === DISBURSEMENT_MODE.UPI;
@@ -149,13 +184,22 @@ export default function DisbursementConfirmationFields({
               onChange={set("transferDate")}
             />
           </Field>
-          <FileInput
-            id="disb-upi-proof"
-            label="Payment screenshot"
-            error={errors.paymentProof}
-            fileKey="paymentProof"
-            onFieldChange={onFieldChange}
-          />
+          <Field id="disb-upi-proof" label="Payment screenshot" error={errors.paymentProof}>
+            <input
+              id="disb-upi-proof"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="block w-full text-sm text-gray-700"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                onFieldChange("paymentProof", file);
+                readScreenshot(file);
+              }}
+            />
+            <p className="text-xs text-gray-500">PDF, JPG or PNG, up to 10 MB. The details are read from it automatically.</p>
+            {screenshotState.busy && <p className="text-xs text-blue-700">Reading the screenshot...</p>}
+            {screenshotState.message && <p className="text-xs text-blue-800">{screenshotState.message}</p>}
+          </Field>
         </>
       )}
     </div>

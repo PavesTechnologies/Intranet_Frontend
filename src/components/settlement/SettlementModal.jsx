@@ -2,13 +2,15 @@ import React, { useState } from "react";
 import Modal from "@/components/Modal/modal";
 import Button from "@/components/Button/Button";
 import SalaryDeductionPanel from "@/pages/expense-management/pages/cash-advance/components/SalaryDeductionPanel";
+import CarryForwardPanel from "@/pages/expense-management/pages/cash-advance/components/CarryForwardPanel";
+import { SETTLEMENT_LOCK, useSettlementLock } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
 
 /**
  * Settlement of a cash advance balance. One shared modal for the settlement list.
  *
  * Two ways to clear the balance, as agreed:
  * - Salary deduction: Finance requests the recovery through payroll (SalaryDeductionPanel).
- * - Carry forward to next expense: not enabled by policy yet, so it is shown but not submitted.
+ * - Carry forward to next expense: one click marks the balance ready; it is added to the next approved advance automatically.
  *
  * The employee's own payment is requested and recorded on the advance's settlement page, not here.
  */
@@ -22,9 +24,6 @@ const CHOICES = [
   { value: SETTLEMENT_CHOICE.SALARY, label: "Salary deduction", hint: "Recovered from salary in a payroll month Finance chooses" },
   { value: SETTLEMENT_CHOICE.CARRY_FORWARD, label: "Carry forward to next expense", hint: "The balance is set against the next expense report" },
 ];
-
-const NOT_ENABLED_MESSAGE =
-  "Carry forward is not enabled yet. It needs the Finance policy to be approved first.";
 
 const formatMoney = (amount, currency) =>
   `${currency || "INR"} ${Number(amount || 0).toLocaleString("en-IN", {
@@ -51,8 +50,21 @@ export const toSettlementAdvance = (adv) => {
 
 export default function SettlementModal({ isOpen, advance, onClose, onSettled }) {
   const [choice, setChoice] = useState(SETTLEMENT_CHOICE.SALARY);
+  // Once carry-forward or a salary request is set, the options stay locked until it is cancelled.
+  const lock = useSettlementLock(advance?.advanceId, Boolean(isOpen && advance));
 
   if (!advance) return null;
+
+  const handleChanged = () => {
+    lock.reload();
+    onSettled?.();
+  };
+  const activeChoice =
+    lock.kind === SETTLEMENT_LOCK.CARRY_FORWARD
+      ? SETTLEMENT_CHOICE.CARRY_FORWARD
+      : lock.kind === SETTLEMENT_LOCK.SALARY
+        ? SETTLEMENT_CHOICE.SALARY
+        : choice;
 
   const balanceIsDue = advance.balance > 0;
   const difference = advance.amount - advance.verifiedExpense;
@@ -95,6 +107,15 @@ export default function SettlementModal({ isOpen, advance, onClose, onSettled })
           </div>
         </div>
 
+        {lock.kind && (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            {lock.kind === SETTLEMENT_LOCK.CARRY_FORWARD
+              ? `Carry-forward is set: ${formatMoney(lock.amount, advance.currencyCode)} is ready for the next approved advance. Settlement options are locked; cancel the carry-forward below to change it.`
+              : "A salary deduction is already requested for this advance. Settlement options are locked; cancel the request below to change it."}
+          </div>
+        )}
+
+        {!lock.kind && (
         <fieldset>
           <legend className="mb-2 font-semibold text-gray-900">Settlement action</legend>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2" role="radiogroup" aria-label="Settlement action">
@@ -116,22 +137,28 @@ export default function SettlementModal({ isOpen, advance, onClose, onSettled })
             ))}
           </div>
         </fieldset>
+        )}
 
-        {choice === SETTLEMENT_CHOICE.SALARY && balanceIsDue && (
+        {activeChoice === SETTLEMENT_CHOICE.SALARY && balanceIsDue && (
           <SalaryDeductionPanel
             advanceId={advance.advanceId}
             outstanding={advance.balance}
             currencyCode={advance.currencyCode}
-            onChanged={() => onSettled?.()}
+            onChanged={handleChanged}
           />
         )}
 
-        {choice === SETTLEMENT_CHOICE.SALARY && !balanceIsDue && (
+        {activeChoice === SETTLEMENT_CHOICE.SALARY && !balanceIsDue && (
           <p className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">This advance has no balance to recover.</p>
         )}
 
-        {choice === SETTLEMENT_CHOICE.CARRY_FORWARD && (
-          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{NOT_ENABLED_MESSAGE}</p>
+        {activeChoice === SETTLEMENT_CHOICE.CARRY_FORWARD && balanceIsDue && (
+          <CarryForwardPanel
+            advanceId={advance.advanceId}
+            currencyCode={advance.currencyCode}
+            outstanding={advance.balance}
+            onChanged={handleChanged}
+          />
         )}
 
         <div className="flex justify-end gap-2 border-t border-gray-200 pt-4">

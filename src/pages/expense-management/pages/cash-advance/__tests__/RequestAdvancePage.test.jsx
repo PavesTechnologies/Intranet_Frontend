@@ -7,6 +7,15 @@ import { lookupService } from '../../../api/expenseReportsApi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
+// Dates must be after today, so the fixtures are built relative to the run date.
+const daysFromToday = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+const NEEDED_BY = daysFromToday(10);
+const SETTLEMENT_DUE = daysFromToday(20);
+
 /**
  * EP04-S1 Test Suite: Employee Cash Advance Request
  *
@@ -38,12 +47,26 @@ async function selectCurrency() {
   fireEvent.click(await screen.findByRole('option', { name: /USD/ }));
 }
 
+// The server's calculation for a complete new advance with no outstanding balance.
+const COMPLETE_NEW_PREVIEW = {
+  requestType: 'COMPLETE_NEW', currencyCode: 'USD', existingOutstanding: 0, eligibleOutstanding: 0,
+  cashRequested: 5000, totalAdvanceAllocation: 5000, justificationRequired: false,
+  exceedsLimit: false, potentialExposure: 5000, exposureLimit: null, excessOverLimit: 0,
+};
+
+// The employee must preview before Submit is enabled.
+async function previewBeforeSubmit() {
+  fireEvent.click(screen.getByRole('button', { name: /preview calculation/i }));
+  await screen.findByText(/Calculation preview/);
+}
+
 describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lookupService.getActiveCostCenters.mockResolvedValue([
       { costCenterId: 'cc-1', costCenterCode: 'ENG', costCenterName: 'Engineering' },
     ]);
+    cashAdvanceApi.preview.mockResolvedValue(COMPLETE_NEW_PREVIEW);
     lookupService.getActiveCurrencies.mockResolvedValue([
       { currencyId: 'cur-1', currencyCode: 'USD', currencyName: 'US Dollar' },
     ]);
@@ -56,10 +79,7 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
     it('should validate required fields', async () => {
       renderWithProviders(<RequestAdvancePage />);
 
-      const submitButton = screen.getByRole('button', { name: /submit request/i });
-      // The button is disabled until currencies and balances finish loading.
-      await waitFor(() => expect(submitButton).toBeEnabled());
-      fireEvent.click(submitButton);
+      fireEvent.click(screen.getByRole('button', { name: /preview calculation/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/title is required/i)).toBeInTheDocument();
@@ -73,15 +93,11 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
       const amountInput = screen.getByLabelText(/amount/i);
       await userEvent.type(amountInput, '-100');
 
-      const submitButton = screen.getByRole('button', { name: /submit request/i });
-      // The button is disabled until currencies and balances finish loading.
-      await waitFor(() => expect(submitButton).toBeEnabled());
-      fireEvent.click(submitButton);
+      fireEvent.click(screen.getByRole('button', { name: /preview calculation/i }));
 
-      // The amount input has min="0", so the browser blocks submission before the
-      // custom message can render. The request must never reach the API.
-      await waitFor(() => expect(amountInput).toBeInvalid());
+      await waitFor(() => expect(screen.getByText(/enter a valid advance amount/i)).toBeInTheDocument());
       expect(cashAdvanceApi.create).not.toHaveBeenCalled();
+      expect(cashAdvanceApi.preview).not.toHaveBeenCalled();
     });
 
     it('should validate settlement date is after needed date', async () => {
@@ -94,14 +110,9 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
       fireEvent.change(neededDateInput, { target: { value: '2026-10-20' } });
       fireEvent.change(settlementDateInput, { target: { value: '2026-10-10' } });
 
-      const submitButton = screen.getByRole('button', { name: /submit request/i });
-      // The button is disabled until currencies and balances finish loading.
-      await waitFor(() => expect(submitButton).toBeEnabled());
-      fireEvent.click(submitButton);
+      fireEvent.click(screen.getByRole('button', { name: /preview calculation/i }));
 
-      // The settlement input now carries min = needed-by date, so the browser rejects the earlier
-      // date natively and the request is never sent.
-      await waitFor(() => expect(settlementDateInput).toBeInvalid());
+      await waitFor(() => expect(screen.getByText(/cannot be before needed by date/i)).toBeInTheDocument());
       expect(cashAdvanceApi.create).not.toHaveBeenCalled();
     });
   });
@@ -125,13 +136,15 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
       await userEvent.type(amountInput, '5000');
       await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
-      await userEvent.type(neededDateInput, '2026-10-15');
-      await userEvent.type(settlementDateInput, '2026-10-25');
+      await userEvent.type(neededDateInput, NEEDED_BY);
+      await userEvent.type(settlementDateInput, SETTLEMENT_DUE);
 
+      await previewBeforeSubmit();
       const submitButton = screen.getByRole('button', { name: /submit request/i });
-      // The button is disabled until currencies and balances finish loading.
       await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
+      // Submit asks first; the request is created and sent only after the user confirms.
+      fireEvent.click(await screen.findByRole('button', { name: /submit for approval/i }));
 
       // Check button is disabled during submission
       await waitFor(() => {
@@ -159,13 +172,15 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
       await userEvent.type(amountInput, '5000');
       await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
-      await userEvent.type(neededDateInput, '2026-10-15');
-      await userEvent.type(settlementDateInput, '2026-10-25');
+      await userEvent.type(neededDateInput, NEEDED_BY);
+      await userEvent.type(settlementDateInput, SETTLEMENT_DUE);
 
+      await previewBeforeSubmit();
       const submitButton = screen.getByRole('button', { name: /submit request/i });
-      // The button is disabled until currencies and balances finish loading.
       await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
+      // Submit asks first; the request is created and sent only after the user confirms.
+      fireEvent.click(await screen.findByRole('button', { name: /submit for approval/i }));
 
       await waitFor(() => {
         expect(cashAdvanceApi.create).toHaveBeenCalledWith(
@@ -197,13 +212,15 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
       await userEvent.type(amountInput, '50000');
       await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
-      await userEvent.type(neededDateInput, '2026-10-15');
-      await userEvent.type(settlementDateInput, '2026-10-25');
+      await userEvent.type(neededDateInput, NEEDED_BY);
+      await userEvent.type(settlementDateInput, SETTLEMENT_DUE);
 
+      await previewBeforeSubmit();
       const submitButton = screen.getByRole('button', { name: /submit request/i });
-      // The button is disabled until currencies and balances finish loading.
       await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
+      // Submit asks first; the request is created and sent only after the user confirms.
+      fireEvent.click(await screen.findByRole('button', { name: /submit for approval/i }));
 
       await waitFor(() => {
         expect(cashAdvanceApi.create).toHaveBeenCalled();

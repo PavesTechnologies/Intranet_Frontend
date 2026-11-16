@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Calculator, AlertCircle } from "lucide-react";
+import React from "react";
+import { Calculator } from "lucide-react";
 
 const formatMoney = (amount, currencyCode = "INR") => {
   const num = Number(amount) || 0;
@@ -21,43 +21,18 @@ export default function CashAdvanceAdjustmentCard({
   currencyCode = "INR",
   status = "",
   outstandingBalance = null,
+  carriedOutAmount = 0,
+  salaryDeductedAmount = 0,
   expenseReport = null,
-  onApplyOffset = null,
   className = "",
 }) {
   const A = Number(advanceAmount) || 0;
   const E = Number(verifiedExpenseAmount) || 0;
+  const C = Number(carriedOutAmount) || 0;
+  const D = Number(salaryDeductedAmount) || 0;
   const persistedOutstanding = outstandingBalance != null ? Math.max(0, Number(outstandingBalance) || 0) : null;
   const netBalance = persistedOutstanding != null ? persistedOutstanding : Math.max(0, A - E);
   const excessReimbursement = Math.max(0, E - A);
-  const reportId = expenseReport?.reportId || expenseReport?.id || expenseReport?.expenseReportId;
-  const reportReimbursable = Number(
-    expenseReport?.reimbursableTotal ??
-    expenseReport?.reimbursableAmount ??
-    expenseReport?.totalAmount ??
-    expenseReport?.amount ??
-    0
-  ) || 0;
-  const [offsetAmount, setOffsetAmount] = useState(() => Math.min(E, persistedOutstanding != null ? persistedOutstanding : A));
-  const [applyingOffset, setApplyingOffset] = useState(false);
-
-  const maxOffset = Math.min(
-    reportReimbursable > 0 ? reportReimbursable : E,
-    persistedOutstanding != null ? persistedOutstanding : A
-  );
-
-  const handleApplyOffset = async () => {
-    if (!onApplyOffset || !reportId) return;
-    const amount = Number(offsetAmount) || 0;
-    if (amount <= 0 || amount > maxOffset) return;
-    setApplyingOffset(true);
-    try {
-      await onApplyOffset({ expenseReportId: reportId, offsetAmount: amount });
-    } finally {
-      setApplyingOffset(false);
-    }
-  };
-
   const upperStatus = (status || "").toUpperCase();
   const isSettled = upperStatus === "SETTLED" || upperStatus === "CLOSED";
   const isFullyAdjusted = (E >= A && A > 0) || upperStatus === "ADJUSTED" || upperStatus === "FULLY_ADJUSTED";
@@ -129,49 +104,15 @@ export default function CashAdvanceAdjustmentCard({
           </p>
         </div>
         <p className="text-[11px] text-gray-500">
-          {formatMoney(A, currencyCode)} advance − {formatMoney(E, currencyCode)} approved ={" "}
-          {A - E >= 0
-            ? formatMoney(A - E, currencyCode)
-            : `${formatMoney(Math.abs(A - E), currencyCode)} payable to employee`}
+          {formatMoney(A, currencyCode)} advance
+          {C > 0 ? <> − {formatMoney(C, currencyCode)} carried forward</> : null} − {formatMoney(E, currencyCode)} approved
+          {D > 0 ? <> − {formatMoney(D, currencyCode)} salary deducted</> : null} ={" "}
+          {A - C - E - D >= 0
+            ? formatMoney(A - C - E - D, currencyCode)
+            : `${formatMoney(Math.abs(A - C - E - D), currencyCode)} payable to employee`}
         </p>
       </div>
 
-      {onApplyOffset && reportId && maxOffset > 0 && !isSettled && (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <p className="text-[10px] font-semibold text-indigo-800 uppercase tracking-wider">Apply Advance Offset</p>
-              <p className="text-[10px] text-indigo-700 mt-0.5">Offset cannot exceed the report reimbursable amount or outstanding advance balance.</p>
-            </div>
-            <span className="text-xs font-bold text-indigo-800">Max: {formatMoney(maxOffset, currencyCode)}</span>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-            <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-gray-600 mb-1">Offset Amount</label>
-              <input
-                type="number"
-                min="0"
-                max={maxOffset}
-                step="0.01"
-                value={offsetAmount}
-                onChange={(e) => setOffsetAmount(e.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleApplyOffset}
-              disabled={applyingOffset || Number(offsetAmount) <= 0 || Number(offsetAmount) > maxOffset}
-              className="rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {applyingOffset ? "Applying..." : "Apply Offset"}
-            </button>
-          </div>
-          {E > 0 && E < A && (
-            <p className="text-[10px] text-amber-700 flex items-center gap-1"><AlertCircle size={12} /> If verified expenses are less than the advance, the residual remains outstanding and may enter recovery (ERR-08).</p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

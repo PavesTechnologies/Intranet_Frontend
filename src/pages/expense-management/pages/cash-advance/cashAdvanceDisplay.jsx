@@ -82,6 +82,18 @@ export const getCostCenterValue = (adv) => {
 };
 
 
+// Reports in these statuses are dead and do not block a new report for the advance.
+const DEAD_REPORT_STATUSES = ["REJECTED", "CANCELLED"];
+
+/**
+ * True when an expense report already exists for this advance (draft or submitted). Used to disable
+ * "create expense report" on the advance, so the same advance does not get a second report.
+ */
+export const hasSubmittedLinkedReport = (adv) => {
+  const reports = adv?.linkedExpenseReports || (adv?.linkedExpenseReport ? [adv.linkedExpenseReport] : []);
+  return reports.some((r) => !DEAD_REPORT_STATUSES.includes(String(r.status || r.reportStatus || "").toUpperCase()));
+};
+
 export const getStatusBadge = (status) => {
   const upper = (status || "").toUpperCase();
   switch (upper) {
@@ -120,11 +132,16 @@ export const getStatusBadge = (status) => {
     case "PARTIALLY ADJUSTED":
     case "ADJUSTED":
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Settlement Pending</span>;
+    case "AWAITING_REIMBURSEMENT":
+    case "AWAITING REIMBURSEMENT":
+      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-sky-50 text-sky-700 border border-sky-200">Awaiting Reimbursement</span>;
     case "CLOSED":
     case "SETTLED":
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Closed</span>;
     case "REJECTED":
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Rejected</span>;
+    case "DEFERRED":
+      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200">Deferred</span>;
     case "OVERDUE":
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Overdue</span>;
     case "CANCELLED":

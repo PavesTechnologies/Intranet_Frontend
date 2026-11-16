@@ -1,3 +1,4 @@
+import { carryForwardApi } from "@/pages/expense-management/api/carryForwardApi";
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +14,9 @@ vi.mock("@/pages/expense-management/api/recoveryApi", () => ({
   },
 }));
 vi.mock("@/components/toastfy/toast", () => ({ showStatusToast: vi.fn() }));
+vi.mock("@/pages/expense-management/api/carryForwardApi", () => ({
+  carryForwardApi: { getReady: vi.fn(), markReady: vi.fn(), cancelReady: vi.fn() },
+}));
 
 const ADVANCE = toSettlementAdvance({
   advanceId: "adv-1",
@@ -56,12 +60,15 @@ describe("SettlementModal", () => {
     expect(recoveryApi.createSalaryDeduction).not.toHaveBeenCalled();
   });
 
-  it("explains that carry forward is not enabled, and sends nothing", () => {
+  it("carry forward marks the full balance ready with one click, and shows the confirmation", async () => {
+    carryForwardApi.getReady.mockResolvedValue({ readyAmount: null });
+    carryForwardApi.markReady.mockResolvedValue({ readyAmount: 1503.85 });
     render(<SettlementModal isOpen advance={ADVANCE} onClose={vi.fn()} onSettled={vi.fn()} />);
     fireEvent.click(screen.getByRole("radio", { name: /Carry forward/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Carry forward/ }));
 
-    expect(screen.getByText(/Carry forward is not enabled yet/)).toBeInTheDocument();
-    expect(recoveryApi.createSalaryDeduction).not.toHaveBeenCalled();
+    expect(carryForwardApi.markReady).toHaveBeenCalledWith(expect.objectContaining({ amount: 3000 }));
+    expect(await screen.findByText(/is ready to carry forward/)).toBeInTheDocument();
   });
 
   it("creates a salary deduction request and reports it", async () => {
