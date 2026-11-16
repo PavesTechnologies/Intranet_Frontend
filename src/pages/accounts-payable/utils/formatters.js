@@ -34,7 +34,7 @@ export function formatCurrency(amount, currencySymbol = "₹") {
  * @param {string} isoString
  * @returns {Date}
  */
-function parseBackendDateTime(isoString) {
+export function parseBackendDateTime(isoString) {
   const hasTimeComponent = isoString.includes("T");
   const hasTimezoneDesignator = /Z$|[+-]\d{2}:?\d{2}$/.test(isoString);
   const normalized = hasTimeComponent && !hasTimezoneDesignator ? `${isoString}Z` : isoString;

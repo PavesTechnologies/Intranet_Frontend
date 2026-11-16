@@ -1,7 +1,15 @@
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { invoiceService } from "../services/invoiceService";
+import { useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { filterInvoices, invoiceService } from "../services/invoiceService";
 
-export const INVOICES_KEY = (params) => ["accountsPayable", "invoices", params];
+/**
+ * One cache entry for the whole invoice list. The backend list endpoint takes no filter params,
+ * so search/filter/page are applied client-side in `select` rather than being part of the key —
+ * changing them re-filters the cached array instantly instead of re-downloading every invoice
+ * per keystroke. Still under ["accountsPayable", "invoices"], so every existing invalidation
+ * (approvals, payments, TDS, OCR review...) refreshes it.
+ */
+export const INVOICE_LIST_KEY = ["accountsPayable", "invoices", "list"];
 
 /**
  * List query for Invoice Management and both queue pages — a single parameterized hook, not
@@ -9,10 +17,15 @@ export const INVOICES_KEY = (params) => ["accountsPayable", "invoices", params];
  * @param {Object} params - see invoiceService.getInvoices for the full shape
  */
 export function useInvoices(params = {}) {
+  // Keyed on the serialized params so `select` only re-runs when the criteria actually change.
+  const paramsKey = JSON.stringify(params);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const select = useCallback((all) => filterInvoices(all, params), [paramsKey]);
+
   const query = useQuery({
-    queryKey: INVOICES_KEY(params),
-    queryFn: () => invoiceService.getInvoices(params),
-    placeholderData: keepPreviousData,
+    queryKey: INVOICE_LIST_KEY,
+    queryFn: () => invoiceService.getAllInvoices(),
+    select,
   });
 
   return {

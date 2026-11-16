@@ -126,10 +126,10 @@ export default function InvoiceDetailPage() {
             <InvoiceOcrReviewPanel invoice={invoice} />
           )}
           <div id="invoice-tds" className="scroll-mt-4">
-            <InvoiceTdsPanel invoice={invoice} />
+            <InvoiceTdsPanel invoice={invoice} anchorId="invoice-tds" />
           </div>
           <div id="invoice-payment-terms" className="scroll-mt-4">
-            <InvoicePaymentTermsPanel invoice={invoice} />
+            <InvoicePaymentTermsPanel invoice={invoice} anchorId="invoice-payment-terms" />
           </div>
           <InvoiceApprovalPanel invoice={invoice} />
           <InvoiceValidationPanel />
@@ -148,7 +148,7 @@ export default function InvoiceDetailPage() {
             </PageCardContent>
           </PageCard>
 
-          <InvoiceAuditHistory invoiceId={invoice.id} />
+          <InvoiceAuditHistory invoice={invoice} />
         </div>
 
         {/* Side column */}

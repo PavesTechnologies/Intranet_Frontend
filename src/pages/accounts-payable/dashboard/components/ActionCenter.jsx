@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { formatMoney } from "./insights";
 import { useActionCenter } from "../hooks/useActionCenter";
+import { withoutMsme } from "../../utils/msme";
 
 const AREA_ICONS = { ap: FileText, approvals: Stamp, payments: Wallet, tds: Landmark, management: ShieldCheck };
 
@@ -72,7 +73,7 @@ export default function ActionCenter() {
   const [expanded, setExpanded] = useState(false);
   if (isLoading || isError || !data) return null;
 
-  const actions = data.actions || [];
+  const actions = withoutMsme(data.actions);
   const quick = data.quick_actions || [];
   const clear = data.all_clear || [];
   if (!actions.length && !quick.length && !clear.length) return null;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -7,90 +7,112 @@ import GstItcPage from "./GstItcPage";
 import * as hooks from "../hooks/useGstItc";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { formatMoney } from "../../dashboard/components/insights";
+import { LEGACY_CLAIM_LABEL } from "../../constants/gstItc";
+import { setupGstHooks } from "../__fixtures__/gstFixtures";
 
-vi.mock("../hooks/useGstItc", () => ({
-  useGstRegister: vi.fn(), useClaimItc: vi.fn(), useSetIrn: vi.fn(), useSetEligibility: vi.fn(), useReverseItc: vi.fn(), useReclaimItc: vi.fn(),
-  useGstr2b: vi.fn(), useImportGstr2b: vi.fn(),
-}));
-vi.mock("../../hooks/useApPermissions", () => ({ useApPermissions: vi.fn() }));
-vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-
-const row = (extra) => ({
-  invoice_id: 9, invoice_number: "WWIM/HYD/26-27/02604", invoice_date: "2026-10-09", vendor_name: "WEWORK INDIA MANAGEMENT LIMITED",
-  supplier_gstin: "36AADCH8710J1ZH", supply_type: "INTRA", taxable_value: 63500, cgst: 5715, sgst: 5715, igst: 0, cess: 0, itc: 11430,
-  itc_eligibility: "ELIGIBLE", eligibility_reason: null, itc_status: "PENDING", claim_period: null, irn_status: "MISSING", risk: null, ...extra,
+vi.mock("../hooks/useGstItc", async () => {
+  const { HOOK_NAMES } = await import("../__fixtures__/gstFixtures");
+  return Object.fromEntries(HOOK_NAMES.map((n) => [n, vi.fn()]));
 });
-
-const DATA = {
-  summary: { claimable_now: 156331.8, claimable_count: 12, claim_period: "2026-09-01", claim_due: "2026-10-20", irn_missing: 1,
-             review: 0, blocked_itc: 0, at_risk: 0, reversal_due: 0, reclaim: 0 },
-  invoices: [row({ irn_status: "PRESENT", itc_status: "CLAIMED", claim_period: "2026-09-01" })],
-  attention: [row()],
-  periods: [{ period: "2026-10-01", label: "Oct 2026", claimed: 0, invoices: 0, due_date: "2026-11-20" }],
-};
-
-const mutate = () => ({ mutateAsync: vi.fn().mockResolvedValue({ itc: 156331.8, invoices: 12, period: "2026-09-01" }), isPending: false });
+vi.mock("../../hooks/useApPermissions", () => ({ useApPermissions: vi.fn() }));
+vi.mock("../../guide/components/PageGuide", () => ({ default: () => null }));
+vi.mock("../../../../contexts/AuthContext", () => ({ useAuth: () => ({ user: { user_id: "fin-checker" } }) }));
+vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  hooks.useGstRegister.mockReturnValue({ data: DATA, isLoading: false, isError: false });
-  for (const name of ["useClaimItc", "useSetIrn", "useSetEligibility", "useReverseItc", "useReclaimItc"]) hooks[name].mockReturnValue(mutate());
+  window.sessionStorage.clear();
+  setupGstHooks(hooks);
   useApPermissions.mockReturnValue({ canManageGstItc: true });
 });
 
-const renderPage = () => render(<GstItcPage />, { wrapper: MemoryRouter });
+const renderPage = (url = "/accounts-payable/gst") => render(<MemoryRouter initialEntries={[url]}><GstItcPage /></MemoryRouter>);
 
-describe("GstItcPage", () => {
-  it("shows what can be claimed and by when", () => {
+describe("GstItcPage - monthly dashboard", () => {
+  it("opens on the latest period with a GSTR-2B import and titles it from the backend", () => {
     renderPage();
-    expect(screen.getByText(/Ready to claim for Sep 2026/)).toBeInTheDocument();
-    expect(screen.getByText(formatMoney(156331.8, "INR"))).toBeInTheDocument();
-    expect(screen.getByText(/12 invoice\(s\) · GSTR-3B due/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Purchase Invoices · Oct 2026" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Return period")).toHaveValue("2026-10");
+    expect(hooks.useGstr2bSummary).toHaveBeenCalledWith("2026-10");
   });
 
-  it("claims the period after confirmation", async () => {
-    const claim = mutate();
-    hooks.useClaimItc.mockReturnValue(claim);
+  it("groups the periods by financial year", () => {
     renderPage();
-    await userEvent.click(screen.getByRole("button", { name: "Mark claimed in GSTR-3B" }));
-    await userEvent.click(screen.getByRole("button", { name: "Confirm claimed" }));
-    expect(claim.mutateAsync).toHaveBeenCalledWith("2026-09-01");
+    const select = screen.getByLabelText("Return period");
+    expect(within(select).getByRole("group", { name: "FY 2026-27" })).toBeInTheDocument();
+    expect(within(select).getByRole("group", { name: "FY 2025-26" })).toBeInTheDocument();
   });
 
-  it("records a missing IRN only when it is 64 hex characters", async () => {
-    const setIrn = mutate();
-    hooks.useSetIrn.mockReturnValue(setIrn);
+  it("reloads summary and records when the period changes", async () => {
     renderPage();
-    await userEvent.click(screen.getByRole("button", { name: "Record IRN" }));
-    const save = screen.getByRole("button", { name: "Save" });
-    await userEvent.type(screen.getByLabelText("IRN"), "abc");
-    expect(save).toBeDisabled();
-    await userEvent.clear(screen.getByLabelText("IRN"));
-    await userEvent.type(screen.getByLabelText("IRN"), "f".repeat(64));
-    await userEvent.click(save);
-    expect(setIrn.mutateAsync).toHaveBeenCalledWith({ invoiceId: 9, irn: "f".repeat(64) });
+    await userEvent.selectOptions(screen.getByLabelText("Return period"), "2026-03");
+    expect(screen.getByRole("heading", { level: 1, name: "Purchase Invoices · Mar 2026" })).toBeInTheDocument();
+    expect(hooks.useGstr2bSummary).toHaveBeenLastCalledWith("2026-03");
+    expect(hooks.useGstr2bMatches).toHaveBeenLastCalledWith(expect.objectContaining({ returnPeriod: "2026-03" }));
+    expect(window.sessionStorage.getItem("ap.gst.period")).toBe("2026-03");
   });
 
-  it("lists the month's invoices with the GST split and claim status", () => {
-    renderPage();
-    expect(screen.getByText("36AADCH8710J1ZH", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText(/Claimed · Sep 2026/)).toBeInTheDocument();
+  it("keeps a period from the URL", () => {
+    renderPage("/accounts-payable/gst?period=2026-11&tab=review");
+    expect(screen.getByLabelText("Return period")).toHaveValue("2026-11");
+    expect(screen.getByRole("tab", { name: "ITC eligibility & approval" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("switches to the GSTR-2B match tab", async () => {
-    hooks.useGstr2b.mockReturnValue({ data: { imports: [], period: null, entries: [], missing_in_2b: [], counts: {} }, isLoading: false, isError: false });
-    hooks.useImportGstr2b.mockReturnValue(mutate());
+  it("shows the backend's overview figures without recomputing them", () => {
     renderPage();
-    expect(screen.getByText(/GSTR-2B not imported yet/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "GSTR-2B match" }));
-    expect(screen.getByText(/No GSTR-2B imported yet/)).toBeInTheDocument();
-    expect(screen.queryByText(/Ready to claim/)).toBeNull();
+    const overview = screen.getByRole("heading", { name: /GST Input Credit Overview/ }).closest("section");
+    expect(within(overview).getByText("Total AP invoices").nextSibling).toHaveTextContent("14");
+    expect(within(overview).getByText("Missing in AP").nextSibling).toHaveTextContent("1");
+    const claimedRow = within(overview).getByRole("rowheader", { name: /Claimed in GSTR-3B/ }).closest("tr");
+    expect(within(claimedRow).getByText(formatMoney(48600, "INR"))).toBeInTheDocument();
+    const approvedRow = within(overview).getByRole("rowheader", { name: /Approved for GSTR-3B/ }).closest("tr");
+    expect(within(approvedRow).getByText("1")).toBeInTheDocument();
+  });
+
+  it("an overview tile filters the reconciliation by that status", async () => {
+    renderPage("/accounts-payable/gst?tab=register");
+    await userEvent.click(screen.getByRole("button", { name: /Duplicate records/ }));
+    expect(screen.getByRole("tab", { name: "GSTR-2B reconciliation" })).toHaveAttribute("aria-selected", "true");
+    expect(hooks.useGstr2bMatches).toHaveBeenLastCalledWith(expect.objectContaining({ status: "DUPLICATE" }));
+  });
+});
+
+describe("GstItcPage - claims go through recorded, verified filings", () => {
+  it("has no one-click claim; the register offers recording the filing instead", async () => {
+    renderPage("/accounts-payable/gst?tab=register");
+    expect(screen.queryByRole("button", { name: /Mark claimed/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Record GSTR-3B filing" }));
+    // the filing modal opens on the register's open return (claim_period)
+    expect(screen.getByLabelText("Filing return period")).toHaveValue("2026-10");
+    expect(screen.getByLabelText("ARN")).toBeInTheDocument();
+  });
+
+  it("labels legacy one-click claims and never shows an ARN for them", async () => {
+    renderPage("/accounts-payable/gst?tab=review");
+    expect(screen.getByText(LEGACY_CLAIM_LABEL)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Legacy claims/ }));
+    expect(screen.getByText("OLD/1")).toBeInTheDocument();
+    expect(screen.queryByText("WWIM/HYD/26-27/02604")).toBeNull();
+  });
+
+  it("marks system suggestions so they are not mistaken for Finance decisions", () => {
+    renderPage("/accounts-payable/gst?tab=review");
+    const row = screen.getByText("SUG/1").closest("tr");
+    expect(within(row).getByText("System suggestion")).toBeInTheDocument();
+  });
+
+  it("opens the invoice's ITC drawer from the worklist", async () => {
+    renderPage("/accounts-payable/gst?tab=review");
+    const row = screen.getByText("WWIM/HYD/26-27/02604").closest("tr");
+    await userEvent.click(within(row).getByRole("button", { name: "Review" }));
+    expect(hooks.useItcDetail).toHaveBeenCalledWith(9);
+    expect(screen.getByRole("dialog", { name: "ITC · WWIM/HYD/26-27/02604" })).toBeInTheDocument();
   });
 
   it("is read-only without the manage permission", () => {
     useApPermissions.mockReturnValue({ canManageGstItc: false });
-    renderPage();
-    expect(screen.queryByRole("button", { name: "Mark claimed in GSTR-3B" })).toBeNull();
+    renderPage("/accounts-payable/gst?tab=register");
+    expect(screen.queryByRole("button", { name: "Record GSTR-3B filing" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Record IRN" })).toBeNull();
   });
 });

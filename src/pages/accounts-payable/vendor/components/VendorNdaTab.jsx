@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { FileSignature, Eye } from "lucide-react";
+import { FileSignature, Eye, RefreshCw } from "lucide-react";
 
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
@@ -8,10 +8,16 @@ import StatusPill from "../../vendor-intake/components/PreScreenStatusBadge";
 
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatDate } from "../../utils/formatters";
+import { useApPermissions } from "../../hooks/useApPermissions";
 import ndaService from "../../procurement/services/ndaService";
+import { useReplaceSignedNda } from "../../procurement/hooks/useNda";
+import SignedNdaUploadModal from "../../procurement/components/SignedNdaUploadModal";
 import {
   NDA_STATUS_LABEL,
   NDA_STATUS_TONE,
+  canReplaceSignedNda,
+  signedNdaDocumentNameOf,
+  signedNdaVersionLabel,
 } from "../../procurement/constants/vendorOnboarding";
 import { useVendorNdas } from "../hooks/useVendorCollections";
 import VendorCollectionPanel from "./VendorCollectionPanel";
@@ -49,10 +55,19 @@ const COLUMNS = [
  * object keys are never links themselves, so the presence of a key only decides whether the
  * action is offered.
  *
+ * A signed document on file can be replaced from here (Completed / Signed / Rejected) through
+ * the same upload dialog the RFQ's Manage NDA uses; the NDA then returns to Signed — Pending
+ * Review, with the new signed_document_version read back from the refreshed list.
+ *
  * @param {{ vendorId: string|number }} props
  */
 export default function VendorNdaTab({ vendorId }) {
   const { items: ndas, count, isLoading, isError, error, refetch } = useVendorNdas(vendorId);
+  const { canUploadSignedNda } = useApPermissions();
+  const replaceMutation = useReplaceSignedNda();
+
+  // The NDA whose signed document is being replaced, if any.
+  const [replacingNda, setReplacingNda] = useState(null);
 
   // nda_id currently being opened, plus whether the signed copy was asked for.
   const [openingDocument, setOpeningDocument] = useState(null);
@@ -68,6 +83,14 @@ export default function VendorNdaTab({ vendorId }) {
       setOpeningDocument(null);
     }
   };
+
+  const handleReplace = ({ file, reason }) =>
+    replaceMutation.mutateAsync({
+      ndaId: replacingNda.nda_id,
+      vendorId: replacingNda.vendor_id ?? vendorId,
+      file,
+      reason,
+    });
 
   const rows = ndas.map((nda) => ({
     nda: `NDA #${nda.nda_id}`,
@@ -106,7 +129,20 @@ export default function VendorNdaTab({ vendorId }) {
             loading={openingDocument === `${nda.nda_id}:true`}
           >
             <FileSignature className="h-3.5 w-3.5" /> Signed
+            {signedNdaVersionLabel(nda) ? ` ${signedNdaVersionLabel(nda)}` : ""}
           </Button>
+        ) : null}
+
+        {canUploadSignedNda && canReplaceSignedNda(nda) ? (
+          <Button size="small" variant="outline" onClick={() => setReplacingNda(nda)}>
+            <RefreshCw className="h-3.5 w-3.5" /> Replace Document
+          </Button>
+        ) : null}
+
+        {signedNdaDocumentNameOf(nda) ? (
+          <span className="w-full break-words text-[11px] text-gray-500">
+            {signedNdaDocumentNameOf(nda)}
+          </span>
         ) : null}
 
         {/* No key on either side means there is nothing to open — say so rather than offering
@@ -131,6 +167,17 @@ export default function VendorNdaTab({ vendorId }) {
       errorMessage="Unable to load NDAs right now."
     >
       <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} />
+
+      {replacingNda && (
+        <SignedNdaUploadModal
+          isOpen
+          mode="replace"
+          nda={replacingNda}
+          onClose={() => setReplacingNda(null)}
+          onSubmit={handleReplace}
+          isSubmitting={replaceMutation.isPending}
+        />
+      )}
     </VendorCollectionPanel>
   );
 }
