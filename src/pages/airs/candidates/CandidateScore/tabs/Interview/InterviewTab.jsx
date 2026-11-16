@@ -12,6 +12,11 @@ import CancelInterviewModal from "./components/CancelInterviewModal";
 import EditInterviewersModal from "./components/EditInterviewersModal";
 import InterviewStatusBadge from "./components/InterviewStatusBadge";
 import InterviewRoundCard from "./components/InterviewRoundCard";
+import EmailDraftsPanel from "../../components/emailDrafts/EmailDraftsPanel";
+import { EMAIL_LABEL, OUTCOME_EMAILS } from "../../components/emailDrafts/emailLabels";
+
+// Email plan phase 3: interview, interviewer and feedback-request emails wait in this panel for Send.
+const INTERVIEW_EMAILS = Object.keys(EMAIL_LABEL).filter((key) => !OUTCOME_EMAILS.includes(key));
 
 // Interview tab (Epic 4) — a candidate can have several interview rounds,
 // freely (HM decides count/order). `interviews` is the full ordered list
@@ -95,8 +100,8 @@ export default function InterviewTab({ candidate }) {
         setModalMode(null);
         toast.success(
           isNextRound
-            ? "Next round scheduled — the previous round is now marked complete."
-            : "Interview scheduled successfully. A calendar invitation will be sent to the selected interviewers once calendar integration is enabled."
+            ? "Next round scheduled — the previous round is now marked complete. The emails are prepared. Nothing is sent until you preview and send it below."
+            : "Interview scheduled. The emails to the candidate and interviewers are prepared. Nothing is sent until you preview and send it below."
         );
       },
       onError: (err) => {
@@ -121,7 +126,7 @@ export default function InterviewTab({ candidate }) {
         onSuccess: () => {
           setModalMode(null);
           setActiveRound(null);
-          toast.success("Interview rescheduled successfully.");
+          toast.success("Interview rescheduled. Any emails about it are prepared. Nothing is sent until you preview and send it below.");
         },
         onError: (err) => {
           toast.error(getErrorMessage(err, "Couldn't reschedule the interview. Please try again."));
@@ -137,7 +142,7 @@ export default function InterviewTab({ candidate }) {
       {
         onSuccess: () => {
           setCancelTarget(null);
-          toast.success("Interview cancelled.");
+          toast.success("Interview cancelled. Anyone who was told about it gets a prepared email. Nothing is sent until you preview and send it below.");
         },
         onError: (err) => {
           toast.error(getErrorMessage(err, "Couldn't cancel the interview. Please try again."));
@@ -154,7 +159,7 @@ export default function InterviewTab({ candidate }) {
         setCompletingRoundId(null);
         toast.success(
           feedbackQueuedCount > 0
-            ? `Marked as completed — feedback requested from ${feedbackQueuedCount} interviewer${feedbackQueuedCount > 1 ? "s" : ""}.`
+            ? `Marked as completed — feedback requests prepared for ${feedbackQueuedCount} interviewer${feedbackQueuedCount > 1 ? "s" : ""}. Nothing is sent until you preview and send it below.`
             : "Marked as completed."
         );
       },
@@ -190,7 +195,7 @@ export default function InterviewTab({ candidate }) {
       {
         onSuccess: () => {
           setEditInterviewersTarget(null);
-          toast.success("Interviewers updated.");
+          toast.success("Interviewers updated. Their emails are prepared. Nothing is sent until you preview and send it below.");
         },
         onError: (err) => {
           toast.error(getErrorMessage(err, "Couldn't update the interviewer list. Please try again."));
@@ -240,6 +245,8 @@ export default function InterviewTab({ candidate }) {
           </Button>
         )}
       </div>
+
+      <EmailDraftsPanel campaignCandidateId={candidate?.id} only={INTERVIEW_EMAILS} canAct={!isHiringManager} />
 
       {displayRounds.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">

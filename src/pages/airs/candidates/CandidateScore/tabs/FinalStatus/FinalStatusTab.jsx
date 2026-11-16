@@ -11,8 +11,11 @@ import { renderStageBadge, renderDecisionBadge } from "../../../utils/candidateU
 import { DECISION_SOURCE_LABEL } from "../../../constants/candidateConstants";
 import { numberOr, formatDateTime } from "../../../utils/candidateDataUtils";
 import { sendRejectionEmail, sendSelectionEmail } from "../../../services/candidateScoreService";
-import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "@/contexts/AuthContext";
+import EmailDraftsPanel from "../../components/emailDrafts/EmailDraftsPanel";
+import EmailPreviewModal from "../../components/emailDrafts/EmailPreviewModal";
+import { OUTCOME_EMAILS } from "../../components/emailDrafts/emailLabels";
+import { useInvalidateEmailDrafts } from "../../../hooks/useEmailDrafts";
 
 // Tone for the hero card/ring — keyed off whichever outcome is most
 // authoritative: the recorded decision, falling
@@ -81,8 +84,10 @@ export default function FinalStatusTab({ candidate }) {
   const { breakdown, loading, error, refetch } = useCompositeScore(candidate?.id);
   const [sendingRejectionEmail, setSendingRejectionEmail] = useState(false);
   const [sendingSelectionEmail, setSendingSelectionEmail] = useState(false);
-  // Review item 26: an email can't be recalled - each send is confirmed first, naming the recipient.
-  const [confirmingEmail, setConfirmingEmail] = useState(null); // "rejection" | "selection" | null
+  // Email plan phase 3: the button prepares the email as a draft and opens its preview; it is sent only
+  // from there, after a confirm step naming the recipient (review item 26: an email can't be recalled).
+  const [previewDraftId, setPreviewDraftId] = useState(null);
+  const invalidateDrafts = useInvalidateEmailDrafts();
   const { hasRole } = useAuth();
   // The backend allows these sends to HR_ADMIN and HIRING_MANAGER only (recruiters get 403).
   const canSendEmails = hasRole(["HR_ADMIN", "HIRING_MANAGER"]);
@@ -98,31 +103,21 @@ export default function FinalStatusTab({ candidate }) {
   const isRejected = stage === "REJECTED";
   const isSelected = stage === "SELECTED";
 
-  const handleSendRejectionEmail = async () => {
-    setConfirmingEmail(null);
-    setSendingRejectionEmail(true);
+  const prepareEmail = async (prepare, setBusy, word) => {
+    setBusy(true);
     try {
-      await sendRejectionEmail(candidate.id);
-      toast.success("Rejection email sent.");
+      const response = await prepare(candidate.id);
+      const draftId = response?.data?.draft_id;
+      invalidateDrafts(candidate.id);
+      if (draftId) setPreviewDraftId(draftId);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Couldn't send the rejection email. Please try again.");
+      toast.error(err?.response?.data?.message || `Couldn't prepare the ${word} email. Please try again.`);
     } finally {
-      setSendingRejectionEmail(false);
+      setBusy(false);
     }
   };
-
-  const handleSendSelectionEmail = async () => {
-    setConfirmingEmail(null);
-    setSendingSelectionEmail(true);
-    try {
-      await sendSelectionEmail(candidate.id);
-      toast.success("Selection email sent.");
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Couldn't send the selection email. Please try again.");
-    } finally {
-      setSendingSelectionEmail(false);
-    }
-  };
+  const handleSendRejectionEmail = () => prepareEmail(sendRejectionEmail, setSendingRejectionEmail, "rejection");
+  const handleSendSelectionEmail = () => prepareEmail(sendSelectionEmail, setSendingSelectionEmail, "selection");
   // Prefer the freshly computed composite score; fall back to whatever
   // composite value already travelled with the candidate record so the ring
   // isn't stuck at 0 while (or if) the breakdown call is still in flight.
@@ -159,9 +154,9 @@ export default function FinalStatusTab({ candidate }) {
               <Button
                 variant="outline"
                 size="small"
-                onClick={() => setConfirmingEmail("rejection")}
+                onClick={handleSendRejectionEmail}
                 loading={sendingRejectionEmail}
-                loadingText="Sending..."
+                loadingText="Preparing..."
                 className="shrink-0"
               >
                 <Mail size={13} /> Send Rejection Email
@@ -172,9 +167,9 @@ export default function FinalStatusTab({ candidate }) {
               <Button
                 variant="outline"
                 size="small"
-                onClick={() => setConfirmingEmail("selection")}
+                onClick={handleSendSelectionEmail}
                 loading={sendingSelectionEmail}
-                loadingText="Sending..."
+                loadingText="Preparing..."
                 className="shrink-0"
               >
                 <Mail size={13} /> Send Selection Email
@@ -199,18 +194,15 @@ export default function FinalStatusTab({ candidate }) {
         </div>
       </div>
 
-      <ConfirmationModal
-        isOpen={!!confirmingEmail}
-        title={confirmingEmail === "selection" ? "Send selection email?" : "Send rejection email?"}
-        message={`This sends the ${confirmingEmail === "selection" ? "selection" : "rejection"} email to `
-          + `${candidate?.name || "this candidate"}${candidate?.email ? ` (${candidate.email})` : ""} now. `
-          + "An email can't be recalled once sent."}
-        confirmText="Send email"
-        variant={confirmingEmail === "selection" ? "primary" : "danger"}
-        isLoading={sendingRejectionEmail || sendingSelectionEmail}
-        onConfirm={confirmingEmail === "selection" ? handleSendSelectionEmail : handleSendRejectionEmail}
-        onCancel={() => setConfirmingEmail(null)}
-      />
+      <EmailDraftsPanel campaignCandidateId={candidate?.id} only={OUTCOME_EMAILS} canAct={canSendEmails} />
+
+      {previewDraftId && (
+        <EmailPreviewModal
+          draftId={previewDraftId}
+          onClose={() => setPreviewDraftId(null)}
+          onSent={() => invalidateDrafts(candidate.id)}
+        />
+      )}
 
       {loading && (
         <div className="py-8 flex items-center justify-center">

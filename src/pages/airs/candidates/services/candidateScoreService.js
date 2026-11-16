@@ -69,8 +69,9 @@ export const getCompositeScoreBreakdown = async (campaignCandidateId) => {
 
 // Candidate Scorecard — Final Status tab —
 // POST /airs/campaign-candidates/{campaign_candidate_id}/send-rejection-email
-// Only valid when pipeline_stage === "REJECTED" (backend-enforced); no
-// dedup lock, so this is safe to call more than once for the same candidate.
+// Email plan phase 3: prepares the rejection email as a draft and returns its draft_id (calling again
+// reopens the same draft); it is sent only from the preview (emailDraftService). Only for REJECTED, and
+// never once a rejection or selection email was sent (backend-enforced).
 export const sendRejectionEmail = async (campaignCandidateId) => {
   try {
     const response = await api.post(
@@ -84,16 +85,15 @@ export const sendRejectionEmail = async (campaignCandidateId) => {
     );
     return response.data;
   } catch (error) {
-    logError("Error sending rejection email:", error);
+    logError("Error preparing the rejection email:", error);
     throw error;
   }
 };
 
 // Candidate Scorecard — Final Status tab —
 // POST /airs/campaign-candidates/{campaign_candidate_id}/send-selection-email
-// Only valid when pipeline_stage === "SELECTED" (backend-enforced); no
-// dedup lock (allow_resend=True server-side), so this is safe to call more
-// than once for the same candidate — same convention as sendRejectionEmail.
+// Email plan phase 3: prepares the selection email as a draft (draft_id), like the rejection email above.
+// Only for SELECTED, never twice, never after a rejection email (backend-enforced).
 export const sendSelectionEmail = async (campaignCandidateId) => {
   try {
     const response = await api.post(
@@ -107,7 +107,7 @@ export const sendSelectionEmail = async (campaignCandidateId) => {
     );
     return response.data;
   } catch (error) {
-    logError("Error sending selection email:", error);
+    logError("Error preparing the selection email:", error);
     throw error;
   }
 };

@@ -25,7 +25,7 @@ const RECOMMENDATION_TONE = {
 // elsewhere; this is input to that decision, not something that
 // auto-updates anything here.
 export default function InterviewRoundFeedback({ round, feedback, isLoading, readOnly = false }) {
-  const requestMutation = useRequestFeedback(round.id);
+  const requestMutation = useRequestFeedback(round.id, round.campaign_candidate_id);
 
   const started = hasRoundStarted(round);
   const canRequest = !readOnly && round.status !== "CANCELLED";
@@ -35,8 +35,8 @@ export default function InterviewRoundFeedback({ round, feedback, isLoading, rea
       onSuccess: (queuedCount) => {
         toast.success(
           queuedCount > 0
-            ? `Feedback requested from ${queuedCount} interviewer${queuedCount > 1 ? "s" : ""}.`
-            : "All interviewers have already been asked or have responded."
+            ? `Feedback request${queuedCount > 1 ? "s" : ""} prepared for ${queuedCount} interviewer${queuedCount > 1 ? "s" : ""}. Nothing is sent until you preview and send it below.`
+            : "All interviewers have already been asked, have a request waiting, or have responded."
         );
       },
       onError: (err) => {
