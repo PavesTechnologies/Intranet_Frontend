@@ -146,7 +146,7 @@ export default function CandidateScorePage() {
 
         <div className="p-5">
           <Suspense fallback={null}>
-            <ActiveTabComponent candidate={candidate} onExpired={refetch} />
+            <ActiveTabComponent candidate={candidate} onExpired={refetch} onCandidateChanged={refetch} />
           </Suspense>
         </div>
       </div>

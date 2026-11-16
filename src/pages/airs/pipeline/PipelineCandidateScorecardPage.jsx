@@ -374,7 +374,7 @@ export default function PipelineCandidateScorecardPage({
             />
           )}
           <Suspense fallback={<LoadingSpinner text="Loading tab..." />}>
-            <ActiveTabComponent candidate={candidate} onExpired={refetch} onLayerFailure={handleLayerFailure} />
+            <ActiveTabComponent candidate={candidate} onExpired={refetch} onCandidateChanged={refetch} onLayerFailure={handleLayerFailure} />
           </Suspense>
         </div>
       </div>

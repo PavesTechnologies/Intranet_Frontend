@@ -87,6 +87,11 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
     decisionReason: data.decision_reason ?? fallback.decisionReason ?? null,
     decisionAt: data.decision_at ?? fallback.decisionAt ?? null,
     awaitingFullScoring: !!(data.awaiting_full_scoring ?? fallback.awaitingFullScoring),
+    // Email plan phase 4: the stage is locked once a rejection or selection email is sent.
+    stageLocked: !!data.stage_locked,
+    stageLockReason: data.stage_lock_reason ?? null,
+    stageLockedAt: data.stage_locked_at ?? null,
+    stageLockMessage: data.stage_lock_message ?? null,
 
     deterministic: numberOr(data.deterministic_score, 0),
     semantic: numberOr(data.semantic_score, 0),

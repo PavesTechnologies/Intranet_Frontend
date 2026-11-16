@@ -177,3 +177,18 @@ export const rescoreCandidate = async (campaignCandidateId) => {
   });
   return response.data;
 };
+
+// Email plan phase 4 - stage lock. GET /airs/stage-lock/unlock-reasons: the reasons an HR admin can give.
+export const getStageUnlockReasons = async () => {
+  const response = await api.get(`${BASE_URL}/stage-lock/unlock-reasons`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data?.data || [];
+};
+
+// POST /airs/campaign-candidates/{id}/stage-unlock {reason_code} - HR admin; audited.
+export const unlockStage = async (campaignCandidateId, reasonCode) => {
+  const response = await api.post(`${BASE_URL}/campaign-candidates/${campaignCandidateId}/stage-unlock`,
+    { reason_code: reasonCode }, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+  return response.data?.data;
+};

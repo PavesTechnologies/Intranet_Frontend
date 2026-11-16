@@ -13,6 +13,7 @@ import { numberOr, formatDateTime } from "../../../utils/candidateDataUtils";
 import { sendRejectionEmail, sendSelectionEmail } from "../../../services/candidateScoreService";
 import { useAuth } from "@/contexts/AuthContext";
 import EmailDraftsPanel from "../../components/emailDrafts/EmailDraftsPanel";
+import StageLockBanner from "../../components/stageLock/StageLockBanner";
 import EmailPreviewModal from "../../components/emailDrafts/EmailPreviewModal";
 import { OUTCOME_EMAILS } from "../../components/emailDrafts/emailLabels";
 import { useInvalidateEmailDrafts } from "../../../hooks/useEmailDrafts";
@@ -80,7 +81,7 @@ function MetaTile({ icon: Icon, label, value }) {
   );
 }
 
-export default function FinalStatusTab({ candidate }) {
+export default function FinalStatusTab({ candidate, onCandidateChanged }) {
   const { breakdown, loading, error, refetch } = useCompositeScore(candidate?.id);
   const [sendingRejectionEmail, setSendingRejectionEmail] = useState(false);
   const [sendingSelectionEmail, setSendingSelectionEmail] = useState(false);
@@ -194,13 +195,15 @@ export default function FinalStatusTab({ candidate }) {
         </div>
       </div>
 
+      <StageLockBanner candidate={candidate} canUnlock={hasRole(["HR_ADMIN"])} onUnlocked={onCandidateChanged} />
+
       <EmailDraftsPanel campaignCandidateId={candidate?.id} only={OUTCOME_EMAILS} canAct={canSendEmails} />
 
       {previewDraftId && (
         <EmailPreviewModal
           draftId={previewDraftId}
           onClose={() => setPreviewDraftId(null)}
-          onSent={() => invalidateDrafts(candidate.id)}
+          onSent={() => { invalidateDrafts(candidate.id); onCandidateChanged?.(); }}
         />
       )}
 
