@@ -10,6 +10,16 @@ vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn() } }
 
 vi.mock("../hooks/useVendorCollections", () => ({ useVendorNdas: vi.fn() }));
 
+const replaceMutateAsync = vi.fn();
+vi.mock("../../procurement/hooks/useNda", () => ({
+  useReplaceSignedNda: () => ({ mutateAsync: replaceMutateAsync, isPending: false }),
+}));
+
+let permissions = { canUploadSignedNda: true };
+vi.mock("../../hooks/useApPermissions", () => ({
+  useApPermissions: () => permissions,
+}));
+
 vi.mock("../../procurement/services/ndaService", () => ({
   default: { getNdaDocumentUrl: vi.fn() },
 }));
@@ -43,6 +53,87 @@ const NDA = {
 beforeEach(() => {
   vi.clearAllMocks();
   window.open = vi.fn();
+  permissions = { canUploadSignedNda: true };
+  replaceMutateAsync.mockResolvedValue({
+    nda_id: 31,
+    status_code: "SIGNED",
+    signed_document_version: 2,
+    message: "Signed NDA replaced; pending internal review",
+  });
+});
+
+describe("VendorNdaTab — replacing the signed document", () => {
+  const SIGNED_NDA = {
+    ...NDA,
+    status_code: "COMPLETED",
+    signed_at: "2026-02-20T09:30:00",
+    signed_document_key: "nda/31/signed.pdf",
+    signed_document_name: "Signed_NDA.pdf",
+    signed_document_version: 1,
+  };
+
+  const lastDialog = () => screen.getAllByRole("dialog").at(-1);
+
+  it.each(["COMPLETED", "SIGNED", "REJECTED"])("offers Replace Document from %s", (status) => {
+    useVendorNdas.mockReturnValue(idle({ items: [{ ...SIGNED_NDA, status_code: status }], count: 1 }));
+    render(<VendorNdaTab vendorId={7} />);
+    expect(screen.getByRole("button", { name: /replace document/i })).toBeInTheDocument();
+  });
+
+  it("hides it for a SENT NDA, without a signed document, or without permission", () => {
+    useVendorNdas.mockReturnValue(idle({ items: [NDA], count: 1 }));
+    const { unmount } = render(<VendorNdaTab vendorId={7} />);
+    expect(screen.queryByRole("button", { name: /replace document/i })).not.toBeInTheDocument();
+    unmount();
+
+    useVendorNdas.mockReturnValue(
+      idle({ items: [{ ...SIGNED_NDA, signed_document_key: null }], count: 1 }),
+    );
+    const second = render(<VendorNdaTab vendorId={7} />);
+    expect(screen.queryByRole("button", { name: /replace document/i })).not.toBeInTheDocument();
+    second.unmount();
+
+    permissions = { canUploadSignedNda: false };
+    useVendorNdas.mockReturnValue(idle({ items: [SIGNED_NDA], count: 1 }));
+    render(<VendorNdaTab vendorId={7} />);
+    expect(screen.queryByRole("button", { name: /replace document/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the signed document's name and backend version alongside View and Signed", () => {
+    useVendorNdas.mockReturnValue(idle({ items: [SIGNED_NDA], count: 1 }));
+    render(<VendorNdaTab vendorId={7} />);
+
+    expect(screen.getByRole("button", { name: /view/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /signed v1/i })).toBeInTheDocument();
+    expect(screen.getByText("Signed_NDA.pdf")).toBeInTheDocument();
+  });
+
+  it("replaces the signed document for this NDA and vendor after confirmation", async () => {
+    useVendorNdas.mockReturnValue(idle({ items: [SIGNED_NDA], count: 1 }));
+    const user = userEvent.setup();
+    render(<VendorNdaTab vendorId={7} />);
+
+    await user.click(screen.getByRole("button", { name: /replace document/i }));
+    const file = new File(["%PDF-1.7"], "Signed_NDA_v2.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("Upload New NDA Document"), file);
+    await user.type(screen.getByLabelText("Reason for Replacement"), "Updated signatory");
+
+    await user.click(within(lastDialog()).getByRole("button", { name: "Replace" }));
+    expect(within(lastDialog()).getByText("Confirm NDA Replacement")).toBeInTheDocument();
+    await user.click(within(lastDialog()).getByRole("button", { name: "Replace" }));
+
+    await waitFor(() =>
+      expect(replaceMutateAsync).toHaveBeenCalledWith({
+        ndaId: 31,
+        vendorId: 7,
+        file,
+        reason: "Updated signatory",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("Replace Signed NDA")).not.toBeInTheDocument(),
+    );
+  });
 });
 
 describe("VendorNdaTab", () => {

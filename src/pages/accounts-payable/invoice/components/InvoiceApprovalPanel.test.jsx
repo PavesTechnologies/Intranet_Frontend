@@ -104,13 +104,13 @@ beforeEach(() => {
 describe("InvoiceApprovalPanel — approval timeline", () => {
   it("shows a loading state while the approval instance is being fetched", () => {
     setApproval({ data: undefined, isLoading: true, error: null });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("Loading approval status...")).toBeInTheDocument();
   });
 
   it("offers Send for Approval once OCR Reviewed and the user is permitted", () => {
     setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
     expect(screen.getByText(/has not been sent for approval yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send for approval/i })).toBeInTheDocument();
   });
@@ -118,7 +118,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
   it("hides Send for Approval when the user lacks canSendForApproval", () => {
     setPermissions({ canSendForApproval: false });
     setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
     expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
   });
 
@@ -128,7 +128,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
   // regardless of whether the approval fetch happens to 404 for some other reason.
   it("does not offer Send for Approval while still Pending Approval, even with no approval data", () => {
     setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "Pending Approval" }} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "Pending Approval" }} defaultOpen />);
     expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
   });
 
@@ -155,7 +155,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
     expect(screen.getByRole("button", { name: /send for approval/i })).toBeInTheDocument();
   });
 
@@ -165,7 +165,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: { status: 500, response: { data: { detail: "Database unavailable" } } },
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("Database unavailable")).toBeInTheDocument();
   });
 
@@ -188,7 +188,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     // The pending approver/level also surfaces in the "Waiting On" summary now, so scope these
     // assertions to the timeline list — the outer <ol>, first in DOM order ahead of the nested
     // per-step <ul> of approvers — to avoid matching both the summary and the nested list.
@@ -226,7 +226,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("Level 1")).toBeInTheDocument();
     expect(screen.getByText("Level 2")).toBeInTheDocument();
     expect(screen.getAllByText(/^· All$/).length).toBe(2);
@@ -251,7 +251,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(screen.getByText(/Level 1 — APPROVED by/)).toBeInTheDocument();
@@ -277,7 +277,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.getByText(/Level 1 — REJECTED by/)).toBeInTheDocument();
   });
@@ -300,7 +300,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("No approval decisions recorded yet.")).toBeInTheDocument();
   });
 
@@ -324,7 +324,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
@@ -349,7 +349,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
@@ -377,7 +377,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("IT Hardware Policy")).toBeInTheDocument();
     expect(screen.getByText("Finance · Hardware")).toBeInTheDocument();
   });
@@ -412,7 +412,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByText("Loading policy details…")).not.toBeInTheDocument();
     expect(screen.getByText("Forbidden")).toBeInTheDocument();
   });
@@ -440,7 +440,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("Default Policy")).toBeInTheDocument();
     expect(screen.getByText("Default")).toBeInTheDocument();
     expect(screen.getByText(/Catch-all fallback/)).toBeInTheDocument();
@@ -477,7 +477,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     // The same pending approvers also appear in the timeline below — scope to the Waiting On
     // box itself (found via its own heading) so this only asserts what that summary shows.
     const waitingOnBox = screen.getByText("Waiting On").closest("div");
@@ -507,7 +507,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText(/no eligible approver has been/)).toBeInTheDocument();
   });
 });
@@ -532,7 +532,7 @@ describe("InvoiceApprovalPanel — Approver's trimmed view", () => {
   it("hides Applied Policy, Waiting On, and the Approval Timeline for a pure Approver (can decide, but can't send for approval)", () => {
     setPermissions({ canSendForApproval: false, canApproveInvoice: true, canRejectInvoice: true, canSendBackInvoice: true });
     setApproval({ data: inFlightApproval, isLoading: false, error: null });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
 
     expect(screen.queryByText("Applied Policy")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting On")).not.toBeInTheDocument();
@@ -546,7 +546,7 @@ describe("InvoiceApprovalPanel — Approver's trimmed view", () => {
   it("keeps Applied Policy, Waiting On, and the Approval Timeline for an AP Executive, even if they also happen to hold decision permissions", () => {
     setPermissions({ canSendForApproval: true, canApproveInvoice: true, canRejectInvoice: true, canSendBackInvoice: true });
     setApproval({ data: inFlightApproval, isLoading: false, error: null });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
 
     expect(screen.getByText("Applied Policy")).toBeInTheDocument();
     expect(screen.getByText("Waiting On")).toBeInTheDocument();
@@ -556,7 +556,7 @@ describe("InvoiceApprovalPanel — Approver's trimmed view", () => {
   it("keeps Applied Policy, Waiting On, and the Approval Timeline for a user with neither send nor decide permission (e.g. Finance, just viewing)", () => {
     setPermissions({ canSendForApproval: false, canApproveInvoice: false, canRejectInvoice: false, canSendBackInvoice: false });
     setApproval({ data: inFlightApproval, isLoading: false, error: null });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
 
     expect(screen.getByText("Applied Policy")).toBeInTheDocument();
     expect(screen.getByText("Waiting On")).toBeInTheDocument();
@@ -583,21 +583,21 @@ describe("InvoiceApprovalPanel — Send Back", () => {
 
   it("shows Send Back alongside Approve/Reject when the user holds the permission", () => {
     setApproval({ data: inFlightApproval, isLoading: false, error: null });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.getByRole("button", { name: /send back/i })).toBeInTheDocument();
   });
 
   it("hides Send Back for a user without canSendBackInvoice, even mid-flight", () => {
     setPermissions({ canSendBackInvoice: false });
     setApproval({ data: inFlightApproval, isLoading: false, error: null });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
   });
 
   it("requires a reason before Send Back can be confirmed", async () => {
     setApproval({ data: inFlightApproval, isLoading: false, error: null });
     const user = userEvent.setup();
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
 
     await user.click(screen.getByRole("button", { name: /send back/i }));
     // Both the row trigger and the modal's own submit button are now labeled "Send Back" — the
@@ -617,7 +617,7 @@ describe("InvoiceApprovalPanel — Send Back", () => {
     const mutate = vi.fn();
     useSendBackInvoiceMutation.mockReturnValue({ mutate, isPending: false });
     const user = userEvent.setup();
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
 
     await user.click(screen.getByRole("button", { name: /send back/i }));
     await user.type(screen.getByLabelText("Reason"), "  Please correct the GST amount  ");
@@ -633,7 +633,7 @@ describe("InvoiceApprovalPanel — Send Back", () => {
   it("hides Send Back when the signed-in user is not the assigned approver, even with the permission", () => {
     useAuth.mockReturnValue({ user: { obs_user_uuid: "someone-else" } });
     setApproval({ data: inFlightApproval, isLoading: false, error: null });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
   });
 
@@ -657,7 +657,7 @@ describe("InvoiceApprovalPanel — Send Back", () => {
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
   });
 });
@@ -666,7 +666,7 @@ describe("InvoiceApprovalPanel — TDS gate (Phase 1 frontend-only sequencing)",
   it("blocks Send for Approval at OCR Reviewed when TDS hasn't been determined yet (404)", () => {
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
     setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
     expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
     expect(screen.getByText(/must have TDS determined/i)).toBeInTheDocument();
   });
@@ -674,7 +674,7 @@ describe("InvoiceApprovalPanel — TDS gate (Phase 1 frontend-only sequencing)",
   it("offers Send for Approval at OCR Reviewed once TDS is determined", () => {
     useInvoiceTds.mockReturnValue({ data: { determination_status: "DETERMINED" }, isLoading: false, error: null });
     setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
     expect(screen.getByRole("button", { name: /send for approval/i })).toBeInTheDocument();
   });
 
@@ -698,7 +698,7 @@ describe("InvoiceApprovalPanel — TDS gate (Phase 1 frontend-only sequencing)",
       isLoading: false,
       error: null,
     });
-    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
     expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
     expect(screen.getByText(/must have TDS determined again/i)).toBeInTheDocument();
   });

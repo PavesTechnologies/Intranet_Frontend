@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "react-toastify";
 import NdaPanel from "./NdaPanel";
 import {
   useVendorNda,
@@ -8,6 +9,7 @@ import {
   useSendNda,
   useUpdateNdaStatus,
   useUploadSignedNda,
+  useReplaceSignedNda,
 } from "../hooks/useNda";
 import ndaService from "../services/ndaService";
 import { validateSignedNdaFile } from "../constants/vendorOnboarding";
@@ -22,6 +24,7 @@ vi.mock("../hooks/useNda", () => ({
   useSendNda: vi.fn(),
   useUpdateNdaStatus: vi.fn(),
   useUploadSignedNda: vi.fn(),
+  useReplaceSignedNda: vi.fn(),
 }));
 
 vi.mock("../services/ndaService", () => ({
@@ -34,6 +37,7 @@ vi.mock("../../hooks/useApPermissions", () => ({
 }));
 
 const uploadMutateAsync = vi.fn();
+const replaceMutateAsync = vi.fn();
 const statusMutateAsync = vi.fn();
 const sendMutateAsync = vi.fn();
 const generateMutateAsync = vi.fn();
@@ -99,6 +103,16 @@ beforeEach(() => {
   useSendNda.mockReturnValue({ mutateAsync: sendMutateAsync, isPending: false });
   useUpdateNdaStatus.mockReturnValue({ mutateAsync: statusMutateAsync, isPending: false });
   useUploadSignedNda.mockReturnValue({ mutateAsync: uploadMutateAsync, isPending: false });
+  replaceMutateAsync.mockResolvedValue({
+    nda_id: 55,
+    vendor_id: 9,
+    status_code: "SIGNED",
+    previous_status_code: "COMPLETED",
+    signed_document_version: 2,
+    previous_signed_document_version: 1,
+    message: "Signed NDA replaced; pending internal review",
+  });
+  useReplaceSignedNda.mockReturnValue({ mutateAsync: replaceMutateAsync, isPending: false });
 });
 
 const openUploadAndPick = async (user, file = pdf()) => {
@@ -380,5 +394,220 @@ describe("NdaPanel — reusing an NDA the vendor already has", () => {
 
     renderPanel();
     expect(screen.queryByText(/existing nda available for this vendor/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("NdaPanel — replacing the signed document", () => {
+  const signedNda = (overrides = {}) =>
+    nda({
+      status_code: "COMPLETED",
+      signed_document_key: "nda/55/signed-v1.pdf",
+      signed_document_name: "Signed_NDA_v1.pdf",
+      signed_document_version: 1,
+      ...overrides,
+    });
+
+  const replaceButton = () => screen.queryByRole("button", { name: /replace document/i });
+  const lastDialog = () => screen.getAllByRole("dialog").at(-1);
+
+  const openReplaceAndPick = async (user, file = pdf("Signed_NDA_v2.pdf")) => {
+    await user.click(replaceButton());
+    await user.upload(screen.getByLabelText("Upload New NDA Document"), file);
+  };
+
+  const replaceAndConfirm = async (user) => {
+    await user.click(within(lastDialog()).getByRole("button", { name: "Replace" }));
+    await user.click(within(lastDialog()).getByRole("button", { name: "Replace" }));
+  };
+
+  it.each(["COMPLETED", "SIGNED", "REJECTED"])("offers Replace Document from %s", (status) => {
+    useVendorNda.mockReturnValue(lookup(signedNda({ status_code: status })));
+    renderPanel();
+    expect(replaceButton()).toBeInTheDocument();
+    // One way to change the signed copy — the first-upload action is not offered alongside.
+    expect(screen.queryByRole("button", { name: /upload/i })).not.toBeInTheDocument();
+  });
+
+  it.each(["PENDING", "SENT"])("does not offer Replace Document from %s", (status) => {
+    useVendorNda.mockReturnValue(lookup(signedNda({ status_code: status })));
+    renderPanel();
+    expect(replaceButton()).not.toBeInTheDocument();
+  });
+
+  it("does not offer Replace Document when no signed document exists", () => {
+    useVendorNda.mockReturnValue(
+      lookup(nda({ status_code: "REJECTED", signed_document_key: null })),
+    );
+    renderPanel();
+    expect(replaceButton()).not.toBeInTheDocument();
+    // The existing corrected-upload path (POST) is untouched.
+    expect(
+      screen.getByRole("button", { name: /upload corrected signed nda/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not offer Replace Document without the upload permission", () => {
+    permissions = { ...permissions, canUploadSignedNda: false };
+    useVendorNda.mockReturnValue(lookup(signedNda()));
+    renderPanel();
+    expect(replaceButton()).not.toBeInTheDocument();
+  });
+
+  it("shows the current signed document name and the backend's version, never the key", () => {
+    useVendorNda.mockReturnValue(lookup(signedNda({ signed_document_version: 3 })));
+    renderPanel();
+    expect(screen.getByText("Signed_NDA_v1.pdf · v3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /view signed nda \(v3\)/i })).toBeInTheDocument();
+    expect(screen.queryByText(/nda\/55\/signed-v1\.pdf/)).not.toBeInTheDocument();
+  });
+
+  it("confirms, then replaces with the vendor and reason", async () => {
+    useVendorNda.mockReturnValue(lookup(signedNda()));
+    const user = userEvent.setup();
+    renderPanel();
+
+    const file = pdf("Signed_NDA_v2.pdf");
+    await openReplaceAndPick(user, file);
+
+    const dialog = lastDialog();
+    expect(within(dialog).getByText("Replace Signed NDA")).toBeInTheDocument();
+    expect(within(dialog).getByText(/Signed_NDA_v1\.pdf · v1/)).toBeInTheDocument();
+    expect(within(dialog).getByText("Completed")).toBeInTheDocument();
+    expect(within(dialog).getByText("Signed_NDA_v2.pdf")).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText("Reason for Replacement"), "Wrong page 3");
+    await user.click(within(dialog).getByRole("button", { name: "Replace" }));
+
+    const confirm = lastDialog();
+    expect(within(confirm).getByText("Confirm NDA Replacement")).toBeInTheDocument();
+    expect(replaceMutateAsync).not.toHaveBeenCalled();
+    await user.click(within(confirm).getByRole("button", { name: "Replace" }));
+
+    await waitFor(() =>
+      expect(replaceMutateAsync).toHaveBeenCalledWith({
+        ndaId: 55,
+        vendorId: 9,
+        file,
+        reason: "Wrong page 3",
+      }),
+    );
+    expect(uploadMutateAsync).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith("Signed NDA replaced; pending internal review");
+    await waitFor(() =>
+      expect(screen.queryByText("Replace Signed NDA")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("sends no reason when none is given", async () => {
+    useVendorNda.mockReturnValue(lookup(signedNda()));
+    const user = userEvent.setup();
+    renderPanel();
+
+    await openReplaceAndPick(user);
+    await replaceAndConfirm(user);
+
+    await waitFor(() =>
+      expect(replaceMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: undefined }),
+      ),
+    );
+  });
+
+  it("cancelling the confirmation sends nothing and keeps the form", async () => {
+    useVendorNda.mockReturnValue(lookup(signedNda()));
+    const user = userEvent.setup();
+    renderPanel();
+
+    await openReplaceAndPick(user);
+    await user.click(within(lastDialog()).getByRole("button", { name: "Replace" }));
+    await user.click(within(lastDialog()).getByRole("button", { name: "Cancel" }));
+
+    expect(replaceMutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByText("Replace Signed NDA")).toBeInTheDocument();
+    expect(screen.getByText("Signed_NDA_v2.pdf")).toBeInTheDocument();
+  });
+
+  it("rejects a non-PDF and an oversized file before anything is sent", async () => {
+    useVendorNda.mockReturnValue(lookup(signedNda()));
+    const user = userEvent.setup({ applyAccept: false });
+    renderPanel();
+
+    await user.click(replaceButton());
+    const input = screen.getByLabelText("Upload New NDA Document");
+
+    await user.upload(input, new File(["x"], "nda.docx", { type: "application/msword" }));
+    expect(screen.getByText("The NDA document must be a PDF document.")).toBeInTheDocument();
+    expect(within(lastDialog()).getByRole("button", { name: "Replace" })).toBeDisabled();
+
+    await user.upload(input, pdf("huge.pdf", 26 * 1024 * 1024));
+    expect(screen.getByText("File is too large. Maximum size is 25MB.")).toBeInTheDocument();
+    expect(within(lastDialog()).getByRole("button", { name: "Replace" })).toBeDisabled();
+    expect(replaceMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("blocks a reason over 500 characters", async () => {
+    useVendorNda.mockReturnValue(lookup(signedNda()));
+    const user = userEvent.setup();
+    renderPanel();
+
+    await openReplaceAndPick(user);
+    fireEvent.change(within(lastDialog()).getByLabelText("Reason for Replacement"), {
+      target: { value: "x".repeat(501) },
+    });
+
+    expect(screen.getByText("The reason can be at most 500 characters.")).toBeInTheDocument();
+    expect(within(lastDialog()).getByRole("button", { name: "Replace" })).toBeDisabled();
+  });
+
+  it("submits only once on a double click", async () => {
+    useVendorNda.mockReturnValue(lookup(signedNda()));
+    let resolve;
+    replaceMutateAsync.mockReturnValue(new Promise((r) => (resolve = r)));
+    const user = userEvent.setup();
+    renderPanel();
+
+    await openReplaceAndPick(user);
+    await user.click(within(lastDialog()).getByRole("button", { name: "Replace" }));
+    const confirmButton = within(lastDialog()).getByRole("button", { name: "Replace" });
+    fireEvent.click(confirmButton);
+    fireEvent.click(confirmButton);
+
+    expect(replaceMutateAsync).toHaveBeenCalledTimes(1);
+    resolve({ status_code: "SIGNED", message: "done" });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("done"));
+  });
+
+  it.each([
+    [403, {}, "You don't have permission to replace this NDA."],
+    [404, {}, "The vendor or NDA could not be found."],
+    [415, {}, "Unsupported file format. Upload a PDF document."],
+    [502, {}, "The document could not be stored. Please try again."],
+    [422, { detail: "NDA is not in a replaceable state." }, "NDA is not in a replaceable state."],
+    [400, { detail: "The uploaded file is empty." }, "The uploaded file is empty."],
+  ])("keeps the dialog open with a readable message on %s", async (status, data, message) => {
+    useVendorNda.mockReturnValue(lookup(signedNda()));
+    replaceMutateAsync.mockRejectedValue({ response: { status, data } });
+    const user = userEvent.setup();
+    renderPanel();
+
+    await openReplaceAndPick(user);
+    await replaceAndConfirm(user);
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(toast.error).toHaveBeenCalledWith(message);
+    expect(toast.success).not.toHaveBeenCalled();
+    // The same file can be retried.
+    expect(within(lastDialog()).getByRole("button", { name: "Replace" })).toBeEnabled();
+  });
+
+  it("after a replacement shows the backend's SIGNED status and offers the review again", () => {
+    useVendorNda.mockReturnValue(
+      lookup(signedNda({ status_code: "SIGNED", signed_document_version: 2 })),
+    );
+    renderPanel();
+
+    expect(screen.getAllByText("Signed — Pending Review").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /accept & complete/i })).toBeInTheDocument();
+    expect(screen.getByText("Signed_NDA_v1.pdf · v2")).toBeInTheDocument();
   });
 });

@@ -171,7 +171,6 @@ function AttentionItem({ icon: Icon, label, count, amount, currency, to, severit
 function NeedsAttention({ data, currency }) {
   const card = (key) => data.action_cards.find((c) => c.key === key);
   const approved = card("approved_not_ready");
-  const msme = card("msme_due");
   const exceptions = card("term_exceptions");
   const tdsOverdue = data.tds?.items.filter((i) => i.key.includes("overdue")).reduce((s, i) => s + i.count, 0) ?? null;
   const tdsAmount = data.tds?.items.filter((i) => i.key.includes("overdue")).reduce((s, i) => s + amountIn(i.amounts, currency), 0);
@@ -194,14 +193,6 @@ function NeedsAttention({ data, currency }) {
           currency={currency}
           to={`${AP_ROUTES.REPORTS}?report=payment_term_exceptions`}
           severity={data.term_exception_count ? "warning" : "info"}
-        />
-        <AttentionItem
-          icon={AlertTriangle}
-          label="MSME statutory deadline ≤ 7 days"
-          count={msme?.count ?? 0}
-          amount={amountIn(msme?.amounts, currency)}
-          currency={currency}
-          severity={msme?.count ? "critical" : "info"}
         />
         {tdsOverdue != null && (
           <AttentionItem
