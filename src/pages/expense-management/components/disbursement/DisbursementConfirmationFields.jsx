@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { DISBURSEMENT_MODE, DISBURSEMENT_MODE_OPTIONS } from "./disbursementConfirmation";
+import { fileInputClass } from "@/pages/expense-management/components/common/fileInputClass";
 
 const inputClass =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none";
@@ -24,7 +25,7 @@ const FileInput = ({ id, label, error, fileKey, onFieldChange }) => (
       id={id}
       type="file"
       accept=".pdf,.jpg,.jpeg,.png"
-      className="block w-full text-sm text-gray-700"
+      className={fileInputClass}
       onChange={(e) => onFieldChange(fileKey, e.target.files?.[0] || null)}
     />
     <p className="text-xs text-gray-500">PDF, JPG or PNG, up to 10 MB.</p>
@@ -189,7 +190,7 @@ export default function DisbursementConfirmationFields({
               id="disb-upi-proof"
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              className="block w-full text-sm text-gray-700"
+              className={fileInputClass}
               onChange={(e) => {
                 const file = e.target.files?.[0] || null;
                 onFieldChange("paymentProof", file);

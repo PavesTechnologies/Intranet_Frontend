@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
-import PageHeader from "@/components/ui/PageHeader";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -213,25 +212,18 @@ export default function DashboardPage() {
   const currency = data?.baseCurrencyCode || "INR";
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="space-y-2 p-3 sm:p-4">
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Dashboard" }]} />
 
-      <PageHeader
-        title="Dashboard"
-        subtitle={active.subtitle}
-        actions={
-          <>
-            <Button variant="outline" size="small" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw size={14} className={`mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
-            </Button>
-            {active.actions.map((a) => (
-              <Button key={a.label} variant={a.variant} size="small" onClick={() => navigate(a.to)}>
-                {a.icon && <a.icon size={14} className="mr-1" />} {a.label}
-              </Button>
-            ))}
-          </>
-        }
-      />
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex items-baseline gap-3">
+          <h1 className="text-xl font-semibold text-[#0a174e]">Dashboard</h1>
+          <p className="truncate text-sm text-slate-500">{active.subtitle}</p>
+        </div>
+        <Button variant="outline" size="small" onClick={() => refetch()} disabled={isFetching}>
+          <RefreshCw size={14} className={`mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+        </Button>
+      </div>
 
       {available.length > 1 && (
         <Tabs value={active.view} onValueChange={setView}>

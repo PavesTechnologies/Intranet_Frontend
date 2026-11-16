@@ -136,8 +136,8 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
       await userEvent.type(amountInput, '5000');
       await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
-      await userEvent.type(neededDateInput, NEEDED_BY);
-      await userEvent.type(settlementDateInput, SETTLEMENT_DUE);
+      fireEvent.change(neededDateInput, { target: { value: NEEDED_BY } });
+      fireEvent.change(settlementDateInput, { target: { value: SETTLEMENT_DUE } });
 
       await previewBeforeSubmit();
       const submitButton = screen.getByRole('button', { name: /submit request/i });
@@ -172,8 +172,8 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
       await userEvent.type(amountInput, '5000');
       await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
-      await userEvent.type(neededDateInput, NEEDED_BY);
-      await userEvent.type(settlementDateInput, SETTLEMENT_DUE);
+      fireEvent.change(neededDateInput, { target: { value: NEEDED_BY } });
+      fireEvent.change(settlementDateInput, { target: { value: SETTLEMENT_DUE } });
 
       await previewBeforeSubmit();
       const submitButton = screen.getByRole('button', { name: /submit request/i });
@@ -212,8 +212,8 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
       await userEvent.type(amountInput, '50000');
       await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
-      await userEvent.type(neededDateInput, NEEDED_BY);
-      await userEvent.type(settlementDateInput, SETTLEMENT_DUE);
+      fireEvent.change(neededDateInput, { target: { value: NEEDED_BY } });
+      fireEvent.change(settlementDateInput, { target: { value: SETTLEMENT_DUE } });
 
       await previewBeforeSubmit();
       const submitButton = screen.getByRole('button', { name: /submit request/i });

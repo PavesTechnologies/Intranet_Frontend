@@ -22,6 +22,7 @@ import { ChartCard, TrendChart } from "@/pages/expense-management/components/das
 import { formatMoney } from "@/pages/expense-management/components/dashboard/dashboardTheme";
 import { useDepartmentNames, useExpenseSummaryReport } from "./useExpenseSummaryReport";
 import { RankedList, ReportSkeleton } from "./ReportWidgets";
+import { BarChart3 } from "lucide-react";
 import {
   DATE_PRESETS,
   SCOPE_LABELS,
@@ -78,6 +79,7 @@ export default function ReportsPage() {
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Reports" }]} />
 
       <PageHeader
+        icon={BarChart3}
         title="Reports"
         subtitle={subtitle}
         actions={

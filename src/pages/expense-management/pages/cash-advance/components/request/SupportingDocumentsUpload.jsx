@@ -199,7 +199,7 @@ export default function SupportingDocumentsUpload({ advanceId, ensureDraft, disa
             onChange={addFiles}
             disabled={!canAdd}
             className="sr-only"
-            aria-label="Add supporting documents"
+            id="supporting-documents-input" name="supportingDocuments" aria-label="Add supporting documents"
           />
         </label>
         {actions}

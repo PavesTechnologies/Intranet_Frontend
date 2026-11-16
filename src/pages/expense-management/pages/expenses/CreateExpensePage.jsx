@@ -299,6 +299,8 @@ export default function CreateExpensePage() {
     tripStartDate: "",
     tripEndDate: "",
     costCenterId: "",
+    projectId: "",
+    clientId: "",
     currencyId: "",
     cashAdvanceId: "",
   });
@@ -1118,6 +1120,8 @@ export default function CreateExpensePage() {
       businessPurpose,
       tripStartDate: formData.tripStartDate,
       tripEndDate: formData.tripEndDate,
+      projectId: formData.projectId || null,
+      clientId: formData.clientId || null,
       costCenterId:
         formData.costCenterId,
       currencyId:
@@ -1990,6 +1994,22 @@ export default function CreateExpensePage() {
   // ACTIVE PROJECT OPTIONS
   // ============================================================
 
+  // Active RMS clients for the report's client field (a report needs a project or a client before it is submitted).
+  const [clients, setClients] = useState([]);
+  // Yes/No: whether this report is for a client. No hides the client field and clears it.
+  const [forClient, setForClient] = useState(false);
+  useEffect(() => {
+    Promise.resolve()
+      .then(() => lookupService.getActiveClients())
+      .then((list) => setClients(Array.isArray(list) ? list : []))
+      .catch(() => setClients([]));
+  }, []);
+
+  const clientOptions = useMemo(
+    () => clients.map((c) => ({ value: c.clientId, label: c.clientName })),
+    [clients]
+  );
+
   const projectOptions = useMemo(() => {
     return projects
       .filter(
@@ -2061,7 +2081,7 @@ export default function CreateExpensePage() {
             <FormInput
               label="Report Title"
               name="title"
-              placeholder="e.g. US Business Trip"
+              placeholder="e.g. US Business Event"
               value={formData.title}
               onChange={handleInputChange}
               requiredMark
@@ -2116,6 +2136,54 @@ export default function CreateExpensePage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
               {/* COST CENTER */}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Project</label>
+                  <Select
+                    options={projectOptions}
+                    value={projectOptions.find((o) => o.value === formData.projectId) || null}
+                    onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
+                    placeholder="Search and select project..."
+                    noOptionsMessage={() => "No projects assigned to you"}
+                    isClearable
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Is this for a client?</label>
+                  <div className="flex gap-2">
+                    <Button type="button" size="small" variant={forClient ? "primary" : "outline"} onClick={() => setForClient(true)}>
+                      Yes
+                    </Button>
+                    <Button
+                      type="button"
+                      size="small"
+                      variant={forClient ? "outline" : "primary"}
+                      onClick={() => {
+                        setForClient(false);
+                        handleSelectChange("clientId", "");
+                      }}
+                    >
+                      No
+                    </Button>
+                  </div>
+                </div>
+                {forClient && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">Client</label>
+                    <Select
+                      options={clientOptions}
+                      value={clientOptions.find((o) => o.value === formData.clientId) || null}
+                      onChange={(opt) => handleSelectChange("clientId", opt ? opt.value : "")}
+                      placeholder="Search and select client..."
+                      isClearable
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 sm:col-span-2">
+                  Choose a project or a client for this event. One of them is required before you submit.
+                </p>
+              </div>
 
               <div className="space-y-1">
 

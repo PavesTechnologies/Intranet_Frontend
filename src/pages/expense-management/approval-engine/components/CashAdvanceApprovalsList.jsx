@@ -567,10 +567,10 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
-                      <td className="px-2.5 py-1.5" />
-                      <td className="px-2.5 py-1.5 font-mono font-medium text-blue-700 whitespace-nowrap">
-                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-emerald-800">Cash Advance</span>
+                      <td className="px-2.5 py-1.5">
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Cash advance</span>
                       </td>
+                      <td className="px-2.5 py-1.5 font-mono text-[11px] font-semibold text-gray-700 whitespace-nowrap">#{String(advId).slice(0, 8).toUpperCase()}</td>
                       <td className="px-2.5 py-1.5 font-medium text-gray-900 whitespace-nowrap">
                         <EmployeeLabel employeeId={empId} />
                       </td>
@@ -583,9 +583,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                       <td className="px-2.5 py-1.5 whitespace-nowrap">
                         {getStatusBadge(adv.status)}
                       </td>
-                      <td className="px-2.5 py-1.5 text-xs text-gray-400">—</td>
-                      <td className="px-2.5 py-1.5 text-xs text-gray-400">—</td>
-                      <td className="px-2.5 py-1.5 font-bold text-gray-900 whitespace-nowrap text-xs">
+                      <td className="px-2.5 py-1.5 font-bold text-gray-900 whitespace-nowrap text-right text-xs">
                         {formatMoney(adv.amount, adv.currencyCode || "INR")}
                       </td>
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
@@ -870,7 +868,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
         {loading && (
           <tbody>
             <tr>
-              <td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
+              <td colSpan={7} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
             </tr>
           </tbody>
         )}
@@ -899,16 +897,14 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-gray-700">
-              <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+              <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                 <tr>
                   <th className="w-8 px-2.5 py-2" />
-                  <th className="px-2.5 py-2">Report</th>
-                  <th className="px-2.5 py-2">Employee</th>
-                  <th className="px-2.5 py-2">Title / Merchant</th>
-                  <th className="px-2.5 py-2">Level / Status</th>
-                  <th className="px-2.5 py-2">Expenses</th>
-                  <th className="px-2.5 py-2">Policy</th>
-                  <th className="px-2.5 py-2">Amount</th>
+                  <th className="px-2.5 py-2 text-left">Report</th>
+                  <th className="px-2.5 py-2 text-left">Employee</th>
+                  <th className="px-2.5 py-2 text-left">Title / Merchant</th>
+                  <th className="px-2.5 py-2 text-left">Level / Status</th>
+                  <th className="px-2.5 py-2 text-left">Amount</th>
                   <th className="px-2.5 py-2 text-right">Actions</th>
                 </tr>
               </thead>

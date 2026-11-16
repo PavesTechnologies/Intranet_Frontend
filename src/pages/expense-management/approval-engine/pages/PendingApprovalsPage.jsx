@@ -35,6 +35,29 @@ const merchantSummary = (relevantLines) => {
 };
 
 /**
+ * Expenses column for an expense-report approval row. Shows the report's total claimed amount (`totalAmount`), not a sum
+ * of the line items below: `pendingLineItems` holds only the items awaiting this approver, so summing them understates
+ * the claim. The pending-item count and the split count are kept as secondary text, because they are not shown elsewhere
+ * in the row.
+ */
+export function ExpensesCell({ item }) {
+  const pendingCount = Array.isArray(item.relevantLines) ? item.relevantLines.length : 0;
+  return (
+    <td className="px-2.5 py-1.5 text-gray-600 text-xs whitespace-nowrap">
+      <span className="font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</span>
+      <span className="block text-[11px] text-gray-400">
+        {pendingCount} to review
+        {item.splitCount > 0 && (
+          <span className="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+            {item.splitCount} split
+          </span>
+        )}
+      </span>
+    </td>
+  );
+}
+
+/**
  * The approver's queue - every report where the caller (or their active delegate) currently has an
  * ACTIVE assignment (GET /xms/approvals/my-queue, server-side paginated). This is the ONLY network
  * call this page makes for its content: ApprovalQueueItemResponse already carries everything a row
@@ -179,18 +202,12 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                           className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`}
                           onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}
                         >
-                          <td className="px-2.5 py-1.5 text-gray-400">
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          <td className="px-2.5 py-1.5">
+                            <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
                           </td>
                           <td className="px-2.5 py-1.5">
-                            <span className="mr-1.5 inline-flex items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-800">Expense</span>
                             <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
                             <SourceBadge cashAdvanceId={item.cashAdvanceId} />
-                            {needsCorrection && (
-                              <span className="ml-1.5 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-800">
-                                Awaiting employee
-                              </span>
-                            )}
                           </td>
                           <td className="px-2.5 py-1.5">
                             <span className="font-medium text-xs text-gray-900">
@@ -198,34 +215,21 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                             </span>
                           </td>
                           <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.relevantLines)}</td>
-                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">
-                            <span className="inline-flex items-center gap-1">
-                              <Layers className="h-3.5 w-3.5" /> Level {item.levelOrder}
-                            </span>
-                          </td>
-                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">
-                            {item.relevantLines.length}
-                            {item.splitCount > 0 && (
-                              <span className="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
-                                {item.splitCount} split
-                              </span>
-                            )}
-                          </td>
                           <td className="px-2.5 py-1.5">
-                            {flagged ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                                <ShieldAlert className="h-3 w-3" /> Warning
+                            {needsCorrection ? (
+                              <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800">Awaiting employee</span>
+                            ) : flagged ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                <ShieldAlert className="h-3 w-3" /> Policy warning · Level {item.levelOrder}
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                                Clear
-                              </span>
+                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">Pending · Level {item.levelOrder}</span>
                             )}
                           </td>
-                          <td className="px-2.5 py-1.5 whitespace-nowrap text-xs">
+                          <td className="px-2.5 py-1.5 whitespace-nowrap text-right text-xs">
                             <span className="font-semibold text-gray-900">{formatMoney(item.relevantTotal, item.currencyCode)}</span>
                             {item.relevantTotal !== item.totalAmount && (
-                              <span className="ml-1 text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)} report total</span>
+                              <span className="ml-1 text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)}</span>
                             )}
                           </td>
                           <td className="px-2.5 py-1.5 text-right text-xs" onClick={(e) => e.stopPropagation()}>
@@ -234,7 +238,7 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={9} className="bg-gray-50/60 p-0">
+                            <td colSpan={7} className="bg-gray-50/60 p-0">
                               {flagged && (
                                 <p className="flex items-center gap-1.5 text-xs text-amber-700 px-4 pt-3">
                                   <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for one-click Approve.
@@ -298,14 +302,14 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
         {isPending && !data && (
           <tbody>
             <tr>
-              <td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
+              <td colSpan={7} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
             </tr>
           </tbody>
         )}
         {isError && (
           <tbody>
             <tr>
-              <td colSpan={9} className="py-6 text-center text-xs text-rose-700">
+              <td colSpan={7} className="py-6 text-center text-xs text-rose-700">
                 Failed to load your queue. <button className="underline" onClick={() => refetch()}>Retry</button>
               </td>
             </tr>
@@ -317,7 +321,7 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
         {data && (data.totalPages ?? 0) > 1 && (
           <tbody>
             <tr>
-              <td colSpan={9} className="py-2">
+              <td colSpan={7} className="py-2">
                 <div className="flex justify-center">
                   <Pagination
                     currentPage={page + 1}
@@ -382,13 +386,13 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                 <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                   <tr>
                     <th className="w-8 px-2.5 py-2" />
-                    <th className="px-2.5 py-2">Report</th>
-                    <th className="px-2.5 py-2">Employee</th>
-                    <th className="px-2.5 py-2">Merchant / Category</th>
-                    <th className="px-2.5 py-2">Level</th>
-                    <th className="px-2.5 py-2">Expenses</th>
-                    <th className="px-2.5 py-2">Policy</th>
-                    <th className="px-2.5 py-2">Amount for My Approval</th>
+                    <th className="px-2.5 py-2 text-left">Report</th>
+                    <th className="px-2.5 py-2 text-left">Employee</th>
+                    <th className="px-2.5 py-2 text-left">Merchant / Category</th>
+                    <th className="px-2.5 py-2 text-left">Level</th>
+                    <th className="px-2.5 py-2 text-left">Expenses</th>
+                    <th className="px-2.5 py-2 text-left">Policy</th>
+                    <th className="px-2.5 py-2 text-left">Amount for My Approval</th>
                     <th className="px-2.5 py-2 text-right">Actions</th>
                   </tr>
                 </thead>

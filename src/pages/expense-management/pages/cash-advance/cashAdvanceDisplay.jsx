@@ -109,7 +109,7 @@ export const getStatusBadge = (status) => {
     case "APPROVED":
     case "EXPENSE_VERIFIED":
     case "EXPENSE VERIFIED":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-teal-50 text-teal-700 border border-teal-200">Approved</span>;
+      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>;
     case "DISBURSED":
     case "IN_PROGRESS":
     case "IN PROGRESS":

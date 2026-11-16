@@ -292,6 +292,7 @@ export default function FinancePage() {
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Finance" }]} />
 
       <PageHeader
+        icon={ClipboardCheck}
         title="Finance"
         subtitle="Verify approved expense reports, follow up on queries, and track whether AP has reimbursed the employee."
       />

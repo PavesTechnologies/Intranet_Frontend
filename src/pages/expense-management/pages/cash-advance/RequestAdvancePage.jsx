@@ -180,11 +180,19 @@ const getActiveAdvances = (list) => {
 
     if (balance <= 0) return false;
 
-    return ![
-      "SETTLED",
-      "CLOSED",
-      "CANCELLED",
-      "REJECTED",
+    // Only advances that were paid out can still be owed. Drafts and requests still awaiting approval are not owed money,
+    // and the server does not count them either.
+    return [
+      "DISBURSED",
+      "IN_PROGRESS",
+      "EXPENSE_SUBMITTED",
+      "EXPENSE_VERIFIED",
+      "SETTLEMENT_PENDING",
+      "PARTIALLY_SETTLED",
+      "PARTIALLY_ADJUSTED",
+      "ADJUSTED",
+      "AWAITING_REIMBURSEMENT",
+      "OVERDUE",
     ].includes(status);
   });
 };
@@ -610,10 +618,7 @@ export default function RequestAdvancePage() {
     /*
      * Check overdue advance
      */
-    if (hasOverdueAdvance) {
-      newErrors.overdue =
-        "You have an overdue cash advance. Resolve the outstanding advance before requesting another advance.";
-    }
+    // An overdue advance does not stop the request. It is routed to Finance, who must authorise it before approval.
 
     // A separate advance needs a reason when an outstanding balance exists (complete new only).
     if (requestType === ADVANCE_TYPE.COMPLETE_NEW && outstandingBalance > 0) {
@@ -1204,7 +1209,6 @@ export default function RequestAdvancePage() {
               submitting ||
               savingDraft ||
               balanceLoading ||
-              hasOverdueAdvance ||
               loadingCurrencies ||
               !preview
             }

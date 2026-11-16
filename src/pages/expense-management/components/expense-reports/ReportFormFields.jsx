@@ -68,16 +68,22 @@ export default function ReportFormFields({
   currencyOptions = [],
   disabled = false,
   lookupsLoading = false,
+  projectOptions = [],
+  clientOptions = [],
+  showClient = false,
+  onShowClientChange,
 }) {
   const selectedCostCenter = costCenterOptions.find((o) => o.value === formData.costCenterId) || null;
   const selectedCurrency = currencyOptions.find((o) => o.value === formData.currencyId) || null;
+  const selectedProject = projectOptions.find((o) => o.value === formData.projectId) || null;
+  const selectedClient = clientOptions.find((o) => o.value === formData.clientId) || null;
 
   return (
     <div className="space-y-4">
       <FormInput
         label="Report Title"
         name="title"
-        placeholder="e.g. US Business Trip"
+        placeholder="e.g. US Business Event"
         value={formData.title}
         onChange={onInputChange}
         requiredMark
@@ -95,6 +101,41 @@ export default function ReportFormFields({
         requiredMark
         error={formErrors.businessPurpose}
       />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Project</label>
+          <Select
+            options={projectOptions}
+            value={selectedProject}
+            onChange={(opt) => onSelectChange("projectId", opt ? opt.value : "")}
+            placeholder="Search and select project..."
+            noOptionsMessage={() => "No projects assigned to you"}
+            isClearable
+            isDisabled={disabled}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Is this for a client?</label>
+          <div className="flex gap-2">
+            <button type="button" disabled={disabled} onClick={() => onShowClientChange && onShowClientChange(true)} className={`rounded-md border px-4 py-2 text-sm font-medium ${showClient ? "border-[#0A0082] bg-[#0A0082] text-white" : "border-gray-300 bg-white text-gray-700"}`}>Yes</button>
+            <button type="button" disabled={disabled} onClick={() => { if (onShowClientChange) onShowClientChange(false); onSelectChange("clientId", ""); }} className={`rounded-md border px-4 py-2 text-sm font-medium ${showClient ? "border-gray-300 bg-white text-gray-700" : "border-[#0A0082] bg-[#0A0082] text-white"}`}>No</button>
+          </div>
+        </div>
+        {showClient && (
+          <div className="space-y-1 sm:col-span-2">
+            <label className="text-sm font-medium text-gray-700">Client</label>
+            <Select
+              options={clientOptions}
+              value={selectedClient}
+              onChange={(opt) => onSelectChange("clientId", opt ? opt.value : "")}
+              placeholder="Search and select client..."
+              isClearable
+              isDisabled={disabled}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormInput

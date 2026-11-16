@@ -51,6 +51,8 @@ const emptyReportForm = {
   currencyId: "",
   tripStartDate: "",
   tripEndDate: "",
+  projectId: "",
+  clientId: "",
 };
  
 export default function MyExpensesPage() {
@@ -77,6 +79,10 @@ export default function MyExpensesPage() {
   const [drawerMode, setDrawerMode] = useState("create"); // "create" or "edit"
   const [currentReport, setCurrentReport] = useState(null);
   const [formData, setFormData] = useState(emptyReportForm);
+  // Project and client for the report form: the client field is shown only when the user answers Yes.
+  const [showClient, setShowClient] = useState(false);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [clientOptions, setClientOptions] = useState([]);
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
  
@@ -95,6 +101,12 @@ export default function MyExpensesPage() {
     } catch (err) {
       console.error("Failed to load lookups:", err);
     }
+    lookupService.getAssignedProjects()
+      .then((list) => setProjectOptions((Array.isArray(list) ? list : []).filter((p) => String(p.status || "").toUpperCase() === "ACTIVE").map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))))
+      .catch(() => setProjectOptions([]));
+    lookupService.getActiveClients()
+      .then((list) => setClientOptions((Array.isArray(list) ? list : []).map((c) => ({ value: c.clientId, label: c.clientName }))))
+      .catch(() => setClientOptions([]));
   }, []);
  
   const fetchReports = useCallback(async () => {
@@ -233,6 +245,7 @@ export default function MyExpensesPage() {
     setDrawerMode("create");
     setCurrentReport(null);
     setFormData(emptyReportForm);
+    setShowClient(false);
     setFormErrors({});
     setIsModalOpen(true);
   };
@@ -247,7 +260,10 @@ export default function MyExpensesPage() {
       currencyId: report.currencyId || "",
       tripStartDate: (report.tripStartDate || "").slice(0, 10),
       tripEndDate: (report.tripEndDate || "").slice(0, 10),
+      projectId: report.projectId || "",
+      clientId: report.clientId || "",
     });
+    setShowClient(!!report.clientId);
     setFormErrors({});
     setIsModalOpen(true);
   };
@@ -263,6 +279,8 @@ export default function MyExpensesPage() {
       currencyId: formData.currencyId,
       tripStartDate: formData.tripStartDate,
       tripEndDate: formData.tripEndDate,
+      projectId: formData.projectId || null,
+      clientId: showClient && formData.clientId ? formData.clientId : null,
     };
 
     try {
@@ -584,6 +602,10 @@ export default function MyExpensesPage() {
                   onSelectChange={handleSelectChange}
                   costCenterOptions={costCenterOptions}
                   currencyOptions={currencyOptions}
+                  projectOptions={projectOptions}
+                  clientOptions={clientOptions}
+                  showClient={showClient}
+                  onShowClientChange={setShowClient}
                   disabled={submitting}
                 />
               </form>
