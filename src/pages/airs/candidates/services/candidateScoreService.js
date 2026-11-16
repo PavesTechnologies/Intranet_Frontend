@@ -112,23 +112,31 @@ export const sendSelectionEmail = async (campaignCandidateId) => {
   }
 };
 
-// Candidate list / Candidates tab — bulk version of the above.
-// POST /airs/campaign-candidates/bulk-send-rejection-email
-// Per-candidate validation (must be REJECTED) — a mixed batch returns
-// partial success ({queued, failed}), not all-or-nothing; max 200 ids,
-// an empty list is a clean no-op. Re-sending is allowed, same as the
-// single version.
-export const bulkSendRejectionEmail = async (campaignCandidateIds) => {
+// Campaign page - bulk rejection email (email plan phase 3): check first, preview one, then send exactly
+// the list the check confirmed.
+const bulkAuth = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+
+// POST /airs/campaign-candidates/bulk-rejection-email/check - who will and won't receive it, with reasons
+// ({will_receive, wont_receive, repeated, check_hash}); nothing is queued.
+export const checkBulkRejectionEmail = async (campaignCandidateIds) => {
+  const response = await api.post(`${BASE_URL}/campaign-candidates/bulk-rejection-email/check`,
+    { campaign_candidate_ids: campaignCandidateIds }, bulkAuth());
+  return response.data?.data;
+};
+
+// POST /airs/campaign-candidates/bulk-rejection-email/preview - one candidate's email as it will be sent.
+export const previewBulkRejectionEmail = async (campaignCandidateId) => {
+  const response = await api.post(`${BASE_URL}/campaign-candidates/bulk-rejection-email/preview`,
+    { campaign_candidate_id: campaignCandidateId }, bulkAuth());
+  return response.data?.data;
+};
+
+// POST /airs/campaign-candidates/bulk-send-rejection-email - needs the check's check_hash; refused (409,
+// code CHECK_CHANGED) when who will receive it changed since the check. Returns {queued, failed, repeated}.
+export const bulkSendRejectionEmail = async (campaignCandidateIds, checkHash) => {
   try {
-    const response = await api.post(
-      `${BASE_URL}/campaign-candidates/bulk-send-rejection-email`,
-      { campaign_candidate_ids: campaignCandidateIds },
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
+    const response = await api.post(`${BASE_URL}/campaign-candidates/bulk-send-rejection-email`,
+      { campaign_candidate_ids: campaignCandidateIds, check_hash: checkHash }, bulkAuth());
     return response.data;
   } catch (error) {
     logError("Error bulk-sending rejection emails:", error);
