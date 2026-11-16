@@ -14,7 +14,7 @@
 export const FINANCE_PERIOD_OPTIONS = [
   { id: "last-5-months", label: "Jul – Nov 2026" },
   { id: "current-quarter", label: "Q3 FY 2026-27 (Oct – Dec)" },
-  { id: "fy-to-date", label: "FY 2026-27 to date" },
+  { id: "fy-to-date ", label: "FY 2026-27 to date" },
 ];
 
 export const DEFAULT_FINANCE_PERIOD = FINANCE_PERIOD_OPTIONS[0].id;
