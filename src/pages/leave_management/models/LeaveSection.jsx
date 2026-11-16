@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import LeaveDashboard from "../charts/LeaveDashboard";
 import ProjectMembersOnLeave from "./ProjectMembersOnLeave";
 import { YearDropdown } from "./EmployeeLeaveBalances";
+import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 
 export default function LeaveSection({ employeeId, leaveId, onClose }) {
   const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard" or "projectMembers"
@@ -26,53 +27,37 @@ export default function LeaveSection({ employeeId, leaveId, onClose }) {
       {/* Tab container */}
       <div className="flex items-center justify-between border-b border-gray-200">
         {/* LEFT: Tabs */}
-        <div className="flex space-x-6">
-          <button
-            onClick={() => setActiveTab("dashboard")}
-            className="relative pb-2 font-medium transition-colors focus:outline-none"
-          >
-            <span
-              className={
-                activeTab === "dashboard"
-                  ? "text-indigo-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none !justify-start items-center gap-6">
+            <TabsTrigger
+              value="dashboard"
+              className="relative pb-2 !rounded-none !bg-transparent !shadow-none font-medium transition-colors focus:outline-none data-[state=active]:!text-indigo-600 data-[state=inactive]:text-gray-600 hover:text-gray-900"
             >
               Leave Balance
-            </span>
+              {activeTab === "dashboard" && (
+                <motion.div
+                  className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-indigo-600"
+                  layoutId="underline"
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                />
+              )}
+            </TabsTrigger>
 
-            {activeTab === "dashboard" && (
-              <motion.div
-                className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-indigo-600"
-                layoutId="underline"
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              />
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab("projectMembers")}
-            className="relative pb-2 font-medium transition-colors focus:outline-none"
-          >
-            <span
-              className={
-                activeTab === "projectMembers"
-                  ? "text-indigo-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }
+            <TabsTrigger
+              value="projectMembers"
+              className="relative pb-2 !rounded-none !bg-transparent !shadow-none font-medium transition-colors focus:outline-none data-[state=active]:!text-indigo-600 data-[state=inactive]:text-gray-600 hover:text-gray-900"
             >
               Team Members on Leave
-            </span>
-
-            {activeTab === "projectMembers" && (
-              <motion.div
-                className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-indigo-600"
-                layoutId="underline"
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              />
-            )}
-          </button>
-        </div>
+              {activeTab === "projectMembers" && (
+                <motion.div
+                  className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-indigo-600"
+                  layoutId="underline"
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                />
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* RIGHT: Year Dropdown */}
         <div className="flex items-end">

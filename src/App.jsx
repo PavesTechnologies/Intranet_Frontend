@@ -300,6 +300,7 @@ import InterviewFeedbackFormPage from "./pages/public/InterviewFeedbackFormPage.
 
 
 // ✅ Leave Management
+import PageContainer from "./components/patterns/PageContainer";
 import EmployeePanel from "./pages/leave_management/EmployeePanel";
 import AdminPanel from "./pages/leave_management/AdminPanel";
 import HRManageTools from "./pages/leave_management/HRManageTools";
@@ -1458,7 +1459,9 @@ const AppRoutes = () => {
             path="/leave-management/manager"
             element={
               <ProtectedRoute allowedRoles={["Manager"]}>
-                <AdminPanel />
+                <PageContainer density="comfortable">
+                  <AdminPanel />
+                </PageContainer>
               </ProtectedRoute>
             }
           />
@@ -1466,7 +1469,9 @@ const AppRoutes = () => {
             path="/leave-management/hr"
             element={
               <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
-                <HRManageTools />
+                <PageContainer density="comfortable">
+                  <HRManageTools />
+                </PageContainer>
               </ProtectedRoute>
             }
           />

@@ -610,7 +610,6 @@
 import React, { useEffect, useState, Fragment, useMemo } from "react";
 import api from "../../../api/axiosInstance";
 import {
-  X,
   Lock,
   CalendarDays,
   AlertTriangle,
@@ -620,13 +619,17 @@ import {
 import { toast } from "react-toastify";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import FormSelect from "../../../components/forms/FormSelect";
+import FormTextArea from "../../../components/forms/FormTextArea";
 import { format } from "date-fns";
 import DateRangePicker from "./DateRangePicker";
 import { useRecordLock } from "../hooks/useRecordLock";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 import Button from "../../../components/Button/Button";
+import Modal from "../../../components/Modal/modal";
+import { InlineLoader } from "../../../components/patterns/Loaders";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -990,12 +993,9 @@ export default function ManagerEditLeaveRequest({
     onClose();
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e) => { if (e.key === "Escape") handleClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Escape-to-close is now owned by the canonical Modal (closeOnEscape,
+  // enabled by default — the original supported Escape too), wired to
+  // handleClose via the onClose prop below.
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1030,60 +1030,43 @@ export default function ManagerEditLeaveRequest({
     JSON.stringify(initialSnapshot)
   : false;
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={(e) => e.target === e.currentTarget && handleClose()}
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Edit Leave Request"
+      size="lg"
+      maxHeight="max-h-[92vh]"
+      bodyClassName="p-0"
+      showCloseButton={!isLockedByOther}
+      // closeOnBackdrop and closeOnEscape are left at canonical defaults
+      // (true) — the original supported both backdrop-click and Escape.
     >
-      <div
-        className={`bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-2 sm:mx-4 border border-gray-100 relative flex flex-col max-h-[92vh] ${
-          isLockedByOther ? "overflow-hidden" : "overflow-y-auto"
-        }`}
-      >
-        {/* Lock Overlay */}
-        {isLockedByOther && (
-          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6 rounded-2xl">
-            <div className="w-16 h-16 rounded-full bg-yellow-50 flex items-center justify-center mb-4">
-              <Lock className="w-8 h-8 text-yellow-500" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-800">Record Locked</h3>
-            {lockMessage && (
-              <p className="text-gray-500 mt-2 text-sm">{lockMessage}</p>
-            )}
-            <p className="text-gray-400 text-xs mt-1">
-              Please try again later.
-            </p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-5 px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition"
-            >
-              Close
-            </button>
+      {/* Lock Overlay */}
+      {isLockedByOther && (
+        <div className="flex flex-col items-center justify-center text-center p-6 bg-white/90 backdrop-blur-sm">
+          <div className="w-16 h-16 rounded-full bg-yellow-50 flex items-center justify-center mb-4">
+            <Lock className="w-8 h-8 text-yellow-500" />
           </div>
-        )}
-
-        {/* Header */}
-        <div className="sticky top-0 bg-white z-10 px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <CalendarDays className="w-4 h-4 text-indigo-600" />
-            </div>
-            <h2 className="text-base font-bold text-gray-900">
-              Edit Leave Request
-            </h2>
-          </div>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition rounded-lg p-1.5"
+          <h3 className="text-xl font-bold text-gray-800">Record Locked</h3>
+          {lockMessage && (
+            <p className="text-gray-500 mt-2 text-sm">{lockMessage}</p>
+          )}
+          <p className="text-gray-400 text-xs mt-1">
+            Please try again later.
+          </p>
+          <Button
             type="button"
+            onClick={onClose}
+            variant="outline"
+            className="mt-5"
           >
-            <X className="w-5 h-5" />
-          </button>
+            Close
+          </Button>
         </div>
+      )}
 
+      {!isLockedByOther && (
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
           {/* Error Banner */}
           {error && (
@@ -1096,7 +1079,7 @@ export default function ManagerEditLeaveRequest({
           <fieldset disabled={isLockedByOther} className="space-y-4">
             {/* Employee Reason — read only */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+              <label className={`${Fonts.eyebrow} mb-1 block`}>
                 Employee's Reason
               </label>
               <div className="w-full min-h-[42px] px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-700 text-sm break-words">
@@ -1108,12 +1091,12 @@ export default function ManagerEditLeaveRequest({
 
             {/* Leave Type */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+              <label className={`${Fonts.eyebrow} mb-1 block`}>
                 Leave Type
               </label>
               {loadingData ? (
-                <div className="mt-1 w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-center text-gray-400 text-sm animate-pulse">
-                  Loading balances...
+                <div className="mt-1 w-full p-3 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center">
+                  <InlineLoader text="Loading balances..." />
                 </div>
               ) : (
                 <LeaveTypeDropdown
@@ -1143,7 +1126,7 @@ export default function ManagerEditLeaveRequest({
 
             {/* Date Range */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+              <label className={`${Fonts.eyebrow} mb-2 block`}>
                 Leave Period
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1198,7 +1181,7 @@ export default function ManagerEditLeaveRequest({
             {/* Half day toggle */}
             {selectedLeaveType?.allowHalfDay && !isMaternityLeave && (
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">
+                <label className={`${Fonts.eyebrow} block`}>
                   Day Type
                 </label>
                 <div className="p-1 inline-flex items-center bg-gray-100 rounded-lg">
@@ -1232,14 +1215,15 @@ export default function ManagerEditLeaveRequest({
                       <label className="text-xs font-medium text-gray-500">
                         Start — {formatDateForDisplay(startDate)}
                       </label>
-                      <FilterListbox
+                      <FormSelect
+                        name="halfDayStart"
                         options={[
                           { value: "fullday", label: "Full Day" },
                           { value: "first", label: "First Half" },
                           { value: "second", label: "Second Half" },
                         ]}
                         value={halfDayConfig.start}
-                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                        onChange={(e) => setHalfDayConfig((p) => ({ ...p, start: e.target.value }))}
                       />
                     </div>
                     {isMultiDay && (
@@ -1249,14 +1233,15 @@ export default function ManagerEditLeaveRequest({
                           <label className="text-xs font-medium text-gray-500">
                             End — {formatDateForDisplay(endDate)}
                           </label>
-                          <FilterListbox
+                          <FormSelect
+                            name="halfDayEnd"
                             options={[
                               { value: "fullday", label: "Full Day" },
                               { value: "first", label: "First Half" },
                               { value: "second", label: "Second Half" },
                             ]}
                             value={halfDayConfig.end}
-                            onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                            onChange={(e) => setHalfDayConfig((p) => ({ ...p, end: e.target.value }))}
                           />
                         </div>
                       </>
@@ -1268,16 +1253,15 @@ export default function ManagerEditLeaveRequest({
 
             {/* Manager Comment */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Manager Comment
-              </label>
-              <textarea
-                maxLength="100"
-                rows="3"
+              <FormTextArea
+                label="Manager Comment"
+                name="managerComment"
+                maxLength={100}
+                rows={3}
                 value={managerComment}
                 onChange={(e) => setManagerComment(e.target.value)}
                 placeholder="Add a comment for the employee..."
-                className="w-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none p-3 rounded-xl text-sm resize-none transition-all"
+                inputClassName="resize-none"
               />
               <p className="text-right text-xs text-gray-400 mt-0.5">
                 {managerComment.length}/100
@@ -1291,7 +1275,7 @@ export default function ManagerEditLeaveRequest({
               type="button"
               onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              variant="ghost"
+              variant="outline"
               size="medium"
             >
               Cancel
@@ -1314,7 +1298,7 @@ export default function ManagerEditLeaveRequest({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }

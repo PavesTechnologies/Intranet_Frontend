@@ -47,6 +47,30 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* ----------------------------------------------------------------
+     * Paves brand tokens (Phase 1 canonical UI foundation)
+     * Additive only — does not repurpose the shadcn --primary/--secondary
+     * tokens above, which many existing ui/* components already rely on
+     * for a neutral surface/accent look.
+     * ---------------------------------------------------------------- */
+    --brand-primary: #0A0082;
+    --brand-primary-hover: #080066;
+    --brand-secondary: #B83280;
+    --brand-secondary-hover: #9D286D;
+
+    --success: #16a34a;
+    --success-bg: #dcfce7;
+    --warning: #d97706;
+    --warning-bg: #fef3c7;
+    --danger: #dc2626;
+    --danger-bg: #fee2e2;
+    --info: #2563eb;
+    --info-bg: #dbeafe;
+    --neutral: #6b7280;
+    --neutral-bg: #f3f4f6;
+
+    --focus-ring: var(--brand-primary);
   }
 
   .dark {
