@@ -352,6 +352,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../api/axiosInstance";
 import Button from "../../components/Button/Button.jsx";
 import FilterListbox from "../../components/filter/FilterListbox.jsx";
+import { Fonts } from "../../components/Fonts/Fonts";
 
 const EmployeeDashboard = ({ employeeId }) => {
   const [isRequestLeaveModalOpen, setIsRequestLeaveModalOpen] = useState(false);
@@ -466,16 +467,18 @@ const EmployeeDashboard = ({ employeeId }) => {
         </Button>
       </div>
 
-      <h2 className="text-small font-semibold m-4">Pending Leave Requests</h2>
       <div className="flex gap-4 flex-col md:flex-row">
-        <div className="bg-white p-6 rounded-lg shadow-sm md:w-full lg:w-[65%]">
-          {/* ✅ No refreshKey prop — PendingLeaveRequests owns its own WS subscription */}
-          <PendingLeaveRequests
-            employeeId={employeeId}
-            year={currentYear}
-            onLeaveCancel={() => setRefreshKey(prev => prev + 1)} // child can trigger refresh when a leave is cancelled
-            refresh={pendingRequests} // can be used by child to trigger manual refresh if needed
-          />
+        <div className="md:w-full lg:w-[65%]">
+          <section className="space-y-3">
+            <h2 className={Fonts.subheading}>Pending Leave Requests</h2>
+            {/* ✅ No refreshKey prop — PendingLeaveRequests owns its own WS subscription */}
+            <PendingLeaveRequests
+              employeeId={employeeId}
+              year={currentYear}
+              onLeaveCancel={() => setRefreshKey(prev => prev + 1)} // child can trigger refresh when a leave is cancelled
+              refresh={pendingRequests} // can be used by child to trigger manual refresh if needed
+            />
+          </section>
         </div>
         <div className="md:w-full lg:w-[35%]">
           <UpcomingHolidays year={currentYear} />
@@ -499,7 +502,7 @@ const EmployeeDashboard = ({ employeeId }) => {
         />
       )}
 
-      <h2 className="text-small font-semibold m-4">My Leave Stats</h2>
+      <h2 className={`${Fonts.subheading} m-4`}>My Leave Stats</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* ✅ No refreshKey — each owns its own WS subscription */}
         <WeeklyPattern employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
@@ -507,11 +510,11 @@ const EmployeeDashboard = ({ employeeId }) => {
         <MonthlyStats employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
       </div>
 
-      <h2 className="text-small font-semibold m-4">Leave Balances</h2>
+      <h2 className={`${Fonts.subheading} m-4`}>Leave Balances</h2>
       {/* ✅ No refreshKey — LeaveDashboard subscribes to "employee-update" directly */}
       <LeaveDashboard employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
 
-      <h2 className="text-small font-semibold m-4">Leave History</h2>
+      <h2 className={`${Fonts.subheading} m-4`}>Leave History</h2>
       {/* ✅ No refreshKey — LeaveHistory subscribes to "employee-update" directly */}
       <LeaveHistory employeeId={employeeId} year={currentYear} />
 

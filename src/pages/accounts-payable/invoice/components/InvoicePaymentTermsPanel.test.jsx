@@ -55,7 +55,7 @@ function setup({ terms = mismatch, permissions = {} } = {}) {
   useRecheckPaymentTermsMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
   verifyMutation = { mutate: vi.fn(), isPending: false };
   useVerifyPaymentTermsMutation.mockReturnValue(verifyMutation);
-  return render(<InvoicePaymentTermsPanel invoice={invoice} />);
+  return render(<InvoicePaymentTermsPanel invoice={invoice} defaultOpen />);
 }
 
 describe("InvoicePaymentTermsPanel", () => {

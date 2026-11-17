@@ -94,6 +94,7 @@ import FormTextArea from "@/components/forms/FormTextArea";
 import FormDatePicker from "@/components/forms/FormDatePicker";
 import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
 import ReceiptDropzone from "@/pages/expense-management/components/expense-reports/ReceiptDropzone";
+import LateReceiptPanel from "@/pages/expense-management/components/expense-reports/LateReceiptPanel";
 import PolicyStatusBadge, {
   PolicyResultBanner,
   derivePolicyStatus,
@@ -311,7 +312,10 @@ export default function ExpenseReportDetailPage() {
   }, [isViewModalOpen]);
 
   const [isEditReportOpen, setIsEditReportOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "", tripStartDate: "", tripEndDate: "" });
+  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "", tripStartDate: "", tripEndDate: "", projectId: "", clientId: "" });
+  const [editShowClient, setEditShowClient] = useState(false);
+  const [editProjectOptions, setEditProjectOptions] = useState([]);
+  const [editClientOptions, setEditClientOptions] = useState([]);
   const [editFormErrors, setEditFormErrors] = useState({});
   const [savingReport, setSavingReport] = useState(false);
   const [isDeleteReportOpen, setIsDeleteReportOpen] = useState(false);
@@ -576,7 +580,10 @@ export default function ExpenseReportDetailPage() {
       currencyId: report.currencyId || "",
       tripStartDate: (report.tripStartDate || "").slice(0, 10),
       tripEndDate: (report.tripEndDate || "").slice(0, 10),
+      projectId: report.projectId || "",
+      clientId: report.clientId || "",
     });
+    setEditShowClient(!!report.clientId);
     setEditFormErrors({});
     setIsEditReportOpen(true);
   };
@@ -586,6 +593,16 @@ export default function ExpenseReportDetailPage() {
     setEditFormData((prev) => ({ ...prev, [name]: value }));
     if (editFormErrors[name]) setEditFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
+
+  // Project and client options for the edit form (the same lists the create form uses).
+  useEffect(() => {
+    lookupService.getAssignedProjects()
+      .then((list) => setEditProjectOptions((Array.isArray(list) ? list : []).filter((p) => String(p.status || "").toUpperCase() === "ACTIVE").map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))))
+      .catch(() => setEditProjectOptions([]));
+    lookupService.getActiveClients()
+      .then((list) => setEditClientOptions((Array.isArray(list) ? list : []).map((c) => ({ value: c.clientId, label: c.clientName }))))
+      .catch(() => setEditClientOptions([]));
+  }, []);
 
   const handleEditSelectChange = (name, value) => {
     setEditFormData((prev) => ({ ...prev, [name]: value }));
@@ -616,6 +633,8 @@ export default function ExpenseReportDetailPage() {
       currencyId: editFormData.currencyId,
       tripStartDate: editFormData.tripStartDate,
       tripEndDate: editFormData.tripEndDate,
+      projectId: editFormData.projectId || null,
+      clientId: editShowClient && editFormData.clientId ? editFormData.clientId : null,
     };
 
     try {
@@ -1042,6 +1061,9 @@ export default function ExpenseReportDetailPage() {
             </div>
           </div>
 
+          {/* Late receipts: attached after approval without reopening the claim */}
+          <LateReceiptPanel reportId={report.reportId} reportStatus={report.reportStatus} lineItems={lineItems} />
+
           {/* Line Items */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
@@ -1198,6 +1220,10 @@ export default function ExpenseReportDetailPage() {
                   onSelectChange={handleEditSelectChange}
                   costCenterOptions={costCenterOptions}
                   currencyOptions={currencyOptions}
+                  projectOptions={editProjectOptions}
+                  clientOptions={editClientOptions}
+                  showClient={editShowClient}
+                  onShowClientChange={setEditShowClient}
                   disabled={savingReport}
                   lookupsLoading={lookupsLoading}
                 />
@@ -1578,6 +1604,7 @@ const emptyForm = (defaultCostCenterId) => ({
   costCenterId: defaultCostCenterId || "",
   clientBillable: false,
   clientId: "",
+  employeePaymentMethod: "",
   allocationReason: "",
   projectId: "",
 });
@@ -1696,6 +1723,7 @@ export function LineItemDrawer({
           // Saved line items carry the client as resolvedClientId (the frozen snapshot).
           clientId: lineItem.resolvedClientId || lineItem.clientId || "",
           allocationReason: lineItem.allocationReason || "",
+          employeePaymentMethod: lineItem.employeePaymentMethod || "",
           projectId: lineItem.projectId || "",
         });
         setTaxPreview(null);
@@ -2017,6 +2045,8 @@ export function LineItemDrawer({
       allocationReason: crossDepartmentCostCenters.length > 0 ? (formData.allocationReason || "").trim() || null : null,
       projectId: formData.clientBillable ? (formData.projectId || null) : null,
       clientBillable: !!formData.clientBillable,
+      // How the employee paid: required before the report is submitted.
+      employeePaymentMethod: formData.employeePaymentMethod || null,
     };
 
     try {
@@ -2260,6 +2290,25 @@ export function LineItemDrawer({
         )}
 
         <div className="space-y-0.5">
+          <label htmlFor="employeePaymentMethod" className="block text-xs font-semibold text-gray-600">
+            How did you pay? <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="employeePaymentMethod"
+            value={formData.employeePaymentMethod || ""}
+            onChange={(e) => setFormData((prev) => ({ ...prev, employeePaymentMethod: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0A0082] focus:outline-none"
+          >
+            <option value="">Select how you paid</option>
+            <option value="PERSONAL_CARD">Personal card</option>
+            <option value="CASH">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="COMPANY_CARD">Company card</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+
+        <div className="space-y-0.5">
           <label htmlFor="description" className="block text-xs font-semibold text-gray-600">
             Description
           </label>
@@ -2473,7 +2522,7 @@ export function LineItemDrawer({
                     ref={inputRef}
                     type="file"
                     multiple
-                    accept=".pdf,.png,.jpg,.jpeg"
+                    name="receiptFiles" accept=".pdf,.png,.jpg,.jpeg"
                     className="hidden"
                     onChange={(e) => {
                       handleFileChange(e.target.files);
@@ -2567,7 +2616,7 @@ export function LineItemDrawer({
                   ref={inputRef}
                   type="file"
                   multiple
-                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+                  name="receiptFilesAdd" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
                   className="hidden"
                   onChange={(e) => {
                     handleFileChange(e.target.files);

@@ -5,7 +5,9 @@ import CompOffBalanceRequests from "../leave_management/models/CompOffBalanceReq
 import HandleLeaveRequestAndApprovals from "../leave_management/models/HandleLeaveRequestAndApprovals";
 import { useAuth } from "../../contexts/AuthContext";
 import Button from "../../components/Button/Button";
+import PageHeader from "../../components/ui/PageHeader";
 import RevokeLeaveRequests from "./models/RevokeLeaveRequests";
+import { Fonts } from "../../components/Fonts/Fonts";
 import { toast } from "react-toastify";
 import { se } from "date-fns/locale";
 import { useWebSocket } from "./websockets/WebSocketProvider.jsx";
@@ -198,23 +200,17 @@ const AdminPanel = ({ employeeId }) => {
 
   return (
     <div className="space-y-6 py-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
-            Leave Management
-          </h1>
-          <p className="text-gray-600">Handle leave requests and approvals</p>
-        </div>
-        <div>
-          {/* <Button
-            onClick={() => navigate(`/block-leave-dates/${employeeId}`)}
-            variant="secondary"
-            size="medium"
-          >
-            Manage Leave Blocks
-          </Button> */}
-        </div>
-      </div>
+      {/* <PageHeader
+        title="Leave Management"
+        subtitle="Handle leave requests and approvals"
+      /> */}
+      {/* <Button
+        onClick={() => navigate(`/block-leave-dates/${employeeId}`)}
+        variant="secondary"
+        size="medium"
+      >
+        Manage Leave Blocks
+      </Button> */}
 
       {/* Statistics Cards */}
       {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -271,15 +267,21 @@ const AdminPanel = ({ employeeId }) => {
       {/* Comp-Off Balance Requests Section */}
       {permissions.includes("VIEW_COMPOFF_BY_EMPLOYEE") &&
         leaveTypes.some((lt) => lt.leaveTypeId === "L-COMPOFF") && (
-          <CompOffBalanceRequests managerId={employeeId} />
+          <section className="space-y-3">
+            <h2 className={Fonts.subheading}>Comp-Off Balance Requests</h2>
+            <CompOffBalanceRequests managerId={employeeId} />
+          </section>
         )}
       {/* <CompOffBalanceRequests managerId={employeeId} /> */}
 
       {revokeRequests.length > 0 && (
-        <RevokeLeaveRequests
-          revokeRequests={revokeRequests}
-          onActionSuccess={fetchRevokeRequests}
-        />
+        <section className="space-y-3">
+          <h2 className={Fonts.subheading}>Revoke Leave Requests</h2>
+          <RevokeLeaveRequests
+            revokeRequests={revokeRequests}
+            onActionSuccess={fetchRevokeRequests}
+          />
+        </section>
       )}
 
       {/* Search and Filter Section */}

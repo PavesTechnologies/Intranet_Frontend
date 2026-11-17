@@ -28,6 +28,7 @@ import vendorService from "../../vendor/services/vendorService";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatDate } from "../../utils/formatters";
 import { AP_ROUTES } from "../../constants/routes";
+import { withoutMsme } from "../../utils/msme";
 import { PAYMENT_TERM_STATUS_META } from "../../constants/paymentTerms";
 import PaymentTermStatusBadge from "../../invoice/components/PaymentTermStatusBadge";
 import {
@@ -105,9 +106,6 @@ const TAB_LABELS = {
   control_exceptions: "Controls",
   month_end_accruals: "Month-end accruals",
   gst_itc_register: "GST ITC register",
-  msme_payments: "MSME payments",
-  msme_43bh: "MSME 43B(h)",
-  msme_form1: "MSME Form-1",
 };
 
 // Display-only header renames; the backend column keys and the exported files are unchanged.
@@ -308,6 +306,7 @@ export default function APReportsPage() {
   const { data: reports = [], isLoading: loadingList, isError: listError, error: listErr } = useQuery({
     queryKey: ["accountsPayable", "reports"],
     queryFn: () => reportService.listReports(),
+    select: withoutMsme,
     retry: false,
   });
   const selectedKey = reports.some((r) => r.key === reportKey) ? reportKey : reports[0]?.key;

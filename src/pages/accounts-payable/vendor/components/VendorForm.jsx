@@ -2,7 +2,6 @@ import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import useApLookups from "../../hooks/useApLookups";
 import { COUNTRY_KIND, getCountryKind } from "../config/vendorCountryConfig";
-import { MSME_CATEGORY_OPTIONS } from "../../constants/paymentTerms";
 
 export const DEFAULT_VENDOR_FORM = {
   vendor_name: "",
@@ -14,9 +13,6 @@ export const DEFAULT_VENDOR_FORM = {
   phone_number: "",
   email: "",
   status_id: "",
-  msme_registered: "false",
-  udyam_number: "",
-  msme_category: "",
 };
 
 /**
@@ -32,8 +28,6 @@ const VendorForm = ({
   mode = "create",
   disabledFields = [],
   hideCountryField = false,
-  // MSME (Udyam) classification — drives the MSMED Act statutory payment limit on invoices.
-  showMsmeFields = false,
 }) => {
   const { countryOptions, currencyOptions, paymentTermOptions, vendorStatusOptions } = useApLookups();
   const isDisabled = (name) => disabledFields.includes(name);
@@ -113,40 +107,6 @@ const VendorForm = ({
         onChange={onChange}
         error={errors.email}
       />
-      {showMsmeFields && (
-        <>
-          <FormSelect
-            label="MSME (Udyam) registered"
-            name="msme_registered"
-            options={[
-              { value: "false", label: "No" },
-              { value: "true", label: "Yes" },
-            ]}
-            value={String(formData.msme_registered ?? "false")}
-            onChange={onChange}
-          />
-          {String(formData.msme_registered) === "true" && (
-            <>
-              <FormInput
-                label="Udyam Registration Number"
-                name="udyam_number"
-                value={formData.udyam_number}
-                onChange={onChange}
-                error={errors.udyam_number}
-                placeholder="UDYAM-XX-00-0000000"
-                requiredMark
-              />
-              <FormSelect
-                label="MSME Category *"
-                name="msme_category"
-                options={MSME_CATEGORY_OPTIONS}
-                value={formData.msme_category}
-                onChange={onChange}
-              />
-            </>
-          )}
-        </>
-      )}
       {mode === "edit" && (
         <FormSelect
           label="Status"

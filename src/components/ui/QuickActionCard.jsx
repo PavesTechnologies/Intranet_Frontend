@@ -9,7 +9,7 @@ export default function QuickActionCard({ icon: Icon, label, hint, tone = "navy"
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex items-start gap-3 overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-transparent hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40"
+      className="group relative flex items-start gap-3 overflow-hidden rounded-2xl border border-slate-100 bg-white p-3 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-transparent hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40"
       {...rest}
     >
       <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${t.tile} transition-transform duration-200 group-hover:scale-110`}>

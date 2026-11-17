@@ -5,6 +5,7 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { carryForwardApi } from "@/pages/expense-management/api/carryForwardApi";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
+import AllocationApprovalForm from "@/pages/expense-management/pages/cash-advance/components/AllocationApprovalForm";
 
 const TREATMENT_LABEL = {
   FULL_ADVANCE: "Full amount. Both advances stay separate.",
@@ -183,6 +184,10 @@ export default function ManagerDecisionSummary({ advance, canAct, onChanged }) {
             The carry-forward is added to the next INR advance approved for this employee. If another advance is approved first, it lands there.
           </p>
         </section>
+      )}
+      {/* Finance approves a Cash Advance + Outstanding request by allocation: the rollover and the cash are set together */}
+      {canAct && advance.requestType === "ADVANCE_PLUS_OUTSTANDING" && ["PENDING_FINANCE_APPROVAL", "PENDING_FINANCE"].includes(String(advance.status || "").toUpperCase()) && (
+        <AllocationApprovalForm advance={advance} balance={balance} onApproved={onChanged} />
       )}
     </div>
   );

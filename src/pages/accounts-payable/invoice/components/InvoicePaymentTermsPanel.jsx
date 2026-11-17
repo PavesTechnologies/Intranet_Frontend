@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { AlertTriangle, CalendarClock, RefreshCw, ShieldCheck } from "lucide-react";
-import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
+import CollapsiblePanel from "./CollapsiblePanel";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import FormInput from "../../../../components/forms/FormInput";
@@ -70,11 +70,14 @@ function SourceRow({ label, value, detail, applied }) {
 /**
  * Payment-term compliance for one invoice (Backend/Business_Layer/services/
  * payment_term_compliance_service.py): what the invoice, PO, vendor agreement and vendor master
- * each say, which one is authoritative, and the contractual / statutory (MSME) / effective due
+ * each say, which one is authoritative, and the contractual / effective due
  * dates kept apart. Everything shown is computed by the backend. A MISMATCH or REVIEW_REQUIRED
  * blocks Mark Ready for Payment until Finance verifies the terms here (remarks mandatory).
+ *
+ * Collapsible (CollapsiblePanel): collapsed unless `defaultOpen`; opens itself when a link to
+ * `#anchorId` is followed (InvoicePaymentPanel's "Check payment terms" fix link).
  */
-export default function InvoicePaymentTermsPanel({ invoice }) {
+export default function InvoicePaymentTermsPanel({ invoice, defaultOpen = false, anchorId }) {
   const { canViewPaymentTerms, canVerifyPaymentTerms, canRecheckPaymentTerms } = useApPermissions();
   const { data: terms, isLoading, error } = useInvoicePaymentTerms(invoice.id, { enabled: canViewPaymentTerms });
   const recheck = useRecheckPaymentTermsMutation();
@@ -121,27 +124,27 @@ export default function InvoicePaymentTermsPanel({ invoice }) {
     );
 
   return (
-    <PageCard>
-      <PageCardContent>
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-            <CalendarClock size={16} /> Payment Terms
-          </h3>
-          <div className="flex items-center gap-2">
-            {terms?.evaluated && <PaymentTermStatusBadge status={terms.validation_status} />}
-            {canRecheckPaymentTerms && !closed && (
-              <button
-                type="button"
-                onClick={handleRecheck}
-                disabled={recheck.isPending}
-                className="inline-flex items-center gap-1 text-xs font-medium text-[#0A0082] hover:underline disabled:opacity-60"
-                title="Re-check against the current PO, agreement and vendor master"
-              >
-                <RefreshCw size={12} className={recheck.isPending ? "animate-spin" : undefined} /> Re-check
-              </button>
-            )}
-          </div>
-        </div>
+    <>
+      <CollapsiblePanel
+        title="Payment Terms"
+        icon={<CalendarClock size={16} />}
+        badge={terms?.evaluated ? <PaymentTermStatusBadge status={terms.validation_status} /> : null}
+        actions={
+          canRecheckPaymentTerms && !closed ? (
+            <button
+              type="button"
+              onClick={handleRecheck}
+              disabled={recheck.isPending}
+              className="inline-flex items-center gap-1 text-xs font-medium text-[#0A0082] hover:underline disabled:opacity-60"
+              title="Re-check against the current PO, agreement and vendor master"
+            >
+              <RefreshCw size={12} className={recheck.isPending ? "animate-spin" : undefined} /> Re-check
+            </button>
+          ) : null
+        }
+        defaultOpen={defaultOpen}
+        anchorId={anchorId}
+      >
 
         {isLoading && <p className="text-sm text-gray-500">Loading payment terms…</p>}
         {error && <p className="text-sm text-rose-600">{getApiErrorMessage(error, "Could not load payment terms.")}</p>}
@@ -203,7 +206,7 @@ export default function InvoicePaymentTermsPanel({ invoice }) {
               </tbody>
             </table>
 
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
               <div>
                 <dt className="text-xs text-gray-500">Applied terms</dt>
                 <dd className="font-medium text-gray-900">
@@ -222,12 +225,6 @@ export default function InvoicePaymentTermsPanel({ invoice }) {
                 <dt className="text-xs text-gray-500">Contractual due</dt>
                 <dd className="font-medium text-gray-900">
                   {terms.contractual_due_date ? formatDate(terms.contractual_due_date) : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Statutory (MSME) limit</dt>
-                <dd className="font-medium text-gray-900">
-                  {terms.statutory_due_date ? formatDate(terms.statutory_due_date) : "Not applicable"}
                 </dd>
               </div>
             </dl>
@@ -258,7 +255,7 @@ export default function InvoicePaymentTermsPanel({ invoice }) {
             )}
           </>
         )}
-      </PageCardContent>
+      </CollapsiblePanel>
 
       <Modal
         isOpen={verifyOpen}
@@ -314,13 +311,8 @@ export default function InvoicePaymentTermsPanel({ invoice }) {
             onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
             placeholder="e.g. Confirmed Net 30 with the vendor by email dated …"
           />
-          {terms?.statutory_due_date && (
-            <p className="text-xs text-amber-700">
-              MSME supplier: the statutory payment limit still caps the effective due date.
-            </p>
-          )}
         </div>
       </Modal>
-    </PageCard>
+    </>
   );
 }

@@ -46,6 +46,59 @@ export const ndaService = {
     return res.data;
   },
 
+  /**
+   * GET /apm/nda/vendor/{vendor_id}/history — every NDA version on file for the vendor, across
+   * all department/category scopes. `active` can hold more than one record (one per scope).
+   * @returns {Promise<{vendor_id:number, count:number, active:object[]|object|null,
+   *   versions:object[]}>}
+   */
+  getVendorNdaHistory: async (vendorId) => {
+    const res = await api.get(`${BASE}/vendor/${vendorId}/history`, { headers: authHeaders() });
+    return res.data;
+  },
+
+  /**
+   * POST /apm/nda/vendor/{vendor_id}/replace — uploads a new NDA PDF as the next version. The
+   * backend deactivates the replaced record (it stays in history) and the new one starts out
+   * PENDING; the resulting status is always read back from the server, never assumed here.
+   *
+   * `ndaId` pins exactly which NDA is replaced, so the department/category scope is only sent
+   * when there is no NDA id to go on — sending both could replace a record in another scope.
+   *
+   * Multipart with the field named exactly `file`; Content-Type is left to the browser (see
+   * uploadSignedDocument).
+   *
+   * @param {number|string} vendorId
+   * @param {{file:File, ndaId?:number|null, departmentId?:number|null,
+   *   purchaseCategoryId?:number|null, reason?:string|null}} payload
+   * @param {{onUploadProgress?:(percent:number)=>void}} [options]
+   */
+  replaceNda: async (
+    vendorId,
+    { file, ndaId, departmentId, purchaseCategoryId, reason } = {},
+    { onUploadProgress } = {},
+  ) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    if (ndaId) {
+      formData.append("nda_id", String(ndaId));
+    } else {
+      if (departmentId) formData.append("department_id", String(departmentId));
+      if (purchaseCategoryId) formData.append("purchase_category_id", String(purchaseCategoryId));
+    }
+    if (reason) formData.append("reason", reason);
+
+    const res = await api.post(`${BASE}/vendor/${vendorId}/replace`, formData, {
+      onUploadProgress: (event) => {
+        if (onUploadProgress && event.total) {
+          onUploadProgress(Math.round((event.loaded * 100) / event.total));
+        }
+      },
+    });
+    return res.data;
+  },
+
   getNda: async (ndaId) => {
     const res = await api.get(`${BASE}/${ndaId}`, { headers: authHeaders() });
     return res.data;
@@ -84,6 +137,31 @@ export const ndaService = {
     formData.append("file", file);
 
     const res = await api.post(`${BASE}/${ndaId}/signed-document`, formData);
+    return res.data;
+  },
+
+  /**
+   * PUT /apm/nda/{nda_id}/signed-document — replaces the signed PDF already on file (allowed
+   * from COMPLETED / SIGNED / REJECTED). The backend keeps the previous version in S3, bumps
+   * `signed_document_version` and moves the NDA back to SIGNED, so it has to be reviewed again;
+   * nothing about the version or status is decided here.
+   *
+   * Multipart, Content-Type left to the browser exactly as for uploadSignedDocument.
+   *
+   * @param {number|string} ndaId
+   * @param {{file:File, vendorId?:number|string|null, reason?:string|null}} payload
+   * @returns {Promise<{nda_id:number, vendor_id:number, status_code:string,
+   *   previous_status_code:string|null, signed_document_version:number|null,
+   *   previous_signed_document_version:number|null, signed_at:string|null, message:string,
+   *   nda:object}>}
+   */
+  replaceSignedDocument: async (ndaId, { file, vendorId, reason } = {}) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (vendorId) formData.append("vendor_id", String(vendorId));
+    if (reason) formData.append("reason", reason);
+
+    const res = await api.put(`${BASE}/${ndaId}/signed-document`, formData);
     return res.data;
   },
 

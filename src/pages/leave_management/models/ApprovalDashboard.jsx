@@ -7,6 +7,11 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import clearingDesk from "../../../components/icons/clearing-desk_emmv.svg";
 import ConfirmationModal from "./ConfirmationModal";
 import api from "../../../api/axiosInstance";
+import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
+import StatusBadge from "../../../components/patterns/StatusBadge";
+import EmptyState from "../../../components/patterns/EmptyState";
+import PageHeader from "../../../components/ui/PageHeader";
 
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
@@ -142,24 +147,21 @@ const ApprovalDashboard = () => {
 
   return (
     <div className="max-w">
-      <div className="mb-6">
-        <h1 className="text-xl md:text-xl font-bold text-gray-800">
-          Pending Approvals
-        </h1>
-        <p className="text-gray-500 mt-1 text-xs md:text-sm">
-          Review and take action on the requests below.
-        </p>
-      </div>
+      <PageHeader
+        title="Pending Approvals"
+        subtitle="Review and take action on the requests below."
+      />
 
       {isLoading ? (
         <div className="text-center p-10 bg-white rounded-lg shadow">
           <LoadingSpinner text="Loading Requests..." />
         </div>
       ) : requests.length === 0 ? (
-        <div className="flex flex-col justify-center items-center p-8 bg-white rounded-lg">
-          <img src={clearingDesk} alt="Np Pending Approvals" className="w-40" />
-          <p className="text-gray-500 mt-2 text-sm`">No Pending Approvals.</p>
-        </div>
+        <EmptyState
+          variant="illustrated"
+          icon={<img src={clearingDesk} alt="" className="h-45 w-45" />}
+          title="No Pending Approvals."
+        />
       ) : (
         <div className="space-y-4">
           {" "}
@@ -198,9 +200,7 @@ const ApprovalDashboard = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-4 mt-2 sm:mt-0">
-                      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 self-start">
-                        {request.status}
-                      </span>
+                      <StatusBadge status={request.status} className="self-start" />
                     </div>
                   </div>
                 </button>
@@ -216,18 +216,11 @@ const ApprovalDashboard = () => {
                     <div className="mt-6 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label
-                            htmlFor={`reason-${request.id}`}
-                            className="block text-sm font-medium text-gray-700 mb-1"
-                          >
-                            Rejection Reason
-                          </label>
-                          <input
-                            id={`reason-${request.id}`}
-                            maxLength="100"
-                            rows="3"
-                            cols="40"
+                          <FormInput
+                            label="Rejection Reason"
+                            name={`reason-${request.id}`}
                             type="text"
+                            maxLength="100"
                             placeholder="Required for rejection..."
                             value={actionState[request.id]?.reason || ""}
                             onChange={(e) =>
@@ -237,23 +230,24 @@ const ApprovalDashboard = () => {
                                 e.target.value,
                               )
                             }
-                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
+                            inputClassName="focus:ring-red-500 focus:border-red-500"
                           />
                         </div>
                       </div>
                       <div className="flex justify-end space-x-3 pt-2">
-                        <button
+                        <Button
                           onClick={() => confirmRejectModel(request)}
-                          className="px-4 py-2 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                          variant="danger"
                         >
                           Reject
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => confirmApproveModel(request)}
-                          className="px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                          variant="primary"
+                          className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
                         >
                           Approve
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>

@@ -27,7 +27,7 @@ const OUTCOME_OPTIONS = [
  * defaults to both/undefined). Rows open the same ExpenseReviewPanel used by the pending queue, in
  * read-only "history" mode.
  */
-export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, breadcrumbLabel, searchTerm = "", hideHeader = false, allowOutcomeFilter = false, noPadding = false }) {
+export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, breadcrumbLabel, searchTerm = "", hideHeader = false, embedded = false, allowOutcomeFilter = false, noPadding = false }) {
   const [page, setPage] = useState(0);
   const pageSize = DEFAULT_PAGE_SIZE;
   const [outcomeFilter, setOutcomeFilter] = useState(fixedOutcome || "");
@@ -56,6 +56,48 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
       return timeB - timeA;
     });
   }, [items, searchTerm]);
+
+  // Embedded: only the rows, inside the approvals page table (its header is shared with the cash advance rows).
+  if (embedded) {
+    return (
+      <>
+        {isPending && (
+          <tbody><tr><td colSpan={7} className="py-10 text-center text-xs text-gray-500">Loading…</td></tr></tbody>
+        )}
+        {!isPending && !isError && filteredItems.length > 0 && (
+          <tbody className="divide-y divide-gray-100">
+            {filteredItems.map((report, index) => (
+              <tr key={report.reportId} className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setReviewingItem(report)}>
+                <td className="px-2.5 py-1.5"><span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span></td>
+                <td className="px-2.5 py-1.5 font-mono text-[11px] font-semibold text-gray-700 whitespace-nowrap">{report.reportNumber}</td>
+                <td className="px-2.5 py-1.5 text-xs"><EmployeeLabel employeeId={report.employeeId} /></td>
+                <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{report.title || "—"}</td>
+                <td className="px-2.5 py-1.5"><ApprovalStatusPill status={report.reportStatus} /></td>
+                <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-right text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
+                <td className="px-2.5 py-1.5" />
+              </tr>
+            ))}
+          </tbody>
+        )}
+        {data && (data.totalPages ?? 0) > 1 && (
+          <tbody>
+            <tr>
+              <td colSpan={7} className="py-2">
+                <div className="flex justify-center">
+                  <Pagination
+                    currentPage={page + 1}
+                    totalPages={data.totalPages ?? 0}
+                    onPrevious={() => setPage(Math.max(page - 1, 0))}
+                    onNext={() => setPage(Math.min(page + 1, (data.totalPages ?? 0) - 1))}
+                  />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className={noPadding ? "" : "p-4 sm:p-6"}>
@@ -122,13 +164,13 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
               <table className="w-full text-sm">
                 <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                   <tr>
-                    <th className="px-2.5 py-2">Report</th>
-                    <th className="px-2.5 py-2">Title</th>
-                    <th className="px-2.5 py-2">Employee</th>
-                    <th className="px-2.5 py-2">Cost Center</th>
-                    <th className="px-2.5 py-2">Submitted</th>
-                    <th className="px-2.5 py-2">Amount</th>
-                    <th className="px-2.5 py-2">Status</th>
+                    <th className="px-2.5 py-2 text-left">Report</th>
+                    <th className="px-2.5 py-2 text-left">Title</th>
+                    <th className="px-2.5 py-2 text-left">Employee</th>
+                    <th className="px-2.5 py-2 text-left">Cost Center</th>
+                    <th className="px-2.5 py-2 text-left">Submitted</th>
+                    <th className="px-2.5 py-2 text-left">Amount</th>
+                    <th className="px-2.5 py-2 text-left">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -146,7 +188,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                       </td>
                       <td className="px-2.5 py-1.5 text-gray-600 text-xs">{report.costCenterName || "—"}</td>
                       <td className="px-2.5 py-1.5 text-gray-600 whitespace-nowrap text-xs">{formatDate(report.createdAt)}</td>
-                      <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
+                      <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-right text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
                       <td className="px-2.5 py-1.5">
                         <ApprovalStatusPill status={report.reportStatus} />
                       </td>

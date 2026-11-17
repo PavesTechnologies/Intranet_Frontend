@@ -1,6 +1,7 @@
 import React from 'react';
 import { Lock, Home, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Button from "../../components/Button/Button";
 
 
 const Unauthorized = () => {
@@ -50,21 +51,23 @@ const Unauthorized = () => {
 
           {/* Action Buttons */}
           <div className="space-y-2">
-            <button
+            <Button
               onClick={handleGoToDashboard}
+              variant="primary"
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 flex items-center justify-center gap-3"
             >
               <Home className="w-4 h-4" />
               Go to Dashboard
-            </button>
-            
-            <button
+            </Button>
+
+            <Button
               onClick={handleGoBack}
+              variant="outline"
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 px-6 rounded-xl transition-colors duration-200 flex items-center justify-center gap-3"
             >
               <ArrowLeft className="w-4 h-4" />
               Go Back
-            </button>
+            </Button>
           </div>
         </div>
 

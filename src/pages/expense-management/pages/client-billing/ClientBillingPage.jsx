@@ -180,6 +180,7 @@ export default function ClientBillingPage() {
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Client Billing" }]} />
 
       <PageHeader
+        icon={Receipt}
         title="Client Billing"
         subtitle="Expenses employees incurred for a client project. Once Finance has verified them, hand them to the invoicing team so the client can be billed."
       />

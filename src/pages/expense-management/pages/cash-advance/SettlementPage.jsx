@@ -608,7 +608,7 @@ export default function SettlementPage() {
                               : statusUpper === "SETTLEMENT_PENDING" || statusUpper === "PARTIALLY_SETTLED"
                               ? "bg-amber-50 text-amber-700 border-amber-200"
                               : statusUpper === "APPROVED" || statusUpper === "EXPENSE_VERIFIED"
-                              ? "bg-teal-50 text-teal-700 border-teal-200"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : statusUpper === "UNDER_REVIEW" || statusUpper === "UNDER REVIEW"
                               ? "bg-purple-50 text-purple-700 border-purple-200"
                               : statusUpper === "SUBMITTED_FOR_REVIEW" || statusUpper === "SUBMITTED FOR REVIEW" || statusUpper === "EXPENSE_SUBMITTED"

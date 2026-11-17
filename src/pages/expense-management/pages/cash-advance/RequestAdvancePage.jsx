@@ -154,6 +154,21 @@ export const expectedTripDateError = (start, end) => {
     : null;
 };
 
+// The same rules the server applies when a cash advance is created, drafts included. Checked here so a draft or a
+// document upload is refused with a clear message before the request is sent, not with a bare "422" error.
+export const draftProblem = (form, today = todayIso()) => {
+  if (!form.neededByDate) return "Needed by date is required and must be in the future.";
+  if (form.neededByDate <= today) return "Needed by date must be a future date.";
+  if (!form.settlementDueDate) return "Settlement expected date is required.";
+  if (form.settlementDueDate <= today) return "Settlement due date must be a future date.";
+  if (form.settlementDueDate < form.neededByDate) return "Settlement expected date cannot be before the needed by date.";
+  const amount = Number(form.amount);
+  if (!(amount > 0) || amount % ADVANCE_ROUND_BLOCK !== 0) {
+    return `The advance amount must be a positive multiple of ${ADVANCE_ROUND_BLOCK}.`;
+  }
+  return "";
+};
+
 export const getSettlementDateRange = (neededByDate) => {
   if (!neededByDate || !isValidDate(neededByDate)) return null;
   const start = new Date(`${neededByDate}T00:00:00`);
@@ -180,11 +195,19 @@ const getActiveAdvances = (list) => {
 
     if (balance <= 0) return false;
 
-    return ![
-      "SETTLED",
-      "CLOSED",
-      "CANCELLED",
-      "REJECTED",
+    // Only advances that were paid out can still be owed. Drafts and requests still awaiting approval are not owed money,
+    // and the server does not count them either.
+    return [
+      "DISBURSED",
+      "IN_PROGRESS",
+      "EXPENSE_SUBMITTED",
+      "EXPENSE_VERIFIED",
+      "SETTLEMENT_PENDING",
+      "PARTIALLY_SETTLED",
+      "PARTIALLY_ADJUSTED",
+      "ADJUSTED",
+      "AWAITING_REIMBURSEMENT",
+      "OVERDUE",
     ].includes(status);
   });
 };
@@ -610,10 +633,7 @@ export default function RequestAdvancePage() {
     /*
      * Check overdue advance
      */
-    if (hasOverdueAdvance) {
-      newErrors.overdue =
-        "You have an overdue cash advance. Resolve the outstanding advance before requesting another advance.";
-    }
+    // An overdue advance does not stop the request. It is routed to Finance, who must authorise it before approval.
 
     // A separate advance needs a reason when an outstanding balance exists (complete new only).
     if (requestType === ADVANCE_TYPE.COMPLETE_NEW && outstandingBalance > 0) {
@@ -669,6 +689,10 @@ export default function RequestAdvancePage() {
     }
     if (!formData.title.trim() || !(Number(formData.amount) > 0)) {
       throw new Error("Enter a title and an amount before adding documents.");
+    }
+    const problem = draftProblem(formData);
+    if (problem) {
+      throw new Error(problem);
     }
     const created = await cashAdvanceApi.create(buildPayload());
     const id = idOfCreated(created);
@@ -803,6 +827,11 @@ export default function RequestAdvancePage() {
     ) {
       draftErrors.amount =
         "Enter a valid advance amount.";
+    }
+
+    const problem = draftProblem(formData);
+    if (problem && !draftErrors.amount) {
+      draftErrors.general = problem;
     }
 
     if (Object.keys(draftErrors).length > 0) {
@@ -1204,7 +1233,6 @@ export default function RequestAdvancePage() {
               submitting ||
               savingDraft ||
               balanceLoading ||
-              hasOverdueAdvance ||
               loadingCurrencies ||
               !preview
             }

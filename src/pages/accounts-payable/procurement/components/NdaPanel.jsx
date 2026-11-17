@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { AlertTriangle, CheckCircle2, ExternalLink, FileSignature, Send, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, FileSignature, RefreshCw, Send, Upload } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import FormTextArea from "../../../../components/forms/FormTextArea";
-import FileUpload from "../../../../components/forms/FileUpload";
 import Modal from "../../../../components/Modal/modal";
 import StatusPill from "../../vendor-intake/components/PreScreenStatusBadge";
 import ExistingNdaReusePanel from "./ExistingNdaReusePanel";
 import GenerateNdaModal from "./GenerateNdaModal";
 import SendNdaConfirmModal from "./SendNdaConfirmModal";
+import SignedNdaUploadModal from "./SignedNdaUploadModal";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatDate } from "../../utils/formatters";
 import { useApPermissions } from "../../hooks/useApPermissions";
@@ -20,6 +20,7 @@ import {
   useSendNda,
   useUpdateNdaStatus,
   useUploadSignedNda,
+  useReplaceSignedNda,
 } from "../hooks/useNda";
 import {
   NDA_LOOKUP_OUTCOME,
@@ -28,13 +29,13 @@ import {
   NDA_STATUS_LABEL,
   NDA_STATUS_TONE,
   NDA_TRANSITION_ACTION_LABEL,
-  SIGNED_NDA_ACCEPT,
   isReusableNda,
+  canReplaceSignedNda,
   canUploadSignedNdaFor,
   humanizeCode,
-  validateSignedNdaFile,
+  signedNdaDocumentNameOf,
+  signedNdaVersionLabel,
 } from "../constants/vendorOnboarding";
-import { formatFileSize } from "../../utils/documentUpload";
 
 const LOOKUP_MESSAGE = {
   [NDA_LOOKUP_OUTCOME.VALID]: "A valid NDA already exists for this vendor and scope — it will be reused.",
@@ -110,9 +111,8 @@ export default function NdaPanel({
   const [statusReason, setStatusReason] = useState("");
   const [documentLoading, setDocumentLoading] = useState(false);
 
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [signedFile, setSignedFile] = useState(null);
-  const [uploadError, setUploadError] = useState("");
+  // "upload" (first signed copy, POST) or "replace" (swap the copy on file, PUT); null = closed.
+  const [uploadMode, setUploadMode] = useState(null);
 
   const [generateOpen, setGenerateOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
@@ -132,6 +132,7 @@ export default function NdaPanel({
   const sendMutation = useSendNda({ prId, requestId });
   const statusMutation = useUpdateNdaStatus({ prId, requestId });
   const uploadMutation = useUploadSignedNda({ prId, requestId });
+  const replaceMutation = useReplaceSignedNda({ prId, requestId });
 
   if (!canViewNda) return null;
 
@@ -222,43 +223,12 @@ export default function NdaPanel({
     }
   };
 
-  const handleSelectSignedFile = (event) => {
-    const file = event.target.files?.[0] || null;
-    setSignedFile(file);
-    setUploadError(file ? validateSignedNdaFile(file) : "");
-  };
-
-  const closeUpload = () => {
-    setUploadOpen(false);
-    setSignedFile(null);
-    setUploadError("");
-  };
-
-  const handleUploadSigned = async () => {
-    // Guard against a double submit as well as disabling the button.
-    if (uploadMutation.isPending) return;
-
-    const validationError = validateSignedNdaFile(signedFile);
-    if (validationError) {
-      setUploadError(validationError);
-      return;
-    }
-
-    setUploadError("");
-
-    try {
-      const result = await uploadMutation.mutateAsync({ ndaId: nda.nda_id, file: signedFile });
-      // The resulting status is whatever the backend set — nothing is assumed here.
-      toast.success(result?.message || "Signed NDA uploaded successfully; pending internal review");
-      closeUpload();
-    } catch (err) {
-      // A failed upload leaves the NDA untouched server-side; keep the modal open with the
-      // backend's reason (415 non-PDF, 400 empty/oversized, 422 wrong state, 502 S3, 403...).
-      const message = getApiErrorMessage(err, "Could not upload the signed NDA.");
-      setUploadError(message);
-      toast.error(message);
-    }
-  };
+  // The resulting status (SIGNED) and signed_document_version come back from the backend
+  // through the invalidated queries — nothing is assumed here.
+  const handleSubmitSigned = ({ file, reason }) =>
+    uploadMode === "replace"
+      ? replaceMutation.mutateAsync({ ndaId: nda.nda_id, vendorId, file, reason })
+      : uploadMutation.mutateAsync({ ndaId: nda.nda_id, file });
 
   const handleOpenDocument = async (signed = false) => {
     setDocumentLoading(true);
@@ -282,6 +252,14 @@ export default function NdaPanel({
   const showReuseOffer = !nda && reusableNdas.length > 0 && canGenerateNda;
 
   const allowedTransitions = NDA_MANUAL_TRANSITIONS[statusCode] || [];
+
+  // Once a signed copy is on file (Signed / Completed / Rejected), changing it is a replacement
+  // — a new version, back to review — rather than another first upload.
+  const canReplace = Boolean(nda) && canUploadSignedNda && canReplaceSignedNda(nda);
+  const canUpload =
+    Boolean(nda) && canUploadSignedNda && !canReplace && canUploadSignedNdaFor(statusCode);
+  const signedName = signedNdaDocumentNameOf(nda);
+  const signedVersion = signedNdaVersionLabel(nda);
   const isRejecting = statusModal?.statusCode === NDA_STATUS.REJECTED;
 
   return (
@@ -338,6 +316,12 @@ export default function NdaPanel({
           <Row label="Valid Until" value={nda.valid_until ? formatDate(nda.valid_until) : "—"} />
           <Row label="Sent" value={nda.sent_at ? formatDate(nda.sent_at) : "—"} />
           <Row label="Completed" value={nda.completed_at ? formatDate(nda.completed_at) : "—"} />
+          {nda.signed_document_key && (
+            <Row
+              label="Signed Document"
+              value={[signedName || "Signed NDA", signedVersion].filter(Boolean).join(" · ")}
+            />
+          )}
         </dl>
       )}
 
@@ -394,15 +378,11 @@ export default function NdaPanel({
 
         {/* The vendor signs outside the system; this is where the signed copy comes back in.
             Allowed from SENT / SIGNED / REJECTED - the backend enforces the same set. */}
-        {nda && canUploadSignedNda && canUploadSignedNdaFor(statusCode) && (
+        {canUpload && (
           <Button
             variant={statusCode === NDA_STATUS.SIGNED ? "outline" : "primary"}
             size="small"
-            onClick={() => {
-              setSignedFile(null);
-              setUploadError("");
-              setUploadOpen(true);
-            }}
+            onClick={() => setUploadMode("upload")}
           >
             <Upload className="h-3.5 w-3.5" />{" "}
             {statusCode === NDA_STATUS.REJECTED
@@ -422,6 +402,13 @@ export default function NdaPanel({
             loadingText="Opening..."
           >
             <ExternalLink className="h-3.5 w-3.5" /> View Signed NDA
+            {signedVersion ? ` (${signedVersion})` : ""}
+          </Button>
+        )}
+
+        {canReplace && (
+          <Button variant="outline" size="small" onClick={() => setUploadMode("replace")}>
+            <RefreshCw className="h-3.5 w-3.5" /> Replace Document
           </Button>
         )}
 
@@ -523,67 +510,19 @@ export default function NdaPanel({
         />
       </Modal>
 
-      {/* Signed NDA upload */}
-      <Modal
-        isOpen={uploadOpen}
-        onClose={closeUpload}
-        title="Upload Signed NDA"
-        subtitle="Attach the PDF the vendor signed. The NDA moves to Signed, pending internal review."
-        size="sm"
-        zIndex="z-[10000]"
-        closeOnBackdrop={false}
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={closeUpload}
-              disabled={uploadMutation.isPending}
-              className="w-full sm:w-auto"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleUploadSigned}
-              loading={uploadMutation.isPending}
-              loadingText="Uploading..."
-              disabled={!signedFile || Boolean(uploadError) || uploadMutation.isPending}
-              className="w-full sm:w-auto"
-            >
-              Upload Signed NDA
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <FileUpload
-            label="Signed NDA (PDF)"
-            name="signed_nda_file"
-            accept={SIGNED_NDA_ACCEPT}
-            onChange={handleSelectSignedFile}
-            disabled={uploadMutation.isPending}
-          />
-
-          {signedFile && (
-            <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
-              <span className="font-medium text-gray-900">{signedFile.name}</span>
-              <span className="ml-2 text-gray-500">{formatFileSize(signedFile.size)}</span>
-            </p>
-          )}
-
-          {uploadError && (
-            <p className="flex items-start gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>{uploadError}</span>
-            </p>
-          )}
-
-          <p className="text-xs text-gray-500">
-            PDF only, up to 25MB. Uploading does not complete the NDA - it stays blocked for RFQ
-            until it is reviewed and accepted.
-          </p>
-        </div>
-      </Modal>
+      {/* Signed NDA upload / replacement — mounted only while open so each opening is fresh. */}
+      {nda && uploadMode && (
+        <SignedNdaUploadModal
+          isOpen
+          mode={uploadMode}
+          nda={nda}
+          onClose={() => setUploadMode(null)}
+          onSubmit={handleSubmitSigned}
+          isSubmitting={
+            uploadMode === "replace" ? replaceMutation.isPending : uploadMutation.isPending
+          }
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import api from "../../../api/axiosInstance";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import AllHolidaysGrid from "./AllHolidaysGrid";
+import Button from "../../../components/Button/Button";
 
 // ── Holiday theme map — matched by keyword, not exact name ─────────────────
 const HOLIDAY_THEMES = [
@@ -229,8 +230,10 @@ export default function UpcomingHolidays({ year }) {
             <span>{theme.emoji}</span>
             <span>{activeHoliday && new Date(activeHoliday.holidayDate).toDateString() === today.toDateString() ? "Today is a Holiday!" : "Upcoming Holiday"}</span>
           </h3>
-          <button
-            className="text-xs font-semibold px-2.5 py-1 rounded-md transition-colors"
+          <Button
+            variant="secondary"
+            size="sm"
+            className="text-xs font-semibold px-2.5 py-1"
             style={{
               color: theme.text,
               background: "rgba(255,255,255,0.18)",
@@ -240,7 +243,7 @@ export default function UpcomingHolidays({ year }) {
             onClick={() => setShowAllHolidays(true)}
           >
             View All
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
@@ -248,14 +251,17 @@ export default function UpcomingHolidays({ year }) {
           {upcoming.length > 0 ? (
             <div className="flex items-center gap-2">
               {/* Prev */}
-              <button
+              <Button
                 onClick={prevHoliday}
                 disabled={currentIndex === 0}
-                className="p-1.5 rounded-full flex-shrink-0 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                variant="ghost"
+                size="icon"
+                aria-label="Previous holiday"
+                className="p-1.5 rounded-full flex-shrink-0"
                 style={{ background: "rgba(255,255,255,0.18)", color: theme.text }}
               >
                 <ChevronLeft className="w-4 h-4" />
-              </button>
+              </Button>
 
               {/* Card content */}
               <div className="flex-1 text-center">
@@ -316,14 +322,17 @@ export default function UpcomingHolidays({ year }) {
               </div>
 
               {/* Next */}
-              <button
+              <Button
                 onClick={nextHoliday}
                 disabled={currentIndex === upcoming.length - 1}
-                className="p-1.5 rounded-full flex-shrink-0 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                variant="ghost"
+                size="icon"
+                aria-label="Next holiday"
+                className="p-1.5 rounded-full flex-shrink-0"
                 style={{ background: "rgba(255,255,255,0.18)", color: theme.text }}
               >
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           ) : (
             <p

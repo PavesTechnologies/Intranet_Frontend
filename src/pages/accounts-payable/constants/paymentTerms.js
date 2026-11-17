@@ -89,12 +89,6 @@ export const AGREEMENT_STATUS_META = {
   SUPERSEDED: { label: "Superseded", className: "bg-slate-100 text-slate-600 border-slate-300" },
 };
 
-export const MSME_CATEGORY_OPTIONS = [
-  { value: "MICRO", label: "Micro" },
-  { value: "SMALL", label: "Small" },
-  { value: "MEDIUM", label: "Medium" },
-];
-
 /** Management (CEO / Chief Product Officer) reporting permissions — created in UMS, read-only by design. */
 export const AP_MANAGEMENT_PERMISSIONS = {
   DASHBOARD_VIEW: "AP_MANAGEMENT_DASHBOARD_VIEW",

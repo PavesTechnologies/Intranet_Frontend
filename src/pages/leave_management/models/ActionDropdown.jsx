@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import api from "../../../api/axiosInstance";
+import Button from "../../../components/Button/Button";
 import {
   MoreHorizontal,
   MessageSquare,
@@ -132,12 +133,15 @@ const ActionDropdown = ({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
+        variant="ghost"
+        size="icon"
+        aria-label="Open actions menu"
         className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
       >
         <MoreHorizontal className="w-4 h-4" />
-      </button>
+      </Button>
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">

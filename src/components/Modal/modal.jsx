@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { X } from "lucide-react";
 
 import Button from "../Button/Button";
@@ -45,6 +45,29 @@ const ANIMATION_MAP = {
   none: "",
 };
 
+// Module-level (not per-instance) ref count + saved value, so that when
+// multiple Modals with disableBodyScroll are open at once (e.g. a
+// confirmation nested inside another modal), the body is only unlocked
+// once the LAST one closes — and is restored to whatever it was before the
+// FIRST one locked it, not blindly cleared.
+let bodyScrollLockCount = 0;
+let previousBodyOverflow = "";
+
+function lockBodyScroll() {
+  if (bodyScrollLockCount === 0) {
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+  }
+  bodyScrollLockCount += 1;
+}
+
+function unlockBodyScroll() {
+  bodyScrollLockCount = Math.max(0, bodyScrollLockCount - 1);
+  if (bodyScrollLockCount === 0) {
+    document.body.style.overflow = previousBodyOverflow;
+  }
+}
+
 const Modal = ({
   isOpen,
   onClose,
@@ -61,7 +84,13 @@ const Modal = ({
   zIndex = "z-[9999]",
 
   closeOnBackdrop = true,
+  closeOnEscape = true,
   scrollable = true,
+  // Optional, off by default so every existing consumer is unaffected.
+  // When true, prevents the page behind the modal from scrolling while it
+  // is open (restoring whatever the body's overflow was before, not just
+  // clearing it) — see lockBodyScroll/unlockBodyScroll above.
+  disableBodyScroll = false,
 
   showCloseButton = true,
   showHeader = true,
@@ -85,6 +114,24 @@ const Modal = ({
 
   animation = "zoom",
 }) => {
+  useEffect(() => {
+    if (!isOpen || !closeOnEscape || !onClose) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, closeOnEscape, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !disableBodyScroll) return undefined;
+
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, [isOpen, disableBodyScroll]);
+
   if (!isOpen) return null;
 
   const mergedClassName = [className, panelClassName].filter(Boolean).join(" ");
@@ -92,6 +139,7 @@ const Modal = ({
   const sizeClass = hasMaxWidth ? "" : SIZE_MAP[size] || SIZE_MAP.lg;
   const animationClass = ANIMATION_MAP[animation] ?? ANIMATION_MAP.zoom;
   const positionClass = POSITION_MAP[position] || POSITION_MAP.center;
+  const hasHeader = showHeader && (title || subtitle || showCloseButton);
 
   const mobileClass = fullScreenMobile
     ? "max-sm:max-w-none max-sm:w-screen max-sm:h-screen max-sm:rounded-none max-sm:max-h-screen"
@@ -121,10 +169,10 @@ const Modal = ({
           ${mergedClassName}
         `}
       >
-        {showHeader && (title || subtitle || showCloseButton) && (
+        {hasHeader && (
           <div
             className={`
-              shrink-0 rounded-t-xl bg-white p-4 sm:p-5
+              shrink-0 rounded-t-xl bg-white px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4
               ${headerBorder ? "border-b border-gray-100" : ""}
               ${headerClassName}
             `}
@@ -182,9 +230,14 @@ const Modal = ({
 
         <div
           className={`
-            min-h-0 flex-1
+            relative min-h-0 flex-1
             ${scrollable ? "overflow-y-auto" : "overflow-hidden"}
-            ${bodyClassName || "p-4 sm:p-5"}
+            ${
+              bodyClassName ||
+              (hasHeader
+                ? "px-4 pt-3 pb-4 sm:px-5 sm:pt-4 sm:pb-5"
+                : "p-4 sm:p-5")
+            }
           `}
         >
           {children}
