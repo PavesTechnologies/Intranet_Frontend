@@ -110,6 +110,7 @@ export default function NotificationsPage() {
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Notifications" }]} />
 
       <PageHeader
+        icon={BellRing}
         title="Notification Center"
         subtitle="Everything that happened in your part of the expense workflow - and what needs you next."
         actions={

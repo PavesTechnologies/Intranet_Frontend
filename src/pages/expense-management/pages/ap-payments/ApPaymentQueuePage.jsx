@@ -126,6 +126,7 @@ export default function ApPaymentQueuePage() {
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "AP Payments" }]} />
 
       <PageHeader
+        icon={Wallet}
         title="AP Payments"
         subtitle="Reimburse employees for finance-verified expense reports, and keep a record of what's been paid."
       />

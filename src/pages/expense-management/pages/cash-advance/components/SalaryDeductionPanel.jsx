@@ -3,6 +3,7 @@ import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { recoveryApi } from "@/pages/expense-management/api/recoveryApi";
 import { Field, confirmationInputClass } from "@/pages/expense-management/components/disbursement/DisbursementConfirmationFields";
+import { fileInputClass } from "@/pages/expense-management/components/common/fileInputClass";
 import {
   EMAIL_STATUS_LABEL,
   EVIDENCE_TYPE_OPTIONS,
@@ -291,7 +292,7 @@ export default function SalaryDeductionPanel({ advanceId, outstanding, currencyC
                         id={`result-file-${request.payrollRequestId}`}
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png"
-                        className="block w-full text-sm text-gray-700"
+                        className={fileInputClass}
                         onChange={(e) => setResult({ ...result, evidenceFile: e.target.files?.[0] || null })}
                       />
                     </Field>

@@ -340,81 +340,40 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      {/* Tab Content */}
-      {/* No type filter: expense reports and cash advances for the selected status, on the same page. */}
-      <div className="approvals-tab-container space-y-6">
-        {/* Expense Reports */}
-        {activeTab === "pending" && (
-          <>
-            <MyDelegateCard />
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
-                    <tr>
-                      <th className="w-8 px-2.5 py-2" />
-                      <th className="px-2.5 py-2">Report</th>
-                      <th className="px-2.5 py-2">Employee</th>
-                      <th className="px-2.5 py-2">Title / Merchant</th>
-                      <th className="px-2.5 py-2">Level / Status</th>
-                      <th className="px-2.5 py-2">Expenses</th>
-                      <th className="px-2.5 py-2">Policy</th>
-                      <th className="px-2.5 py-2">Amount</th>
-                      <th className="px-2.5 py-2 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <PendingApprovalsPage
-                    key={`pending-${reloadKey}`}
-                    searchTerm={searchTerm}
-                    hideHeader
-                    noPadding
-                    embedded
-                  />
-                  {(isManager || isFinance) && (
-                    <CashAdvanceApprovalsList
-                      key={`cash-pending-${reloadKey}`}
-                      activeTab="pending"
-                      searchTerm={searchTerm}
-                      embedded
-                    />
-                  )}
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-        {activeTab === "approved" && (
-          <ApprovalHistoryPage
-            key={`approved-${reloadKey}`}
-            outcome="APPROVED"
-            title="Approved"
-            breadcrumbLabel="Approved"
-            searchTerm={searchTerm}
-            hideHeader
-            noPadding
-          />
-        )}
-        {activeTab === "rejected" && (
-          <ApprovalHistoryPage
-            key={`rejected-${reloadKey}`}
-            outcome="REJECTED"
-            title="Rejected"
-            breadcrumbLabel="Rejected"
-            searchTerm={searchTerm}
-            hideHeader
-            noPadding
-          />
-        )}
-
-        {/* Cash Advances (shown to managers and Finance; the stage decides which items each user acts on) */}
-        {activeTab !== "pending" && (isManager || isFinance) && (
-          <CashAdvanceApprovalsList
-            key={`cash-${activeTab}-${reloadKey}`}
-            activeTab={activeTab}
-            searchTerm={searchTerm}
-          />
-        )}
+      {/* One table for expense reports and cash advances. The Type and Status badges tell them apart. */}
+      <div className="approvals-tab-container space-y-4">
+        {activeTab === "pending" && <MyDelegateCard />}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
+                <tr>
+                  <th className="px-2.5 py-2 text-left">Type</th>
+                  <th className="px-2.5 py-2 text-left">Reference</th>
+                  <th className="px-2.5 py-2 text-left">Employee</th>
+                  <th className="px-2.5 py-2 text-left">Title / Merchant</th>
+                  <th className="px-2.5 py-2 text-left">Status</th>
+                  <th className="px-2.5 py-2 text-right">Amount</th>
+                  <th className="px-2.5 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              {activeTab === "pending" && (
+                <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} hideHeader noPadding embedded />
+              )}
+              {activeTab === "approved" && (
+                <ApprovalHistoryPage key={`approved-${reloadKey}`} outcome="APPROVED" searchTerm={searchTerm} embedded />
+              )}
+              {activeTab === "rejected" && (
+                <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" searchTerm={searchTerm} embedded />
+              )}
+              {(isManager || isFinance) && (
+                <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} embedded />
+              )}
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
+
 }
