@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
 import api from "../../../api/axiosInstance";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
+import FormSelect from "../../../components/forms/FormSelect";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import FormLabel from "../../../components/forms/FormLabel";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const SECOND_URL = "/api/workflow/admin";
@@ -193,66 +198,73 @@ const RuleBookPage = () => {
       )}
 
       {/* Rule Creation Panel */}
-      <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg p-8 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-indigo-700">
-            Rule Book Configuration
-          </h1>
-          {editing && (
-            <button
-              onClick={handleResetForm}
-              className="text-sm text-gray-500 hover:text-indigo-600"
-            >
-              ✖ Cancel Edit
-            </button>
-          )}
-        </div>
-
+      <div className="max-w-5xl mx-auto">
+        <PageCard
+          className="shadow-lg"
+          title="Rule Book Configuration"
+          actions={
+            editing && (
+              <Button
+                onClick={handleResetForm}
+                variant="link"
+                className="text-sm text-gray-500 hover:text-indigo-600"
+              >
+                ✖ Cancel Edit
+              </Button>
+            )
+          }
+        >
+        <PageCardContent className="p-8 space-y-6">
         {/* Action Type */}
         <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">
-            Action Type
-          </label>
+          <FormLabel className="mb-1">Action Type</FormLabel>
           <div className="flex gap-2">
             <div className="flex-1">
-              <FilterListbox
+              <FormSelect
+                name="actionType"
                 options={[
                   { value: "", label: "Select Action Type" },
                   ...actionTypes.map((type) => ({ value: type, label: type.replaceAll("_", " ") })),
                 ]}
                 value={newRule.name}
-                onChange={(val) => setNewRule({ ...newRule, name: val })}
+                onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
               />
             </div>
 
             {!showAddActionType ? (
-              <button
+              <Button
                 onClick={() => setShowAddActionType(true)}
+                variant="primary"
+                size="sm"
                 className="bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600"
               >
                 + Add New
-              </button>
+              </Button>
             ) : (
               <div className="flex gap-2">
-                <input
+                <FormInput
                   type="text"
+                  name="newActionType"
                   value={newActionType}
                   onChange={(e) => setNewActionType(e.target.value)}
                   placeholder="Enter new action type"
-                  className="border border-gray-300 rounded-md px-3 py-2 w-48"
+                  inputClassName="w-48"
                 />
-                <button
+                <Button
                   onClick={handleAddActionType}
-                  className="bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600"
+                  variant="primary"
+                  size="sm"
+                  className="bg-green-500 hover:bg-green-600"
                 >
                   Save
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setShowAddActionType(false)}
+                  variant="link"
                   className="text-gray-500 hover:text-red-500 font-medium"
                 >
                   ✖
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -260,16 +272,15 @@ const RuleBookPage = () => {
 
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">
-            Description
-          </label>
-          <input
+          <FormInput
+            label="Description"
+            name="ruleDescription"
             type="text"
             value={newRule.description}
             onChange={(e) =>
               setNewRule({ ...newRule, description: e.target.value })
             }
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500"
+            inputClassName="focus:ring-indigo-500"
             placeholder="Enter rule description"
           />
         </div>
@@ -278,12 +289,14 @@ const RuleBookPage = () => {
         <div>
           <div className="flex justify-between items-center mb-2">
             <h2 className="text-lg font-medium text-gray-700">Conditions</h2>
-            <button
+            <Button
               onClick={handleAddCondition}
+              variant="primary"
+              size="sm"
               className="bg-indigo-500 text-white px-3 py-1 rounded-md hover:bg-indigo-600"
             >
               + Add Condition
-            </button>
+            </Button>
           </div>
 
           {newRule.conditions.length === 0 ? (
@@ -294,8 +307,9 @@ const RuleBookPage = () => {
                 key={index}
                 className="flex gap-3 mb-2 border rounded-md p-3 bg-gray-50 items-center"
               >
-                <input
+                <FormInput
                   type="text"
+                  name={`condition-attribute-${index}`}
                   placeholder="Attribute"
                   value={condition.attribute}
                   onChange={(e) => {
@@ -303,24 +317,26 @@ const RuleBookPage = () => {
                     updated[index].attribute = e.target.value;
                     setNewRule({ ...newRule, conditions: updated });
                   }}
-                  className="flex-1 border border-gray-300 rounded px-2 py-1"
+                  inputClassName="flex-1"
                 />
                 <div className="w-28">
-                  <FilterListbox
+                  <FormSelect
+                    name={`condition-operator-${index}`}
                     options={[
                       { value: "==", label: "==" },
                       { value: "!=", label: "!=" },
                     ]}
                     value={condition.operator}
-                    onChange={(val) => {
+                    onChange={(e) => {
                       const updated = [...newRule.conditions];
-                      updated[index].operator = val;
+                      updated[index].operator = e.target.value;
                       setNewRule({ ...newRule, conditions: updated });
                     }}
                   />
                 </div>
-                <input
+                <FormInput
                   type="text"
+                  name={`condition-value-${index}`}
                   placeholder="Value"
                   value={condition.value}
                   onChange={(e) => {
@@ -328,7 +344,7 @@ const RuleBookPage = () => {
                     updated[index].value = e.target.value;
                     setNewRule({ ...newRule, conditions: updated });
                   }}
-                  className="flex-1 border border-gray-300 rounded px-2 py-1"
+                  inputClassName="flex-1"
                 />
               </div>
             ))
@@ -341,12 +357,14 @@ const RuleBookPage = () => {
             <h2 className="text-lg font-medium text-gray-700">
               Approval Steps
             </h2>
-            <button
+            <Button
               onClick={handleAddStep}
-              className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
+              variant="primary"
+              size="sm"
+              className="bg-green-500 hover:bg-green-600"
             >
               + Add Step
-            </button>
+            </Button>
           </div>
 
           {newRule.approvalSteps.length === 0 ? (
@@ -359,51 +377,55 @@ const RuleBookPage = () => {
                 key={index}
                 className="flex gap-3 mb-2 border rounded-md p-3 bg-gray-50 items-center"
               >
-                <input
+                <FormInput
                   type="number"
+                  name={`approval-level-${index}`}
                   value={step.level}
                   onChange={(e) => {
                     const updated = [...newRule.approvalSteps];
                     updated[index].level = parseInt(e.target.value);
                     setNewRule({ ...newRule, approvalSteps: updated });
                   }}
-                  className="w-20 border border-gray-300 rounded px-2 py-1"
+                  inputClassName="w-20"
                 />
                 <div className="flex-1">
-                  <FilterListbox
+                  <FormSelect
+                    name="approverType"
                     options={[
                       { value: "", label: "Select Approver Type" },
                       ...approverTypes.map((type) => ({ value: type, label: type })),
                     ]}
                     value={step.approverType}
-                    onChange={(val) => {
+                    onChange={(e) => {
                       const updated = [...newRule.approvalSteps];
-                      updated[index].approverType = val;
+                      updated[index].approverType = e.target.value;
                       setNewRule({ ...newRule, approvalSteps: updated });
                     }}
                   />
                 </div>
-                <input
+                <FormInput
                   type="text"
+                  name={`approver-value-${index}`}
                   value={step.approverValue}
                   onChange={(e) => {
                     const updated = [...newRule.approvalSteps];
                     updated[index].approverValue = e.target.value;
                     setNewRule({ ...newRule, approvalSteps: updated });
                   }}
-                  className="flex-1 border border-gray-300 rounded px-2 py-1"
+                  inputClassName="flex-1"
                   placeholder="Approver Value"
                 />
                 <div className="w-32">
-                  <FilterListbox
+                  <FormSelect
+                    name={`approval-mode-${index}`}
                     options={[
                       { value: "SEQUENTIAL", label: "Sequential" },
                       { value: "PARALLEL", label: "Parallel" },
                     ]}
                     value={step.mode}
-                    onChange={(val) => {
+                    onChange={(e) => {
                       const updated = [...newRule.approvalSteps];
-                      updated[index].mode = val;
+                      updated[index].mode = e.target.value;
                       setNewRule({ ...newRule, approvalSteps: updated });
                     }}
                   />
@@ -415,24 +437,25 @@ const RuleBookPage = () => {
 
         {/* Save / Update */}
         <div className="text-right">
-          <button
+          <Button
             onClick={handleSaveRule}
+            variant="primary"
             className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 transition-all"
           >
             {editing ? "Update Rule" : "Save Rule"}
-          </button>
+          </Button>
         </div>
+        </PageCardContent>
+        </PageCard>
       </div>
 
       {/* Existing Rules */}
-      <div className="max-w-5xl mx-auto bg-white mt-10 rounded-xl shadow-lg p-8 transition-all duration-300">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
-          📜 Existing Rules
-        </h2>
-
+      <div className="max-w-5xl mx-auto mt-10">
+        <PageCard className="shadow-lg" title="📜 Existing Rules">
+        <PageCardContent className="p-8">
         {loading ? (
-          <div className="flex justify-center py-6 text-indigo-600 font-medium animate-pulse">
-            Loading rules...
+          <div className="flex justify-center py-6">
+            <LoadingSpinner text="Loading rules..." />
           </div>
         ) : (rules ?? []).length === 0 ? (
           <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg">
@@ -476,18 +499,22 @@ const RuleBookPage = () => {
                     </td>
                     <td className="p-3 border text-center">
                       <div className="flex justify-center gap-3">
-                        <button
+                        <Button
                           onClick={() => handleEditRule(rule)}
-                          className="px-3 py-1 text-indigo-600 border border-indigo-500 rounded hover:bg-indigo-50 transition"
+                          variant="outline"
+                          size="sm"
+                          className="text-indigo-600 border-indigo-500 hover:bg-indigo-50"
                         >
                           Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => handleDeleteRule(rule.id)}
-                          className="px-3 py-1 text-red-600 border border-red-500 rounded hover:bg-red-50 transition"
+                          variant="danger"
+                          size="sm"
+                          className="text-red-600 border-red-500 hover:bg-red-50"
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -496,6 +523,8 @@ const RuleBookPage = () => {
             </table>
           </div>
         )}
+        </PageCardContent>
+        </PageCard>
       </div>
     </div>
   );

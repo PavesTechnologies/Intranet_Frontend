@@ -73,11 +73,6 @@ export default function PaymentReadyPage() {
         <span className={invoice.isOverdue ? "font-medium text-red-600" : ""}>
           {formatDate(invoice.dueDate)}
           {invoice.isOverdue && <span className="ml-1 text-xs">(overdue)</span>}
-          {invoice.statutoryDueDate && (
-            <span className="ml-1 rounded bg-amber-50 px-1 text-[10px] font-semibold text-amber-700" title="MSME supplier — statutory payment limit applies">
-              MSME
-            </span>
-          )}
         </span>
       ),
       invoiceAmount: formatCurrency(invoice.invoiceAmount, symbol),

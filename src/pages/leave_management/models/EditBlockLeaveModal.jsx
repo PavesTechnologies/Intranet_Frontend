@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
+import Button from "../../../components/Button/Button";
+import FormTextArea from "../../../components/forms/FormTextArea";
+import Modal from "../../../components/Modal/modal";
 
 export default function EditBlockLeaveModal({
   isOpen,
@@ -219,35 +221,48 @@ export default function EditBlockLeaveModal({
   if (!isOpen || !block) return null;
 
   return (
-    <div className="relative z-50" aria-modal="true">
-      <div className="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
-      <div className="fixed inset-0 z-10 overflow-y-auto">
-        <div className="flex min-h-full items-center justify-center p-4">
-          <div className="relative w-full max-w-6xl rounded-lg bg-white shadow-xl">
-            {/* Header */}
-            <div className="flex justify-between items-center border-b px-6 py-4 bg-gray-50">
-              <h2 className="text-lg font-semibold">
-                Edit Leave Block –{" "}
-                <span className="text-indigo-600">{block.projectName}</span>
-              </h2>
-              <button onClick={onClose}>
-                <XMarkIcon className="h-6 w-6 text-gray-500 hover:text-gray-700" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Reason
-                </label>
-                <textarea
-                  rows={3}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-              </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        <>
+          Edit Leave Block –{" "}
+          <span className="text-indigo-600">{block.projectName}</span>
+        </>
+      }
+      size="6xl"
+      closeOnBackdrop={false}
+      closeOnEscape={false}
+      showCloseButton={true}
+      headerClassName="bg-gray-50"
+      footerClassName="bg-gray-50"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSaveClick}
+            disabled={submitting}
+          >
+            {submitting ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+              <FormTextArea
+                label="Reason"
+                name="blockReason"
+                rows={3}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -330,7 +345,7 @@ export default function EditBlockLeaveModal({
                         const mainState = getEmployeeCheckState(empId);
                         return (
                           <tr key={empId}>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-700">
                               {member.label}
                             </td>
 
@@ -413,28 +428,7 @@ export default function EditBlockLeaveModal({
                   </table>
                 </div>
               </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex justify-end gap-2 border-t bg-gray-50 px-6 py-4">
-              <button
-                onClick={onClose}
-                disabled={submitting}
-                className="px-4 py-2 rounded-md border text-gray-700 bg-white hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveClick}
-                disabled={submitting}
-                className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400"
-              >
-                {submitting ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

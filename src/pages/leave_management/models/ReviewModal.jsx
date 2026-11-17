@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Button from "../../../components/Button/Button";
 
 const ReviewModal = ({ isOpen, onClose, request, onApprove, onReject }) => {
   const [rejectionReason, setRejectionReason] = useState('');
@@ -44,9 +45,9 @@ const ReviewModal = ({ isOpen, onClose, request, onApprove, onReject }) => {
 
 
         <div className="mt-6 flex justify-end space-x-4">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-          <button onClick={handleReject} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-red-300" disabled={!rejectionReason}>Reject</button>
-          <button onClick={handleApprove} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">Approve</button>
+          <Button onClick={onClose} variant="outline" className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</Button>
+          <Button onClick={handleReject} variant="danger" className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-red-300" disabled={!rejectionReason}>Reject</Button>
+          <Button onClick={handleApprove} variant="primary" className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">Approve</Button>
         </div>
       </div>
     </div>

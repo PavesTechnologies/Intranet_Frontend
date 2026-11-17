@@ -17,7 +17,6 @@ export const GLOSSARY = {
   "GSTR-3B": "The monthly GST return (due the 20th) in which input credit is claimed.",
   "GSTR-2B": "The government's monthly statement of the invoices your vendors actually filed - credit is claimable only for those.",
   IRN: "Invoice Reference Number of an e-invoice (64 characters, with a QR code). Without it, GST credit is not allowed for e-invoicing vendors.",
-  MSME: "Micro or small enterprise vendor - must be paid within 45 days (MSMED Act); late payment means interest and lost tax deduction.",
   "Payment terms": "How many days after the invoice date the vendor must be paid - from the PO, the agreement or the vendor master.",
 };
 
@@ -66,7 +65,7 @@ export const PAGE_GUIDES = {
       role: "Finance Executive",
       when: PAY,
       steps: [
-        { label: "See what to pay", detail: "Due dates, overdue and MSME deadlines are flagged.", terms: ["MSME"] },
+        { label: "See what to pay", detail: "Due dates and overdue invoices are flagged." },
         { label: "Pay in your bank portal", detail: "NEFT / RTGS / IMPS - put the invoice number in the remarks." },
         { label: "Upload the receipt", detail: "One invoice: Record payment on it. Many: Upload receipts - each is matched to its invoice.", to: AP_ROUTES.BULK_IMPORT, terms: ["UTR"] },
         { label: "Paid - TDS is next", detail: "The invoice becomes Paid and its TDS waits for the month's challan.", to: AP_ROUTES.TDS_CHALLANS, terms: ["TDS"] },
@@ -118,9 +117,10 @@ export const PAGE_GUIDES = {
       role: "Finance Executive",
       when: (p) => p.canViewGstItc,
       steps: [
-        { label: "Fix what blocks credit", detail: "Record missing IRNs; confirm credit that may be blocked (food, cabs...).", terms: ["IRN", "ITC"] },
-        { label: "Match with GSTR-2B", detail: "On the 14th, import GSTR-2B - only invoices the vendor filed can be claimed.", terms: ["GSTR-2B"] },
-        { label: "Claim by the 20th", detail: "File GSTR-3B on the GST portal, then mark the month claimed here.", terms: ["GSTR-3B"] },
+        { label: "Match with GSTR-2B", detail: "On the 14th, import the GSTR-2B Excel - resolve mismatches and map what didn't match.", terms: ["GSTR-2B"] },
+        { label: "Review eligibility", detail: "Confirm each invoice's credit (or block it); record missing IRNs.", terms: ["IRN", "ITC"] },
+        { label: "Approve for GSTR-3B", detail: "Approve eligible, matched credit for the return - approval is not a claim.", terms: ["GSTR-3B"] },
+        { label: "Record the filing by the 20th", detail: "File GSTR-3B on the portal, record its ARN here; a second Finance user verifies it.", terms: ["GSTR-3B", "ARN"] },
       ],
     }],
   },

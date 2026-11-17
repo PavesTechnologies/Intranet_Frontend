@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import Button from "../../../components/Button/Button";
 
 export const showConfirmToast = ({ onConfirm, saving }) => {
   toast.info(
@@ -32,12 +33,13 @@ export const showConfirmToast = ({ onConfirm, saving }) => {
           Are you sure you want to save these changes?
         </p>
         <div style={{ display: "flex", gap: "10px" }}>
-          <button
+          <Button
             onClick={() => {
               closeToast?.();
               onConfirm?.();
             }}
             disabled={saving}
+            variant="primary"
             style={{
               flex: 1,
               background: "#1d4ed8",
@@ -50,10 +52,11 @@ export const showConfirmToast = ({ onConfirm, saving }) => {
             }}
           >
             {saving ? "Saving..." : "Confirm"}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => closeToast?.()}
             disabled={saving}
+            variant="outline"
             style={{
               flex: 1,
               background: "#fff",
@@ -66,7 +69,7 @@ export const showConfirmToast = ({ onConfirm, saving }) => {
             }}
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     ),

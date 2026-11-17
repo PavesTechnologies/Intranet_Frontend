@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, BookOpenCheck, CalendarRange, CheckCircle2, ChevronRight, Clock, Hourglass, Info, Landmark, Percent, ShieldAlert, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, BookOpenCheck, CalendarRange, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clock, Hourglass, Info, Landmark, Percent, ShieldAlert, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
 import clsx from "clsx";
 import GenericTable from "../../../../components/Table/table";
 import {
@@ -13,6 +14,7 @@ import {
   formatMoney,
 } from "./insights";
 import { AP_ROUTES } from "../../constants/routes";
+import { withoutMsme } from "../../utils/msme";
 
 const KPI_ICONS = {
   liability: Wallet,
@@ -47,34 +49,64 @@ const HIGHLIGHT_TONE = {
   info: { icon: Info, className: "text-[#0A0082]" },
 };
 
-/** "AP at a glance": the dashboard in a few plain sentences, worst news first - each opens its detail. */
+/**
+ * "AP at a glance": the dashboard in a few plain sentences, worst news first - each opens its detail.
+ * Collapsed by default so it does not push the KPIs below the fold; the header toggles it.
+ */
 function Highlights({ items }) {
+  const [expanded, setExpanded] = useState(false);
   if (!items?.length) return null;
   return (
     <section aria-labelledby="ap-glance" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <h2 id="ap-glance" className="text-sm font-semibold text-slate-800">AP at a glance</h2>
-      <ul className="mt-2 divide-y divide-slate-100">
-        {items.map((h) => {
-          const tone = HIGHLIGHT_TONE[h.tone] || HIGHLIGHT_TONE.info;
-          const Icon = tone.icon;
-          const body = (
-            <>
-              <Icon className={clsx("mt-0.5 h-4 w-4 shrink-0", tone.className)} aria-hidden="true" />
-              <span className="min-w-0 flex-1 text-sm leading-relaxed text-slate-700">{h.text}</span>
-              {h.link && <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />}
-            </>
-          );
-          return (
-            <li key={h.text}>
-              {h.link ? (
-                <Link to={h.link} className="flex items-start gap-3 rounded-md px-1 py-2 hover:bg-slate-50">{body}</Link>
-              ) : (
-                <div className="flex items-start gap-3 px-1 py-2">{body}</div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <h2 id="ap-glance" className="text-sm font-semibold text-slate-800">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls="ap-glance-panel"
+          onClick={() => setExpanded((v) => !v)}
+          className="-m-2 flex w-[calc(100%+1rem)] items-center justify-between gap-3 rounded-lg p-2 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40"
+        >
+          AP at a glance
+          {expanded
+            ? <ChevronUp className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+            : <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />}
+        </button>
+      </h2>
+      {/* grid-rows 0fr -> 1fr animates to the content's natural height without measuring it. */}
+      <div
+        id="ap-glance-panel"
+        aria-hidden={!expanded}
+        inert={expanded ? undefined : ""}
+        className={clsx(
+          "grid transition-[grid-template-rows,opacity] duration-300 ease-in-out motion-reduce:transition-none",
+          expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <ul className="mt-2 divide-y divide-slate-100">
+            {items.map((h) => {
+              const tone = HIGHLIGHT_TONE[h.tone] || HIGHLIGHT_TONE.info;
+              const Icon = tone.icon;
+              const body = (
+                <>
+                  <Icon className={clsx("mt-0.5 h-4 w-4 shrink-0", tone.className)} aria-hidden="true" />
+                  <span className="min-w-0 flex-1 text-sm leading-relaxed text-slate-700">{h.text}</span>
+                  {h.link && <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />}
+                </>
+              );
+              return (
+                <li key={h.text}>
+                  {h.link ? (
+                    <Link to={h.link} className="flex items-start gap-3 rounded-md px-1 py-2 hover:bg-slate-50">{body}</Link>
+                  ) : (
+                    <div className="flex items-start gap-3 px-1 py-2">{body}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
     </section>
   );
 }
@@ -261,7 +293,7 @@ export default function ManagementDashboard({ data }) {
   const trend = (data.spend_trend || []).map((m) => ({ ...m, invoiced: Number(m.invoiced), paid: Number(m.paid) }));
   return (
     <div className="space-y-4">
-      <Highlights items={data.highlights} />
+      <Highlights items={withoutMsme(data.highlights)} />
 
       {/* Six columns only from 2xl: below that a 6-up row leaves too little width for a full
           money value, so the cards run three to a row instead. */}
@@ -316,7 +348,7 @@ export default function ManagementDashboard({ data }) {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <EfficiencyCard efficiency={data.efficiency} />
-        <ComplianceCard items={data.compliance} currency={currency} />
+        <ComplianceCard items={withoutMsme(data.compliance)} currency={currency} />
         <ChartCard title="Reports" subtitle="The detail behind these figures - every report exports to Excel">
           <ul className="space-y-1.5 text-sm">
             {[
@@ -328,7 +360,6 @@ export default function ManagementDashboard({ data }) {
               ["month_end_accruals", "Month-end accruals"],
               ["control_exceptions", "Control exceptions"],
               ["gst_itc_register", "GST input credit register"],
-              ["msme_payments", "MSME payments"],
             ].map(([key, label]) => (
               <li key={key}>
                 <Link to={`${AP_ROUTES.REPORTS}?report=${key}`} className="flex items-center justify-between rounded-md px-2 py-1.5 text-slate-700 hover:bg-slate-50">
