@@ -6,6 +6,8 @@
  * rfq_eligibility_service.py).
  */
 
+import { getApiErrorMessage } from "../../utils/apiError";
+
 /** vendor_onboarding_request.status.status_code (module_name "VENDOR_ONBOARDING"). */
 export const ONBOARDING_STATUS = {
   CREATED: "CREATED",
@@ -71,7 +73,9 @@ export const NDA_STATUS_LABEL = {
   [NDA_STATUS.NOT_REQUIRED]: "Not Required",
   [NDA_STATUS.PENDING]: "Pending",
   [NDA_STATUS.SENT]: "Sent",
-  [NDA_STATUS.SIGNED]: "Signed",
+  // A signed document is on file but has not been reviewed — the wording says so everywhere
+  // the status is shown, since a replaced document lands back here too.
+  [NDA_STATUS.SIGNED]: "Signed — Pending Review",
   [NDA_STATUS.COMPLETED]: "Completed",
   [NDA_STATUS.REJECTED]: "Rejected",
   [NDA_STATUS.EXPIRED]: "Expired",
@@ -131,6 +135,36 @@ export const canUploadSignedNdaFor = (statusCode) =>
   NDA_SIGNED_UPLOAD_ALLOWED_FROM.includes(statusCode);
 
 /**
+ * Statuses a signed document already on file may be replaced from
+ * (PUT /apm/nda/{nda_id}/signed-document). A replacement always lands back on SIGNED, so even a
+ * COMPLETED NDA goes through internal review again.
+ */
+export const NDA_SIGNED_REPLACE_ALLOWED_FROM = [
+  NDA_STATUS.COMPLETED,
+  NDA_STATUS.SIGNED,
+  NDA_STATUS.REJECTED,
+];
+
+/** Replace needs both an allowed status and a signed document to replace. */
+export const canReplaceSignedNda = (nda) =>
+  Boolean(nda?.signed_document_key) && NDA_SIGNED_REPLACE_ALLOWED_FROM.includes(nda?.status_code);
+
+export const NDA_REPLACE_REASON_MAX_LENGTH = 500;
+
+/**
+ * File name of the signed document, only when the record states one. The storage key is never
+ * used for this, so no S3 path reaches the UI.
+ */
+export const signedNdaDocumentNameOf = (nda) =>
+  nda?.signed_document_name || nda?.signed_document_filename || nda?.signed_file_name || null;
+
+/** "v2" from the backend's signed_document_version — never computed on the client. */
+export const signedNdaVersionLabel = (nda) =>
+  nda?.signed_document_version !== null && nda?.signed_document_version !== undefined
+    ? `v${nda.signed_document_version}`
+    : null;
+
+/**
  * Only a COMPLETED NDA clears the RFQ gate when one is required — SIGNED still means
  * "pending internal review". This is for labelling the UI; RFQ eligibility itself always
  * comes from the backend's own check (rfq_eligibility_service.py).
@@ -143,19 +177,50 @@ export const NDA_CLEARS_RFQ = [NDA_STATUS.NOT_REQUIRED, NDA_STATUS.COMPLETED];
 export const SIGNED_NDA_ACCEPT = ".pdf,application/pdf";
 export const MAX_SIGNED_NDA_SIZE_BYTES = 25 * 1024 * 1024;
 
-/** @returns {string} empty when valid, otherwise a user-facing message. */
-export function validateSignedNdaFile(file) {
-  if (!file) return "Select the signed NDA PDF to upload.";
+/**
+ * PDF / non-empty / 25 MB check shared by every NDA upload. `subject` names the document in
+ * the messages ("signed NDA", "replacement NDA").
+ * @returns {string} empty when valid, otherwise a user-facing message.
+ */
+export function validateNdaPdfFile(file, subject = "NDA") {
+  if (!file) return `Select the ${subject} PDF to upload.`;
 
   const isPdf =
     file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-  if (!isPdf) return "The signed NDA must be a PDF document.";
+  if (!isPdf) return `The ${subject} must be a PDF document.`;
 
   if (file.size === 0) return "The selected file is empty.";
   if (file.size > MAX_SIGNED_NDA_SIZE_BYTES) return "File is too large. Maximum size is 25MB.";
 
   return "";
 }
+
+/** @returns {string} empty when valid, otherwise a user-facing message. */
+export const validateSignedNdaFile = (file) => validateNdaPdfFile(file, "signed NDA");
+
+/**
+ * Fallbacks for POST /apm/nda/vendor/{id}/replace, used only when the backend sends no
+ * readable `detail` of its own — its message always wins.
+ */
+export const NDA_REPLACE_ERROR_MESSAGE = {
+  400: "The uploaded file is invalid or empty.",
+  403: "You don't have permission to replace this NDA.",
+  404: "The vendor or NDA could not be found.",
+  409: "This NDA has already been replaced. Refresh to see the latest version.",
+  413: "File is too large. Maximum size is 25MB.",
+  415: "Unsupported file format. Upload a PDF document.",
+  422: "The replacement could not be validated. Check the file and try again.",
+  502: "The document could not be stored. Please try again.",
+};
+
+/** The backend's own message when it sent one, else the status-specific fallback above. */
+export const ndaReplaceErrorMessage = (err, fallback = "Could not replace the NDA.") => {
+  if (err?.response?.data?.detail) return getApiErrorMessage(err, fallback);
+  return NDA_REPLACE_ERROR_MESSAGE[err?.response?.status] || getApiErrorMessage(err, fallback);
+};
+
+/** What an NDA can be verified to (PATCH /apm/nda/{nda_id}/status). */
+export const NDA_VERIFICATION_TARGETS = [NDA_STATUS.COMPLETED, NDA_STATUS.REJECTED];
 
 /**
  * Row-level wording for a vendor's NDA state in the Invite Vendors list, where the label has

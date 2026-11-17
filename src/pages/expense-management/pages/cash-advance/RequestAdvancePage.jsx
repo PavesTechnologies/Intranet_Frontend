@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { AlertCircle, CheckCircle2, Info, Loader2 } from "lucide-react";
 
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
@@ -9,7 +10,12 @@ import FormSelect from "@/components/forms/FormSelect";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
-import { useNavigate } from "react-router-dom";
+import AdvanceTypeSelector, { ADVANCE_TYPE } from "@/pages/expense-management/pages/cash-advance/components/request/AdvanceTypeSelector";
+import EmployeeProfileCard from "@/pages/expense-management/pages/cash-advance/components/request/EmployeeProfileCard";
+import OutstandingBalanceSummary from "@/pages/expense-management/pages/cash-advance/components/request/OutstandingBalanceSummary";
+import SupportingDocumentsUpload from "@/pages/expense-management/pages/cash-advance/components/request/SupportingDocumentsUpload";
+import AdvanceCalculationPreview from "@/pages/expense-management/pages/cash-advance/components/request/AdvanceCalculationPreview";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { lookupService } from "@/pages/expense-management/api/expenseReportsApi";
@@ -123,6 +129,12 @@ const isOverdueAdvance = (advance) => {
 // Settlement must fall within this many days after the needed-by date.
 const SETTLEMENT_WINDOW_DAYS = 30;
 
+// Advances are requested in whole blocks of this amount. Keep in step with the server's ADVANCE_ROUND_BLOCK.
+const ADVANCE_ROUND_BLOCK = 500;
+
+/** Today on the employee's calendar, as yyyy-mm-dd. Dates on or before this are refused. */
+const todayIso = () => toIsoDate(new Date());
+
 const toIsoDate = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -131,6 +143,32 @@ const toIsoDate = (date) => {
 };
 
 /** Earliest and latest settlement dates allowed for a needed-by date (YYYY-MM-DD), or null when unset. */
+/**
+ * The expected trip dates are optional, so the report can be prefilled. When both are given, the end cannot be before the
+ * start. Returns the message to show, or null. These dates are separate from the needed-by and settlement dates.
+ */
+export const expectedTripDateError = (start, end) => {
+  if (!start || !end || !isValidDate(start) || !isValidDate(end)) return null;
+  return new Date(`${end}T00:00:00`) < new Date(`${start}T00:00:00`)
+    ? "Expected event end date cannot be before the expected event start date."
+    : null;
+};
+
+// The same rules the server applies when a cash advance is created, drafts included. Checked here so a draft or a
+// document upload is refused with a clear message before the request is sent, not with a bare "422" error.
+export const draftProblem = (form, today = todayIso()) => {
+  if (!form.neededByDate) return "Needed by date is required and must be in the future.";
+  if (form.neededByDate <= today) return "Needed by date must be a future date.";
+  if (!form.settlementDueDate) return "Settlement expected date is required.";
+  if (form.settlementDueDate <= today) return "Settlement due date must be a future date.";
+  if (form.settlementDueDate < form.neededByDate) return "Settlement expected date cannot be before the needed by date.";
+  const amount = Number(form.amount);
+  if (!(amount > 0) || amount % ADVANCE_ROUND_BLOCK !== 0) {
+    return `The advance amount must be a positive multiple of ${ADVANCE_ROUND_BLOCK}.`;
+  }
+  return "";
+};
+
 export const getSettlementDateRange = (neededByDate) => {
   if (!neededByDate || !isValidDate(neededByDate)) return null;
   const start = new Date(`${neededByDate}T00:00:00`);
@@ -157,11 +195,19 @@ const getActiveAdvances = (list) => {
 
     if (balance <= 0) return false;
 
-    return ![
-      "SETTLED",
-      "CLOSED",
-      "CANCELLED",
-      "REJECTED",
+    // Only advances that were paid out can still be owed. Drafts and requests still awaiting approval are not owed money,
+    // and the server does not count them either.
+    return [
+      "DISBURSED",
+      "IN_PROGRESS",
+      "EXPENSE_SUBMITTED",
+      "EXPENSE_VERIFIED",
+      "SETTLEMENT_PENDING",
+      "PARTIALLY_SETTLED",
+      "PARTIALLY_ADJUSTED",
+      "ADJUSTED",
+      "AWAITING_REIMBURSEMENT",
+      "OVERDUE",
     ].includes(status);
   });
 };
@@ -169,20 +215,62 @@ const getActiveAdvances = (list) => {
 export default function RequestAdvancePage() {
   // In-app navigation after save, so only this page changes (a full reload restarts the whole app).
   const navigate = useNavigate();
+  // "Request again" from a rejected or deferred advance passes the earlier details here. Dates are never copied: they must be new.
+  const location = useLocation();
+  const prefill = location.state?.prefill ?? {};
+  // The draft created by a submit attempt. A retry updates this draft instead of creating a second one.
+  const draftIdRef = useRef(null);
   const [formData, setFormData] = useState({
-    title: "",
-    costCenterId: "",
-    amount: "",
-    currencyId: "",
-    purpose: "",
+    title: prefill.title ?? "",
+    costCenterId: prefill.costCenterId ?? "",
+    amount: prefill.amount ?? "",
+    currencyId: prefill.currencyId ?? "",
+    purpose: prefill.purpose ?? "",
     neededByDate: "",
+    expectedTripStartDate: "",
+    expectedTripEndDate: "",
     settlementDueDate: "",
-    notes: "",
+    notes: prefill.notes ?? "",
   });
 
   const [errors, setErrors] = useState({});
+  // Request type and the justification for a separate advance. The total and the cash are calculated by the server.
+  const [requestType, setRequestType] = useState(ADVANCE_TYPE.COMPLETE_NEW);
+  const [employeeJustification, setEmployeeJustification] = useState("");
+  const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [preview, setPreview] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
+  // The saved draft this form edits. Set by the first save or the first document; cleared after a submit.
+  const [draftId, setDraftId] = useState(null);
+
+  // Read-only identity from the employee record. Missing details are simply not shown.
+  useEffect(() => {
+    let cancelled = false;
+    // Wrapped so a profile that cannot be loaded leaves the form usable.
+    Promise.resolve()
+      .then(() => cashAdvanceApi.myProfile())
+      .then((data) => {
+        if (!cancelled) setProfile(data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setProfile(null);
+      })
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // A preview describes the values it was made from, so it is dropped when they change.
+  useEffect(() => {
+    setPreview(null);
+  }, [requestType, formData.amount, formData.currencyId]);
 
   const [submitting, setSubmitting] = useState(false);
+  const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
 
   const [advances, setAdvances] = useState([]);
@@ -473,6 +561,9 @@ export default function RequestAdvancePage() {
     ) {
       newErrors.amount =
         "Enter a valid advance amount.";
+    } else if (Number(formData.amount) % ADVANCE_ROUND_BLOCK !== 0) {
+      newErrors.amount =
+        `The advance amount must be a multiple of ${ADVANCE_ROUND_BLOCK} (for example 2,000 or 2,500).`;
     }
 
     if (!formData.currencyId) {
@@ -488,11 +579,25 @@ export default function RequestAdvancePage() {
     if (!formData.neededByDate) {
       newErrors.neededByDate =
         "Needed By Date is required.";
+    } else if (isValidDate(formData.neededByDate) && formData.neededByDate <= todayIso()) {
+      newErrors.neededByDate =
+        "Needed By Date must be after today.";
     }
 
     if (!formData.settlementDueDate) {
       newErrors.settlementDueDate =
         "Settlement Expected Date is required.";
+    } else if (isValidDate(formData.settlementDueDate) && formData.settlementDueDate <= todayIso()) {
+      newErrors.settlementDueDate =
+        "Settlement Expected Date must be after today.";
+    }
+
+    const tripDateError = expectedTripDateError(
+      formData.expectedTripStartDate,
+      formData.expectedTripEndDate
+    );
+    if (tripDateError) {
+      newErrors.expectedTripEndDate = tripDateError;
     }
 
     /*
@@ -528,9 +633,17 @@ export default function RequestAdvancePage() {
     /*
      * Check overdue advance
      */
-    if (hasOverdueAdvance) {
-      newErrors.overdue =
-        "You have an overdue cash advance. Resolve the outstanding advance before requesting another advance.";
+    // An overdue advance does not stop the request. It is routed to Finance, who must authorise it before approval.
+
+    // A separate advance needs a reason when an outstanding balance exists (complete new only).
+    if (requestType === ADVANCE_TYPE.COMPLETE_NEW && outstandingBalance > 0) {
+      const reason = employeeJustification.trim();
+      if (!reason) {
+        newErrors.employeeJustification =
+          "Explain why a separate new advance is needed while your outstanding balance remains.";
+      } else if (reason.length < 20) {
+        newErrors.employeeJustification = "The reason must be at least 20 characters.";
+      }
     }
 
     setErrors(newErrors);
@@ -544,35 +657,136 @@ export default function RequestAdvancePage() {
   const buildPayload = () => ({
     ...formData,
     amount: Number(formData.amount),
+    requestType,
+    // For Cash Advance + Outstanding the amount is the additional amount; the server checks they match.
+    additionalAmount: requestType === ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING ? Number(formData.amount) : null,
+    employeeJustification:
+      requestType === ADVANCE_TYPE.COMPLETE_NEW && employeeJustification.trim() ? employeeJustification.trim() : null,
   });
+
+  /*
+   * Ask the server for the calculation before submitting.
+   */
+  // The figures the employee is confirming, taken from the server's preview.
+  const confirmMessage = preview
+    ? `Cash requested now: ${formatMoney(preview.cashRequested, preview.currencyCode || "INR")}. ` +
+      `Total advance amount: ${formatMoney(preview.totalAdvanceAllocation, preview.currencyCode || "INR")}. ` +
+      "This sends the request to your approver. You cannot change the amount or details after it is submitted."
+    : "This sends the request to your approver. You cannot change the amount or details after it is submitted.";
+
+  const rememberDraft = (id) => {
+    draftIdRef.current = id;
+    setDraftId(id);
+  };
+
+  const idOfCreated = (created) =>
+    created?.data?.data?.advanceId || created?.data?.advanceId || created?.data?.data?.id;
+
+  // Saves the draft if it does not exist yet, so a document has a request to belong to. Reuses it otherwise.
+  const ensureDraftId = async () => {
+    if (draftIdRef.current) {
+      return draftIdRef.current;
+    }
+    if (!formData.title.trim() || !(Number(formData.amount) > 0)) {
+      throw new Error("Enter a title and an amount before adding documents.");
+    }
+    const problem = draftProblem(formData);
+    if (problem) {
+      throw new Error(problem);
+    }
+    const created = await cashAdvanceApi.create(buildPayload());
+    const id = idOfCreated(created);
+    if (!id) {
+      throw new Error("The request was saved, but its ID was not returned.");
+    }
+    rememberDraft(id);
+    return id;
+  };
+
+  const handlePreview = async () => {
+    // Preview checks the whole form first, so the calculation is only ever made of valid input.
+    if (!validateForm()) {
+      return;
+    }
+    const amountNumber = Number(formData.amount);
+    if (!(amountNumber > 0)) {
+      setErrors((previous) => ({ ...previous, amount: "Enter a valid advance amount." }));
+      return;
+    }
+    setPreviewing(true);
+    try {
+      const data = await cashAdvanceApi.preview({
+        requestType,
+        amount: amountNumber,
+        currencyId: formData.currencyId || null,
+      });
+      setPreview(data ?? null);
+    } catch (error) {
+      showStatusToast(
+        error?.response?.data?.message || error?.message || "Could not calculate the preview",
+        "error",
+        6000
+      );
+    } finally {
+      setPreviewing(false);
+    }
+  };
 
   /*
    * Submit cash advance request
    */
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
+    // The employee must see the calculation before the request can be sent.
+    if (!preview) {
+      showStatusToast("Preview the calculation before you submit.", "error");
+      return;
+    }
+
+    // Ask first. The request is created and sent for approval only after the user confirms.
+    setConfirmSubmitOpen(true);
+  };
+
+  /*
+   * Create the request, then send it for approval. Confirmed by the user in the dialog.
+   */
+  const confirmSubmit = async () => {
     setSubmitting(true);
 
     try {
       const payload = buildPayload();
 
-      console.log(
-        "Cash Advance Payload:",
-        payload
-      );
+      // A retry saves the current form into the draft from the first attempt, so nothing is duplicated and no stale values are sent.
+      let advanceId = draftIdRef.current;
+      if (advanceId) {
+        await cashAdvanceApi.update(advanceId, payload);
+      } else {
+        const created = await cashAdvanceApi.create(payload);
+        advanceId =
+          created?.data?.data?.advanceId ||
+          created?.data?.advanceId ||
+          created?.data?.data?.id;
 
-      await cashAdvanceApi.create(payload);
+        if (!advanceId) {
+          throw new Error("The request was created but its ID was not returned.");
+        }
+        draftIdRef.current = advanceId;
+      }
+
+      await cashAdvanceApi.submit(advanceId);
+      draftIdRef.current = null;
 
       showStatusToast(
-        "Cash advance request submitted successfully.",
+        "Cash advance request submitted for approval.",
         "success"
       );
 
+      setConfirmSubmitOpen(false);
       navigate("/expense-management/cash-advance/my");
     } catch (error) {
       console.error(
@@ -580,11 +794,17 @@ export default function RequestAdvancePage() {
         error
       );
 
-      showStatusToast(
+      const message =
         error?.response?.data?.message ||
-          error?.response?.data?.error ||
-          "Failed to submit cash advance request.",
-        "error"
+        error?.response?.data?.error ||
+        error?.message ||
+        "Failed to submit cash advance request.";
+      showStatusToast(
+        draftIdRef.current
+          ? `${message} Your request is saved as a draft. Press Submit again to send it.`
+          : message,
+        "error",
+        8000
       );
     } finally {
       setSubmitting(false);
@@ -609,6 +829,11 @@ export default function RequestAdvancePage() {
         "Enter a valid advance amount.";
     }
 
+    const problem = draftProblem(formData);
+    if (problem && !draftErrors.amount) {
+      draftErrors.general = problem;
+    }
+
     if (Object.keys(draftErrors).length > 0) {
       setErrors(draftErrors);
       return;
@@ -624,7 +849,12 @@ export default function RequestAdvancePage() {
         payload
       );
 
-      await cashAdvanceApi.create(payload);
+      if (draftIdRef.current) {
+        await cashAdvanceApi.update(draftIdRef.current, payload);
+      } else {
+        const created = await cashAdvanceApi.create(payload);
+        rememberDraft(idOfCreated(created));
+      }
 
       showStatusToast(
         "Cash advance draft saved successfully.",
@@ -665,111 +895,25 @@ export default function RequestAdvancePage() {
         </p>
       </div>
 
-      {/* Outstanding Balance */}
-      <div
-        className={`rounded-xl border p-4 shadow-sm ${
-          hasOverdueAdvance
-            ? "border-rose-200 bg-rose-50"
-            : outstandingBalance > 0
-            ? "border-amber-200 bg-amber-50"
-            : "border-emerald-200 bg-emerald-50"
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          {balanceLoading ? (
-            <Loader2 className="mt-0.5 h-5 w-5 animate-spin text-blue-600" />
-          ) : hasOverdueAdvance ? (
-            <AlertCircle className="mt-0.5 h-5 w-5 text-rose-600" />
-          ) : outstandingBalance > 0 ? (
-            <Info className="mt-0.5 h-5 w-5 text-amber-600" />
-          ) : (
-            <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-600" />
-          )}
+      {/* Outstanding Balance (compact) */}
+      <OutstandingBalanceSummary
+        loading={balanceLoading}
+        totalOutstanding={outstandingBalance}
+        openCount={activeAdvances.length}
+        hasOverdue={hasOverdueAdvance}
+        overdueMessage="You have an overdue cash advance. Resolve it before requesting another advance."
+        currency="INR"
+      />
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                  Current Outstanding Cash Advance
-                </p>
-
-                {balanceLoading ? (
-                  <p className="mt-1 text-sm font-medium text-gray-600">
-                    Checking outstanding balance...
-                  </p>
-                ) : (
-                  <p
-                    className={`mt-1 text-2xl font-bold ${
-                      hasOverdueAdvance
-                        ? "text-rose-700"
-                        : outstandingBalance > 0
-                        ? "text-amber-700"
-                        : "text-emerald-700"
-                    }`}
-                  >
-                    {formatMoney(
-                      outstandingBalance,
-                      "INR"
-                    )}
-                  </p>
-                )}
-              </div>
-
-              {!balanceLoading &&
-                activeAdvances.length > 0 && (
-                  <span className="text-xs font-medium text-gray-600">
-                    {activeAdvances.length} active advance
-                    {activeAdvances.length !== 1
-                      ? "s"
-                      : ""}
-                  </span>
-                )}
-            </div>
-
-            {!balanceLoading &&
-              hasOverdueAdvance && (
-                <div className="mt-2 rounded-lg border border-rose-200 bg-white/70 p-3">
-                  <p className="text-xs font-semibold text-rose-800">
-                    Overdue outstanding advance
-                  </p>
-
-                  <p className="mt-1 text-[11px] leading-relaxed text-rose-700">
-                    You have an overdue cash advance with
-                    an outstanding balance. Please resolve it
-                    before submitting a new cash advance
-                    request.
-                  </p>
-                </div>
-              )}
-
-            {!balanceLoading &&
-              !hasOverdueAdvance &&
-              outstandingBalance > 0 && (
-                <p className="mt-2 text-[11px] leading-relaxed text-amber-800">
-                  You currently have an outstanding cash
-                  advance. You may submit another request
-                  because the existing advance is not overdue,
-                  but the balance will remain visible during
-                  approval and settlement.
-                </p>
-              )}
-
-            {!balanceLoading &&
-              outstandingBalance <= 0 && (
-                <p className="mt-2 text-[11px] text-emerald-800">
-                  You currently have no outstanding cash
-                  advance balance.
-                </p>
-              )}
-          </div>
-        </div>
-      </div>
+      <EmployeeProfileCard profile={profile} loading={profileLoading} />
 
       {/* Form */}
       <form
         onSubmit={handleSubmit}
         className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
       >
+        <AdvanceTypeSelector value={requestType} onChange={setRequestType} />
+
         <div>
           <h2 className="text-sm font-bold text-gray-900">
             General Information
@@ -784,6 +928,8 @@ export default function RequestAdvancePage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Title */}
           <FormInput
+            labelClassName="block text-sm font-medium text-gray-700 leading-5"
+            inputClassName="h-10"
             label={
               <RequiredLabel>
                 Title / Subject
@@ -826,9 +972,11 @@ export default function RequestAdvancePage() {
 
           {/* Amount */}
           <FormInput
+            labelClassName="block text-sm font-medium text-gray-700 leading-5"
+            inputClassName="h-10"
             label={
               <RequiredLabel>
-                Amount
+                {requestType === ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING ? "Additional Amount Required" : "Amount Required"}
               </RequiredLabel>
             }
             name="amount"
@@ -845,6 +993,25 @@ export default function RequestAdvancePage() {
             placeholder="Enter amount"
             error={errors.amount}
           />
+
+          {requestType === ADVANCE_TYPE.COMPLETE_NEW && outstandingBalance > 0 && (
+            <div>
+              <label htmlFor="employee-justification" className="block text-sm font-medium leading-5 text-gray-700">
+                Reason for Separate Advance <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="employee-justification"
+                rows={3}
+                value={employeeJustification}
+                onChange={(event) => setEmployeeJustification(event.target.value)}
+                placeholder="Why does this trip need a separate advance while your earlier balance remains?"
+                className="mt-1 w-full rounded-md border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:outline-none"
+              />
+              {errors.employeeJustification && (
+                <p className="mt-1 text-xs text-red-600">{errors.employeeJustification}</p>
+              )}
+            </div>
+          )}
 
           {/* Currency */}
           <FormSelect
@@ -925,6 +1092,24 @@ export default function RequestAdvancePage() {
             error={errors.neededByDate}
           />
 
+          <FormInput
+            label="Expected event start date"
+            name="expectedTripStartDate"
+            type="date"
+            value={getDateValue(formData.expectedTripStartDate)}
+            onChange={(event) => updateField("expectedTripStartDate", event.target.value)}
+            error={errors.expectedTripStartDate}
+          />
+
+          <FormInput
+            label="Expected event end date"
+            name="expectedTripEndDate"
+            type="date"
+            value={getDateValue(formData.expectedTripEndDate)}
+            onChange={(event) => updateField("expectedTripEndDate", event.target.value)}
+            error={errors.expectedTripEndDate}
+          />
+
           {/* Settlement Date */}
           <FormInput
             label={
@@ -992,6 +1177,34 @@ export default function RequestAdvancePage() {
           </div>
         )}
 
+        {/* Supporting documents (optional) */}
+        <SupportingDocumentsUpload
+          advanceId={draftId}
+          ensureDraft={ensureDraftId}
+          disabled={submitting || savingDraft}
+          actions={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handlePreview}
+              disabled={previewing || submitting}
+              className="whitespace-nowrap text-xs"
+            >
+              {previewing ? "Calculating..." : "Preview calculation"}
+            </Button>
+          }
+        />
+
+        {/* Preview */}
+        <div className="space-y-3">
+          <AdvanceCalculationPreview preview={preview} />
+          {!preview && (
+            <p className="text-right text-[11px] text-gray-500">
+              Preview the calculation before you submit.
+            </p>
+          )}
+        </div>
+
         {/* Buttons */}
         <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
           <Button
@@ -1020,8 +1233,8 @@ export default function RequestAdvancePage() {
               submitting ||
               savingDraft ||
               balanceLoading ||
-              hasOverdueAdvance ||
-              loadingCurrencies
+              loadingCurrencies ||
+              !preview
             }
             className="bg-blue-600 text-xs text-white hover:bg-blue-700"
           >
@@ -1036,6 +1249,17 @@ export default function RequestAdvancePage() {
           </Button>
         </div>
       </form>
+
+      <ConfirmationModal
+        isOpen={confirmSubmitOpen}
+        title="Submit cash advance request"
+        message={confirmMessage}
+        confirmText="Submit for approval"
+        cancelText="Cancel"
+        onConfirm={confirmSubmit}
+        onCancel={() => setConfirmSubmitOpen(false)}
+        isLoading={submitting}
+      />
     </div>
   );
 }

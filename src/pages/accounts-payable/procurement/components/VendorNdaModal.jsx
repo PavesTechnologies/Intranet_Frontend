@@ -8,6 +8,7 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import StatusPill from "../../vendor-intake/components/PreScreenStatusBadge";
 
 import NdaPanel from "./NdaPanel";
+import NdaHistoryPanel from "./NdaHistoryPanel";
 import NdaDocumentEditor from "./NdaDocumentEditor";
 import SendNdaConfirmModal from "./SendNdaConfirmModal";
 
@@ -509,6 +510,10 @@ export default function VendorNdaModal({
                 showSend={false}
               />
             </div>
+
+            {/* Active NDA, replacement and version history — spans every scope the vendor
+                has an NDA in, with this engagement's NDA flagged. */}
+            <NdaHistoryPanel vendorId={vendorId} prId={prId} currentNdaId={ndaId} />
           </div>
         </div>
       )}

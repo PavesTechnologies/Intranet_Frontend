@@ -9,6 +9,7 @@ import {
   Customized,
 } from "recharts";
 import useLeaveData from "../hooks/useLeaveData";
+import { InlineLoader } from "../../../components/patterns/Loaders";
 
 const monthsOrder = [
   "Jan",
@@ -57,7 +58,7 @@ const MonthlyStats = ({ employeeId, refreshKey, year }) => {
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-500 animate-pulse">Loading...</p>
+        <InlineLoader text="Loading..." />
       ) : leaveData.length > 0 ? (
         <div className="h-36 sm:h-44 md:h-52 lg:h-56 xl:h-45">
           <ResponsiveContainer width="100%" height="100%">

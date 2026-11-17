@@ -349,19 +349,23 @@ export function ItemList({ items, currency, linkFor, timeline = false, showEmplo
   const navigate = useNavigate();
   if (!items?.length) return <Empty text={empty} />;
   return (
-    <ul className={timeline ? "relative space-y-3 before:absolute before:bottom-2 before:left-[5px] before:top-2 before:w-px before:bg-slate-200" : "divide-y divide-slate-100"}>
+    <ul className={timeline ? "relative space-y-1 before:absolute before:bottom-3 before:left-[9px] before:top-3 before:w-px before:bg-gradient-to-b before:from-[#0A0082]/30 before:to-slate-100" : "space-y-1"}>
       {items.map((it) => {
         const to = linkFor?.(it);
         return (
           <li
             key={`${it.reportId}-${it.at}`}
             onClick={to ? () => navigate(to) : undefined}
-            className={`flex items-start gap-3 ${timeline ? "relative pl-5" : "py-2.5"} ${to ? "cursor-pointer rounded-lg hover:bg-slate-50" : ""}`}
+            className={`group flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors ${timeline ? "relative pl-7" : ""} ${
+              to ? "cursor-pointer hover:bg-[#0A0082]/[0.04]" : ""
+            }`}
           >
-            {timeline && <span className="absolute left-0 top-1.5 h-[11px] w-[11px] rounded-full border-2 border-white bg-indigo-500 shadow" />}
+            {timeline && (
+              <span className="absolute left-[5px] top-4 h-[10px] w-[10px] rounded-full bg-[#0A0082] ring-4 ring-white" aria-hidden="true" />
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[11px] font-semibold text-slate-700">{it.reportNumber}</span>
+                <span className="font-mono text-[11px] font-semibold text-[#0a174e]">{it.reportNumber}</span>
                 <StatusBadge label={it.status} size="sm" />
               </div>
               <p className="mt-0.5 truncate text-xs text-slate-500">
@@ -370,7 +374,7 @@ export function ItemList({ items, currency, linkFor, timeline = false, showEmplo
               </p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="text-xs font-semibold tabular-nums text-slate-900">{formatMoney(it.amount, currency)}</p>
+              <p className="text-sm font-bold tabular-nums text-[#0a174e]">{formatMoney(it.amount, currency)}</p>
               <p className="text-[11px] text-slate-400">{timeAgo(it.at)}</p>
             </div>
           </li>

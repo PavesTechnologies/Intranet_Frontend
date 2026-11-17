@@ -36,7 +36,7 @@ const DATA = {
   finance: {
     as_of: "2026-10-09", base_currency: "INR",
     kpis: [kpi("ready_to_pay", "Ready to pay", 129600, { format: "money", currency_code: "INR", subtitle: "2 invoices · 1 overdue", link: "/accounts-payable/payments/ready" })],
-    paid_trend: [], action_cards: [{ key: "approved_not_ready", count: 0, amounts: [] }, { key: "term_exceptions", count: 0, amounts: [] }, { key: "msme_due", count: 0, amounts: [] }],
+    paid_trend: [], action_cards: [{ key: "approved_not_ready", count: 0, amounts: [] }, { key: "term_exceptions", count: 0, amounts: [] }],
     ageing: { buckets: [] }, upcoming: { buckets: [], note: "Expected payments based on recorded invoices - not a guaranteed cash-flow forecast." },
     recent_payments: [], receipts_missing: { count: 0, days: 90 }, term_exceptions: [], term_exception_count: 0, agreements_expiring: [], tds: null,
   },
@@ -56,7 +56,7 @@ const DATA = {
   },
   management: {
     as_of: "2026-10-09", base_currency: "INR",
-    highlights: [
+    highlights:  [
       { tone: "bad", text: "₹2.6 L on 1 approved invoice is past its due date - pay it now.", link: "/accounts-payable/reports?report=ageing" },
       { tone: "good", text: "91.7% of invoices were paid on time in the last 90 days.", link: null },
     ],
@@ -169,7 +169,32 @@ describe("role view content", () => {
     expect(screen.getByRole("link", { name: /Upload invoice/ })).toBeInTheDocument();
   });
 
-  it("Management: read-only position, concentration, efficiency and compliance", () => {
+  it("Management: AP at a glance is collapsed by default and toggles from its header", async () => {
+    const user = userEvent.setup();
+    setViews(["management"]);
+    renderPage();
+    const glance = screen.getByRole("region", { name: "AP at a glance" });
+    const toggle = within(glance).getByRole("button", { name: "AP at a glance" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "ap-glance-panel");
+    expect(within(glance).queryByRole("link", { name: /past its due date - pay it now/ })).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(glance).getByRole("link", { name: /past its due date - pay it now/ })).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard(" ");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("Management: read-only position, concentration, efficiency and compliance", async () => {
+    const user = userEvent.setup();
     setViews(["management"]);
     renderPage();
     expect(screen.getByText("Hi Jagadish, here's where AP stands")).toBeInTheDocument();
@@ -177,6 +202,7 @@ describe("role view content", () => {
     expect(screen.getByText("72.2%")).toBeInTheDocument();
     expect(screen.getByText("The 5 largest of 12 vendors hold 64.3% of what we owe")).toBeInTheDocument();
     const glance = screen.getByRole("region", { name: "AP at a glance" });
+    await user.click(within(glance).getByRole("button", { name: "AP at a glance" }));
     expect(within(glance).getByRole("link", { name: /past its due date - pay it now/ })).toHaveAttribute("href", "/accounts-payable/reports?report=ageing");
     expect(within(glance).getByText(/91.7% of invoices were paid on time/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What does Total AP liability mean?" })).toBeInTheDocument();

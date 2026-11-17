@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, XCircle } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -34,6 +35,29 @@ const merchantSummary = (relevantLines) => {
 };
 
 /**
+ * Expenses column for an expense-report approval row. Shows the report's total claimed amount (`totalAmount`), not a sum
+ * of the line items below: `pendingLineItems` holds only the items awaiting this approver, so summing them understates
+ * the claim. The pending-item count and the split count are kept as secondary text, because they are not shown elsewhere
+ * in the row.
+ */
+export function ExpensesCell({ item }) {
+  const pendingCount = Array.isArray(item.relevantLines) ? item.relevantLines.length : 0;
+  return (
+    <td className="px-2.5 py-1.5 text-gray-600 text-xs whitespace-nowrap">
+      <span className="font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</span>
+      <span className="block text-[11px] text-gray-400">
+        {pendingCount} to review
+        {item.splitCount > 0 && (
+          <span className="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+            {item.splitCount} split
+          </span>
+        )}
+      </span>
+    </td>
+  );
+}
+
+/**
  * The approver's queue - every report where the caller (or their active delegate) currently has an
  * ACTIVE assignment (GET /xms/approvals/my-queue, server-side paginated). This is the ONLY network
  * call this page makes for its content: ApprovalQueueItemResponse already carries everything a row
@@ -43,7 +67,7 @@ const merchantSummary = (relevantLines) => {
  * (lineItemService.getAll + getLineItemReviews) that only reconstructed what the queue endpoint
  * already returned.
  */
-export default function PendingApprovalsPage({ searchTerm = "", hideHeader = false, noPadding = false }) {
+export default function PendingApprovalsPage({ searchTerm = "", hideHeader = false, noPadding = false, embedded = false }) {
   const [page, setPage] = useState(0);
   const pageSize = DEFAULT_PAGE_SIZE;
   const [expandedReportId, setExpandedReportId] = useState(null);
@@ -168,6 +192,153 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
     );
   };
 
+  const itemRows = filteredItems.map((item, index) => {
+                    const isExpanded = expandedReportId === item.reportId;
+                    const flagged = hasPolicyIssue(item.relevantLines);
+                    const needsCorrection = item.reportStatus === "AWAITING_CORRECTION";
+                    return (
+                      <React.Fragment key={item.reportId}>
+                        <tr
+                          className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`}
+                          onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}
+                        >
+                          <td className="px-2.5 py-1.5">
+                            <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
+                          </td>
+                          <td className="px-2.5 py-1.5">
+                            <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
+                            <SourceBadge cashAdvanceId={item.cashAdvanceId} />
+                          </td>
+                          <td className="px-2.5 py-1.5">
+                            <span className="font-medium text-xs text-gray-900">
+                              <EmployeeLabel employeeId={item.employeeId} />
+                            </span>
+                          </td>
+                          <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.relevantLines)}</td>
+                          <td className="px-2.5 py-1.5">
+                            {needsCorrection ? (
+                              <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800">Awaiting employee</span>
+                            ) : flagged ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                <ShieldAlert className="h-3 w-3" /> Policy warning · Level {item.levelOrder}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">Pending · Level {item.levelOrder}</span>
+                            )}
+                          </td>
+                          <td className="px-2.5 py-1.5 whitespace-nowrap text-right text-xs">
+                            <span className="font-semibold text-gray-900">{formatMoney(item.relevantTotal, item.currencyCode)}</span>
+                            {item.relevantTotal !== item.totalAmount && (
+                              <span className="ml-1 text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)}</span>
+                            )}
+                          </td>
+                          <td className="px-2.5 py-1.5 text-right text-xs" onClick={(e) => e.stopPropagation()}>
+                            {renderActions(item)}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={7} className="bg-gray-50/60 p-0">
+                              {flagged && (
+                                <p className="flex items-center gap-1.5 text-xs text-amber-700 px-4 pt-3">
+                                  <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for one-click Approve.
+                                </p>
+                              )}
+                              <LineItemReviewPanel
+                                reportId={item.reportId}
+                                relevantLines={item.relevantLines}
+                                isBusy={isMutating}
+                                onApproveLine={(line) => handleApproveLine(item.reportId, line)}
+                                onFlagLine={(line, comment) => handleFlagLine(item.reportId, line, comment)}
+                                onApproveException={(line, violationId, justification) =>
+                                  handleApproveException(item.reportId, line.lineItemId, violationId, justification)
+                                }
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  });
+
+  const modals = createPortal(
+    <>
+      <CommentPromptModal
+        isOpen={!!rejectingReport}
+        title={`Reject report ${rejectingReport?.reportNumber ?? ""}`}
+        description="This is a terminal decision - the employee cannot resubmit this report. Use Needs Correction on individual lines instead if the report just needs a fix."
+        confirmLabel="Reject Report"
+        confirmVariant="danger"
+        isLoading={rejectReport.isPending}
+        onCancel={() => setRejectingReport(null)}
+        onConfirm={(comment) => {
+          rejectReport.mutate(
+            { reportId: rejectingReport.reportId, comment },
+            {
+              onSuccess: () => {
+                showStatusToast("Report rejected", "success");
+                setRejectingReport(null);
+              },
+              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to reject report", "error"),
+            },
+          );
+        }}
+      />
+
+      <ExpenseReviewPanel
+        isOpen={!!reviewingItem}
+        onClose={() => setReviewingItem(null)}
+        reportId={reviewingItem?.reportId}
+        mode="queue"
+        queueItem={reviewingItem}
+      />
+    </>,
+    document.body,
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {isPending && !data && (
+          <tbody>
+            <tr>
+              <td colSpan={7} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
+            </tr>
+          </tbody>
+        )}
+        {isError && (
+          <tbody>
+            <tr>
+              <td colSpan={7} className="py-6 text-center text-xs text-rose-700">
+                Failed to load your queue. <button className="underline" onClick={() => refetch()}>Retry</button>
+              </td>
+            </tr>
+          </tbody>
+        )}
+        {filteredItems.length > 0 && (
+          <tbody className="divide-y divide-gray-100">{itemRows}</tbody>
+        )}
+        {data && (data.totalPages ?? 0) > 1 && (
+          <tbody>
+            <tr>
+              <td colSpan={7} className="py-2">
+                <div className="flex justify-center">
+                  <Pagination
+                    currentPage={page + 1}
+                    totalPages={data.totalPages ?? 0}
+                    onPrevious={() => setPage(Math.max(page - 1, 0))}
+                    onNext={() => setPage(Math.min(page + 1, (data.totalPages ?? 0) - 1))}
+                  />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        )}
+        {modals}
+      </>
+    );
+  }
+
   return (
     <div className={noPadding ? "" : "p-4 sm:p-6"}>
       {!hideHeader && (
@@ -199,14 +370,6 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
         </div>
       )}
 
-      { data && !isError && items.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
-          <Inbox className="h-8 w-8 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600">No pending approvals.</p>
-          <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>
-        </div>
-      )}
-
       {!isPending && !isError && items.length > 0 && filteredItems.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
@@ -223,103 +386,18 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                 <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                   <tr>
                     <th className="w-8 px-2.5 py-2" />
-                    <th className="px-2.5 py-2">Report</th>
-                    <th className="px-2.5 py-2">Employee</th>
-                    <th className="px-2.5 py-2">Merchant / Category</th>
-                    <th className="px-2.5 py-2">Level</th>
-                    <th className="px-2.5 py-2">Expenses</th>
-                    <th className="px-2.5 py-2">Policy</th>
-                    <th className="px-2.5 py-2">Amount for My Approval</th>
+                    <th className="px-2.5 py-2 text-left">Report</th>
+                    <th className="px-2.5 py-2 text-left">Employee</th>
+                    <th className="px-2.5 py-2 text-left">Merchant / Category</th>
+                    <th className="px-2.5 py-2 text-left">Level</th>
+                    <th className="px-2.5 py-2 text-left">Expenses</th>
+                    <th className="px-2.5 py-2 text-left">Policy</th>
+                    <th className="px-2.5 py-2 text-left">Amount for My Approval</th>
                     <th className="px-2.5 py-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredItems.map((item, index) => {
-                    const isExpanded = expandedReportId === item.reportId;
-                    const flagged = hasPolicyIssue(item.relevantLines);
-                    const needsCorrection = item.reportStatus === "AWAITING_CORRECTION";
-                    return (
-                      <React.Fragment key={item.reportId}>
-                        <tr
-                          className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`}
-                          onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}
-                        >
-                          <td className="px-2.5 py-1.5 text-gray-400">
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </td>
-                          <td className="px-2.5 py-1.5">
-                            <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
-                            <SourceBadge cashAdvanceId={item.cashAdvanceId} />
-                            {needsCorrection && (
-                              <span className="ml-1.5 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-800">
-                                Awaiting employee
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-2.5 py-1.5">
-                            <span className="font-medium text-xs text-gray-900">
-                              <EmployeeLabel employeeId={item.employeeId} />
-                            </span>
-                          </td>
-                          <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.relevantLines)}</td>
-                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">
-                            <span className="inline-flex items-center gap-1">
-                              <Layers className="h-3.5 w-3.5" /> Level {item.levelOrder}
-                            </span>
-                          </td>
-                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">
-                            {item.relevantLines.length}
-                            {item.splitCount > 0 && (
-                              <span className="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
-                                {item.splitCount} split
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-2.5 py-1.5">
-                            {flagged ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                                <ShieldAlert className="h-3 w-3" /> Warning
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                                Clear
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-2.5 py-1.5 whitespace-nowrap text-xs">
-                            <span className="font-semibold text-gray-900">{formatMoney(item.relevantTotal, item.currencyCode)}</span>
-                            {item.relevantTotal !== item.totalAmount && (
-                              <span className="ml-1 text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)} report total</span>
-                            )}
-                          </td>
-                          <td className="px-2.5 py-1.5 text-right text-xs" onClick={(e) => e.stopPropagation()}>
-                            {renderActions(item)}
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan={9} className="bg-gray-50/60 p-0">
-                              {flagged && (
-                                <p className="flex items-center gap-1.5 text-xs text-amber-700 px-4 pt-3">
-                                  <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for one-click Approve.
-                                </p>
-                              )}
-                              <LineItemReviewPanel
-                                reportId={item.reportId}
-                                relevantLines={item.relevantLines}
-                                isBusy={isMutating}
-                                onApproveLine={(line) => handleApproveLine(item.reportId, line)}
-                                onFlagLine={(line, comment) => handleFlagLine(item.reportId, line, comment)}
-                                onApproveException={(line, violationId, justification) =>
-                                  handleApproveException(item.reportId, line.lineItemId, violationId, justification)
-                                }
-                              />
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
+                  {itemRows}
                 </tbody>
               </table>
             </div>
@@ -379,35 +457,7 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
         </div>
       )}
 
-      <CommentPromptModal
-        isOpen={!!rejectingReport}
-        title={`Reject report ${rejectingReport?.reportNumber ?? ""}`}
-        description="This is a terminal decision - the employee cannot resubmit this report. Use Needs Correction on individual lines instead if the report just needs a fix."
-        confirmLabel="Reject Report"
-        confirmVariant="danger"
-        isLoading={rejectReport.isPending}
-        onCancel={() => setRejectingReport(null)}
-        onConfirm={(comment) => {
-          rejectReport.mutate(
-            { reportId: rejectingReport.reportId, comment },
-            {
-              onSuccess: () => {
-                showStatusToast("Report rejected", "success");
-                setRejectingReport(null);
-              },
-              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to reject report", "error"),
-            },
-          );
-        }}
-      />
-
-      <ExpenseReviewPanel
-        isOpen={!!reviewingItem}
-        onClose={() => setReviewingItem(null)}
-        reportId={reviewingItem?.reportId}
-        mode="queue"
-        queueItem={reviewingItem}
-      />
+      {modals}
     </div>
   );
 }

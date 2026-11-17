@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { AlertTriangle, CheckCircle2, Circle, Clock, CornerUpLeft, Send, XCircle } from "lucide-react";
-import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
+import CollapsiblePanel from "./CollapsiblePanel";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import FormTextArea from "../../../../components/forms/FormTextArea";
@@ -53,8 +53,11 @@ function StepStatusIcon({ status }) {
  * approver for the currently active step, not already decided) is the real gate — a permitted
  * user who isn't eligible gets the backend's own explanatory error surfaced via toast rather
  * than a client-side guess at eligibility.
+ *
+ * Collapsible (CollapsiblePanel): collapsed unless `defaultOpen`. The action buttons and modals
+ * are unchanged — they're just inside the card body.
  */
-export default function InvoiceApprovalPanel({ invoice }) {
+export default function InvoiceApprovalPanel({ invoice, defaultOpen = false }) {
   const { canSendForApproval, canApproveInvoice, canRejectInvoice, canSendBackInvoice } = useApPermissions();
   const { user } = useAuth();
   const { data: approval, isLoading, error } = useInvoiceApproval(invoice.id);
@@ -199,12 +202,12 @@ export default function InvoiceApprovalPanel({ invoice }) {
   };
 
   return (
-    <PageCard>
-      <PageCardContent>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">Approval</h3>
-          {approval && <StatusBadge label={approval.status} size="sm" />}
-        </div>
+    <>
+      <CollapsiblePanel
+        title="Approval"
+        badge={approval ? <StatusBadge label={approval.status} size="sm" /> : null}
+        defaultOpen={defaultOpen}
+      >
 
         <dl className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div>
@@ -398,7 +401,7 @@ export default function InvoiceApprovalPanel({ invoice }) {
             )}
           </>
         )}
-      </PageCardContent>
+      </CollapsiblePanel>
 
       <Modal
         isOpen={sendConfirmOpen}
@@ -519,6 +522,6 @@ export default function InvoiceApprovalPanel({ invoice }) {
           required
         />
       </Modal>
-    </PageCard>
+    </>
   );
 }

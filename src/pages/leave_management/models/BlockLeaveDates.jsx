@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import FormSelect from "../../../components/forms/FormSelect";
 import {
   ChevronDownIcon,
   FunnelIcon,
   CalendarDaysIcon,
-  ArrowLeftCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +11,10 @@ import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
+import Button from "../../../components/Button/Button";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import BackButton from "../../../components/patterns/BackButton";
+import FormLabel from "../../../components/forms/FormLabel";
 
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -119,9 +122,7 @@ const MultiSelect = ({
 
   return (
     <div className="w-full" id={id}>
-      {label ? (
-        <label className="block text-sm font-medium   mb-1">{label}</label>
-      ) : null}
+      {label ? <FormLabel className="mb-1">{label}</FormLabel> : null}
       <button
         type="button"
         onClick={() => setOpen((s) => !s)}
@@ -152,13 +153,14 @@ const MultiSelect = ({
               )}
               {selectAll && (
                 <div className="mt-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
                     onClick={handleToggleAll}
                     className="text-xs text-indigo-600 hover:underline dark:text-indigo-400"
                   >
                     {allSelected ? "Clear visible" : "Select all visible"}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -471,59 +473,42 @@ export default function BlockLeaveDates({ employeeId }) {
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white/70 backdrop-blur-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold">Block Leave Dates</h1>
-              <p className="mt-1 text-xs">
-                Choose a project, select employees and leave types, then apply a
-                date range.
-              </p>
-            </div>
-            <div>
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                <ArrowLeftCircleIcon className="mr-2 h-10 w-9" />
-              </button>
-            </div>
+          <div className="flex items-center gap-3">
+            <BackButton onClick={() => navigate(-1)} />
+            <h1 className="text-xl font-semibold">Block Leave Dates</h1>
           </div>
+          <p className="mt-1 text-xs">
+            Choose a project, select employees and leave types, then apply a
+            date range.
+          </p>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <section className="lg:col-span-2">
-            <form
-              onSubmit={onSubmit}
-              className="rounded-xl border bg-white  shadow-sm"
+            <PageCard
+              title="Project and members"
+              subtitle="Start by picking a project to manage its members’ leave availability."
             >
-              <div className="p-6 space-y-8">
+            <form onSubmit={onSubmit}>
+              <PageCardContent className="p-6 space-y-8">
                 <div>
-                  <h2 className="text-base font-semibold">
-                    Project and members
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Start by picking a project to manage its members’ leave
-                    availability.
-                  </p>
                   <div className="mt-4 space-y-4">
                     {/* Project */}
                     <div>
-                      <label className="block text-sm font-medium  mb-1">
-                        Project
-                      </label>
+                      <FormLabel className="mb-1">Project</FormLabel>
                       {loading ? (
                         <div className={`${skeleton} h-10 w-full`} />
                       ) : (
-                        <FilterListbox
+                        <FormSelect
+                          name="project"
                           options={[
                             { value: "", label: "Select a project" },
                             ...projectOptions,
                           ]}
                           value={projectId}
-                          onChange={setProjectId}
+                          onChange={(e) => setProjectId(e.target.value)}
                         />
                       )}
                     </div>
@@ -563,9 +548,7 @@ export default function BlockLeaveDates({ employeeId }) {
                           />
                         ) : (
                           <div>
-                            <label className="block text-sm font-medium   mb-1">
-                              Members
-                            </label>
+                            <FormLabel className="mb-1">Members</FormLabel>
                             <div className={`${skeleton} h-10 w-full`} />
                           </div>
                         )}
@@ -628,11 +611,12 @@ export default function BlockLeaveDates({ employeeId }) {
                     className="w-full rounded-lg h-auto"
                   ></textarea>
                 </div>
-              </div>
+              </PageCardContent>
 
               <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800  px-6 py-4 rounded-b-xl">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => {
                     setBlockAllMembers(false);
                     setSelectedMembers([]);
@@ -641,28 +625,25 @@ export default function BlockLeaveDates({ employeeId }) {
                     setEndDate("");
                     setReason("");
                   }}
-                  className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-700 bg-white  px-4 py-2 text-sm font-medium text-gray-700 dark:text-blue-500 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="dark:text-blue-500"
                 >
                   Clear
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="primary"
                   disabled={!canSubmit || submitting}
-                  className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                    !canSubmit || submitting
-                      ? "bg-indigo-400 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-700"
-                  }`}
                 >
                   {submitting ? "Saving..." : "Block leave"}
-                </button>
+                </Button>
               </div>
             </form>
+            </PageCard>
           </section>
 
           <aside className="lg:col-span-1">
-            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white shadow-sm p-6">
-              <h3 className="text-sm font-semibold  ">Summary</h3>
+            <PageCard title="Summary" className="dark:border-gray-800">
+              <PageCardContent className="p-6">
               <div className="mt-4 space-y-3 text-sm">
                 <div className="flex items-start justify-between">
                   <span className="text-gray-600 dark:text-gray-400">
@@ -729,7 +710,8 @@ export default function BlockLeaveDates({ employeeId }) {
                   </span>
                 </div>
               </div>
-            </div>
+              </PageCardContent>
+            </PageCard>
           </aside>
         </div>
       </main>

@@ -112,6 +112,28 @@ describe("APReportsPage", () => {
     expect(reportService.exportReport).toHaveBeenCalledWith("payments_made", runFilters, "pdf");
   });
 
+  it("labels the ageing report's not-due column 'Within Due Date' and keeps the other headers", async () => {
+    reportService.listReports.mockResolvedValue([{ key: "ageing", title: "Ageing by vendor", period: "as_of" }]);
+    reportService.runReport.mockResolvedValue({
+      key: "ageing",
+      title: "Ageing by vendor",
+      period: { type: "as_of", as_of: "2026-10-09" },
+      columns: [
+        { key: "vendor_name", label: "Vendor", type: "text" },
+        { key: "not_due", label: "Not yet due", type: "money" },
+        { key: "b_1-15", label: "1-15 days", type: "money" },
+        { key: "total", label: "Total outstanding", type: "money" },
+      ],
+      rows: [{ vendor_name: "Vertex", not_due: 1000, "b_1-15": 500, total: 1500, currency_code: "INR" }],
+      totals: [],
+    });
+    renderPage("/accounts-payable/reports?report=ageing");
+    expect(await screen.findByText("Within Due Date")).toBeInTheDocument();
+    expect(screen.queryByText("Not yet due")).toBeNull();
+    expect(screen.getByText("1-15 days")).toBeInTheDocument();
+    expect(screen.getByText("Total outstanding")).toBeInTheDocument();
+  });
+
   it("explains when no reports are available", async () => {
     reportService.listReports.mockResolvedValue([]);
     renderPage();

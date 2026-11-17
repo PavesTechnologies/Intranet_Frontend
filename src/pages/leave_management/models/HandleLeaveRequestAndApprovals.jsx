@@ -7,11 +7,14 @@ import LeaveDashboard from "../charts/LeaveDashboard";
 import { toast } from "react-toastify";
 import ManagerEditLeaveRequest from "./ManagerEditLeaveRequest";
 import LeaveSection from "./LeaveSection";
-import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 import Button from "../../../components/Button/Button";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import FormInput from "../../../components/forms/FormInput";
+import FormSelect from "../../../components/forms/FormSelect";
+import StatusBadge from "../../../components/patterns/StatusBadge";
+import Modal from "../../../components/Modal/modal";
+import DataTable from "../../../components/patterns/DataTable";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -271,12 +274,13 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       <div className="flex flex-col">
         <span className="text-gray-700 whitespace-pre-wrap">{displayText}</span>
         {isLong && (
-          <button
+          <Button
+            variant="link"
             onClick={() => setExpanded(!expanded)}
-            className="text-blue-600 text-xs hover:underline self-start"
+            className="text-xs self-start"
           >
             {expanded ? "View Less" : "View More"}
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -526,529 +530,410 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-200 text-gray-800";
-    }
-  };
+  // ─── Canonical DataTable column definitions ──────────────────────────
+  // Selection is implemented as a manual column (header/render), NOT via
+  // DataTable's own `selectable` prop — DataTable's built-in "select all"
+  // only ever affects the rows currently passed to it (the current page),
+  // whereas this component's select-all has always operated across the
+  // full (unpaginated) `adminLeaveRequests` list. Using the built-in
+  // feature would have silently narrowed that to the current page only, so
+  // the existing `selectedRequests`/`selectedResourceId` state and
+  // `handleSelectAll`/`handleSelectRequest` handlers are reused completely
+  // unchanged — see docs/ui/phase-2-leave-management.md ("P2.27").
+  //
+  // P2.30: reverted the P2.28 single-"details"-column consolidation back to
+  // one DataTable column per field, so every original header (Employee,
+  // From, To, Days, Requested On, Leave Type, Reason, Status, Last Action
+  // By, Documents, Actions) renders as its own <th>/<td>, matching
+  // CompOffBalanceRequests' one-column-per-field shape. Every value's
+  // markup/formatting/handlers below is unchanged from the P2.28 render.
+  const columns = [
+    {
+      key: "select",
+      sticky: "left",
+      className: "text-center w-10",
+      header: (
+        <input
+          type="checkbox"
+          checked={
+            selectedRequests.length > 0 &&
+            selectableRequests.length > 0 &&
+            selectedRequests.length === selectableRequests.length
+          }
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          disabled={selectableRequests.length === 0}
+          aria-label="Select all rows"
+        />
+      ),
+      render: (request) => (
+        <input
+          type="checkbox"
+          checked={selectedRequests.includes(request.leaveId)}
+          onChange={(e) =>
+            handleSelectRequest(
+              request.leaveId,
+              e.target.checked,
+              request.employeeId,
+            )
+          }
+          className="rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+          disabled={["approved", "rejected", "cancelled"].includes(
+            request.status.toLowerCase(),
+          )}
+          aria-label="Select row"
+        />
+      ),
+    },
+    {
+      key: "employee",
+      header: "Employee",
+      sticky: "left",
+      className: "whitespace-nowrap",
+      render: (request) => (
+        <Button
+          variant="link"
+          onClick={() =>
+            setLeaveBalaceModel({
+              employeeId: request.employeeId,
+              employeeName: request.employeeFullName,
+              leaveId: request.leaveId,
+            })
+          }
+        >
+          {request.employeeFullName}
+        </Button>
+      ),
+    },
+    {
+      key: "from",
+      header: "From",
+      className: "whitespace-nowrap font-medium text-gray-900",
+      render: (request) => (
+        <>
+          {request.startDate
+            ? new Date(request.startDate).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+            : "-"}
+          <span className="text-gray-500">
+            {request.startSession &&
+              request.startSession !== "none" &&
+              request.startSession !== "fullday" &&
+              ` (${request.startSession})`}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: "to",
+      header: "To",
+      className: "whitespace-nowrap font-medium text-gray-900",
+      render: (request) => (
+        <>
+          {request.endDate
+            ? new Date(request.endDate).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+            : "-"}
+          <span className="text-gray-500">
+            {request.endSession &&
+              request.endSession !== "none" &&
+              request.endSession !== "fullday" &&
+              ` (${request.endSession})`}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: "days",
+      header: "Days",
+      className: "text-center font-medium text-gray-900",
+      render: (request) => request.daysRequested,
+    },
+    {
+      key: "requestedOn",
+      header: "Requested On",
+      className: "whitespace-nowrap font-medium text-gray-900",
+      render: (request) =>
+        request.requestDate
+          ? new Date(request.requestDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+          : "-",
+    },
+    {
+      key: "leaveType",
+      header: "Leave Type",
+      className: "whitespace-nowrap font-medium text-gray-900",
+      render: (request) => request.leaveName,
+    },
+    {
+      key: "reason",
+      header: "Reason",
+      className: "text-gray-900 min-w-[200px]",
+      render: (request) => <LeaveReasonCell reason={request.reason} />,
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (request) => <StatusBadge status={request.status} />,
+    },
+    {
+      key: "lastActionBy",
+      header: "Last Action By",
+      className: "text-gray-500",
+      render: (request) => (
+        <>
+          <div className="font-medium text-gray-900">
+            {request.approvedBy ? request.approvedBy.fullName : "—"}
+          </div>
+          {request.managerComment && (
+            <div className="text-gray-500 mt-1">{request.managerComment}</div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "documents",
+      header: "Documents",
+      className: "text-gray-500",
+      render: (request) =>
+        request.driveLink && request.driveLink.trim() ? (
+          <a
+            href={request.driveLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-600 hover:text-indigo-900"
+          >
+            View Documents
+          </a>
+        ) : null,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      sticky: "right",
+      render: (request) => (
+        <div className="flex items-center gap-2 flex-wrap">
+          {request.status.toLowerCase() === "pending" && (
+            <>
+              <Button
+                variant="primary"
+                size="icon"
+                title="Approve"
+                className="text-green-600 hover:text-green-800"
+                onClick={() =>
+                  setConfirmation({
+                    action: "approve",
+                    leaveId: request.leaveId,
+                    resourceId: request.employeeId,
+                    year: request.year,
+                  })
+                }
+                aria-label="Approve Request"
+                disabled={loading}
+              >
+                <Check className="w-4 h-4" />
+              </Button>
+
+              <Button
+                variant="danger"
+                size="icon"
+                title="Reject"
+                className="text-red-600 hover:text-red-800"
+                onClick={() =>
+                  setConfirmation({
+                    action: "reject",
+                    leaveId: request.leaveId,
+                    resourceId: request.employeeId,
+                    year: request.year,
+                  })
+                }
+                aria-label="Reject Request"
+                disabled={loading}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Edit"
+                onClick={() => setEditingRequest(request)}
+                aria-label="Edit Request"
+                disabled={loading}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+            </>
+          )}
+          {request.status.toLowerCase() === "approved" && (
+            <Button
+              variant="danger"
+              size="icon"
+              title="Cancel Approved Leave"
+              className="text-yellow-600 hover:text-yellow-800"
+              onClick={() =>
+                setConfirmation({
+                  action: "cancel",
+                  leaveId: request.leaveId,
+                })
+              }
+              aria-label="Cancel Approved Leave"
+              disabled={loading}
+            >
+              <XCircle className="w-6 h-6" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  // Two distinct empty conditions, preserved exactly from the original raw
+  // table: no data at all for the current filters vs. a client-side search
+  // that matched nothing. DataTable shows whichever applies via its own
+  // canonical EmptyState (standard/text-only variant).
+  const emptyTableMessage =
+    adminLeaveRequests.length === 0
+      ? "No leaves to be displayed."
+      : filteredRequests.length === 0
+        ? `No leaves found matching ${searchTerm}.`
+        : undefined;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm">
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex flex-col lg:flex-row items-center gap-4 flex-wrap">
-          {/* --- SEARCH INPUT --- */}
-          {/* No changes needed here, it already matches the new style. */}
-          <div className="relative flex-1 w-full lg:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search by Name or Leave Type"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-            />
-          </div>
+    <div>
+      <div className="bg-white rounded-lg shadow-sm">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex flex-col lg:flex-row items-center gap-4 flex-wrap">
+            {/* --- SEARCH INPUT --- */}
+            <div className="relative flex-1 w-full lg:w-auto">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+              <FormInput
+                type="text"
+                name="leaveApprovalSearch"
+                placeholder="Search by Name or Leave Type"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                inputClassName="pl-10 pr-4 py-2.5 focus:ring-indigo-500"
+              />
+            </div>
 
-          {/* --- STATUS DROPDOWN --- */}
-          <div className="w-full lg:w-auto lg:min-w-[150px]">
-            <FilterListbox
-              options={STATUS_OPTIONS}
-              value={selectedStatus}
-              onChange={setSelectedStatus}
-            />
-          </div>
+            {/* --- STATUS DROPDOWN --- */}
+            <div className="w-full lg:w-auto lg:min-w-[150px]">
+              <FormSelect
+                name="statusFilter"
+                options={STATUS_OPTIONS}
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+              />
+            </div>
 
-          {/* --- YEAR DROPDOWN --- */}
-          <div className="w-full lg:w-auto lg:min-w-[150px]">
-            <FilterListbox
-              options={yearOptions}
-              value={selectedYear}
-              onChange={setSelectedYear}
-            />
-          </div>
+            {/* --- YEAR DROPDOWN --- */}
+            <div className="w-full lg:w-auto lg:min-w-[150px]">
+              <FormSelect
+                name="yearFilter"
+                options={yearOptions}
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+              />
+            </div>
 
-          {/* --- MONTH DROPDOWN --- */}
-          <div className="w-full lg:w-auto lg:min-w-[150px]">
-            <FilterListbox
-              options={MONTHS}
-              value={selectedMonth}
-              onChange={setSelectedMonth}
-            />
+            {/* --- MONTH DROPDOWN --- */}
+            <div className="w-full lg:w-auto lg:min-w-[150px]">
+              <FormSelect
+                name="monthFilter"
+                options={MONTHS}
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full rounded-lg shadow-sm">
-          <thead className="bg-gray-50 border-gray-200 relative">
-            {selectedRequests.length > 0 && (
-              <tr>
-                <th
-                  colSpan={12}
-                  className="sticky left-0 z-10 p-0 bg-gray-50 text-left"
-                >
-                  <div className="flex items-center gap-4 w-1/2 bg-indigo-100 text-indigo-700 px-6 py-2 rounded-t-lg">
-                    <span className="font-semibold">
-                      {selectedRequests.length} selected
-                    </span>
 
-                    {/* ✅ Accept All */}
-                    <button
-                      onClick={handleAcceptAll} //{canApprove ? handleAcceptAll : undefined}
-                      disabled={selectedRequests.length === 0} //{!canApprove || selectedRequests.length === 0}
-                      // title={
-                      //   canApprove
-                      //     ? "Approve all selected leave requests"
-                      //     : "You don’t have permission to approve requests"
-                      // }
-                      title="Approve all selected leave requests"
-                      //                 className={`px-3 py-1 rounded-md transition
-                      // ${
-                      //   canApprove
-                      //     ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
-                      //     : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      // }`}
-                      className={`px-3 py-1 rounded-md transition
-                      ${"bg-green-600 hover:bg-green-700 text-white cursor-pointer"}`}
-                    >
-                      Approve
-                    </button>
+      {selectedRequests.length > 0 && (
+        <div className="mt-4 flex items-center gap-4 w-full lg:w-1/2 bg-indigo-100 text-indigo-700 px-6 py-2 rounded-lg">
+          <span className="font-semibold">
+            {selectedRequests.length} selected
+          </span>
 
-                    {/* ❌ Reject All */}
-                    <button
-                      onClick={handleRejectAll} //{canReject ? handleRejectAll : undefined}
-                      disabled={selectedRequests.length === 0} //{!canReject || selectedRequests.length === 0}
-                      // title={
-                      //   canReject
-                      //     ? "Reject all selected leave requests"
-                      //     : "You don’t have permission to reject requests"
-                      // }
-                      title="Reject all selected leave requests"
-                      // className={`px-3 py-1 rounded-md transition
-                      // ${
-                      //   canReject
-                      //     ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
-                      //     : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      // }`}
-                      className={`px-3 py-1 rounded-md transition
-                      ${"bg-red-600 hover:bg-red-700 text-white cursor-pointer"}`}
-                    >
-                      Reject
-                    </button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleAcceptAll}
+            disabled={selectedRequests.length === 0}
+            title="Approve all selected leave requests"
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            Approve
+          </Button>
 
-                    {/* 🧹 Clear Selection */}
-                    <button
-                      onClick={() => {
-                        setSelectedRequests([]);
-                        setSelectedResourceId([]);
-                      }}
-                      className="ml-auto px-2 py-1 text-indigo-600 hover:text-indigo-900 font-semibold transition"
-                      title="Clear Selection"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </th>
-              </tr>
-            )}
-            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-sm">
-              <th
-                className="px-4 py-3 text-center text-xs sticky left-1 z-20 bg-blue-900 whitespace-nowrap"
-                style={{ width: "4%" }}
-              >
-                <input
-                  type="checkbox"
-                  checked={
-                    selectedRequests.length > 0 &&
-                    selectableRequests.length > 0 &&
-                    selectedRequests.length === selectableRequests.length
-                  }
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  disabled={selectableRequests.length === 0}
-                />
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs sticky left-[4.5%] z-20 bg-blue-900 whitespace-nowrap"
-                style={{ width: "12%" }}
-              >
-                Employee
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "12%" }}
-              >
-                From
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "12%" }}
-              >
-                To
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "5%" }}
-              >
-                Days
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "8%" }}
-              >
-                Requested On
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "10%" }}
-              >
-                Leave Type
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "16%" }}
-              >
-                Reason
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "8%" }}
-              >
-                Status
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "15%" }}
-              >
-                Last Action By
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
-                style={{ width: "8%" }}
-              >
-                Documents
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs sticky right-0 z-20 bg-indigo-900 whitespace-nowrap"
-                style={{ width: "8%" }}
-              >
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200 text-center">
-            {/* ✨ START: Conditional Rendering Logic ✨ */}
-            {loading ? (
-              // State 1: Show spinner while loading
-              <tr>
-                <td colSpan="13" className="py-8">
-                  <LoadingSpinner text="Loading..." />
-                </td>
-              </tr>
-            ) : adminLeaveRequests.length === 0 ? (
-              // State 2: Show message if no data is available
-              <tr>
-                <td colSpan="13" className="text-center text-gray-500 py-12">
-                  No leaves to be displayed.
-                </td>
-              </tr>
-            ) : filteredRequests.length === 0 ? (
-              <tr>
-                <td className="text-center text-gray-500 py-12" colSpan="13">
-                  No leaves found matching {searchTerm}.
-                </td>
-              </tr>
-            ) : (
-              // State 3: Render the data rows if data exists
-              paginatedRequests.map((request) => {
-                // console.log("request editing ", request);
-                const typeObj =
-                  allLeaveTypes.find(
-                    (t) => t.leaveName === request.leaveName,
-                  ) || request.leaveType;
-                return (
-                  <tr
-                    key={request.leaveId}
-                    className="hover:bg-gray-50 transition-colors text-xs"
-                  >
-                    {/* Your existing <td> elements go here, no changes needed inside the map */}
-                    <td className="sticky left-1 z-10 bg-white">
-                      <input
-                        type="checkbox"
-                        checked={selectedRequests.includes(request.leaveId)}
-                        onChange={(e) =>
-                          handleSelectRequest(
-                            request.leaveId,
-                            e.target.checked,
-                            request.employeeId,
-                          )
-                        }
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        disabled={[
-                          "approved",
-                          "rejected",
-                          "cancelled",
-                        ].includes(request.status.toLowerCase())}
-                      />
-                    </td>
-                    <td className="cursor-pointer text-blue-600 hover:underline sticky left-[4.5%] z-10 bg-white">
-                      <button
-                        onClick={() =>
-                          setLeaveBalaceModel({
-                            employeeId: request.employeeId,
-                            employeeName: request.employeeFullName,
-                            leaveId: request.leaveId,
-                          })
-                        }
-                      >
-                        {request.employeeFullName}
-                        {/* <div className="text-gray-500 text-ellipsis whitespace-nowrap overflow-hidden max-w-[100px]">
-                          {request.jobTitle}
-                        </div> */}
-                      </button>
-                    </td>
-                    {/* ... other <td> cells for your data ... */}
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900 whitespace-nowrap">
-                        {request.startDate
-                          ? new Date(request.startDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )
-                          : "-"}
-                        <div className="text-gray-500">
-                          {request.startSession &&
-                            request.startSession !== "none" &&
-                            request.startSession !== "fullday" &&
-                            ` (${request.startSession})`}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900 whitespace-nowrap">
-                        {request.endDate
-                          ? new Date(request.endDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )
-                          : "-"}
-                        <div className="text-gray-500">
-                          {request.endSession &&
-                            request.endSession !== "none" &&
-                            request.endSession !== "fullday" &&
-                            ` (${request.endSession})`}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {request.daysRequested}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900 whitespace-nowrap">
-                        {request.requestDate
-                          ? new Date(request.requestDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )
-                          : "-"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {request.leaveName}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-gray-900 text-left">
-                        <LeaveReasonCell reason={request.reason} />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                          request.status,
-                        )}`}
-                      >
-                        {request.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500">
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {request.approvedBy
-                            ? request.approvedBy.fullName
-                            : "—"}
-                        </div>
-                        {request.managerComment && (
-                          <div className="text-gray-500 mt-1">
-                            {request.managerComment}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
-                      {request.driveLink && request.driveLink.trim() && (
-                        <a
-                          href={request.driveLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          View Documents
-                        </a>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 sticky right-0 z-10 bg-white">
-                      <div className="flex items-center gap-2">
-                        {request.status.toLowerCase() === "pending" && (
-                          <>
-                            {/* ✅ Approve Button */}
-                            <button
-                              // title={
-                              //   canApprove
-                              //     ? "Approve"
-                              //     : "You don't have permission to approve this request"
-                              // }
-                              title="Approve"
-                              // className={`p-1 transition-colors ${
-                              //   canApprove
-                              //     ? "text-green-600 hover:text-green-800"
-                              //     : "text-gray-400 cursor-not-allowed"
-                              // } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              className={`p-1 transition-colors ${"text-green-600 hover:text-green-800"}`}
-                              onClick={() =>
-                                //canApprove &&
-                                setConfirmation({
-                                  action: "approve",
-                                  leaveId: request.leaveId,
-                                  resourceId: request.employeeId,
-                                  year: request.year,
-                                })
-                              }
-                              aria-label="Approve Request"
-                              disabled={loading} //{loading || !canApprove}
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleRejectAll}
+            disabled={selectedRequests.length === 0}
+            title="Reject all selected leave requests"
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Reject
+          </Button>
 
-                            {/* ❌ Reject Button */}
-                            <button
-                              // title={
-                              //   canReject
-                              //     ? "Reject"
-                              //     : "You don't have permission to reject this request"
-                              // }
-                              title="Reject"
-                              // className={`p-1 transition-colors ${
-                              //   canReject
-                              //     ? "text-red-600 hover:text-red-800"
-                              //     : "text-gray-400 cursor-not-allowed"
-                              // } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              className="p-1 transition-colors text-red-600 hover:text-red-800"
-                              onClick={() =>
-                                //canReject &&
-                                setConfirmation({
-                                  action: "reject",
-                                  leaveId: request.leaveId,
-                                  resourceId: request.employeeId,
-                                  year: request.year,
-                                })
-                              }
-                              aria-label="Reject Request"
-                              disabled={loading} //{loading || !canReject}
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+          <Button
+            variant="link"
+            onClick={() => {
+              setSelectedRequests([]);
+              setSelectedResourceId([]);
+            }}
+            className="ml-auto"
+            title="Clear Selection"
+          >
+            ✕
+          </Button>
+        </div>
+      )}
 
-                            {/* ✏️ Edit Button */}
-                            <button
-                              // title={
-                              //   canEdit
-                              //     ? "Edit"
-                              //     : "You don't have permission to edit this request"
-                              // }
-                              title="Edit"
-                              onClick={() =>
-                                //canEdit &&
-                                setEditingRequest(request)
-                              }
-                              aria-label="Edit Request"
-                              disabled={loading} //{loading || !canEdit}
-                              // className={`p-1 transition-colors ${
-                              //   canEdit
-                              //     ? "text-blue-600 hover:text-blue-800"
-                              //     : "text-gray-400 cursor-not-allowed"
-                              // } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              className="p-1 transition-colors text-blue-600 hover:text-blue-800"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                        {request.status.toLowerCase() === "approved" && (
-                          <button
-                            title="Cancel Approved Leave"
-                            className="p-1 text-yellow-600 hover:text-yellow-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() =>
-                              setConfirmation({
-                                action: "cancel",
-                                leaveId: request.leaveId,
-                              })
-                            }
-                            aria-label="Cancel Approved Leave"
-                            disabled={loading}
-                          >
-                            <XCircle className="w-6 h-6" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-            {/* ✨ END: Conditional Rendering Logic ✨ */}
-          </tbody>
-        </table>
-        {totalPages > 1 && (
-          <div className="mb-4">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
-              onNext={() =>
-                setCurrentPage((page) => Math.min(page + 1, totalPages))
-              }
-            />
-          </div>
-        )}
+      <DataTable
+        className="mt-4"
+        columns={columns}
+        rows={paginatedRequests}
+        // Only the genuine first load (no data fetched yet) shows the
+        // canonical skeleton. Approve/reject/edit reuse this same `loading`
+        // flag, but by then `adminLeaveRequests` already holds data, so the
+        // table keeps rendering its existing rows (with the acting row's
+        // own button already `disabled`) instead of blanking into a
+        // skeleton — the same regression already fixed once for
+        // CompOffBalanceRequests. See docs/ui/phase-2-leave-management.md
+        // ("P2.27") for the full rationale.
+        loading={loading && adminLeaveRequests.length === 0}
+        getRowKey={(request) => request.leaveId}
+        emptyTitle={emptyTableMessage}
+      />
 
-        {/* NEW: Render the Edit Modal */}
-        {editingRequest && (
+      {totalPages > 1 && (
+        <div className="mb-4 mt-4">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+            onNext={() =>
+              setCurrentPage((page) => Math.min(page + 1, totalPages))
+            }
+          />
+        </div>
+      )}
+
+      {/* NEW: Render the Edit Modal */}
+      {editingRequest && (
           <ManagerEditLeaveRequest
             isOpen={!!editingRequest}
             onClose={() => setEditingRequest(null)}
@@ -1058,31 +943,33 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
         )}
 
         {leaveBalanceModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[100vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">
-                  Analysis for - {leaveBalanceModal.employeeName}
-                </h2>
-                <Button
-                  onClick={() => setLeaveBalaceModel(null)}
-                  variant="ghost"
-                  size="medium"
-                >
-                  &times;
-                </Button>
-              </div>
-              <LeaveSection
-                employeeId={leaveBalanceModal.employeeId}
-                leaveId={leaveBalanceModal.leaveId}
-              />
-            </div>
-          </div>
+          <Modal
+            isOpen={!!leaveBalanceModal}
+            onClose={() => setLeaveBalaceModel(null)}
+            title={`Analysis for - ${leaveBalanceModal.employeeName}`}
+            size="4xl"
+            closeOnBackdrop={false}
+            closeOnEscape={false}
+            showCloseButton={true}
+          >
+            <LeaveSection
+              employeeId={leaveBalanceModal.employeeId}
+              leaveId={leaveBalanceModal.leaveId}
+            />
+          </Modal>
         )}
 
         {confirmation && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-40 backdrop-blur">
-            <div className="bg-white p-8 rounded-xl shadow-2xl w-[90vw] max-w-[360px] border border-gray-200 animate-fade-in">
+          <Modal
+            isOpen={!!confirmation}
+            onClose={() => setConfirmation(null)}
+            showHeader={false}
+            closeOnBackdrop={false}
+            closeOnEscape={false}
+            panelClassName="w-[90vw] max-w-[360px]"
+            bodyClassName="p-8"
+            animation="fade"
+          >
               <div className="flex flex-col items-center">
                 <div
                   className={`flex items-center justify-center w-16 h-16 rounded-full mb-4 ${confirmation.action === "approve"
@@ -1103,13 +990,14 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                 </h3>
                 {(confirmation.action === "reject" ||
                   confirmation.action === "cancel") && (
-                    <input
+                    <FormInput
+                      name="confirmationComment"
                       placeholder={
                         confirmation.action === "reject"
                           ? "Manager comment"
                           : "Reason for cancellation"
                       }
-                      className="border rounded px-2 py-1 mb-3 text-sm w-full"
+                      inputClassName="mb-3 text-sm"
                       value={comments[confirmation.leaveId] || ""}
                       onChange={(e) =>
                         setComments((prev) => ({
@@ -1155,10 +1043,8 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                   </Button>
                 </div>
               </div>
-            </div>
-          </div>
+          </Modal>
         )}
-      </div>
     </div>
   );
 });

@@ -1,6 +1,7 @@
 // components/ActionDropdown.js or .tsx
 import React, { useState, useRef, useEffect } from "react";
 import { MoreHorizontal, FileText, XCircle } from "lucide-react";
+import Button from "../../../components/Button/Button";
 
 const ActionDropdownPendingLeaveRequests = ({ onEdit, onCancel }) => {
   const [open, setOpen] = useState(false);
@@ -18,9 +19,9 @@ const ActionDropdownPendingLeaveRequests = ({ onEdit, onCancel }) => {
 
   return (
     <div className="relative inline-block text-left" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="p-1 text-gray-500 hover:text-gray-700">
+      <Button onClick={() => setOpen(!open)} variant="ghost" size="icon" aria-label="Open actions menu" className="p-1 text-gray-500 hover:text-gray-700">
         <MoreHorizontal className="w-5 h-5" />
-      </button>
+      </Button>
       {open && (
         <div className="absolute right-0 mt-2 w-40 bg-white border rounded shadow-lg z-50">
           <button

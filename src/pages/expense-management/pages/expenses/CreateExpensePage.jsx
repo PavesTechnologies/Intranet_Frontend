@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   FileText,
@@ -40,10 +41,8 @@ import {
   validateBusinessPurpose,
 } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import {
-  formatDeadlineDate,
+  getOverdueSubmitBlockMessage,
   getSubmissionDeadlineInfo,
-  todayIsoDate,
-  validateReportingPeriod,
   validateTripDates,
 } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 
@@ -55,12 +54,16 @@ import api from "@/api/axiosInstance";
 import { isJustified } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import PolicyJustificationModal from "@/pages/expense-management/components/expense-reports/PolicyJustificationModal";
 import { LineItemDrawer } from "./ExpenseReportDetailPage";
+import { advanceExpenseDeadline } from "@/pages/expense-management/components/expense-reports/expenseDateRange";
+import { nextAdvanceSelection } from "@/pages/expense-management/components/expense-reports/advanceReportPrefill";
+import LineItemEntryFlow from "@/pages/expense-management/components/expense-reports/LineItemEntryFlow";
 
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import TaxBreakdownPanel, {
   emptyTaxValue,
 } from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
 import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
+import { toIsoDate } from "@/pages/expense-management/pages/reports/reportUtils";
 const breadcrumbs = [
   {
     label: "Expense Management",
@@ -223,6 +226,7 @@ const extractAdvList = (res) => {
 
 export default function CreateExpensePage() {
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
 
   const submitMutation = useSubmitReport();
 
@@ -296,9 +300,9 @@ export default function CreateExpensePage() {
     businessPurpose: "",
     tripStartDate: "",
     tripEndDate: "",
-    reportingPeriodStart: "",
-    reportingPeriodEnd: "",
     costCenterId: "",
+    projectId: "",
+    clientId: "",
     currencyId: "",
     cashAdvanceId: "",
   });
@@ -336,11 +340,12 @@ export default function CreateExpensePage() {
   const [isLineItemDrawerOpen, setIsLineItemDrawerOpen] =
     useState(false);
 
+  const [isSelectionDialogOpen, setIsSelectionDialogOpen] = useState(false);
   const [editingLineItem, setEditingLineItem] = useState(null);
 
   const [lineItemFormData, setLineItemFormData] = useState({
     categoryId: "",
-    expenseDate: new Date().toISOString().split("T")[0],
+    expenseDate: toIsoDate(new Date()),
     merchantName: "",
     description: "",
     amount: "",
@@ -702,6 +707,48 @@ export default function CreateExpensePage() {
   );
 
 
+  // The advance this report is linked to. Its request date bounds the trip dates (server rule).
+  const linkedAdvance = useMemo(
+    () =>
+      formData.cashAdvanceId
+        ? cashAdvances.find((a) => String(a.advanceId || a.id || a.cashAdvanceId || "") === String(formData.cashAdvanceId))
+        : null,
+    [formData.cashAdvanceId, cashAdvances]
+  );
+
+  // The values the selected advance filled in last time, so changing or clearing the advance refreshes only those.
+  const autoFilledRef = useRef({});
+
+  // The advance whose values were last applied to the form, so each selection is filled once.
+  const appliedAdvanceRef = useRef(null);
+
+  const handleAdvanceSelect = (advanceId) => {
+    const advance = advanceId
+      ? cashAdvances.find((a) => String(a.advanceId || a.id || a.cashAdvanceId || "") === String(advanceId))
+      : null;
+    const result = nextAdvanceSelection({
+      form: formData,
+      previousAuto: autoFilledRef.current,
+      advance,
+      costCenters,
+      currencies,
+    });
+    appliedAdvanceRef.current = advanceId || null;
+    autoFilledRef.current = result.autoFilled;
+    setFormData(result.form);
+  };
+
+  // An advance opened from the URL (?cashAdvanceId=) is set before the advance list loads, so fill its values here.
+  useEffect(() => {
+    const advanceId = formData.cashAdvanceId;
+    if (!advanceId || appliedAdvanceRef.current === advanceId) return;
+    const loaded = cashAdvances.some((a) => String(a.advanceId || a.id || a.cashAdvanceId || "") === String(advanceId));
+    if (!loaded) return;
+    handleAdvanceSelect(advanceId);
+    // handleAdvanceSelect reads the current form and lists, so it runs when either changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.cashAdvanceId, cashAdvances, costCenters, currencies]);
+
   const cashAdvanceOptions = useMemo(() => {
     return cashAdvances
       .filter((a) => {
@@ -823,10 +870,6 @@ export default function CreateExpensePage() {
     const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
     if (tripDateError) {
       errors[formData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
-    }
-    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
-    if (periodError) {
-      errors.reportingPeriodEnd = periodError;
     }
 
 
@@ -1062,12 +1105,6 @@ export default function CreateExpensePage() {
     // TRIP DATES (drive the submission deadline)
     // ----------------------------------------------------------
 
-    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
-    if (periodError) {
-      setFormErrors((prev) => ({ ...prev, reportingPeriodEnd: periodError }));
-      showStatusToast(periodError, "error", 6000);
-      return;
-    }
 
     const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
     if (tripDateError) {
@@ -1085,8 +1122,8 @@ export default function CreateExpensePage() {
       businessPurpose,
       tripStartDate: formData.tripStartDate,
       tripEndDate: formData.tripEndDate,
-      reportingPeriodStart: formData.reportingPeriodStart || null,
-      reportingPeriodEnd: formData.reportingPeriodEnd || null,
+      projectId: formData.projectId || null,
+      clientId: formData.clientId || null,
       costCenterId:
         formData.costCenterId,
       currencyId:
@@ -1443,6 +1480,33 @@ export default function CreateExpensePage() {
   // LINE ITEM INPUT
   // ============================================================
 
+  // Manual Entry: a blank line for the drawer. Used by the Add Line Item chooser.
+  const openManualLineItem = () => {
+    setEditingLineItem(null);
+    setLineItemFormData({
+      categoryId: "",
+      expenseDate: toIsoDate(new Date()),
+      merchantName: "",
+      description: "",
+      amount: "",
+      currencyId: createdReport?.currencyId || formData.currencyId || "",
+      taxAmount: "0",
+      clientBillable: false,
+      projectId: "",
+    });
+    setReceiptFile(null);
+    setLineItemErrors({});
+    setIsLineItemDrawerOpen(true);
+  };
+
+  // After a line is saved (typed or scanned), continue on the report page, where the report is submitted.
+  const handleLineItemSavedContinue = async () => {
+    const itemsRes = await lineItemService.getAll(reportId);
+    const payload = itemsRes.data?.data;
+    setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
+    navigate(`/expense-management/expenses/reports/${reportId}`);
+  };
+
   const handleLineItemInputChange = (
     e
   ) => {
@@ -1756,12 +1820,9 @@ export default function CreateExpensePage() {
   const submitNow = () => {
     // UI guard only: the backend enforces the same deadline on the submit call.
     const deadlineInfo = getSubmissionDeadlineInfo({ reportStatus: "DRAFT", tripEndDate: formData.tripEndDate });
-    if (deadlineInfo?.isOverdue) {
-      showStatusToast(
-        `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`,
-        "error",
-        4000,
-      );
+    const blockMessage = getOverdueSubmitBlockMessage(deadlineInfo);
+    if (blockMessage) {
+      showStatusToast(blockMessage, "error", 4000);
       return;
     }
     submitMutation.mutate(reportId, {
@@ -1877,7 +1938,7 @@ export default function CreateExpensePage() {
               setEditingLineItem(li);
               setLineItemFormData({
                 categoryId: li.categoryId || "",
-                expenseDate: li.expenseDate || new Date().toISOString().split("T")[0],
+                expenseDate: li.expenseDate || toIsoDate(new Date()),
                 merchantName: li.merchantName || "",
                 description: li.description || "",
                 amount: li.amount || "",
@@ -1935,6 +1996,22 @@ export default function CreateExpensePage() {
   // ACTIVE PROJECT OPTIONS
   // ============================================================
 
+  // Active RMS clients for the report's client field (a report needs a project or a client before it is submitted).
+  const [clients, setClients] = useState([]);
+  // Yes/No: whether this report is for a client. No hides the client field and clears it.
+  const [forClient, setForClient] = useState(false);
+  useEffect(() => {
+    Promise.resolve()
+      .then(() => lookupService.getActiveClients())
+      .then((list) => setClients(Array.isArray(list) ? list : []))
+      .catch(() => setClients([]));
+  }, []);
+
+  const clientOptions = useMemo(
+    () => clients.map((c) => ({ value: c.clientId, label: c.clientName })),
+    [clients]
+  );
+
   const projectOptions = useMemo(() => {
     return projects
       .filter(
@@ -1982,6 +2059,15 @@ export default function CreateExpensePage() {
             <p className="text-sm text-gray-500 mt-0.5">
               Start a new expense report, then add individual line items with receipts.
             </p>
+            {hasRole(["General", "Admin"]) && (
+              <button
+                type="button"
+                onClick={() => navigate("/expense-management/expenses/outdated")}
+                className="mt-2 inline-flex items-center rounded-md border border-blue-600 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+              >
+                Outdated expense
+              </button>
+            )}
           </div>
 
         </div>
@@ -2006,7 +2092,7 @@ export default function CreateExpensePage() {
             <FormInput
               label="Report Title"
               name="title"
-              placeholder="e.g. US Business Trip"
+              placeholder="e.g. US Business Event"
               value={formData.title}
               onChange={handleInputChange}
               requiredMark
@@ -2029,7 +2115,7 @@ export default function CreateExpensePage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormInput
-                label="Trip / Meeting Start Date"
+                label="Event start date"
                 name="tripStartDate"
                 type="date"
                 value={formData.tripStartDate}
@@ -2039,7 +2125,7 @@ export default function CreateExpensePage() {
                 error={formErrors.tripStartDate}
               />
               <FormInput
-                label="Estimated End Date"
+                label="Event end date"
                 name="tripEndDate"
                 type="date"
                 value={formData.tripEndDate}
@@ -2050,35 +2136,65 @@ export default function CreateExpensePage() {
                 error={formErrors.tripEndDate}
               />
             </div>
+            {linkedAdvance && formData.tripEndDate && advanceExpenseDeadline(formData.tripEndDate) && (
+              <p className="text-xs text-gray-500">
+                Expenses must be dated within the trip dates. Submit this report by {advanceExpenseDeadline(formData.tripEndDate)} (30 days after the trip ends).
+              </p>
+            )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormInput
-                label="Reporting Period Start"
-                name="reportingPeriodStart"
-                type="date"
-                value={formData.reportingPeriodStart}
-                onChange={handleInputChange}
-                max={todayIsoDate()}
-                disabled={submitting}
-                error={formErrors.reportingPeriodStart}
-              />
-              <FormInput
-                label="Reporting Period End"
-                name="reportingPeriodEnd"
-                type="date"
-                value={formData.reportingPeriodEnd}
-                onChange={handleInputChange}
-                min={formData.reportingPeriodStart || undefined}
-                max={todayIsoDate()}
-                disabled={submitting}
-                error={formErrors.reportingPeriodEnd}
-              />
-            </div>
 
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
               {/* COST CENTER */}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Project</label>
+                  <Select
+                    options={projectOptions}
+                    value={projectOptions.find((o) => o.value === formData.projectId) || null}
+                    onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
+                    placeholder="Search and select project..."
+                    noOptionsMessage={() => "No projects assigned to you"}
+                    isClearable
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Is this client billable?</label>
+                  <div className="flex gap-2">
+                    <Button type="button" size="small" variant={forClient ? "primary" : "outline"} onClick={() => setForClient(true)}>
+                      Yes
+                    </Button>
+                    <Button
+                      type="button"
+                      size="small"
+                      variant={forClient ? "outline" : "primary"}
+                      onClick={() => {
+                        setForClient(false);
+                        handleSelectChange("clientId", "");
+                      }}
+                    >
+                      No
+                    </Button>
+                  </div>
+                </div>
+                {forClient && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">Client</label>
+                    <Select
+                      options={clientOptions}
+                      value={clientOptions.find((o) => o.value === formData.clientId) || null}
+                      onChange={(opt) => handleSelectChange("clientId", opt ? opt.value : "")}
+                      placeholder="Search and select client..."
+                      isClearable
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 sm:col-span-2">
+                  Choose a project or a client for this event. One of them is required before you submit.
+                </p>
+              </div>
 
               <div className="space-y-1">
 
@@ -2289,8 +2405,7 @@ export default function CreateExpensePage() {
                 }
 
                 onChange={(opt) =>
-                  handleSelectChange(
-                    "cashAdvanceId",
+                  handleAdvanceSelect(
                     opt
                       ? opt.value
                       : ""
@@ -2444,35 +2559,7 @@ export default function CreateExpensePage() {
               <Button
                 type="button"
                 variant="primary"
-                onClick={() => {
-
-                  setEditingLineItem(
-                    null
-                  );
-
-
-                  setLineItemFormData({
-                    categoryId: "",
-                    expenseDate:
-                      new Date()
-                        .toISOString()
-                        .split(
-                          "T"
-                        )[0],
-                    merchantName:
-                      "",
-                    description:
-                      "",
-                    amount: "",
-                    currencyId: createdReport?.currencyId || formData.currencyId || "",
-                    taxAmount: "0",
-                    clientBillable: false,
-                    projectId: "",
-                  });
-                  setReceiptFile(null);
-                  setLineItemErrors({});
-                  setIsLineItemDrawerOpen(true);
-                }}
+                onClick={() => setIsSelectionDialogOpen(true)}
                 className="shadow-sm"
               >
 
@@ -2955,13 +3042,25 @@ export default function CreateExpensePage() {
         categoryOptions={categoryOptions}
         costCenterOptions={costCenterOptions}
         currencyOptions={currencyOptions}
-        onSaved={async () => {
-          const itemsRes = await lineItemService.getAll(reportId);
-          const payload = itemsRes.data?.data;
-          setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
-          // After a line is saved, continue on the report page (where the report is submitted).
-          navigate(`/expense-management/expenses/reports/${reportId}`);
+        onSaved={handleLineItemSavedContinue}
+      />
+
+      <LineItemEntryFlow
+        isOpen={isSelectionDialogOpen}
+        onClose={() => setIsSelectionDialogOpen(false)}
+        onManual={openManualLineItem}
+        onSaved={handleLineItemSavedContinue}
+        reportId={reportId}
+        report={{
+          costCenterId: createdReport?.costCenterId || formData.costCenterId,
+          currencyId: createdReport?.currencyId || formData.currencyId,
         }}
+        categories={categories}
+        currencies={currencies}
+        categoryOptions={categoryOptions}
+        costCenterOptions={costCenterOptions}
+        currencyOptions={currencyOptions}
+        projects={projects}
       />
 
 

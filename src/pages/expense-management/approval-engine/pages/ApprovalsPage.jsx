@@ -11,6 +11,7 @@ import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PendingApprovalsPage from "./PendingApprovalsPage";
 import ApprovalHistoryPage from "./ApprovalHistoryPage";
 import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
+import MyDelegateCard from "../components/MyDelegateCard";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
@@ -131,7 +132,6 @@ export default function ApprovalsPage() {
   // Which cash advance stage this page acts on: managers approve at manager stage; a Finance-only
   // user approves at finance stage. A user with both roles sees the manager stage here and the
   // finance stage on the Finance tab.
-  const cashAdvanceStage = isManager || !isFinance ? "MANAGER" : "FINANCE";
 
   // -----------------------------
   // Status options
@@ -340,51 +340,40 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      {/* Tab Content */}
-      {/* No type filter: expense reports and cash advances for the selected status, on the same page. */}
-      <div className="approvals-tab-container space-y-6">
-        {/* Expense Reports */}
-        {activeTab === "pending" && (
-          <PendingApprovalsPage
-            key={`pending-${reloadKey}`}
-            searchTerm={searchTerm}
-            hideHeader
-            noPadding
-          />
-        )}
-        {activeTab === "approved" && (
-          <ApprovalHistoryPage
-            key={`approved-${reloadKey}`}
-            outcome="APPROVED"
-            title="Approved"
-            breadcrumbLabel="Approved"
-            searchTerm={searchTerm}
-            hideHeader
-            noPadding
-          />
-        )}
-        {activeTab === "rejected" && (
-          <ApprovalHistoryPage
-            key={`rejected-${reloadKey}`}
-            outcome="REJECTED"
-            title="Rejected"
-            breadcrumbLabel="Rejected"
-            searchTerm={searchTerm}
-            hideHeader
-            noPadding
-          />
-        )}
-
-        {/* Cash Advances (shown to managers and Finance; the stage decides which items each user acts on) */}
-        {(isManager || isFinance) && (
-          <CashAdvanceApprovalsList
-            key={`cash-${activeTab}-${reloadKey}`}
-            activeTab={activeTab}
-            searchTerm={searchTerm}
-            stage={cashAdvanceStage}
-          />
-        )}
+      {/* One table for expense reports and cash advances. The Type and Status badges tell them apart. */}
+      <div className="approvals-tab-container space-y-4">
+        {activeTab === "pending" && <MyDelegateCard />}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
+                <tr>
+                  <th className="px-2.5 py-2 text-left">Type</th>
+                  <th className="px-2.5 py-2 text-left">Reference</th>
+                  <th className="px-2.5 py-2 text-left">Employee</th>
+                  <th className="px-2.5 py-2 text-left">Title / Merchant</th>
+                  <th className="px-2.5 py-2 text-left">Status</th>
+                  <th className="px-2.5 py-2 text-right">Amount</th>
+                  <th className="px-2.5 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              {activeTab === "pending" && (
+                <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} hideHeader noPadding embedded />
+              )}
+              {activeTab === "approved" && (
+                <ApprovalHistoryPage key={`approved-${reloadKey}`} outcome="APPROVED" searchTerm={searchTerm} embedded />
+              )}
+              {activeTab === "rejected" && (
+                <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" searchTerm={searchTerm} embedded />
+              )}
+              {(isManager || isFinance) && (
+                <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} embedded />
+              )}
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
+
 }

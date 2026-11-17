@@ -28,6 +28,7 @@ import vendorService from "../../vendor/services/vendorService";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatDate } from "../../utils/formatters";
 import { AP_ROUTES } from "../../constants/routes";
+import { withoutMsme } from "../../utils/msme";
 import { PAYMENT_TERM_STATUS_META } from "../../constants/paymentTerms";
 import PaymentTermStatusBadge from "../../invoice/components/PaymentTermStatusBadge";
 import {
@@ -105,10 +106,13 @@ const TAB_LABELS = {
   control_exceptions: "Controls",
   month_end_accruals: "Month-end accruals",
   gst_itc_register: "GST ITC register",
-  msme_payments: "MSME payments",
-  msme_43bh: "MSME 43B(h)",
-  msme_form1: "MSME Form-1",
 };
+
+// Display-only header renames; the backend column keys and the exported files are unchanged.
+const COLUMN_LABELS = {
+  ageing: { not_due: "Within Due Date" },
+};
+const columnLabel = (reportKey, column) => COLUMN_LABELS[reportKey]?.[column.key] || column.label;
 
 function cellValue(column, row) {
   const value = row[column.key];
@@ -142,6 +146,7 @@ function DetailedReports({ reports, reportKey, onSelect, filters, isRange, month
     enabled: Boolean(reportKey) && !filters.invalid,
     retry: false,
   });
+  console.log("data from report : " ,report);
 
   const doExport = async (format) => {
     setExporting(format);
@@ -219,7 +224,10 @@ function DetailedReports({ reports, reportKey, onSelect, filters, isRange, month
           ) : (
             <div className="max-h-[560px] overflow-auto">
               <GenericTable
-                headers={report.columns.map((c) => (NUMERIC.includes(c.type) ? <span className="block w-full text-right">{c.label}</span> : c.label))}
+                headers={report.columns.map((c) => {
+                  const label = columnLabel(reportKey, c);
+                  return NUMERIC.includes(c.type) ? <span className="block w-full text-right">{label}</span> : label;
+                })}
                 columns={report.columns.map((c) => c.key)}
                 rows={report.rows.slice(0, PREVIEW_ROWS).map((row) =>
                   Object.fromEntries(report.columns.map((c) => [c.key, cellValue(c, row)])),
@@ -298,6 +306,7 @@ export default function APReportsPage() {
   const { data: reports = [], isLoading: loadingList, isError: listError, error: listErr } = useQuery({
     queryKey: ["accountsPayable", "reports"],
     queryFn: () => reportService.listReports(),
+    select: withoutMsme,
     retry: false,
   });
   const selectedKey = reports.some((r) => r.key === reportKey) ? reportKey : reports[0]?.key;

@@ -18,7 +18,13 @@ function ActivitySkeleton() {
   );
 }
 
-/** Live billing-configuration events. Handles loading, error (with retry) and empty states. */
+const TYPE_DOT = {
+  INVOICE_APPROVAL: "bg-amber-500",
+  INVOICE_DELIVERY: "bg-emerald-500",
+  BILLING_SETUP: "bg-indigo-500",
+};
+
+/** Recent invoice approval, delivery and billing-setup events. Handles loading, error (with retry) and empty states. */
 export default function RecentActivityCard({ activity, loading, error, onRetry }) {
   let body;
   if (loading) {
@@ -50,25 +56,38 @@ export default function RecentActivityCard({ activity, loading, error, onRetry }
           <History className="h-5 w-5 text-slate-500" aria-hidden="true" />
         </span>
         <p className="text-sm font-medium text-slate-700">No recent activity yet</p>
-        <p className="text-xs text-slate-500">Billing setup changes and approvals will appear here.</p>
+        <p className="text-xs text-slate-500">Billing setup changes, invoice approvals and deliveries will appear here.</p>
       </div>
     );
   } else {
     body = (
       <ul className="divide-y divide-slate-100">
-        {activity.slice(0, 5).map((item, index) => (
+        {activity.map((item, index) => (
           <li
-            key={`${item.configId ?? "activity"}-${index}`}
+            key={`${item.type}-${item.reference ?? ""}-${index}`}
             className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5 text-xs"
           >
             <span className="flex min-w-0 items-center gap-2">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" aria-hidden="true" />
-              <span className="truncate font-medium text-slate-800">{item.action || "Billing setup updated"}</span>
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${TYPE_DOT[item.type] || "bg-slate-400"}`} aria-hidden="true" />
+              <span className="truncate font-medium text-slate-800">{item.title}</span>
+              {item.reference ? (
+                <span translate="no" className="truncate text-slate-500">
+                  {item.reference}
+                </span>
+              ) : null}
             </span>
             <span className="text-slate-500">
-              <span className="font-medium text-slate-700">{item.user || "System"}</span>
-              {" · "}
-              {item.time ? <time dateTime={String(item.time)}>{formatDisplayDateTime(item.time)}</time> : "Recently"}
+              {item.actor ? (
+                <>
+                  <span className="font-medium text-slate-700">{item.actor}</span>
+                  {" · "}
+                </>
+              ) : null}
+              {item.occurredAt ? (
+                <time dateTime={String(item.occurredAt)}>{formatDisplayDateTime(item.occurredAt)}</time>
+              ) : (
+                "Recently"
+              )}
             </span>
           </li>
         ))}
@@ -78,8 +97,8 @@ export default function RecentActivityCard({ activity, loading, error, onRetry }
 
   return (
     <DashboardCard
-      title="Configuration & Audit Trail"
-      description="Recent events from project billing configurations and approval workflows."
+      title="Recent Activity"
+      description="Latest billing setup, invoice approval and delivery events."
       icon={Activity}
       actions={
         <Link

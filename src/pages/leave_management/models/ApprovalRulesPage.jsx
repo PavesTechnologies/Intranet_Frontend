@@ -1,10 +1,17 @@
 import React, { useEffect, useState, Fragment } from "react";
 import api from "../../../api/axiosInstance";
 import { Listbox, Transition } from "@headlessui/react";
-import { Check, Plus, ChevronDown, Pencil, Trash2, X } from "lucide-react";
+import { Check, Plus, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { toast } from "react-toastify";
 import ConfirmationModal from "./ConfirmationModal";
+import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
+import FormLabel from "../../../components/forms/FormLabel";
+import DataTable from "../../../components/patterns/DataTable";
+import PageHeader from "../../../components/ui/PageHeader";
+import PageContainer from "../../../components/patterns/PageContainer";
+import Modal from "../../../components/Modal/modal";
 import { set } from "date-fns";
 import { is } from "date-fns/locale";
 
@@ -159,84 +166,81 @@ export default function ApprovalRulesPage() {
   //                            UI START
   // ================================================================
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <PageContainer density="comfortable" className="max-w-6xl mx-auto">
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Approval Rules</h1>
-
-        <button
-          onClick={() => openModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700 transition"
-        >
-          <Plus className="w-5 h-5" /> Add Rule
-        </button>
-      </div>
+      <PageHeader
+        title="Approval Rules"
+        actions={
+          <Button
+            variant="primary"
+            onClick={() => openModal()}
+            className="flex items-center gap-2 rounded-xl shadow"
+          >
+            <Plus className="w-5 h-5" /> Add Rule
+          </Button>
+        }
+      />
 
       {/* TABLE */}
       <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr className="text-gray-600 uppercase text-xs">
-              <th className="p-3">Action</th>
-              <th className="p-3">Maker</th>
-              <th className="p-3">Checker</th>
-              <th className="p-3 text-center">Level</th>
-              <th className="p-3">Condition</th>
-              <th className="p-3">Approver Type</th>
-              <th className="p-3 text-center">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {rules.map((rule) => (
-              <tr
-                key={rule.id}
-                className="border-b hover:bg-gray-50 transition"
-              >
-                <td className="p-3 font-medium">{rule.actionType}</td>
-                <td className="p-3">{rule.makerRole}</td>
-                <td className="p-3">{rule.checkerRole}</td>
-                <td className="p-3 text-center">{rule.approvalLevel}</td>
-                <td className="p-3">{rule.approvalCondition}</td>
-                <td className="p-3">{rule.approverType}</td>
-
-                <td className="p-3 flex justify-center gap-3">
-                  <button
+        <DataTable
+          loading={loading}
+          emptyTitle="No approval rules found"
+          getRowKey={(rule) => rule.id}
+          columns={[
+            { key: "actionType", header: "Action" },
+            { key: "makerRole", header: "Maker" },
+            { key: "checkerRole", header: "Checker" },
+            {
+              key: "approvalLevel",
+              header: "Level",
+              className: "text-center",
+            },
+            { key: "approvalCondition", header: "Condition" },
+            { key: "approverType", header: "Approver Type" },
+            {
+              key: "actions",
+              header: "Actions",
+              className: "text-center",
+              render: (rule) => (
+                <div className="flex justify-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => openModal(rule)}
                     className="text-indigo-600 hover:text-indigo-800"
+                    aria-label="Edit rule"
                   >
                     <Pencil className="w-5 h-5" />
-                  </button>
+                  </Button>
 
-                  <button
+                  <Button
+                    variant="danger"
+                    size="icon"
                     onClick={() => confirmDelete(rule.id)}
                     className="text-red-600 hover:text-red-800"
+                    aria-label="Delete rule"
                   >
                     <Trash2 className="w-5 h-5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+          rows={rules}
+        />
       </div>
 
       {/* ===================== MODAL ===================== */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl w-full max-w-md max-h-[85vh] overflow-y-auto shadow-xl border p-6 space-y-5">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-800">
-                {editingRule ? "Edit Rule" : "Add New Rule"}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={20} width={20} />
-              </button>
-            </div>
-
+      <Modal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        title={editingRule ? "Edit Rule" : "Add New Rule"}
+        size="md"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+        showCloseButton={true}
+      >
             <form onSubmit={handleSubmit} className="space-y-5">
               <Dropdown
                 label="Action Type"
@@ -299,26 +303,25 @@ export default function ApprovalRulesPage() {
 
               {/* Buttons */}
               <div className="flex justify-end gap-4 pt-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={closeModal}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-100"
                 >
                   Cancel
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow"
+                  variant="primary"
+                  className="shadow"
                   disabled={loading}
                 >
                   Save
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {showConfirmModal && (
         <ConfirmationModal
@@ -330,7 +333,7 @@ export default function ApprovalRulesPage() {
           onCancel={() => setShowConfirmModal(false)}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -338,22 +341,25 @@ export default function ApprovalRulesPage() {
 
 function InputField({ label, value, onChange, type = "text" }) {
   return (
-    <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
-      <input
-        type={type}
-        className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500"
-        value={value}
-        onChange={onChange}
-      />
-    </div>
+    <FormInput
+      label={label}
+      name={
+        label
+          ? label.replace(/\s+/g, "").replace(/^./, (c) => c.toLowerCase())
+          : undefined
+      }
+      type={type}
+      value={value}
+      onChange={onChange}
+      inputClassName="focus:ring-2 focus:ring-indigo-500"
+    />
   );
 }
 
 function Dropdown({ label, value, options, onChange, disabledOptions }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
+      <FormLabel className="mb-1">{label}</FormLabel>
 
       <Listbox value={value} onChange={onChange}>
         <div className="relative">

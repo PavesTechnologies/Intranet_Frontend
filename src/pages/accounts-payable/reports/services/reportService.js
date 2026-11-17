@@ -57,7 +57,7 @@ export const reportService = {
   },
 
   /** Downloads the Excel or PDF export and saves it with the server-provided file name. */
-  async exportReport(key, filters = {}, format = "xlsx") {
+  async exportReport(key, filters = {}, format = "xlsx") {  
     try {
       const response = await api.get(`${AP_BASE_URL}/reports/${key}`, {
         params: toParams({ ...filters, format }),

@@ -194,7 +194,7 @@ export default function ReceiptDropzone({ lineItemId }) {
             ref={inputRef}
             type="file"
             multiple
-            accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+            id="receipt-dropzone-input" name="receipts" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
             className="hidden"
             onChange={(e) => {
               uploadFiles(e.target.files);
@@ -294,7 +294,7 @@ export default function ReceiptDropzone({ lineItemId }) {
       <ConfirmationModal
         isOpen={!!receiptToDelete}
         title="Delete Receipt"
-        message={`Are you sure you want to delete the receipt "${receiptToDelete?.fileName}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete the receipt "${receiptToDelete?.originalFileName || receiptToDelete?.fileName || "receipt"}"? This action cannot be undone.`}
         confirmText="Delete Receipt"
         cancelText="Cancel"
         onConfirm={handleDeleteConfirm}

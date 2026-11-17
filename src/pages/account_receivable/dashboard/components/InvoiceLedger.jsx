@@ -1,32 +1,40 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, ArrowUpRight, Receipt, Search, SearchX } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpDown,
+  ArrowUpRight,
+  Receipt,
+  Search,
+  SearchX,
+} from "lucide-react";
 
 import DashboardCard from "./DashboardCard";
 import SegmentedControl from "./SegmentedControl";
 import StatusBadge from "./StatusBadge";
 import { formatDisplayDate } from "../../utils/format";
-import { getAgingTone, getInvoiceStatus } from "../utils/dashboardFormatters";
+import { formatMoney, getAgingTone, getInvoiceStatus, pluralize, toIsoDate } from "../utils/dashboardFormatters";
 import { AR_ROUTES } from "../utils/dashboardRoutes";
 
-const STATUS_MATCHERS = {
-  ALL: () => true,
-  OVERDUE: (row) => row.status === "OVERDUE",
-  PENDING: (row) => row.status === "PENDING_APPROVAL",
-  PAID: (row) => row.status === "PAID" || row.status === "PARTIALLY_PAID",
-};
-
-const STATUS_LABELS = { ALL: "All", OVERDUE: "Overdue", PENDING: "Pending", PAID: "Paid" };
+const VIEWS = [
+  { value: "ALL", label: "All" },
+  { value: "OVERDUE", label: "Overdue" },
+  { value: "PENDING_APPROVAL", label: "Pending Approval" },
+  { value: "AWAITING_SEND", label: "Awaiting Send" },
+  { value: "SENT", label: "Sent" },
+];
 
 const COLUMNS = [
-  { key: "invoiceId", label: "Invoice", sortable: true },
+  { key: "invoiceNumber", label: "Invoice", sortable: true },
   { key: "clientName", label: "Client & Project", sortable: true },
-  { key: "billingType", label: "Billing Model" },
   { key: "dueDate", label: "Due Date", sortable: true },
-  { key: "amount", label: "Taxable Subtotal", sortable: true, align: "right" },
-  { key: "total", label: "Gross Total", sortable: true, align: "right" },
+  { key: "grandTotal", label: "Gross Total", sortable: true, align: "right" },
+  { key: "outstandingBalance", label: "Outstanding", sortable: true, align: "right" },
   { key: "status", label: "Status" },
-  { key: "action", label: "Action", srOnly: true, align: "right" },
+  { key: "action", label: "Open", srOnly: true, align: "right" },
 ];
 
 const AGING_TEXT = {
@@ -35,10 +43,16 @@ const AGING_TEXT = {
   neutral: "text-slate-500",
 };
 
+const sortValue = (row, key) => {
+  if (key === "dueDate") return toIsoDate(row.dueDate) || "9999-12-31"; // undated last
+  if (key === "grandTotal" || key === "outstandingBalance") return Number(row[key]) || 0;
+  return String(row[key] ?? "");
+};
+
 const compareRows = (key, dir) => (a, b) => {
-  const av = a[key];
-  const bv = b[key];
-  const result = typeof av === "number" ? av - bv : String(av).localeCompare(String(bv));
+  const av = sortValue(a, key);
+  const bv = sortValue(b, key);
+  const result = typeof av === "number" ? av - bv : av.localeCompare(bv);
   return dir === "asc" ? result : -result;
 };
 
@@ -59,40 +73,138 @@ function SortHeader({ column, sort, dir, onSort }) {
   );
 }
 
-export default function InvoiceLedger({ rows, filters, setFilter, toggleSort, resetLedgerFilters, formatMoney }) {
-  const { q, status, sort, dir } = filters;
+function dueNote(row) {
+  if (row.daysOverdue > 0) return { text: `${pluralize(row.daysOverdue, "day")} overdue`, tone: getAgingTone(row.daysOverdue) };
+  if (row.daysOutstanding != null) return { text: `Open ${pluralize(row.daysOutstanding, "day")}`, tone: "neutral" };
+  return null;
+}
 
-  const counts = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(STATUS_MATCHERS).map(([key, match]) => [key, rows.filter(match).length])
-      ),
-    [rows]
-  );
+/**
+ * Invoice ledger. The view and search are applied by the API
+ * (GET /api/v1/dashboard/invoices); sorting is done here on the returned rows.
+ */
+export default function InvoiceLedger({ rows, loading, error, onRetry, filters, setFilter, toggleSort, resetLedgerFilters }) {
+  const { q, view, sort, dir } = filters;
+  const visibleRows = useMemo(() => [...rows].sort(compareRows(sort, dir)), [rows, sort, dir]);
+  const hasFilters = Boolean(q) || view !== "ALL";
 
-  const visibleRows = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    return rows
-      .filter(STATUS_MATCHERS[status])
-      .filter(
-        (row) =>
-          !term ||
-          [row.clientName, row.invoiceId, row.project].some((v) => v.toLowerCase().includes(term))
-      )
-      .sort(compareRows(sort, dir));
-  }, [rows, q, status, sort, dir]);
-
-  const hasFilters = Boolean(q) || status !== "ALL";
+  let body;
+  if (error) {
+    body = (
+      <tr>
+        <td colSpan={COLUMNS.length} className="px-4 py-12 text-left">
+          <div role="alert" className="flex flex-col items-center gap-2 text-center">
+            <AlertCircle className="h-6 w-6 text-rose-600" aria-hidden="true" />
+            <p className="text-sm font-medium text-slate-700">{error}</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              Retry
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  } else if (loading && rows.length === 0) {
+    body = [0, 1, 2].map((i) => (
+      <tr key={i} aria-hidden="true">
+        <td colSpan={COLUMNS.length} className="px-4 py-3.5">
+          <span className="block h-3 w-full rounded bg-slate-100 motion-safe:animate-pulse" />
+        </td>
+      </tr>
+    ));
+  } else if (visibleRows.length === 0) {
+    body = (
+      <tr>
+        <td colSpan={COLUMNS.length} className="px-4 py-12 text-left">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+              <SearchX className="h-5 w-5 text-slate-500" aria-hidden="true" />
+            </span>
+            <p className="text-sm font-medium text-slate-700">
+              {hasFilters ? "No invoices match these filters" : "No invoices yet"}
+            </p>
+            <p className="text-xs text-slate-500">
+              {hasFilters ? "Try a different search term or view." : "Generated invoices will be listed here."}
+            </p>
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={resetLedgerFilters}
+                className="mt-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              >
+                Clear Filters
+              </button>
+            ) : null}
+          </div>
+        </td>
+      </tr>
+    );
+  } else {
+    body = visibleRows.map((row) => {
+      const statusInfo = getInvoiceStatus(row.displayStatus);
+      const note = dueNote(row);
+      return (
+        <tr key={row.invoiceId} className="transition-colors hover:bg-slate-50">
+          <td className="whitespace-nowrap px-4 py-3 text-left">
+            <span translate="no" className="block font-mono font-semibold text-indigo-700">
+              {row.invoiceNumber || "—"}
+            </span>
+            <span className="block text-[11px] text-slate-500">{row.billingType || "—"}</span>
+          </td>
+          <td className="max-w-[260px] px-4 py-3 text-left">
+            <div className="truncate font-semibold text-slate-900" title={row.clientName}>
+              {row.clientName || "—"}
+            </div>
+            <div className="truncate text-[11px] text-slate-500" title={row.projectName}>
+              {row.projectName || "—"}
+            </div>
+          </td>
+          <td className="whitespace-nowrap px-4 py-3 text-left">
+            <div className="font-medium tabular-nums text-slate-800">{formatDisplayDate(row.dueDate)}</div>
+            {note ? (
+              <div className={`text-[11px] font-medium tabular-nums ${AGING_TEXT[note.tone]}`}>{note.text}</div>
+            ) : null}
+          </td>
+          <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-900">
+            {formatMoney(row.grandTotal, row.currencyCode)}
+          </td>
+          <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
+            {row.outstandingBalance != null ? (
+              formatMoney(row.outstandingBalance, row.currencyCode)
+            ) : (
+              <span className="text-[11px] text-slate-400">Not sent</span>
+            )}
+          </td>
+          <td className="whitespace-nowrap px-4 py-3 text-left">
+            <StatusBadge tone={statusInfo.tone}>{statusInfo.label}</StatusBadge>
+          </td>
+          <td className="whitespace-nowrap px-4 py-3 text-right">
+            <Link
+              to={AR_ROUTES.invoice(row.invoiceId)}
+              aria-label={`View invoice ${row.invoiceNumber || ""}`.trim()}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              View
+              <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+            </Link>
+          </td>
+        </tr>
+      );
+    });
+  }
 
   return (
     <DashboardCard
-      title="Debtor Ledger & Active Invoices"
-      description="Client balances, aging and payment status for active invoices."
+      title="Invoice Ledger"
+      description="Invoices with their balance, aging and status, soonest due first."
       icon={Receipt}
       bodyClassName="p-0"
       actions={
         <>
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <label htmlFor="ar-ledger-search" className="sr-only">
               Search invoices
             </label>
@@ -113,37 +225,34 @@ export default function InvoiceLedger({ rows, filters, setFilter, toggleSort, re
             />
           </div>
           <SegmentedControl
-            label="Filter invoices by status"
+            label="Filter invoices"
             size="sm"
-            value={status}
-            onChange={(value) => setFilter("status", value)}
-            options={Object.keys(STATUS_MATCHERS).map((key) => ({
-              value: key,
-              label: `${STATUS_LABELS[key]} (${counts[key]})`,
-            }))}
+            value={view}
+            onChange={(value) => setFilter("view", value)}
+            options={VIEWS}
           />
         </>
       }
       footer={
         <>
           <span aria-live="polite" className="tabular-nums">
-            Showing {visibleRows.length} of {rows.length} invoices
+            {loading ? "Loading invoices…" : `Showing ${pluralize(visibleRows.length, "invoice")}`}
           </span>
           <Link
             to={AR_ROUTES.invoiceGeneration}
             className="inline-flex items-center gap-1 rounded font-semibold text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
-            View Full Invoice Register
+            Open Invoice Generation
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
         </>
       }
     >
       {/* relative: keeps sr-only (absolute) header text inside the scroll box */}
-      <div className="relative overflow-x-auto">
-        <table className="w-full min-w-[880px] text-left text-xs">
+      <div className="relative overflow-x-auto" aria-busy={loading}>
+        <table className="w-full min-w-[860px] text-left text-xs">
           <caption className="sr-only">
-            Active invoices, sorted by {COLUMNS.find((c) => c.key === sort)?.label} {dir === "asc" ? "ascending" : "descending"}
+            Invoices sorted by {COLUMNS.find((c) => c.key === sort)?.label} {dir === "asc" ? "ascending" : "descending"}
           </caption>
           <thead className="border-b border-slate-200 bg-slate-50 text-[11px] text-slate-600">
             <tr>
@@ -169,78 +278,7 @@ export default function InvoiceLedger({ rows, filters, setFilter, toggleSort, re
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {visibleRows.length === 0 ? (
-              <tr>
-                <td colSpan={COLUMNS.length} className="px-4 py-12">
-                  <div className="flex flex-col items-center gap-2 text-center">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
-                      <SearchX className="h-5 w-5 text-slate-500" aria-hidden="true" />
-                    </span>
-                    <p className="text-sm font-medium text-slate-700">No invoices match these filters</p>
-                    <p className="text-xs text-slate-500">Try a different search term or status.</p>
-                    {hasFilters ? (
-                      <button
-                        type="button"
-                        onClick={resetLedgerFilters}
-                        className="mt-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                      >
-                        Clear Filters
-                      </button>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              visibleRows.map((row) => {
-                const statusInfo = getInvoiceStatus(row.status);
-                const agingTone = getAgingTone(row.agingDays);
-                return (
-                  <tr key={row.invoiceId} className="transition-colors hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-left">
-                      <span translate="no" className="font-mono font-semibold text-indigo-700">
-                        {row.invoiceId}
-                      </span>
-                    </td>
-                    <td className="max-w-[240px] px-4 py-3 text-left">
-                      <div className="truncate font-semibold text-slate-900" title={row.clientName}>
-                        {row.clientName}
-                      </div>
-                      <div className="truncate text-[11px] text-slate-500" title={row.project}>
-                        {row.project}
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-left text-slate-600">{row.billingType}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-left">
-                      <div className="font-medium tabular-nums text-slate-800">{formatDisplayDate(row.dueDate)}</div>
-                      <div className={`text-[11px] font-medium tabular-nums ${AGING_TEXT[agingTone]}`}>
-                        {row.agingDays > 0 ? `${row.agingDays} days aging` : "Current"}
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-600">
-                      {formatMoney(row.amount)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-900">
-                      {formatMoney(row.total)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-left">
-                      <StatusBadge tone={statusInfo.tone}>{statusInfo.label}</StatusBadge>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <Link
-                        to={AR_ROUTES.invoice(row.invoiceId)}
-                        aria-label={`View invoice ${row.invoiceId}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                      >
-                        View
-                        <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
+          <tbody className="divide-y divide-slate-100">{body}</tbody>
         </table>
       </div>
     </DashboardCard>

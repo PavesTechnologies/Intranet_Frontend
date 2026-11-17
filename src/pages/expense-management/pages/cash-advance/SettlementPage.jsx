@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { loadSettlementLock, SETTLEMENT_LOCK } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
 import { DollarSign, CheckCircle2, RefreshCw, Eye, Receipt, CheckCircle, Clock, FileText, AlertCircle, Layers, ArrowUpRight, ArrowDownLeft, CreditCard, XCircle, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -9,7 +10,10 @@ import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
+import SettlementModal, { toSettlementAdvance } from "@/components/settlement/SettlementModal";
+import { getSettlementBlockReason } from "@/pages/expense-management/api/adjustmentRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
+import { hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
@@ -84,9 +88,12 @@ const LINKABLE_EXPENSE_STATUSES = [
 ];
 
 // The button is for the advance's own employee only. The backend checks this again when the report is created.
+// The login token carries the employee id as employee_id; accept the camelCase form too.
+const signedInEmployeeId = (user) => user?.employeeId ?? user?.employee_id ?? "";
+
 const canOpenExpenseFor = (adv, user) =>
-  Boolean(user?.employeeId) &&
-  String(adv.employeeId ?? "").trim().toLowerCase() === String(user.employeeId).trim().toLowerCase() &&
+  Boolean(signedInEmployeeId(user)) &&
+  String(adv.employeeId ?? "").trim().toLowerCase() === String(signedInEmployeeId(user)).trim().toLowerCase() &&
   LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
   Number(adv.outstandingBalance ?? 0) > 0;
 
@@ -95,9 +102,12 @@ export default function SettlementPage() {
   const { data: directory } = useEmployeeDirectory();
   const navigate = useNavigate();
   const [advances, setAdvances] = useState([]);
+  // Per advance: what has already been done with the balance (carry-forward or salary request), if anything.
+  const [settlementLocks, setSettlementLocks] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  // Open items (not yet settled or closed) are the working queue; closed records are shown only when asked for.
+  const [statusFilter, setStatusFilter] = useState("OPEN");
 
   const isFinanceExecutive = useMemo(() => {
     if (typeof hasRole === "function") {
@@ -236,6 +246,19 @@ export default function SettlementPage() {
     }
   };
 
+  // Lock state for every advance on the list, so a settled-by-action advance cannot be settled again.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = advances.map((a) => a.advanceId || a.id).filter(Boolean);
+    Promise.all(ids.map((id) => loadSettlementLock(id).then((lock) => [id, lock]).catch(() => [id, { kind: null }])))
+      .then((pairs) => {
+        if (!cancelled) setSettlementLocks(Object.fromEntries(pairs));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [advances]);
+
   useEffect(() => {
     fetchSettlementAdvances();
   }, [isFinanceExecutive]);
@@ -245,7 +268,9 @@ export default function SettlementPage() {
       const statusUpper = (adv.status || "").toUpperCase();
 
       let matchStatus = true;
-      if (statusFilter === "APPROVED") {
+      if (statusFilter === "OPEN") {
+        matchStatus = !["SETTLED", "CLOSED"].includes(statusUpper);
+      } else if (statusFilter === "APPROVED") {
         matchStatus = ["APPROVED"].includes(statusUpper);
       } else if (statusFilter === "DISBURSED" || statusFilter === "IN_PROGRESS") {
         matchStatus = [
@@ -299,7 +324,9 @@ export default function SettlementPage() {
 
     setSubmitting(true);
     try {
-      await cashAdvanceApi.disburse(advanceId, buildDisbursementFormData(values));
+      // Fully covered by carried-in balance: there is no payment to describe, so nothing is sent with the request.
+      const noPaymentDue = Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) <= 0;
+      await cashAdvanceApi.disburse(advanceId, noPaymentDue ? null : buildDisbursementFormData(values));
       showStatusToast(`Cash advance #${String(advanceId).slice(0, 8)} disbursed successfully!`, "success");
       setDisbursing(null);
       fetchSettlementAdvances();
@@ -367,6 +394,13 @@ export default function SettlementPage() {
     setSettlementErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    // The adjustment endpoint cannot record this settlement yet (see getSettlementBlockReason). Stop before sending.
+    const blockReason = getSettlementBlockReason(settlementAction);
+    if (blockReason) {
+      showStatusToast(blockReason, "error", 8000);
+      return;
+    }
+
     setSubmitting(true);
     try {
       await cashAdvanceApi.createReimbursementAdjustment(
@@ -411,11 +445,25 @@ export default function SettlementPage() {
   ];
 
   const statusOptions = [
-    { label: "All Advances", value: "ALL" },
+    { label: "Open (needs action)", value: "OPEN" },
+    { label: "All Advances (incl. closed)", value: "ALL" },
     { label: "Approved (Awaiting Disbursement)", value: "APPROVED" },
     { label: "Disbursed / Outstanding", value: "DISBURSED" },
-    { label: "Fully Settled", value: "SETTLED" },
+    { label: "Closed (Fully Settled)", value: "SETTLED" },
   ];
+
+  // Shown in the header so the user can see which role this session is working under.
+  const roleLabel = useMemo(() => {
+    const roles = Array.isArray(user?.roles)
+      ? user.roles.map((r) => String(r).toUpperCase())
+      : typeof user?.role === "string"
+      ? [user.role.toUpperCase()]
+      : [];
+    if (roles.some((r) => ["FINANCE EXECUTIVE", "FINANCE_EXECUTIVE", "FINANCE"].includes(r))) return "Finance Executive";
+    if (roles.some((r) => ["ADMIN", "SUPER_ADMIN"].includes(r))) return "Administrator";
+    if (roles.some((r) => r.includes("MANAGER"))) return "Manager";
+    return "Employee";
+  }, [user]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
@@ -425,6 +473,9 @@ export default function SettlementPage() {
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#0a174e]">Cash Advance Settlement & Closure</h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Signed in as <span className="font-semibold text-gray-700">{roleLabel}</span>
+          </p>
           <p className="text-xs text-gray-500 mt-0.5">
             Settle outstanding cash advance balances against submitted expenses, record repayments/reimbursements, and achieve zero-balance closure.
           </p>
@@ -515,7 +566,6 @@ export default function SettlementPage() {
             <table className="w-full text-left text-xs text-gray-700">
               <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                 <tr>
-                  <th className="py-3 px-4">Ref #</th>
                   {isFinanceExecutive && <th className="py-3 px-4">Employee Name</th>}
                   <th className="py-3 px-4">Title & Purpose</th>
                   <th className="py-3 px-4 text-right">Advance Disbursed</th>
@@ -533,9 +583,6 @@ export default function SettlementPage() {
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
-                      <td className="py-3 px-4 font-mono font-medium text-blue-700">
-                        #{String(advId).slice(0, 8)}
-                      </td>
                       {isFinanceExecutive && (
                         <td className="py-3 px-4 font-medium text-gray-900 whitespace-nowrap">
                           {getEmployeeName(adv, directory)}
@@ -561,7 +608,7 @@ export default function SettlementPage() {
                               : statusUpper === "SETTLEMENT_PENDING" || statusUpper === "PARTIALLY_SETTLED"
                               ? "bg-amber-50 text-amber-700 border-amber-200"
                               : statusUpper === "APPROVED" || statusUpper === "EXPENSE_VERIFIED"
-                              ? "bg-teal-50 text-teal-700 border-teal-200"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : statusUpper === "UNDER_REVIEW" || statusUpper === "UNDER REVIEW"
                               ? "bg-purple-50 text-purple-700 border-purple-200"
                               : statusUpper === "SUBMITTED_FOR_REVIEW" || statusUpper === "SUBMITTED FOR REVIEW" || statusUpper === "EXPENSE_SUBMITTED"
@@ -599,10 +646,12 @@ export default function SettlementPage() {
                           {canOpenExpenseFor(adv, user) && (
                             <button
                               onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
-                              title="Create an expense report for this cash advance"
-                              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
+                              disabled={hasSubmittedLinkedReport(adv)}
+                              title={hasSubmittedLinkedReport(adv) ? "An expense report is already submitted for this advance" : "Create an expense report for this cash advance"}
+                              aria-label="Cash Advance Expense"
+                              className={`inline-flex items-center rounded-md border p-1.5 ${hasSubmittedLinkedReport(adv) ? "border-gray-200 text-gray-400 cursor-not-allowed" : "border-indigo-200 text-indigo-700 hover:bg-indigo-50"}`}
                             >
-                              <Receipt size={13} /> Cash Advance Expense
+                              <Receipt size={15} />
                             </button>
                           )}
 
@@ -621,16 +670,28 @@ export default function SettlementPage() {
                                   Disburse
                                 </Button>
                               )}
-                              {!isSettled && statusUpper !== "APPROVED" && (
-                                <Button
-                                  size="sm"
-                                  variant="primary"
-                                  onClick={() => handleOpenSettle(adv)}
-                                  className="!py-1 !px-2.5 !text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
-                                >
-                                  Settle Advance
-                                </Button>
-                              )}
+                              {!isSettled && statusUpper !== "APPROVED" && (() => {
+                                const lockKind = settlementLocks[adv.advanceId || adv.id]?.kind;
+                                const locked = Boolean(lockKind);
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="primary"
+                                    onClick={() => handleOpenSettle(adv)}
+                                    disabled={locked}
+                                    title={
+                                      lockKind === SETTLEMENT_LOCK.CARRY_FORWARD
+                                        ? "Carry-forward is already set for this advance"
+                                        : lockKind === SETTLEMENT_LOCK.SALARY
+                                          ? "A salary deduction is already requested for this advance"
+                                          : undefined
+                                    }
+                                    className={`!py-1 !px-2.5 !text-[11px] text-white ${locked ? "bg-gray-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"}`}
+                                  >
+                                    Settle Advance
+                                  </Button>
+                                );
+                              })()}
                             </>
                           )}
                         </div>
@@ -651,6 +712,7 @@ export default function SettlementPage() {
         <RecordDisbursementModal
           title="Disburse Cash Advance"
           submitLabel="Confirm Disburse"
+          paymentRequired={Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) > 0}
           isSubmitting={submitting}
           onCancel={() => setDisbursing(null)}
           onSubmit={handleConfirmDisburse}
@@ -671,224 +733,40 @@ export default function SettlementPage() {
                   <span className="text-xs font-medium text-gray-600">Outstanding Balance:</span>
                   <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.outstandingBalance || disbursing.amount, disbursing.currencyCode || "INR")}</span>
                 </div>
+                {Number(disbursing.carriedInAmount) > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-medium text-gray-600">Carried in (already with the employee):</span>
+                      <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.carriedInAmount, disbursing.currencyCode || "INR")}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-200 pt-2">
+                      <span className="text-xs font-medium text-gray-600">Pay to employee now:</span>
+                      <span className="text-sm font-bold text-emerald-700">{formatMoney(Number(disbursing.amount) - Number(disbursing.carriedInAmount), disbursing.currencyCode || "INR")}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="text-xs text-gray-600 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
-                <p className="font-medium text-amber-900 mb-1">Payment will be initiated to:</p>
-                <p className="text-amber-800">{disbursing.employeeName || `Employee ID: ${disbursing.employeeId || disbursing.employee_id}`}</p>
-              </div>
+              {Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) > 0 && (
+                <div className="text-xs text-gray-600 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="font-medium text-amber-900 mb-1">Payment will be initiated to:</p>
+                  <p className="text-amber-800">{disbursing.employeeName || `Employee ID: ${disbursing.employeeId || disbursing.employee_id}`}</p>
+                </div>
+              )}
             </>
           }
         />
       )}
 
-      {isFinanceExecutive && settlingAdvance && (() => {
-        const advAmt = Number(settlingAdvance.amount) || 0;
-        const expAmt = Number(
-          settlingAdvance.verifiedExpenseAmount ||
-          settlingAdvance.expenseAmount ||
-          settlingAdvance.totalExpenses ||
-          0
-        );
-        const diff = advAmt - expAmt;
-        const empName = getEmployeeName(settlingAdvance, directory);
-        const currency = settlingAdvance.currencyCode || "INR";
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 border border-gray-100">
-              <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50/50">
-                <div>
-                  <h3 className="font-bold text-gray-900 text-sm">
-                    Settlement Details
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Advance #{String(settlingAdvance.advanceId || settlingAdvance.id).slice(0, 8)} • Employee: <span className="font-medium text-gray-800">{empName}</span>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSettlingAdvance(null)}
-                  className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition"
-                >
-                  <XCircle size={18} />
-                </button>
-              </div>
-
-              <form onSubmit={handleConfirmSettlement} className="p-5 space-y-5 text-xs">
-                {/* Settlement Details summary metrics */}
-                <div className="grid grid-cols-3 gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Advance Amount</p>
-                    <p className="text-base font-bold text-gray-900 mt-1">{formatMoney(advAmt, currency)}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total Expenses</p>
-                    <p className="text-base font-bold text-gray-900 mt-1">{formatMoney(expAmt, currency)}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Balance</p>
-                    <div className="mt-1">
-                      {diff > 0 ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                          {formatMoney(diff, currency)} <span className="text-[10px] font-normal ml-1">(Employee Repayment Due)</span>
-                        </span>
-                      ) : diff < 0 ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                          {formatMoney(Math.abs(diff), currency)} <span className="text-[10px] font-normal ml-1">(Additional Reimbursement Due)</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {formatMoney(0, currency)} <span className="text-[10px] font-normal ml-1">(Fully Settled)</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Settlement Action options */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-800">Settlement Action</label>
-                  <div className="space-y-2 pt-1">
-                    <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-gray-800">
-                      <input
-                        type="radio"
-                        name="settlementAction"
-                        value="SETTLE"
-                        checked={settlementAction === "SETTLE"}
-                        onChange={(e) => setSettlementAction(e.target.value)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                      />
-                      <span>
-                        Settle now (cash or bank transfer){" "}
-                        <span className="text-gray-500 font-normal">
-                          {diff > 0
-                            ? `(Employee to refund ${formatMoney(diff, currency)})`
-                            : diff < 0
-                            ? `(Company to reimburse ${formatMoney(Math.abs(diff), currency)})`
-                            : "(Zero balance)"}
-                        </span>
-                      </span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-gray-800">
-                      <input
-                        type="radio"
-                        name="settlementAction"
-                        value="ADJUST"
-                        checked={settlementAction === "ADJUST"}
-                        onChange={(e) => setSettlementAction(e.target.value)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                      />
-                      <span>
-                        Carry forward to next advance{" "}
-                        <span className="text-gray-500 font-normal">(no payment now, balance stays outstanding)</span>
-                      </span>
-                    </label>
-
-                    {diff > 0 && (
-                      <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-gray-800">
-                        <input
-                          type="radio"
-                          name="settlementAction"
-                          value="PAYROLL_DEDUCTION"
-                          checked={settlementAction === "PAYROLL_DEDUCTION"}
-                          onChange={(e) => setSettlementAction(e.target.value)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                        />
-                        <span>
-                          Recover from salary{" "}
-                          <span className="text-gray-500 font-normal">(needs authorization and payroll confirmation)</span>
-                        </span>
-                      </label>
-                    )}
-                    {settlementErrors.action && <p className="text-[11px] text-red-600">{settlementErrors.action}</p>}
-                  </div>
-                </div>
-
-                {settlementAction === SETTLEMENT_ACTION.ADJUST && (
-                  <div className="space-y-2 rounded-lg border border-gray-200 p-3">
-                    <FormSelect
-                      label="Review cycle"
-                      name="settlementReviewCycle"
-                      value={settlementReviewCycle}
-                      onChange={(e) => setSettlementReviewCycle(e.target.value)}
-                      options={REVIEW_CYCLE_OPTIONS.filter((o) => o.value !== "MONTHLY")}
-                    />
-                    <p className="text-xs text-gray-500">
-                      Review date: {getNextReviewDate(settlementReviewCycle) || "—"}. The balance stays outstanding until then.
-                    </p>
-                  </div>
-                )}
-
-                {settlementAction === SETTLEMENT_ACTION.SETTLE && diff !== 0 && (
-                  <div className="space-y-3 rounded-lg border border-gray-200 p-3">
-                    <p className="text-xs font-bold text-gray-800">Payment proof</p>
-                    <DisbursementConfirmationFields
-                      values={settlementConfirmation}
-                      errors={settlementErrors}
-                      modes={SETTLEMENT_MODES}
-                      onFieldChange={(key, value) => setSettlementConfirmation((prev) => ({ ...prev, [key]: value }))}
-                    />
-                  </div>
-                )}
-
-                {settlementAction === SETTLEMENT_ACTION.PAYROLL_DEDUCTION && (
-                  <div className="space-y-3 rounded-lg border border-gray-200 p-3">
-                    <p className="text-xs font-bold text-gray-800">Salary deduction authorization</p>
-                    <FormInput
-                      label="Authorization reference"
-                      name="authorizationReference"
-                      value={settlementPayroll.authorizationReference}
-                      onChange={(e) => setSettlementPayroll((prev) => ({ ...prev, authorizationReference: e.target.value }))}
-                      requiredMark
-                      error={settlementErrors.authorizationReference}
-                    />
-                    <FormInput
-                      label="Payroll confirmation reference"
-                      name="payrollConfirmationReference"
-                      value={settlementPayroll.payrollConfirmationReference}
-                      onChange={(e) => setSettlementPayroll((prev) => ({ ...prev, payrollConfirmationReference: e.target.value }))}
-                      requiredMark
-                      error={settlementErrors.payrollConfirmationReference}
-                    />
-                  </div>
-                )}
-
-                {/* Remarks field */}
-                <div>
-                  <FormTextArea
-                    label="Remarks"
-                    name="settlementNotes"
-                    value={settlementNotes}
-                    onChange={(e) => setSettlementNotes(e.target.value)}
-                    placeholder="Expenses verified. Balance to be refunded."
-                    rows={2}
-                    className="!text-xs"
-                  />
-                </div>
-
-                {/* Footer buttons */}
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
-                  <Button type="button" variant="outline" onClick={() => setSettlingAdvance(null)} className="text-xs">
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={submitting}
-                    className="text-xs bg-[#0a4b94] hover:bg-blue-800 text-white px-5 font-semibold"
-                  >
-                    {submitting ? <LoadingSpinner size="sm" className="mr-1.5" /> : "Confirm Settlement"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        );
-      })()}
+      <SettlementModal
+        isOpen={isFinanceExecutive && !!settlingAdvance}
+        advance={toSettlementAdvance(settlingAdvance)}
+        onClose={() => setSettlingAdvance(null)}
+        onSettled={() => {
+          setSettlingAdvance(null);
+          fetchSettlementAdvances();
+        }}
+      />
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { MemoryRouter } from 'react-router-dom';
  * EP04-S4 Test Suite: Expense-Advance Integration
  *
  * Covers the create-report form: the cash advance link (react-select), the report-level
- * validation (trip dates, reporting period, required fields) and the create call payload.
+ * validation (trip dates, required fields) and the create call payload.
  */
 
 vi.mock('../../../api/expenseReportsApi');
@@ -49,8 +49,8 @@ const pickOption = async (labelText, optionText) => {
 const fillReport = async ({ advanceTitle } = {}) => {
   fireEvent.change(screen.getByLabelText(/report title/i), { target: { value: 'Hotel Expense Report' } });
   fireEvent.change(screen.getByLabelText(/business purpose/i), { target: { value: PURPOSE } });
-  fireEvent.change(screen.getByLabelText(/trip \/ meeting start date/i), { target: { value: '2026-10-01' } });
-  fireEvent.change(screen.getByLabelText(/estimated end date/i), { target: { value: '2026-10-05' } });
+  fireEvent.change(screen.getByLabelText(/event start date/i), { target: { value: '2026-10-01' } });
+  fireEvent.change(screen.getByLabelText(/event end date/i), { target: { value: '2026-10-05' } });
   await pickOption(/^Cost Center/, 'ENG - Engineering');
   await pickOption(/^Report Currency/, 'USD - US Dollar');
   if (advanceTitle) {
@@ -102,6 +102,7 @@ describe('CreateExpensePage - EP04-S4: Expense-Advance Integration', () => {
     cashAdvanceApi.getMyAdvances.mockResolvedValue({
       data: { data: mockAdvances },
     });
+    lookupService.getActiveClients.mockResolvedValue([]);
     lookupService.getActiveCostCenters.mockResolvedValue([
       { costCenterId: 'cc-1', costCenterCode: 'ENG', costCenterName: 'Engineering' },
     ]);
@@ -224,26 +225,12 @@ describe('CreateExpensePage - EP04-S4: Expense-Advance Integration', () => {
     });
   });
 
-  describe('Reporting period and trip date validation', () => {
-    it('should reject a reporting period that ends in the future', async () => {
-      renderWithProviders(<CreateExpensePage />);
-      const future = new Date();
-      future.setDate(future.getDate() + 10);
-      const futureIso = future.toISOString().split('T')[0];
-
-      fireEvent.change(screen.getByLabelText(/reporting period end/i), { target: { value: futureIso } });
-      await fillReport();
-      fireEvent.click(screen.getByRole('button', { name: /create expense report/i }));
-
-      expect(await screen.findByText('The reporting period cannot end in the future.')).toBeInTheDocument();
-      expect(expenseReportService.create).not.toHaveBeenCalled();
-    });
-
+  describe('Trip date validation', () => {
     it('should reject an estimated end date before the trip start date', async () => {
       renderWithProviders(<CreateExpensePage />);
       await fillReport();
       // Other required fields are valid; only the end date is moved before the start date.
-      fireEvent.change(screen.getByLabelText(/estimated end date/i), { target: { value: '2026-09-30' } });
+      fireEvent.change(screen.getByLabelText(/event end date/i), { target: { value: '2026-09-30' } });
       fireEvent.click(screen.getByRole('button', { name: /create expense report/i }));
 
       await waitFor(() => {

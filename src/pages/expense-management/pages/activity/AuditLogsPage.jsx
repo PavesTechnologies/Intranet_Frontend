@@ -159,6 +159,7 @@ export default function AuditLogsPage() {
       />
 
       <PageHeader
+        icon={ScrollText}
         title="Audit Logs"
         subtitle="A permanent, read-only record of who changed what across Expense Management, and when."
       />

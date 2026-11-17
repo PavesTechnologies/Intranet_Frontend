@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { Landmark, CheckCircle2, AlertTriangle, PencilLine } from "lucide-react";
-import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
+import CollapsiblePanel from "./CollapsiblePanel";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -31,8 +31,11 @@ const DETERMINATION_STATUS = { PENDING: "PENDING", DETERMINED: "DETERMINED", VER
  * pure-approver trim. The backend is the sole source of every calculated field (taxable base,
  * rate, amount) — this panel never computes any of them; the only input it ever sends back is a
  * payment nature code, per the TDS Phase 1 contract.
+ *
+ * Collapsible (CollapsiblePanel): collapsed unless `defaultOpen`; opens itself when a link to
+ * `#anchorId` is followed (InvoicePaymentPanel's "Verify TDS" fix link).
  */
-export default function InvoiceTdsPanel({ invoice }) {
+export default function InvoiceTdsPanel({ invoice, defaultOpen = false, anchorId }) {
   const { canViewTds, canDetermineTds, canEditTds, canVerifyTds } = useApPermissions();
   const { data: tds, isLoading, error } = useInvoiceTds(invoice.id);
   const determineTds = useDetermineTdsMutation();
@@ -109,13 +112,13 @@ export default function InvoiceTdsPanel({ invoice }) {
   };
 
   return (
-    <PageCard>
-      <PageCardContent>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">TDS Determination</h3>
-          {status && <StatusBadge label={status} size="sm" />}
-        </div>
-
+    <>
+      <CollapsiblePanel
+        title="TDS Determination"
+        badge={status ? <StatusBadge label={status} size="sm" /> : null}
+        defaultOpen={defaultOpen}
+        anchorId={anchorId}
+      >
         {isLoading ? (
           <LoadingSpinner text="Loading TDS status..." />
         ) : isLoadFailure ? (
@@ -253,7 +256,7 @@ export default function InvoiceTdsPanel({ invoice }) {
             </div>
           </>
         )}
-      </PageCardContent>
+      </CollapsiblePanel>
 
       <Modal
         isOpen={verifyOpen}
@@ -283,7 +286,7 @@ export default function InvoiceTdsPanel({ invoice }) {
           rows={2}
         />
       </Modal>
-    </PageCard>
+    </>
   );
 }
 

@@ -68,6 +68,12 @@ export const lineItemService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // The dates a line on this report may carry. Same rules the server applies when a line is saved.
+  getExpenseDateRange: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/line-items/expense-date-range`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
   create: (reportId, payload) =>
     api.post(`/xms/employee/expense-reports/${reportId}/line-items`, payload, {
       baseURL: EXPENSE_API_BASE,
@@ -123,7 +129,46 @@ export const splitService = {
     }),
 };
 
+// Late receipts: a receipt found after the report was approved, reimbursed or closed. Attaching one never changes the
+// expense's amount, status or payment. Mirrors the backend's LATE_ATTACHABLE set (ReceiptServiceImpl).
+export const LATE_RECEIPT_REPORT_STATUSES = ["APPROVED", "REIMBURSED", "CLOSED"];
+
+export const lateReceiptService = {
+  attach: (lineItemId, formData) =>
+    api.post(`/xms/employee/expense-line-items/${lineItemId}/late-receipts`, formData, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  forReport: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/late-receipts`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  verify: (receiptId, note) =>
+    api.post(`/xms/finance/late-receipts/${receiptId}/verify`, { note }, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  reject: (receiptId, note) =>
+    api.post(`/xms/finance/late-receipts/${receiptId}/reject`, { note }, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // Late receipts waiting for review, across all reports (Finance, Finance Executive, AP Executive).
+  pendingReview: () =>
+    api.get("/xms/finance/late-receipts", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+};
+
 export const receiptService = {
+  // Every receipt on a report, all lines. Used to find lines that still have no receipt.
+  listForReport: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/receipts`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
   getAll: (lineItemId) =>
     api.get(`/xms/employee/expense-line-items/${lineItemId}/receipts`, {
       baseURL: EXPENSE_API_BASE,
@@ -346,14 +391,8 @@ export const invoiceHandoffService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
-  // Resends a handoff that hasn't reached AR's queue; the response carries arDeliveryStatus SENT or FAILED.
-  redeliverToAr: (syncId) =>
-    api.post(`/xms/finance/invoice-handoff-queue/handoffs/${syncId}/redeliver`, null, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
   // InvoiceHandoffSummaryResponse: readyCount, readyBaseAmount, readyProjectCount, handedOffCount, baseCurrencyCode,
-  // readyClientCount, arDeliveryFailedCount
+  // readyClientCount
   getSummary: () =>
     api.get("/xms/finance/invoice-handoff-queue/summary", {
       baseURL: EXPENSE_API_BASE,

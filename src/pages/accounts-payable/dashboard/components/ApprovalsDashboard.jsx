@@ -51,9 +51,9 @@ export default function ApprovalsDashboard({ data }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         {data.kpis.map((kpi) => (
-          <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} currency={currency} />
+          <KpiTile key={kpi.key} kpi={kpi} icon={KPI_ICONS[kpi.key]} currency={currency} variant="detailed" />
         ))}
       </div>
 

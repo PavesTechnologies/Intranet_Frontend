@@ -13,6 +13,29 @@ export const SETTING_TYPES = {
 
 export const SETTINGS_CATALOG = [
   {
+    group: "Cash advance recovery",
+    settings: [
+      {
+        key: "cash-advance.recovery.grace-days",
+        label: "Refund grace period (working days)",
+        type: SETTING_TYPES.INTEGER,
+        defaultValue: 1,
+        defaultLabel: "1 working day",
+        description:
+          "Working days the employee has to return a pending cash advance amount after the refund notice. After this, an open balance goes into the salary recovery report for the payroll run.",
+      },
+      {
+        key: "cash-advance.recovery.payroll-report-email",
+        label: "Salary recovery report email",
+        type: SETTING_TYPES.STRING,
+        defaultValue: "lokeswari353@gmail.com",
+        defaultLabel: "lokeswari353@gmail.com",
+        description:
+          "Receives the salary recovery report (employee ID, name, advance issued, verified expense, amount to recover) for the payroll run. Payroll initiates the deduction; the system does not record it as completed.",
+      },
+    ],
+  },
+  {
     group: "Approvals",
     settings: [
       {

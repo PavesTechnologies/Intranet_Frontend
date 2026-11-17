@@ -6,16 +6,22 @@ import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
+import { recoveryApi } from "@/pages/expense-management/api/recoveryApi";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 import { useAuth } from "@/contexts/AuthContext";
 import SettleBalancePanel from "@/pages/expense-management/pages/cash-advance/components/SettleBalancePanel";
+import MoneyMovements from "@/pages/expense-management/pages/cash-advance/components/MoneyMovements";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
+import CashAdvanceApprovalPanel from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceApprovalPanel";
+import DecisionNotice from "@/pages/expense-management/pages/cash-advance/components/DecisionNotice";
+import { canApproveAdvance } from "@/pages/expense-management/approval-engine/components/CashAdvanceApprovalsList";
 import {
   formatDate,
   formatMoney,
   getCostCenterValue,
   getStatusBadge,
+  hasSubmittedLinkedReport,
 } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 
 const APPROVALS_PATH = "/expense-management/approvals";
@@ -38,7 +44,7 @@ export default function CashAdvanceDetailPage() {
   const { advanceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { hasRole } = useAuth();
+  const { user, hasRole } = useAuth();
 
   const isApprovalView = location.pathname.startsWith(APPROVALS_PATH);
   const isSettlementView = location.pathname.startsWith(SETTLEMENT_PATH);
@@ -66,34 +72,71 @@ export default function CashAdvanceDetailPage() {
   ];
 
   const [advance, setAdvance] = useState(null);
+  const [loadError, setLoadError] = useState("");
   const [settlement, setSettlement] = useState(null);
   const [utilization, setUtilization] = useState(null);
+  // Amount Payroll has actually deducted for this advance, summed for the money-movement cards.
+  const [salaryDeducted, setSalaryDeducted] = useState(0);
+
+  useEffect(() => {
+    const id = advance?.advanceId || advanceId;
+    if (!id) return undefined;
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => recoveryApi.listSalaryDeductions(id))
+      .then((list) => {
+        const rows = Array.isArray(list) ? list : list?.content ?? [];
+        // Only what Payroll confirmed has been deducted. A request that is still waiting for Payroll is not a deduction yet.
+        const total = rows
+          .filter((r) => r.status === "PAYROLL_CONFIRMED")
+          .reduce((sum, r) => sum + Number(r.actualAmountDeducted || 0), 0);
+        if (!cancelled) setSalaryDeducted(total);
+      })
+      .catch(() => {
+        if (!cancelled) setSalaryDeducted(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [advance?.advanceId, advanceId]);
   const [loading, setLoading] = useState(true);
 
   const fetchAdvance = useCallback(async () => {
     setLoading(true);
 
+    // Only a failure to load the advance itself means "not found". A failed settlement or utilization call keeps the
+    // page open and shows the server's message, so the real cause is visible.
+    let response;
     try {
-      const response = await cashAdvanceApi.getById(advanceId);
+      response = await cashAdvanceApi.getById(advanceId);
+    } catch (error) {
+      console.error("Failed to load cash advance:", error);
+      // Show the server's reason (for example, a permission message) instead of implying the record is missing.
+      setLoadError(error.response?.data?.message || "Cash advance not found.");
+      setAdvance(null);
+      setLoading(false);
+      return;
+    }
 
-      setAdvance(response?.data?.data ?? response?.data ?? null);
+    setLoadError("");
+    setAdvance(response?.data?.data ?? response?.data ?? null);
 
-      // The settlement figures (verified expenses, repaid, outstanding) come from the settlement endpoint
-      if (isSettlementView) {
+    // Figures load on both the employee and the settlement routes, so the same balance is shown in each.
+    {
+      try {
         const [settlementResponse, utilizationResponse] = await Promise.all([
           cashAdvanceApi.getSettlement(advanceId),
           cashAdvanceApi.getUtilization(advanceId),
         ]);
         setSettlement(settlementResponse?.data?.data ?? settlementResponse?.data ?? null);
         setUtilization(utilizationResponse?.data?.data ?? utilizationResponse?.data ?? null);
+      } catch (error) {
+        console.error("Failed to load settlement figures:", error);
+        showStatusToast(error.response?.data?.message || "Could not load the settlement figures", "error", 8000);
       }
-    } catch (error) {
-      console.error("Failed to load cash advance:", error);
-
-      setAdvance(null);
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   }, [advanceId, isSettlementView]);
 
   useEffect(() => {
@@ -114,7 +157,7 @@ export default function CashAdvanceDetailPage() {
         <Breadcrumb items={breadcrumbs} />
 
         <div className="rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-sm text-gray-700">Cash advance not found.</p>
+          <p className="text-sm text-gray-700">{loadError || "Cash advance not found."}</p>
 
           <Button variant="outline" onClick={() => navigate(backPath)} className="mt-4 text-xs">
             {backLabel}
@@ -192,14 +235,23 @@ export default function CashAdvanceDetailPage() {
           <div>{getStatusBadge(advance.status)}</div>
         </div>
 
+        {!isSettlementView && (
+          <DecisionNotice
+            advance={advance}
+            isOwner={!!user?.employeeId && user.employeeId === advance.employeeId}
+            onChanged={fetchAdvance}
+          />
+        )}
+
 
         {/* Settlement breakdown (settlement view only) */}
         {isSettlementView && (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {[
               ["Disbursed", formatMoney(advance.amount, advance.currencyCode || "INR"), "text-gray-900"],
               ["Verified Expenses", formatMoney(verifiedExpenses, advance.currencyCode || "INR"), "text-blue-700"],
-              ["Repaid by Employee", formatMoney(settlement?.totalRepaidAmount ?? 0, advance.currencyCode || "INR"), "text-emerald-700"],
+              ["Carried forward", formatMoney(advance.carriedOutAmount ?? 0, advance.currencyCode || "INR"), "text-indigo-700"],
+              ["Salary deduction", formatMoney(salaryDeducted, advance.currencyCode || "INR"), "text-rose-700"],
               ["Outstanding Balance", formatMoney(outstanding, advance.currencyCode || "INR"), Number(outstanding) > 0 ? "text-amber-700" : "text-gray-900"],
             ].map(([label, value, tone]) => (
               <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
@@ -218,23 +270,13 @@ export default function CashAdvanceDetailPage() {
               <span className="text-[11px] font-semibold text-gray-600">Closure: {utilization.closureStatus?.replace(/_/g, " ")}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {[
-                ["Claimed", utilization.claimedAmount],
-                ["Approved", utilization.approvedAmount],
-                ["Returned", utilization.returnedAmount],
-                ["Pending review", utilization.pendingReviewAmount],
-                ["Submitted (reserved)", utilization.submittedReservationAmount],
-                ["Approved utilization", utilization.approvedUtilization],
-                ["Repaid (confirmed)", utilization.totalRepaidAmount],
-                ["Outstanding", utilization.outstandingBalance],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
-                  <p className="mt-1 text-sm font-bold text-gray-900">{formatMoney(value ?? 0, utilization.currencyCode || advance.currencyCode || "INR")}</p>
-                </div>
-              ))}
-            </div>
+            {Number(utilization.reimbursementOwedAmount) > 0 && (
+              <p className="text-xs font-semibold text-amber-700">
+                Awaiting employee reimbursement:{" "}
+                {formatMoney(utilization.reimbursementOwedAmount, utilization.currencyCode || advance.currencyCode || "INR")}.
+                This advance closes once it is paid.
+              </p>
+            )}
 
             {!utilization.balanceConsistent && (
               <p className="text-xs font-semibold text-rose-700">
@@ -306,28 +348,9 @@ export default function CashAdvanceDetailPage() {
             currencyCode={advance.currencyCode || "INR"}
             status={advance.status}
             outstandingBalance={outstanding}
+            carriedOutAmount={advance.carriedOutAmount ?? 0}
+            salaryDeductedAmount={salaryDeducted}
             expenseReport={advance.linkedExpenseReport}
-            onApplyOffset={async ({ expenseReportId, offsetAmount }) => {
-              if (!expenseReportId) {
-                showStatusToast("No linked expense report is available for the advance offset.", "error");
-                return;
-              }
-              const maxOffset = Math.min(
-                Number(outstanding) || 0,
-                Number(advance.linkedExpenseReport?.reimbursableTotal ?? advance.linkedExpenseReport?.totalAmount ?? 0) || 0
-              );
-              if (offsetAmount <= 0 || offsetAmount > maxOffset) {
-                showStatusToast("Offset amount cannot exceed the verified expense amount or outstanding advance balance.", "error");
-                return;
-              }
-              await cashAdvanceApi.applyAdvanceOffset(expenseReportId, {
-                cashAdvanceId: advance.advanceId || advance.id,
-                advanceId: advance.advanceId || advance.id,
-                offsetAmount,
-              });
-              showStatusToast("Advance offset applied successfully.", "success");
-              fetchAdvance();
-            }}
           />
         )}
 
@@ -373,6 +396,19 @@ export default function CashAdvanceDetailPage() {
           </div>
         </div>
 
+        {isSettlementView && settlement && (
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#0a174e]">Money movement</h4>
+            <MoneyMovements
+              settlement={settlement}
+              currencyCode={currencyCode}
+              advanceId={advance.advanceId || advance.id || advanceId}
+              carriedOut={advance.carriedOutAmount ?? 0}
+              salaryDeducted={salaryDeducted}
+            />
+          </section>
+        )}
+
         {canRepay && (
           <SettleBalancePanel
             advanceId={advance.advanceId || advance.id || advanceId}
@@ -390,11 +426,21 @@ export default function CashAdvanceDetailPage() {
           </div>
         )}
 
+        {isApprovalView && (
+          <CashAdvanceApprovalPanel
+            advance={advance}
+            canAct={canApproveAdvance(advance, user, hasRole)}
+            onChanged={fetchAdvance}
+          />
+        )}
+
         {!isApprovalView && !isSettlementView && ["DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "SETTLEMENT_PENDING", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED"].includes(status) && Number(outstanding) > 0 && (
           <div className="pt-2">
             <Button
               variant="primary"
               onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${advance.advanceId || advance.id}`)}
+              disabled={hasSubmittedLinkedReport(advance)}
+              title={hasSubmittedLinkedReport(advance) ? "An expense report is already submitted for this advance" : undefined}
               className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               <Send size={13} className="mr-1.5" /> Stage 4: Submit Linked Expenses

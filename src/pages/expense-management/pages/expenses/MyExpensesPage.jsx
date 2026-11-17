@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, Eye, FileStack, FilePlus2, Landmark, Layers, AlertCircle, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, FileStack, FilePlus2, Landmark, Layers, AlertCircle, X, Paperclip } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
@@ -10,7 +10,7 @@ import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "@/components/status/statusbadge";
-import PaymentStatusBadge from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
+import PaymentStatusBadge, { paymentStateOf } from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +22,7 @@ import {
   REPORT_DELETABLE_STATUSES,
 } from "@/pages/expense-management/api/expenseReportsApi";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
-import { getSubmissionDeadlineInfo, validateReportingPeriod, validateTripDates } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
+import { getSubmissionDeadlineInfo, validateTripDates } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SavedFiltersControl from "@/pages/expense-management/components/common/SavedFiltersControl";
 import Pagination from "@/components/Pagination/pagination";
  
@@ -51,8 +51,8 @@ const emptyReportForm = {
   currencyId: "",
   tripStartDate: "",
   tripEndDate: "",
-  reportingPeriodStart: "",
-  reportingPeriodEnd: "",
+  projectId: "",
+  clientId: "",
 };
  
 export default function MyExpensesPage() {
@@ -79,6 +79,10 @@ export default function MyExpensesPage() {
   const [drawerMode, setDrawerMode] = useState("create"); // "create" or "edit"
   const [currentReport, setCurrentReport] = useState(null);
   const [formData, setFormData] = useState(emptyReportForm);
+  // Project and client for the report form: the client field is shown only when the user answers Yes.
+  const [showClient, setShowClient] = useState(false);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [clientOptions, setClientOptions] = useState([]);
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
  
@@ -97,6 +101,12 @@ export default function MyExpensesPage() {
     } catch (err) {
       console.error("Failed to load lookups:", err);
     }
+    lookupService.getAssignedProjects()
+      .then((list) => setProjectOptions((Array.isArray(list) ? list : []).filter((p) => String(p.status || "").toUpperCase() === "ACTIVE").map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))))
+      .catch(() => setProjectOptions([]));
+    lookupService.getActiveClients()
+      .then((list) => setClientOptions((Array.isArray(list) ? list : []).map((c) => ({ value: c.clientId, label: c.clientName }))))
+      .catch(() => setClientOptions([]));
   }, []);
  
   const fetchReports = useCallback(async () => {
@@ -227,8 +237,6 @@ export default function MyExpensesPage() {
     if (businessPurposeError) errors.businessPurpose = businessPurposeError;
     const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
     if (tripDateError) errors[formData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
-    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
-    if (periodError) errors.reportingPeriodEnd = periodError;
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -237,6 +245,7 @@ export default function MyExpensesPage() {
     setDrawerMode("create");
     setCurrentReport(null);
     setFormData(emptyReportForm);
+    setShowClient(false);
     setFormErrors({});
     setIsModalOpen(true);
   };
@@ -251,9 +260,10 @@ export default function MyExpensesPage() {
       currencyId: report.currencyId || "",
       tripStartDate: (report.tripStartDate || "").slice(0, 10),
       tripEndDate: (report.tripEndDate || "").slice(0, 10),
-      reportingPeriodStart: (report.reportingPeriodStart || "").slice(0, 10),
-      reportingPeriodEnd: (report.reportingPeriodEnd || "").slice(0, 10),
+      projectId: report.projectId || "",
+      clientId: report.clientId || "",
     });
+    setShowClient(!!report.clientId);
     setFormErrors({});
     setIsModalOpen(true);
   };
@@ -269,8 +279,8 @@ export default function MyExpensesPage() {
       currencyId: formData.currencyId,
       tripStartDate: formData.tripStartDate,
       tripEndDate: formData.tripEndDate,
-      reportingPeriodStart: formData.reportingPeriodStart || null,
-      reportingPeriodEnd: formData.reportingPeriodEnd || null,
+      projectId: formData.projectId || null,
+      clientId: showClient && formData.clientId ? formData.clientId : null,
     };
 
     try {
@@ -347,8 +357,8 @@ export default function MyExpensesPage() {
     totalAmount: <span className="font-mono font-semibold text-xs text-gray-900">{formatAmount(r.totalAmount)}</span>,
     status: (
       <div className="flex flex-col items-start gap-1">
-        <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />
-        <PaymentStatusBadge report={r} />
+        {/* One pill: once approved, the payment state (Awaiting payment / Paid) says more than "Approved". */}
+        {paymentStateOf(r) ? <PaymentStatusBadge report={r} /> : <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />}
         {getSubmissionDeadlineInfo(r)?.isOverdue && (
           <span className="text-[11px] font-medium text-red-700">Overdue submission</span>
         )}
@@ -428,15 +438,26 @@ export default function MyExpensesPage() {
         </div>
  
         {canManage && (
-          <Button
-            onClick={handleCreateClick}
-            variant="primary"
-            size="small"
-            className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
-          >
-            <Plus size={14} />
-            Create Expense Report
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button
+              onClick={() => navigate("/expense-management/expenses/outdated")}
+              variant="secondary"
+              size="small"
+              className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
+            >
+              <Paperclip size={14} />
+              Outdated expense
+            </Button>
+            <Button
+              onClick={handleCreateClick}
+              variant="primary"
+              size="small"
+              className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
+            >
+              <Plus size={14} />
+              Create Expense Report
+            </Button>
+          </div>
         )}
       </div>
  
@@ -592,6 +613,10 @@ export default function MyExpensesPage() {
                   onSelectChange={handleSelectChange}
                   costCenterOptions={costCenterOptions}
                   currencyOptions={currencyOptions}
+                  projectOptions={projectOptions}
+                  clientOptions={clientOptions}
+                  showClient={showClient}
+                  onShowClientChange={setShowClient}
                   disabled={submitting}
                 />
               </form>

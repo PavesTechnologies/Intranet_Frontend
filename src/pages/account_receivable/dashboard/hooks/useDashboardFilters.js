@@ -1,15 +1,14 @@
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { DISPLAY_CURRENCIES, PERIODS } from "../utils/dashboardFormatters";
+import { PERIODS } from "../utils/dashboardFormatters";
 
-export const LEDGER_STATUS_FILTERS = ["ALL", "OVERDUE", "PENDING", "PAID"];
-export const LEDGER_SORT_KEYS = ["invoiceId", "clientName", "dueDate", "amount", "total"];
+export const LEDGER_VIEWS = ["ALL", "OVERDUE", "PENDING_APPROVAL", "AWAITING_SEND", "SENT"];
+export const LEDGER_SORT_KEYS = ["invoiceNumber", "clientName", "dueDate", "grandTotal", "outstandingBalance"];
 
 const DEFAULTS = {
-  currency: "USD",
   period: "MTD",
-  status: "ALL",
+  view: "ALL",
   q: "",
   sort: "dueDate",
   dir: "asc",
@@ -18,8 +17,8 @@ const DEFAULTS = {
 const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
 
 /**
- * Dashboard filter state kept in the URL (?currency=&period=&status=&q=&sort=&dir=)
- * so views can be bookmarked, shared and restored on back navigation.
+ * Dashboard filter state kept in the URL (?period=&view=&q=&sort=&dir=) so
+ * views can be bookmarked, shared and restored on back navigation.
  * Defaults are omitted from the URL to keep it clean.
  */
 export function useDashboardFilters() {
@@ -27,9 +26,8 @@ export function useDashboardFilters() {
 
   const filters = useMemo(
     () => ({
-      currency: pick(params.get("currency"), Object.keys(DISPLAY_CURRENCIES), DEFAULTS.currency),
       period: pick(params.get("period"), PERIODS, DEFAULTS.period),
-      status: pick(params.get("status"), LEDGER_STATUS_FILTERS, DEFAULTS.status),
+      view: pick(params.get("view"), LEDGER_VIEWS, DEFAULTS.view),
       q: params.get("q") ?? DEFAULTS.q,
       sort: pick(params.get("sort"), LEDGER_SORT_KEYS, DEFAULTS.sort),
       dir: pick(params.get("dir"), ["asc", "desc"], DEFAULTS.dir),
@@ -71,7 +69,7 @@ export function useDashboardFilters() {
   const resetLedgerFilters = useCallback(() => {
     setParams((prev) => {
       const next = new URLSearchParams(prev);
-      next.delete("status");
+      next.delete("view");
       next.delete("q");
       return next;
     });
