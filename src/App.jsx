@@ -233,6 +233,8 @@ import OfferGeneratedPreview from "./pages/employee-onboarding/offer-generated-p
 // ✅ Expense Management (XMS)
 import XmsDashboardPage from "./pages/expense-management/pages/dashboard/DashboardPage.jsx";
 import XmsCreateExpensePage from "./pages/expense-management/pages/expenses/CreateExpensePage.jsx";
+import XmsOutdatedExpensePage from "./pages/expense-management/pages/expenses/OutdatedExpensePage.jsx";
+import XmsLateReceiptReviewPage from "./pages/expense-management/pages/finance/LateReceiptReviewPage.jsx";
 import XmsMyExpensesPage from "./pages/expense-management/pages/expenses/MyExpensesPage.jsx";
 import XmsAllExpensesPage from "./pages/expense-management/pages/expenses/AllExpensesPage.jsx";
 import XmsExpenseReportsPage from "./pages/expense-management/pages/expenses/ExpenseReportsPage.jsx";
@@ -1931,6 +1933,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/filters" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsAdvancedFilterPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/outdated" element={<ProtectedRoute allowedRoles={["General", "Admin"]}><XmsOutdatedExpensePage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports/:reportId" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsExpenseReportDetailPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
@@ -1965,6 +1968,7 @@ const AppRoutes = () => {
               the generic "Finance" role passes this route gate but then 403s on every API call,
               so it's deliberately excluded here (see sidebarConfig.js's XMS_FINANCE_VERIFICATION). */}
           <Route path="/expense-management/finance" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsFinancePage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/late-receipts" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive", "AP_Executive"]}><XmsLateReceiptReviewPage /></ProtectedRoute>} />
           {/* Old Verification / Reimbursements / Payment Status URLs, merged into the one page above. */}
           <Route path="/expense-management/finance/*" element={<Navigate to="/expense-management/finance" replace />} />
           <Route path="/expense-management/ap-payments/queue" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApPaymentQueuePage /></ProtectedRoute>} />

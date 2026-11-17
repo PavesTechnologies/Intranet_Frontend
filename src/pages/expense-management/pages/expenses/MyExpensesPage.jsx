@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, Eye, FileStack, FilePlus2, Landmark, Layers, AlertCircle, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, FileStack, FilePlus2, Landmark, Layers, AlertCircle, X, Paperclip } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
@@ -438,15 +438,26 @@ export default function MyExpensesPage() {
         </div>
  
         {canManage && (
-          <Button
-            onClick={handleCreateClick}
-            variant="primary"
-            size="small"
-            className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
-          >
-            <Plus size={14} />
-            Create Expense Report
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button
+              onClick={() => navigate("/expense-management/expenses/outdated")}
+              variant="secondary"
+              size="small"
+              className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
+            >
+              <Paperclip size={14} />
+              Outdated expense
+            </Button>
+            <Button
+              onClick={handleCreateClick}
+              variant="primary"
+              size="small"
+              className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
+            >
+              <Plus size={14} />
+              Create Expense Report
+            </Button>
+          </div>
         )}
       </div>
  

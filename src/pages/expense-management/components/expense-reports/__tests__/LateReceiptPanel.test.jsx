@@ -15,9 +15,13 @@ vi.mock("@/pages/expense-management/api/expenseReportsApi", () => ({
     verify: vi.fn(),
     reject: vi.fn(),
   },
+  receiptService: {
+    listForReport: vi.fn(),
+    getViewUrl: vi.fn(),
+  },
 }));
 
-import { lateReceiptService } from "@/pages/expense-management/api/expenseReportsApi";
+import { lateReceiptService, receiptService } from "@/pages/expense-management/api/expenseReportsApi";
 import { showStatusToast } from "@/components/toastfy/toast";
 import LateReceiptPanel from "../LateReceiptPanel";
 
@@ -68,6 +72,7 @@ describe("LateReceiptPanel", () => {
     vi.clearAllMocks();
     authState.roles = ["General"];
     lateReceiptService.forReport.mockImplementation(() => respond([]));
+    receiptService.listForReport.mockImplementation(() => respond([]));
   });
 
   it("does not render for a draft report, and does not load receipts", () => {

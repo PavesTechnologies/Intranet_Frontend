@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   FileText,
@@ -225,6 +226,7 @@ const extractAdvList = (res) => {
 
 export default function CreateExpensePage() {
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
 
   const submitMutation = useSubmitReport();
 
@@ -2057,6 +2059,15 @@ export default function CreateExpensePage() {
             <p className="text-sm text-gray-500 mt-0.5">
               Start a new expense report, then add individual line items with receipts.
             </p>
+            {hasRole(["General", "Admin"]) && (
+              <button
+                type="button"
+                onClick={() => navigate("/expense-management/expenses/outdated")}
+                className="mt-2 inline-flex items-center rounded-md border border-blue-600 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+              >
+                Outdated expense
+              </button>
+            )}
           </div>
 
         </div>
@@ -2150,7 +2161,7 @@ export default function CreateExpensePage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Is this for a client?</label>
+                  <label className="text-sm font-medium text-gray-700">Is this client billable?</label>
                   <div className="flex gap-2">
                     <Button type="button" size="small" variant={forClient ? "primary" : "outline"} onClick={() => setForClient(true)}>
                       Yes

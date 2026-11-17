@@ -132,9 +132,11 @@ export default function SupportingDocumentsUpload({ advanceId, ensureDraft, disa
         await uploadOne(item, targetId);
       }
     } catch (error) {
-      setProblems([error?.message || "Save the request before adding documents."]);
+      // Show the server's message (for example "Needed by date must be a future date."), not the HTTP status text.
+      const message = error?.response?.data?.message || error?.message || "Save the request before adding documents.";
+      setProblems([message]);
       setPending((list) => list.map((p) => (items.some((i) => i.localId === p.localId) && p.status === "queued"
-        ? { ...p, status: "failed", error: error?.message || "Not uploaded." } : p)));
+        ? { ...p, status: "failed", error: message } : p)));
     } finally {
       setBusy(false);
     }

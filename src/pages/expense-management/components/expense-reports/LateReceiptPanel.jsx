@@ -7,6 +7,7 @@ import { fileInputClass } from "@/pages/expense-management/components/common/fil
 import {
   LATE_RECEIPT_REPORT_STATUSES,
   lateReceiptService,
+  receiptService,
 } from "@/pages/expense-management/api/expenseReportsApi";
 
 const MIN_REASON_LENGTH = 10;
@@ -55,6 +56,7 @@ export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [
   const isLateStatus = LATE_RECEIPT_REPORT_STATUSES.includes(reportStatus);
 
   const [receipts, setReceipts] = useState([]);
+  const [reportReceipts, setReportReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -67,8 +69,12 @@ export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [
     if (!reportId) return;
     setLoading(true);
     try {
-      const res = await lateReceiptService.forReport(reportId);
-      setReceipts(unwrap(res));
+      const [lateRes, allRes] = await Promise.all([
+        lateReceiptService.forReport(reportId),
+        receiptService.listForReport(reportId).catch(() => ({ data: { data: [] } })),
+      ]);
+      setReceipts(unwrap(lateRes));
+      setReportReceipts(unwrap(allRes));
     } catch (err) {
       console.error("Failed to load late receipts:", err);
     } finally {
@@ -81,6 +87,39 @@ export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [
   }, [isLateStatus, load]);
 
   const lineById = (id) => lineItems.find((line) => line.lineItemId === id);
+
+  // A line needs a receipt when its category requires one and no valid receipt is attached. A late receipt that Finance
+  // rejected does not count, the same rule the cash advance utilisation uses.
+  const rejectedIds = new Set(receipts.filter((r) => r.verificationStatus === "REJECTED").map((r) => r.receiptId));
+  const hasValidReceipt = (lineId) =>
+    reportReceipts.some((r) => r.lineItemId === lineId && !rejectedIds.has(r.receiptId)) ||
+    receipts.some((r) => r.lineItemId === lineId && r.verificationStatus !== "REJECTED");
+  const missingLines = lineItems.filter((line) => line.receiptRequired && !hasValidReceipt(line.lineItemId));
+
+  const startAttachFor = (lineId) => {
+    setForm((f) => ({ ...f, lineItemId: lineId }));
+    setFormError("");
+    setShowForm(true);
+  };
+
+  // The tab opens before the link is requested, so the browser's pop-up blocker does not stop it.
+  const openReceipt = async (receipt) => {
+    const win = window.open("", "_blank");
+    if (!win) {
+      showStatusToast("Allow pop-ups for this site to open the receipt.", "error");
+      return;
+    }
+    try {
+      const res = await receiptService.getViewUrl(receipt.receiptId);
+      const url = unwrap(res)?.url;
+      if (!url) throw new Error("No link was returned for this receipt.");
+      win.opener = null;
+      win.location.href = url;
+    } catch (err) {
+      win.close();
+      showStatusToast(errorMessage(err, "The receipt could not be opened."), "error");
+    }
+  };
 
   const resetForm = () => {
     setForm({ lineItemId: "", file: null, actualReceiptDate: "", reason: "" });
@@ -231,6 +270,23 @@ export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [
         </form>
       )}
 
+      {canAttach && isLateStatus && missingLines.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="missing-receipts">
+          <p className="text-sm font-semibold text-amber-900">Missing receipts</p>
+          <p className="mb-2 text-xs text-amber-800">These expenses still need a receipt. Attach one you have found.</p>
+          <ul className="space-y-2">
+            {missingLines.map((line) => (
+              <li key={line.lineItemId} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm text-gray-800">{lineLabel(line)}</span>
+                <Button variant="secondary" size="small" onClick={() => startAttachFor(line.lineItemId)}>
+                  Attach receipt
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {loading && receipts.length === 0 ? (
         <p className="text-sm text-gray-500">Loading late receipts…</p>
       ) : receipts.length === 0 ? (
@@ -251,6 +307,9 @@ export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [
                   <span className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[receipt.verificationStatus] || ""}`}>
                     {STATUS_LABEL[receipt.verificationStatus] || receipt.verificationStatus}
                   </span>
+                  <Button variant="secondary" size="small" onClick={() => openReceipt(receipt)}>
+                    View receipt
+                  </Button>
                 </div>
                 <p className="text-xs text-gray-600">
                   Receipt dated {formatDate(receipt.actualReceiptDate)} · Uploaded {formatDate(receipt.uploadedAt)} by {receipt.uploadedBy}

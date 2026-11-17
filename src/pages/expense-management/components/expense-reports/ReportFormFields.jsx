@@ -116,7 +116,7 @@ export default function ReportFormFields({
           />
         </div>
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Is this for a client?</label>
+          <label className="text-sm font-medium text-gray-700">Is this client billable?</label>
           <div className="flex gap-2">
             <button type="button" disabled={disabled} onClick={() => onShowClientChange && onShowClientChange(true)} className={`rounded-md border px-4 py-2 text-sm font-medium ${showClient ? "border-[#0A0082] bg-[#0A0082] text-white" : "border-gray-300 bg-white text-gray-700"}`}>Yes</button>
             <button type="button" disabled={disabled} onClick={() => { if (onShowClientChange) onShowClientChange(false); onSelectChange("clientId", ""); }} className={`rounded-md border px-4 py-2 text-sm font-medium ${showClient ? "border-gray-300 bg-white text-gray-700" : "border-[#0A0082] bg-[#0A0082] text-white"}`}>No</button>

@@ -154,6 +154,21 @@ export const expectedTripDateError = (start, end) => {
     : null;
 };
 
+// The same rules the server applies when a cash advance is created, drafts included. Checked here so a draft or a
+// document upload is refused with a clear message before the request is sent, not with a bare "422" error.
+export const draftProblem = (form, today = todayIso()) => {
+  if (!form.neededByDate) return "Needed by date is required and must be in the future.";
+  if (form.neededByDate <= today) return "Needed by date must be a future date.";
+  if (!form.settlementDueDate) return "Settlement expected date is required.";
+  if (form.settlementDueDate <= today) return "Settlement due date must be a future date.";
+  if (form.settlementDueDate < form.neededByDate) return "Settlement expected date cannot be before the needed by date.";
+  const amount = Number(form.amount);
+  if (!(amount > 0) || amount % ADVANCE_ROUND_BLOCK !== 0) {
+    return `The advance amount must be a positive multiple of ${ADVANCE_ROUND_BLOCK}.`;
+  }
+  return "";
+};
+
 export const getSettlementDateRange = (neededByDate) => {
   if (!neededByDate || !isValidDate(neededByDate)) return null;
   const start = new Date(`${neededByDate}T00:00:00`);
@@ -675,6 +690,10 @@ export default function RequestAdvancePage() {
     if (!formData.title.trim() || !(Number(formData.amount) > 0)) {
       throw new Error("Enter a title and an amount before adding documents.");
     }
+    const problem = draftProblem(formData);
+    if (problem) {
+      throw new Error(problem);
+    }
     const created = await cashAdvanceApi.create(buildPayload());
     const id = idOfCreated(created);
     if (!id) {
@@ -808,6 +827,11 @@ export default function RequestAdvancePage() {
     ) {
       draftErrors.amount =
         "Enter a valid advance amount.";
+    }
+
+    const problem = draftProblem(formData);
+    if (problem && !draftErrors.amount) {
+      draftErrors.general = problem;
     }
 
     if (Object.keys(draftErrors).length > 0) {
@@ -1159,9 +1183,6 @@ export default function RequestAdvancePage() {
           ensureDraft={ensureDraftId}
           disabled={submitting || savingDraft}
           actions={
-        {/* Preview */}
-        <div className="space-y-3">
-          <div className="flex justify-end">
             <Button
               type="button"
               variant="outline"

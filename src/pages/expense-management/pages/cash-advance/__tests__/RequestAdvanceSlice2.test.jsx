@@ -26,9 +26,19 @@ function renderPage() {
   );
 }
 
+// The server needs a future needed-by date and settlement date to create any request, drafts included, so the
+// fixture fills valid dates relative to today (the same rule the form and the server apply).
+const daysFromToday = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
 async function fillTitleAndAmount() {
   fireEvent.change(screen.getByLabelText(/title/i), { target: { value: "Pune trip" } });
   fireEvent.change(screen.getByLabelText(/^Amount Required/), { target: { value: "5000" } });
+  fireEvent.change(screen.getByLabelText(/needed by date/i), { target: { value: daysFromToday(10) } });
+  fireEvent.change(screen.getByLabelText(/settlement expected date/i), { target: { value: daysFromToday(20) } });
 }
 
 describe("RequestAdvancePage: supporting documents and drafts", () => {

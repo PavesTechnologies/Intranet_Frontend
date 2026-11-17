@@ -353,7 +353,9 @@ export default function LineItemEntryFlow({
 
             const reviewData = {
               categoryId: categoryIdVal,
-              expenseDate: responsePayload.receiptDate || toIsoDate(new Date()),
+              // Only the date printed on the receipt. If the scan did not read one, leave it blank for the employee:
+              // today is usually outside the report's permitted dates, and the server rejects it.
+              expenseDate: responsePayload.receiptDate || "",
               merchantName: merchantVal,
               description: "",
               amount: amountNum <= 0 ? "" : amountNum.toFixed(2),
