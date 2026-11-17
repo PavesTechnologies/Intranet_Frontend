@@ -1154,9 +1154,6 @@ export default function RequestAdvancePage() {
           ensureDraft={ensureDraftId}
           disabled={submitting || savingDraft}
           actions={
-        {/* Preview */}
-        <div className="space-y-3">
-          <div className="flex justify-end">
             <Button
               type="button"
               variant="outline"
