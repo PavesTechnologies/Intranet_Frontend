@@ -10,9 +10,31 @@ import { apiErrorMessage } from "../services/aiProviderService";
 const inputClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white";
 const CODE_PATTERN = /^[A-Z][A-Z0-9_]{2,39}$/;
 
-// Settings phase 1: the reasons a person picks when moving a candidate against the screening outcome.
-// Codes are never renamed or deleted (past overrides keep them); retire one to stop offering it.
+// Two kinds of reason code share this screen. Codes are never renamed or deleted (past uses keep them);
+// retire one to stop offering it.
+const KINDS = {
+  OVERRIDE: {
+    tab: "Override reasons",
+    title: "Override reason codes",
+    intro: "The reasons recruiters and hiring managers pick when they move a candidate against the screening "
+      + "outcome. A code is never renamed or deleted, so past overrides keep their meaning: retire a code to "
+      + "stop offering it. \"Other\" always stays available.",
+    offered: "will be offered from the next move.",
+    retired: "will no longer be offered. Past overrides keep it.",
+  },
+  STAGE_UNLOCK: {
+    tab: "Stage-unlock reasons",
+    title: "Stage-unlock reason codes",
+    intro: "The reasons an HR admin picks when unlocking a candidate's stage after a rejection or selection "
+      + "email was sent. A code is never renamed or deleted, so past unlocks keep their meaning: retire a code "
+      + "to stop offering it. At least one always stays available.",
+    offered: "will be offered from the next unlock.",
+    retired: "will no longer be offered. Past unlocks keep it.",
+  },
+};
+
 export default function SettingsReasonCodes() {
+  const [kind, setKind] = useState("OVERRIDE");
   const [codes, setCodes] = useState(null);
   const [labels, setLabels] = useState({});
   const [orders, setOrders] = useState({});
@@ -27,11 +49,18 @@ export default function SettingsReasonCodes() {
   };
 
   useEffect(() => {
-    getReasonCodes().then(reset).catch((error) => {
+    let current = true;
+    setCodes(null);
+    setAdding({ code: "", label: "" });
+    getReasonCodes(kind).then((rows) => { if (current) reset(rows); }).catch((error) => {
+      if (!current) return;
       toast.error(apiErrorMessage(error, "Couldn't load the reason codes."));
       setCodes([]);
     });
-  }, []);
+    return () => { current = false; };
+  }, [kind]);
+
+  const text = KINDS[kind];
 
   const run = async (action, success) => {
     setBusy(true);
@@ -60,18 +89,36 @@ export default function SettingsReasonCodes() {
   const newCode = adding.code.trim().toUpperCase();
   const canAdd = CODE_PATTERN.test(newCode) && adding.label.trim().length >= 2 && !busy;
 
-  if (!codes) return <LoadingSpinner text="Loading reason codes..." />;
+  const kindSelector = (
+    <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50" role="tablist"
+      aria-label="Kind of reason code">
+      {Object.entries(KINDS).map(([value, { tab }]) => (
+        <button key={value} type="button" role="tab" aria-selected={kind === value} disabled={busy}
+          onClick={() => setKind(value)}
+          className={`px-3 py-1 text-xs rounded-md font-medium ${kind === value
+            ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          {tab}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (!codes) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-5">
+        {kindSelector}
+        <LoadingSpinner text="Loading reason codes..." />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-5">
-      <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-        <ListChecks className="h-4 w-4 text-slate-500" /> Override reason codes
+      {kindSelector}
+      <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mt-4">
+        <ListChecks className="h-4 w-4 text-slate-500" /> {text.title}
       </h2>
-      <p className="text-[11px] text-slate-500 mt-1 max-w-2xl">
-        The reasons recruiters and hiring managers pick when they move a candidate against the screening
-        outcome. A code is never renamed or deleted, so past overrides keep their meaning: retire a code to
-        stop offering it. "Other" always stays available.
-      </p>
+      <p className="text-[11px] text-slate-500 mt-1 max-w-2xl">{text.intro}</p>
 
       <table className="w-full mt-4 text-xs">
         <thead>
@@ -141,10 +188,10 @@ export default function SettingsReasonCodes() {
         title={{ add: "Add this reason code?", edit: "Save this change?", active: pending?.row?.is_active ? "Retire this code?" : "Restore this code?" }[pending?.kind] || ""}
         message={(() => {
           if (!pending) return "";
-          if (pending.kind === "add") return `${pending.payload.code}: "${pending.payload.label}" will be offered from the next move.`;
+          if (pending.kind === "add") return `${pending.payload.code}: "${pending.payload.label}" ${text.offered}`;
           if (pending.kind === "active") {
             return pending.row.is_active
-              ? `${pending.row.code} will no longer be offered. Past overrides keep it.`
+              ? `${pending.row.code} ${text.retired}`
               : `${pending.row.code} will be offered again.`;
           }
           const parts = [];
@@ -158,7 +205,7 @@ export default function SettingsReasonCodes() {
         onCancel={() => setPending(null)}
         onConfirm={async () => {
           if (pending.kind === "add") {
-            if (await run(() => addReasonCode(pending.payload), "Reason code added.")) setAdding({ code: "", label: "" });
+            if (await run(() => addReasonCode(pending.payload, kind), "Reason code added.")) setAdding({ code: "", label: "" });
           } else {
             await run(() => updateReasonCode(pending.row.code, pending.payload), "Reason code saved.");
           }

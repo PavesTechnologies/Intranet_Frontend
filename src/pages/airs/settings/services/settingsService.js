@@ -52,14 +52,14 @@ export const getSchedules = async () => {
   return unwrap(response.data);
 };
 
-// ── override reason codes ─────────────────────────────────────
-export const getReasonCodes = async () => {
-  const response = await api.get(`${BASE_URL}/settings/reason-codes`, { headers: authHeaders() });
+// ── reason codes: kind OVERRIDE (moves against the outcome) or STAGE_UNLOCK (unlocking a locked stage) ──
+export const getReasonCodes = async (kind = "OVERRIDE") => {
+  const response = await api.get(`${BASE_URL}/settings/reason-codes`, { params: { kind }, headers: authHeaders() });
   return unwrap(response.data);
 };
 
-export const addReasonCode = async (payload) => {
-  const response = await api.post(`${BASE_URL}/settings/reason-codes`, payload, { headers: authHeaders() });
+export const addReasonCode = async (payload, kind = "OVERRIDE") => {
+  const response = await api.post(`${BASE_URL}/settings/reason-codes`, payload, { params: { kind }, headers: authHeaders() });
   return unwrap(response.data);
 };
 
