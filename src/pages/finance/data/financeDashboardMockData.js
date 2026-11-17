@@ -8,7 +8,7 @@
  * ../utils/financeFormatters.js.
  *
  * To connect a backend later, replace getFinanceDashboardData() with a hook that
- * fetches the same shape — the UI components only consume this shape.
+ * fetches the s          ame shape — the UI components only consume this shape.
  */
 
 export const FINANCE_PERIOD_OPTIONS = [

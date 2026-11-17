@@ -1,6 +1,8 @@
 const BASE = "/accounts-payable";
 
 export const AP_ROUTES = {
+  // Module root — has no page of its own; App.jsx redirects it to DASHBOARD.
+  ROOT: BASE,
   DASHBOARD: `${BASE}/dashboard`,
   GUIDE: `${BASE}/guide`,
   DASHBOARD_ACTIVITY: `${BASE}/dashboard/activity`,
