@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import CategoryDonut from "@/components/ui/CategoryDonut";
 import { categoryColor } from "@/components/ui/categoryColors";
@@ -72,5 +72,28 @@ describe("category donut", () => {
       />,
     );
     expect(legendRow(container, "Tiny").textContent).toMatch(/<1%/);
+  });
+});
+
+describe("category donut details", () => {
+  it("lists categories largest first, with expense count and average per expense", () => {
+    const { container } = render(<CategoryDonut slices={[...SLICES].reverse()} currency="INR" />);
+    const keys = [...container.querySelectorAll("[data-legend]")].map((el) => el.getAttribute("data-legend"));
+    expect(keys).toEqual(["Meals", "Travel", "Lodging"]);
+    expect(legendRow(container, "Travel").textContent).toMatch(/2 expenses · avg INR 325/);
+    expect(container.querySelector('[data-donut="summary"]').textContent).toMatch(/3 categories · 4 expenses · avg INR 475/);
+  });
+
+  it("names where most of the money goes", () => {
+    const { container } = render(<CategoryDonut slices={SLICES} currency="INR" />);
+    expect(container.querySelector('[data-donut="insight"]').textContent).toMatch(/Meals is more than half of the total, at 53%/);
+  });
+
+  it("hovering a category shows it in the centre", () => {
+    const { container } = render(<CategoryDonut slices={SLICES} currency="INR" />);
+    fireEvent.mouseEnter(legendRow(container, "Travel"));
+    expect(container.textContent).toMatch(/INR 650.00\s*34% of total/);
+    fireEvent.mouseLeave(legendRow(container, "Travel"));
+    expect(container.querySelector('[data-donut="centre"]')).not.toBeNull();
   });
 });
