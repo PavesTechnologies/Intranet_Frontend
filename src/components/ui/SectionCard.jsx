@@ -3,10 +3,10 @@ import React from "react";
 // Shared dashboard card: rounded, softly shadowed, with an optional tinted icon beside the heading.
 // Headings use the site's navy; the icon tile takes the card's tone. Kept compact: fewer wrappers, tighter spacing.
 export const TONES = {
-  navy: { tile: "bg-[#0A0082]/10 text-[#0A0082]" },
-  pink: { tile: "bg-[#ff3d72]/10 text-[#ff3d72]" },
-  teal: { tile: "bg-teal-500/10 text-teal-700" },
-  amber: { tile: "bg-amber-400/15 text-amber-700" },
+  navy: { tile: "bg-[#0A0082]/10 text-[#0A0082]", bar: "from-[#0A0082] to-[#4f63c9]" },
+  pink: { tile: "bg-[#ff3d72]/10 text-[#ff3d72]", bar: "from-[#ff3d72] to-[#ff7aa0]" },
+  teal: { tile: "bg-teal-500/10 text-teal-700", bar: "from-emerald-500 to-teal-400" },
+  amber: { tile: "bg-amber-400/15 text-amber-700", bar: "from-amber-400 to-orange-300" },
 };
 
 export default function SectionCard({ title, subtitle, action, icon: Icon, tone = "navy", children, className = "", ...rest }) {

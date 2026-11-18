@@ -14,8 +14,10 @@ vi.mock('@/components/toastfy/toast', () => ({ showStatusToast: vi.fn() }));
 
 // The panel has its own tests; here we only check which report it receives.
 vi.mock('@/pages/expense-management/components/expense-reports/LateReceiptPanel', () => ({
-  default: ({ reportId, reportStatus, lineItems }) => (
-    <div data-testid="late-panel">panel:{reportId}:{reportStatus}:{lineItems.length}</div>
+  default: ({ reportId, reportStatus, lineItems, tripStartDate, tripEndDate }) => (
+    <div data-testid="late-panel">
+      panel:{reportId}:{reportStatus}:{lineItems.length}:{tripStartDate || '-'}:{tripEndDate || '-'}
+    </div>
   ),
 }));
 
@@ -75,5 +77,26 @@ describe('OutdatedExpensePage', () => {
 
     await waitFor(() => expect(lineItemService.getAll).toHaveBeenCalledWith('r1'));
     expect(await screen.findByTestId('late-panel')).toHaveTextContent('panel:r1:APPROVED:2');
+  });
+
+  it('shows whether the chosen report is a direct or cash advance expense, its trip, and passes the trip to the panel', async () => {
+    expenseReportService.getAll.mockResolvedValue({ data: { data: [
+      { ...report('r1', 'EXP-1', 'REIMBURSED'), tripStartDate: '2026-11-03', tripEndDate: '2026-11-07' },
+      { ...report('r2', 'EXP-2', 'APPROVED'), cashAdvanceId: 'adv-1' },
+    ] } });
+    lineItemService.getAll.mockResolvedValue({ data: { data: [{ lineItemId: 'l1' }] } });
+
+    renderPage();
+
+    const select = await screen.findByLabelText(/settled expense report/i);
+    fireEvent.change(select, { target: { value: 'r1' } });
+    const summary = await screen.findByTestId('selected-report');
+    expect(summary).toHaveTextContent('Direct Expense');
+    expect(summary).toHaveTextContent(/Trip:/);
+    expect(await screen.findByTestId('late-panel')).toHaveTextContent('2026-11-03:2026-11-07');
+
+    fireEvent.change(select, { target: { value: 'r2' } });
+    expect(await screen.findByTestId('selected-report')).toHaveTextContent('Cash Advance');
+    expect(screen.getByTestId('selected-report')).not.toHaveTextContent(/Trip:/);
   });
 });

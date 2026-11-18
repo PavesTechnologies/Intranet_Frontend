@@ -40,7 +40,7 @@ const ICON_FOR = {
   violations: Gauge,
 };
 
-function KpiTile({ step, kpi, currency }) {
+export function KpiTile({ step, kpi, currency }) {
   const t = TONE[step.tone] || TONE.gray;
   const Icon = ICON_FOR[step.key] || Inbox;
   return (

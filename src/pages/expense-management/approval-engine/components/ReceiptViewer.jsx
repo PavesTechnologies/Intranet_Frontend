@@ -10,6 +10,14 @@ const isPdfFile = (fileName = "") => /\.pdf$/i.test(fileName);
 const nameOf = (receipt) => receipt?.fileName || receipt?.originalFileName || "";
 const isPdfReceipt = (receipt) =>
   isPdfFile(nameOf(receipt)) || (receipt?.contentType || "").toLowerCase() === "application/pdf";
+// A receipt attached after approval (attachmentKind LATE) carries Finance/AP's review status, shown to the approver for
+// information only.
+const isLateReceipt = (receipt) => receipt?.attachmentKind === "LATE";
+const LATE_STATUS = {
+  PENDING_REVIEW: { label: "Under Finance review", className: "border-amber-200 bg-amber-50 text-amber-800" },
+  VERIFIED: { label: "Verified by Finance", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  REJECTED: { label: "Rejected by Finance", className: "border-red-200 bg-red-50 text-red-800" },
+};
 const isImageReceipt = (receipt) =>
   isImageFile(nameOf(receipt)) || (receipt?.contentType || "").toLowerCase().startsWith("image/");
 
@@ -174,6 +182,23 @@ export default function ReceiptViewer({ lineItemId }) {
         </div>
       )}
 
+      {isLateReceipt(activeReceipt) && (
+        <div
+          className={`flex flex-col gap-0.5 border-b px-3 py-1.5 text-[11px] font-medium ${
+            (LATE_STATUS[activeReceipt.verificationStatus] || LATE_STATUS.PENDING_REVIEW).className
+          }`}
+          data-testid="late-receipt-banner"
+        >
+          <span>
+            Late receipt · {(LATE_STATUS[activeReceipt.verificationStatus] || LATE_STATUS.PENDING_REVIEW).label}
+          </span>
+          <span className="font-normal">
+            Added after the report was approved. It does not change the approved amount; Finance reviews it.
+            {activeReceipt.verificationNote ? ` Finance note: ${activeReceipt.verificationNote}` : ""}
+          </span>
+        </div>
+      )}
+
       <div className="min-h-0 flex-1">{body}</div>
 
       {receipts?.length > 1 && (
@@ -188,6 +213,7 @@ export default function ReceiptViewer({ lineItemId }) {
               }`}
             >
               {isImageFile(r.fileName) ? "Image" : "PDF"} {idx + 1}
+              {isLateReceipt(r) && " · Late"}
             </button>
           ))}
         </div>

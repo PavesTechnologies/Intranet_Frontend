@@ -57,6 +57,8 @@ const XMS_MANAGER    = [ROLES.MANAGER];
 // "Finance" viewing role does NOT satisfy them, so including it would let a Finance-role user into
 // pages where every action 403s.
 const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
+// Late receipt review: exactly the roles the route (App.jsx) and the backend (ReceiptServiceImpl.REVIEW_ROLES) accept.
+export const XMS_LATE_RECEIPT_REVIEWERS = [ROLES.FINANCE, ROLES.FINANCE_EXECUTIVE, AP_ROLES.AP_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 export const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
@@ -252,6 +254,14 @@ export const XMS_SUBMENU = [
     label: "Finance",
     to: "/expense-management/finance",
     allowedRoles: XMS_FINANCE_VERIFICATION,
+    // Exact match, so "Finance" is not highlighted as well while Late Receipts (/finance/late-receipts) is open.
+    end: true,
+  },
+  {
+    // Receipts employees attached after a report was settled, waiting for Finance/AP to verify or reject.
+    label: "Late Receipts",
+    to: "/expense-management/finance/late-receipts",
+    allowedRoles: XMS_LATE_RECEIPT_REVIEWERS,
   },
   {
     // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")

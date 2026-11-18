@@ -38,6 +38,17 @@ const errorMessage = (err, fallback) => err?.response?.data?.message || err?.mes
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
+// Receipt state of one expense, as the employee sees it in the "Expenses on this report" list. The labels differ from the
+// late-receipt row labels (Verified, Rejected, Waiting for review) so the two lists can't be confused.
+const LINE_STATUS = {
+  NONE: { label: "No receipt", className: "border-gray-200 bg-gray-50 text-gray-600", canAdd: true },
+  NEEDED: { label: "Receipt needed", className: "border-amber-200 bg-amber-50 text-amber-700", canAdd: true },
+  ORIGINAL: { label: "Receipt attached", className: "border-emerald-200 bg-emerald-50 text-emerald-700", canAdd: false },
+  PENDING: { label: "Late receipt under review", className: "border-amber-200 bg-amber-50 text-amber-700", canAdd: false },
+  VERIFIED: { label: "Late receipt verified", className: "border-emerald-200 bg-emerald-50 text-emerald-700", canAdd: false },
+  REJECTED: { label: "Late receipt rejected", className: "border-red-200 bg-red-50 text-red-700", canAdd: true },
+};
+
 const lineLabel = (line) =>
   [line.merchantName || "Expense", formatDate(line.expenseDate), line.amount != null ? `₹${line.amount}` : null]
     .filter(Boolean)
@@ -49,7 +60,7 @@ const lineLabel = (line) =>
  * The employee attaches a receipt found after approval, with the date printed on it and a reason. Finance/AP then verify
  * or reject it. Nothing here changes an expense's amount, status or payment.
  */
-export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [] }) {
+export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [], tripStartDate, tripEndDate }) {
   const { hasRole } = useAuth();
   const canAttach = hasRole(["General", "Admin"]);
   const canReview = hasRole(["Finance", "Finance_Executive", "AP_Executive"]);
@@ -88,13 +99,20 @@ export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [
 
   const lineById = (id) => lineItems.find((line) => line.lineItemId === id);
 
-  // A line needs a receipt when its category requires one and no valid receipt is attached. A late receipt that Finance
-  // rejected does not count, the same rule the cash advance utilisation uses.
-  const rejectedIds = new Set(receipts.filter((r) => r.verificationStatus === "REJECTED").map((r) => r.receiptId));
-  const hasValidReceipt = (lineId) =>
-    reportReceipts.some((r) => r.lineItemId === lineId && !rejectedIds.has(r.receiptId)) ||
-    receipts.some((r) => r.lineItemId === lineId && r.verificationStatus !== "REJECTED");
-  const missingLines = lineItems.filter((line) => line.receiptRequired && !hasValidReceipt(line.lineItemId));
+  // Receipt state of each expense. A verified late receipt wins, then one under review, then an original receipt. A late
+  // receipt Finance rejected is not proof (the same rule the cash advance utilisation uses), so the employee can add
+  // another. With no receipt at all, an expense whose category requires one is shown as needing it.
+  const lateIds = new Set(receipts.map((r) => r.receiptId));
+  const lineStatus = (line) => {
+    const late = receipts.filter((r) => r.lineItemId === line.lineItemId);
+    if (late.some((r) => r.verificationStatus === "VERIFIED")) return LINE_STATUS.VERIFIED;
+    if (late.some((r) => r.verificationStatus === "PENDING_REVIEW")) return LINE_STATUS.PENDING;
+    if (reportReceipts.some((r) => r.lineItemId === line.lineItemId && !lateIds.has(r.receiptId))) return LINE_STATUS.ORIGINAL;
+    if (late.some((r) => r.verificationStatus === "REJECTED")) return LINE_STATUS.REJECTED;
+    return line.receiptRequired ? LINE_STATUS.NEEDED : LINE_STATUS.NONE;
+  };
+  const tripText =
+    tripStartDate || tripEndDate ? `${formatDate(tripStartDate)} – ${formatDate(tripEndDate)}` : null;
 
   const startAttachFor = (lineId) => {
     setForm((f) => ({ ...f, lineItemId: lineId }));
@@ -236,6 +254,9 @@ export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [
               value={form.actualReceiptDate}
               onChange={(e) => setForm({ ...form, actualReceiptDate: e.target.value })}
             />
+            {tripText && (
+              <span className="text-xs text-gray-500">Trip: {tripText}. The receipt date must fall within the trip.</span>
+            )}
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-gray-700">Receipt file</span>
@@ -270,19 +291,33 @@ export default function LateReceiptPanel({ reportId, reportStatus, lineItems = [
         </form>
       )}
 
-      {canAttach && isLateStatus && missingLines.length > 0 && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="missing-receipts">
-          <p className="text-sm font-semibold text-amber-900">Missing receipts</p>
-          <p className="mb-2 text-xs text-amber-800">These expenses still need a receipt. Attach one you have found.</p>
-          <ul className="space-y-2">
-            {missingLines.map((line) => (
-              <li key={line.lineItemId} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm text-gray-800">{lineLabel(line)}</span>
-                <Button variant="secondary" size="small" onClick={() => startAttachFor(line.lineItemId)}>
-                  Attach receipt
-                </Button>
-              </li>
-            ))}
+      {canAttach && isLateStatus && lineItems.length > 0 && (
+        <div className="mb-4 rounded-lg border border-gray-200 p-3" data-testid="expense-receipt-status">
+          <p className="text-sm font-semibold text-gray-900">Expenses on this report</p>
+          {tripText && <p className="text-xs text-gray-500">Trip: {tripText}</p>}
+          <ul className="mt-2 divide-y divide-gray-100">
+            {lineItems.map((line) => {
+              const status = lineStatus(line);
+              return (
+                <li
+                  key={line.lineItemId}
+                  className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between"
+                  data-testid="expense-status-row"
+                >
+                  <span className="text-sm text-gray-800">{lineLabel(line)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-medium ${status.className}`}>
+                      {status.label}
+                    </span>
+                    {status.canAdd && (
+                      <Button variant="secondary" size="small" onClick={() => startAttachFor(line.lineItemId)}>
+                        Add receipt
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

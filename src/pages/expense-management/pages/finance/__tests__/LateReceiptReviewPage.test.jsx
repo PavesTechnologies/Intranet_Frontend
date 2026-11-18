@@ -57,6 +57,64 @@ describe("LateReceiptReviewPage", () => {
     expect(within(row).getByText(/Reason: The hotel sent/)).toBeInTheDocument();
   });
 
+  it("shows the expense type, the trip, and the receipt total against the claim", async () => {
+    lateReceiptService.pendingReview.mockImplementation(() =>
+      respond([item({ expenseSource: "DIRECT", tripStartDate: "2026-11-03", tripEndDate: "2026-11-07", receiptTotal: 2000 })]));
+
+    render(<LateReceiptReviewPage />);
+
+    const row = (await itemRows())[0];
+    expect(within(row).getByText("Direct Expense")).toBeInTheDocument();
+    expect(within(row).getByText(/^Trip /)).toBeInTheDocument();
+    expect(within(row).getByTestId("amount-comparison")).toHaveTextContent("₹500.00 less than claimed");
+    expect(within(row).queryByText(/outside the trip/)).toBeNull();
+  });
+
+  it("flags a receipt dated outside the trip, and says when OCR has not read the total yet", async () => {
+    lateReceiptService.pendingReview.mockImplementation(() =>
+      respond([item({ expenseSource: "CASH_ADVANCE", tripStartDate: "2026-11-10", tripEndDate: "2026-11-12" })]));
+
+    render(<LateReceiptReviewPage />);
+
+    const row = (await itemRows())[0];
+    expect(within(row).getByText("Cash Advance")).toBeInTheDocument();
+    expect(within(row).getByText(/outside the trip/)).toBeInTheDocument();
+    expect(within(row).getByTestId("amount-comparison")).toHaveTextContent("not read yet");
+  });
+
+  it("shows reviewed receipts under the history tabs, with the decision and no Verify or Reject", async () => {
+    lateReceiptService.pendingReview.mockImplementation((status) =>
+      respond(status === "REJECTED"
+        ? [item({ receiptId: "rcpt-9", verificationStatus: "REJECTED", verifiedBy: "jagadish@example.com",
+          verifiedAt: "2026-11-18T10:50:00", verificationNote: "The receipt is for a different trip" })]
+        : [item()]));
+
+    render(<LateReceiptReviewPage />);
+    await itemRows();
+    expect(lateReceiptService.pendingReview).toHaveBeenLastCalledWith(undefined);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Rejected" }));
+
+    await waitFor(() => expect(lateReceiptService.pendingReview).toHaveBeenLastCalledWith("REJECTED"));
+    const decision = await screen.findByTestId("late-review-decision");
+    expect(decision).toHaveTextContent("Rejected");
+    expect(decision).toHaveTextContent("By jagadish@example.com");
+    expect(decision).toHaveTextContent("Note: The receipt is for a different trip");
+    expect(screen.queryByRole("button", { name: "Verify" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
+    expect(screen.getByRole("button", { name: "View receipt" })).toBeInTheDocument();
+  });
+
+  it("shows a tab-specific empty message", async () => {
+    lateReceiptService.pendingReview.mockImplementation(() => respond([]));
+
+    render(<LateReceiptReviewPage />);
+    await screen.findByText(/no late receipts are waiting for review/i);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Verified" }));
+    expect(await screen.findByText(/no late receipts have been verified yet/i)).toBeInTheDocument();
+  });
+
   it("shows an empty state when nothing is waiting", async () => {
     lateReceiptService.pendingReview.mockImplementation(() => respond([]));
 

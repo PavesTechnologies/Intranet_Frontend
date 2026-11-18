@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Lightbulb, PieChart } from "lucide-react";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 import { categoryColor } from "./categoryColors";
+import EmptyPanel, { GhostDonut } from "./EmptyPanel";
 
 // Claimed amount by category. Each slice's share is of the sum of the slices, so the ring always closes at 100%.
 // The centre shows the claimed total (the backend's figure, passed in as `claimed`); hovering or focusing a slice or a
@@ -33,7 +34,7 @@ function insight(sorted, sum) {
   return `Spread fairly evenly: the largest, ${top.label}, is ${formatShare(topShare)} of the total.`;
 }
 
-export default function CategoryDonut({ slices, currency, claimed = null, period = "All time" }) {
+export default function CategoryDonut({ slices, currency, claimed = null, period = "All time", emptyActions = [] }) {
   const [active, setActive] = useState(null);
 
   const positive = (slices || [])
@@ -44,13 +45,16 @@ export default function CategoryDonut({ slices, currency, claimed = null, period
 
   if (sum <= 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl bg-gradient-to-b from-slate-50 to-white px-4 py-8 text-center" data-donut="empty">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ff3d72]/10 text-[#ff3d72]">
-          <PieChart className="h-6 w-6" aria-hidden="true" />
-        </span>
-        <p className="text-sm font-semibold text-[#0a174e]">No claimed expenses yet</p>
-        <p className="max-w-xs text-xs text-slate-500">Once you submit an expense report, your spend by category will appear here.</p>
-      </div>
+      <EmptyPanel
+        icon={PieChart}
+        tone="pink"
+        title="No claimed expenses yet"
+        text="Once you submit an expense report, your spend by category will appear here: each category's amount, its share of the total, how many expenses it holds and the average per expense."
+        preview={<GhostDonut />}
+        steps={["Pick a category per expense", "Submit the report", "See where your money goes"]}
+        actions={emptyActions}
+        data-donut="empty"
+      />
     );
   }
 

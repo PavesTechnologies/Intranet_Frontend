@@ -68,6 +68,9 @@ function renderEmployeePanel() {
 const rowFor = (fileName) =>
   screen.getAllByTestId("late-receipt-row").find((row) => within(row).queryByText(fileName));
 
+const expenseRow = async (merchant) =>
+  (await screen.findAllByTestId("expense-status-row")).find((row) => within(row).queryByText(new RegExp(merchant)));
+
 describe("late receipt flow: employee attaches, Finance reviews, employee sees the result", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,7 +81,7 @@ describe("late receipt flow: employee attaches, Finance reviews, employee sees t
     };
   });
 
-  it("a verified late receipt shows as Verified to the employee and clears the missing list", async () => {
+  it("a verified late receipt shows as Verified to the employee, and its expense no longer offers Add receipt", async () => {
     const { unmount: unmountReviewer } = render(<LateReceiptReviewPage />);
     const queueRow = (await screen.findAllByTestId("late-review-item"))
       .find((row) => within(row).queryByText("rcpt-1.pdf"));
@@ -94,10 +97,16 @@ describe("late receipt flow: employee attaches, Finance reviews, employee sees t
     expect(await screen.findByText("rcpt-1.pdf")).toBeInTheDocument();
     expect(within(rowFor("rcpt-1.pdf")).getByText("Verified")).toBeInTheDocument();
     expect(within(rowFor("rcpt-1.pdf")).getByText(/Review note: Matches the hotel invoice/)).toBeInTheDocument();
-    expect(screen.queryByTestId("missing-receipts")).not.toBeInTheDocument();
+
+    const hotel = await expenseRow("Hotel Taj");
+    expect(within(hotel).getByText("Late receipt verified")).toBeInTheDocument();
+    expect(within(hotel).queryByRole("button", { name: "Add receipt" })).toBeNull();
+    const cab = await expenseRow("City Cab");
+    expect(within(cab).getByText("Late receipt under review")).toBeInTheDocument();
+    expect(within(cab).queryByRole("button", { name: "Add receipt" })).toBeNull();
   });
 
-  it("a rejected late receipt shows as Rejected with the reason, and its expense is listed as missing again", async () => {
+  it("a rejected late receipt shows as Rejected with the reason, and its expense can take another receipt", async () => {
     const { unmount: unmountReviewer } = render(<LateReceiptReviewPage />);
     const queueRow = (await screen.findAllByTestId("late-review-item"))
       .find((row) => within(row).queryByText("rcpt-2.pdf"));
@@ -114,22 +123,51 @@ describe("late receipt flow: employee attaches, Finance reviews, employee sees t
     expect(within(rowFor("rcpt-2.pdf")).getByText("Rejected")).toBeInTheDocument();
     expect(within(rowFor("rcpt-2.pdf")).getByText(/Review note: The receipt is for a different trip/)).toBeInTheDocument();
 
-    const missing = await screen.findByTestId("missing-receipts");
-    expect(within(missing).getByText(/City Cab/)).toBeInTheDocument();
-    expect(within(missing).queryByText(/Hotel Taj/)).not.toBeInTheDocument();
-    expect(within(missing).getByRole("button", { name: "Attach receipt" })).toBeInTheDocument();
+    const cab = await expenseRow("City Cab");
+    expect(within(cab).getByText("Late receipt rejected")).toBeInTheDocument();
+    expect(within(cab).getByRole("button", { name: "Add receipt" })).toBeInTheDocument();
+    const hotel = await expenseRow("Hotel Taj");
+    expect(within(hotel).queryByRole("button", { name: "Add receipt" })).toBeNull();
   });
 
-  it("the Attach receipt action on a missing line opens the form with that expense already chosen", async () => {
+  it("Add receipt on an expense opens the form with that expense already chosen", async () => {
     state.store.late = [lateReceipt("rcpt-2", "line-2")];
     state.store.late[0].verificationStatus = "REJECTED";
 
     renderEmployeePanel();
 
-    const missing = await screen.findByTestId("missing-receipts");
-    const cabRow = within(missing).getByText(/City Cab/).closest("li");
-    fireEvent.click(within(cabRow).getByRole("button", { name: "Attach receipt" }));
+    const cab = await expenseRow("City Cab");
+    fireEvent.click(within(cab).getByRole("button", { name: "Add receipt" }));
 
     expect(screen.getByLabelText("Expense")).toHaveValue("line-2");
+  });
+
+  it("an expense with no receipt whose category requires one is shown as needing it", async () => {
+    state.store.late = [];
+
+    render(
+      <LateReceiptPanel
+        reportId={REPORT_ID}
+        reportStatus="APPROVED"
+        lineItems={LINES}
+        tripStartDate="2026-11-04"
+        tripEndDate="2026-11-07"
+      />
+    );
+
+    const cab = await expenseRow("City Cab");
+    expect(within(cab).getByText("Receipt needed")).toBeInTheDocument();
+    expect(within(screen.getByTestId("expense-receipt-status")).getByText(/Trip:/)).toBeInTheDocument();
+  });
+
+  it("an expense that already has its original receipt does not offer Add receipt", async () => {
+    state.store.late = [];
+    state.store.reportReceipts = [{ receiptId: "orig-1", lineItemId: "line-1" }];
+
+    renderEmployeePanel();
+
+    const hotel = await expenseRow("Hotel Taj");
+    expect(within(hotel).getByText("Receipt attached")).toBeInTheDocument();
+    expect(within(hotel).queryByRole("button", { name: "Add receipt" })).toBeNull();
   });
 });

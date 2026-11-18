@@ -154,11 +154,13 @@ export const lateReceiptService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
-  // Late receipts waiting for review, across all reports (Finance, Finance Executive, AP Executive).
-  pendingReview: () =>
+  // Late receipts across all reports (Finance, Finance Executive, AP Executive). No status = waiting for review;
+  // "VERIFIED", "REJECTED" or "ALL" = the reviewed history.
+  pendingReview: (status) =>
     api.get("/xms/finance/late-receipts", {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
+      params: status ? { status } : undefined,
     }),
 };
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +21,26 @@ vi.mock("react-router-dom", async () => ({
 
 vi.mock("@/pages/expense-management/api/expenseReportsApi", () => ({
   dashboardService: { get: vi.fn() },
+  expenseReportService: { getAll: vi.fn(() => Promise.resolve({ data: [] })) },
+}));
+
+vi.mock("@/pages/expense-management/api/cashAdvanceApi", () => ({
+  cashAdvanceApi: {
+    getMyAdvances: vi.fn(() => Promise.resolve({ data: [] })),
+    getMyApprovals: vi.fn(() => Promise.resolve({ data: { data: { content: [], totalElements: 2 } } })),
+  },
+}));
+
+vi.mock("@/pages/expense-management/approval-engine/api/approvalWorkflowApi", () => ({
+  approvalWorkflowApi: {
+    getMyQueue: vi.fn(() => Promise.resolve({ data: { data: { content: [], totalElements: 1 } } })),
+    getMyHistory: vi.fn(() => Promise.resolve({ data: { data: { content: [], totalElements: 0 } } })),
+  },
+}));
+
+// The embedded Approvals list is covered by its own tests; here only its presence matters.
+vi.mock("@/pages/expense-management/approval-engine/pages/ApprovalsPage", () => ({
+  default: ({ embedded }) => <div data-testid="approvals-page" data-embedded={String(embedded)} />,
 }));
 
 import { dashboardService } from "@/pages/expense-management/api/expenseReportsApi";
@@ -57,20 +77,29 @@ describe("role dashboards: one simple money flow per role", () => {
     localStorage.clear();
   });
 
-  it("manager sees the approvals flow and opens on it", async () => {
-    dashboardService.get.mockResolvedValue(payload("manager", [
+  it("manager opens on My money, with approvals as a collapsible panel", async () => {
+    const manager = payload("manager", [
       ["pending", "Waiting for you", 4, "count"],
       ["pendingValue", "Value waiting", 18500, "money"],
       ["approved30", "Approved (30 days)", 22, "count"],
       ["sentBack30", "Sent back (30 days)", 2, "count"],
-    ]));
+    ]);
+    dashboardService.get.mockImplementation((view) => Promise.resolve(view === "manager" ? manager : payload("employee", [])));
 
     renderAs(["MANAGER"]);
 
-    await waitFor(() => expect(document.querySelector('[data-kpi="pending"]')).not.toBeNull());
+    // closed, the header already says what is waiting
+    await waitFor(() => expect(document.querySelector("[data-approvals-summary]").textContent).toMatch(/4 items worth .*18,500/));
+    expect(dashboardService.get).toHaveBeenCalledWith("employee");
     expect(dashboardService.get).toHaveBeenCalledWith("manager");
-    expect(document.querySelector('[data-kpi="pending"]').textContent).toMatch(/4/);
-    expect(document.querySelector('[data-kpi="pendingValue"]').textContent).toMatch(/18,500/);
+    expect(screen.queryByRole("tab", { name: "Approvals" })).toBeNull();
+    expect(document.querySelector('[data-kpi="pending"]')).toBeNull();
+
+    // opened, it adds the rate and the lists without repeating the header's figures
+    fireEvent.click(document.querySelector("[data-approvals-toggle]"));
+    expect(document.querySelector("[data-decision-mix]").textContent).toMatch(/92% approved/);
+    expect(document.querySelector("[data-approvals-panel]").querySelectorAll("[data-kpi]")).toHaveLength(0);
+    expect(document.querySelector("[data-approvals-panel]").textContent.match(/18,500/g)).toHaveLength(1);
   });
 
   it("finance sees the verification flow", async () => {
@@ -83,9 +112,28 @@ describe("role dashboards: one simple money flow per role", () => {
 
     renderAs(["FINANCE_EXECUTIVE"]);
 
-    await waitFor(() => expect(document.querySelector('[data-kpi="toVerify"]')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector("[data-finance-headline]")).not.toBeNull());
     expect(dashboardService.get).toHaveBeenCalledWith("finance");
     expect(screen.getByText(/Verified this month/)).toBeInTheDocument();
+    expect(document.querySelector("[data-finance-headline]").textContent).toMatch(/7 reports worth .*64,000 waiting/);
+    // the headline's figures are not repeated as cards
+    expect(document.querySelector('[data-kpi="toVerify"]')).toBeNull();
+    expect(document.querySelector('[data-kpi="queueValue"]')).toBeNull();
+    expect(document.body.textContent.match(/64,000/g)).toHaveLength(1);
+    expect(document.body.textContent).not.toMatch(/undefined|NaN/);
+  });
+
+  it("finance works its approvals from the same dashboard", async () => {
+    dashboardService.get.mockResolvedValue(payload("finance", [["toVerify", "To verify", 0, "count"]]));
+
+    renderAs(["FINANCE_EXECUTIVE"]);
+
+    // expense-report queue (1) + cash advances (2) routed to this user
+    await waitFor(() => expect(document.querySelector('[data-kpi="approvals"]').textContent).toMatch(/3/));
+    expect(screen.queryByTestId("approvals-page")).toBeNull();
+
+    fireEvent.click(document.querySelector('[data-finance-tab="approvals"]'));
+    expect(screen.getByTestId("approvals-page").dataset.embedded).toBe("true");
   });
 
   it("AP sees the payments flow and never shows an undefined amount", async () => {
