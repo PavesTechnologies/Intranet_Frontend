@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Clock,
   CheckCircle2,
@@ -8,9 +8,11 @@ import {
 } from "lucide-react";
 
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
+import Pagination from "@/components/Pagination/pagination";
 import PendingApprovalsPage from "./PendingApprovalsPage";
 import ApprovalHistoryPage from "./ApprovalHistoryPage";
 import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
+import SupplementaryApprovalsList from "../components/SupplementaryApprovalsList";
 import MyDelegateCard from "../components/MyDelegateCard";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
@@ -20,6 +22,21 @@ import { useQuery } from "@tanstack/react-query";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 
 const QUEUE_PAGE_SIZE = 20;
+// Rows per page across the whole table: expense reports first, then cash advances, as one sequence.
+const APPROVALS_PAGE_SIZE = 10;
+
+const PENDING_SHOW_OPTIONS = [
+  { label: "All", value: "ALL" },
+  { label: "Ready to approve", value: "PENDING" },
+  { label: "Policy warnings", value: "FLAGGED" },
+  { label: "Awaiting employee", value: "AWAITING" },
+];
+
+const PENDING_SORT_OPTIONS = [
+  { label: "Newest first", value: "NEWEST" },
+  { label: "Oldest first", value: "OLDEST" },
+  { label: "Amount, high to low", value: "AMOUNT_DESC" },
+];
 
 export default function ApprovalsPage() {
   const { hasRole } = useAuth();
@@ -30,6 +47,46 @@ export default function ApprovalsPage() {
   const [activeTab, setActiveTab] = useState("pending");
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [pendingShow, setPendingShow] = useState("ALL");
+  // Rows each list currently shows, keyed by tab, so the page can show one empty message for the whole table.
+  const [rowCounts, setRowCounts] = useState({});
+  const reportExpenseRows = useCallback(
+    (count) => setRowCounts((prev) => (prev[`${activeTab}-expense`] === count ? prev : { ...prev, [`${activeTab}-expense`]: count })),
+    [activeTab]
+  );
+  const reportCashRows = useCallback(
+    (count) => setRowCounts((prev) => (prev[`${activeTab}-cash`] === count ? prev : { ...prev, [`${activeTab}-cash`]: count })),
+    [activeTab]
+  );
+  const reportSuppRows = useCallback(
+    (count) => setRowCounts((prev) => (prev[`${activeTab}-supp`] === count ? prev : { ...prev, [`${activeTab}-supp`]: count })),
+    [activeTab]
+  );
+
+  const [pendingSort, setPendingSort] = useState("NEWEST");
+
+  // One pager for the whole table. The expense rows and the cash advance rows form one sequence (expense rows first),
+  // and each child renders only the slice of its own rows that falls inside the current page.
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    setPage(0);
+  }, [activeTab, searchTerm, pendingShow, pendingSort]);
+  const expenseCount = rowCounts[`${activeTab}-expense`] ?? 0;
+  const cashCount = rowCounts[`${activeTab}-cash`] ?? 0;
+  const suppCount = rowCounts[`${activeTab}-supp`] ?? 0;
+  const combinedRows = expenseCount + cashCount + suppCount;
+  const totalPages = Math.max(1, Math.ceil(combinedRows / APPROVALS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const winStart = safePage * APPROVALS_PAGE_SIZE;
+  const winEnd = winStart + APPROVALS_PAGE_SIZE;
+  // Each source covers its own slice of the one sequence: expense reports, then cash advances, then supplementary claims.
+  const windowFor = (offset, count) => ({
+    start: Math.max(Math.min(winStart - offset, count), 0),
+    end: Math.max(Math.min(winEnd - offset, count), 0),
+  });
+  const expenseWindow = windowFor(0, expenseCount);
+  const cashWindow = windowFor(expenseCount, cashCount);
+  const suppWindow = windowFor(expenseCount + cashCount, suppCount);
 
   // -----------------------------
   // Role check
@@ -52,6 +109,16 @@ export default function ApprovalsPage() {
   const isFinance = hasRole
     ? hasRole(["Finance", "FINANCE", "Finance_Executive", "FINANCE_EXECUTIVE"])
     : false;
+
+  const mountedLists = ["expense", ...(isManager || isFinance ? ["cash", "supp"] : [])];
+  const allReported = mountedLists.every((key) => rowCounts[`${activeTab}-${key}`] !== undefined);
+  const totalRows = mountedLists.reduce((sum, key) => sum + (rowCounts[`${activeTab}-${key}`] ?? 0), 0);
+  const showEmptyTable = allReported && totalRows === 0;
+  const EMPTY_TEXT = {
+    pending: ["No approvals are awaiting you.", "Nothing needs your decision right now."],
+    approved: ["No approved items yet.", "Items you approve will show here."],
+    rejected: ["No rejected items yet.", "Items you reject will show here."],
+  };
 
   // -----------------------------
   // Breadcrumbs
@@ -337,6 +404,34 @@ export default function ApprovalsPage() {
               buttonClassName="!px-3 !py-1.5 !text-xs"
             />
           </div>
+
+          {/* Pending only: which rows to show, and their order */}
+          {activeTab === "pending" && (
+            <>
+              <div className="w-full lg:w-44">
+                <FormSelect
+                  label="Show"
+                  name="pendingShow"
+                  value={pendingShow}
+                  onChange={(e) => setPendingShow(e.target.value)}
+                  options={PENDING_SHOW_OPTIONS}
+                  className="[&>label]:mb-1 [&>label]:text-xs"
+                  buttonClassName="!px-3 !py-1.5 !text-xs"
+                />
+              </div>
+              <div className="w-full lg:w-44">
+                <FormSelect
+                  label="Sort by"
+                  name="pendingSort"
+                  value={pendingSort}
+                  onChange={(e) => setPendingSort(e.target.value)}
+                  options={PENDING_SORT_OPTIONS}
+                  className="[&>label]:mb-1 [&>label]:text-xs"
+                  buttonClassName="!px-3 !py-1.5 !text-xs"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -345,32 +440,81 @@ export default function ApprovalsPage() {
         {activeTab === "pending" && <MyDelegateCard />}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full table-fixed text-sm text-left">
+              {/* Fixed column widths: each header sits exactly above its cells, whatever the row content is. */}
+              <colgroup>
+                <col className="w-[9%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                <col className="w-[20%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[10%]" />
+                <col className="w-[11%]" />
+              </colgroup>
               <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                 <tr>
                   <th className="px-2.5 py-2 text-left">Type</th>
                   <th className="px-2.5 py-2 text-left">Reference</th>
                   <th className="px-2.5 py-2 text-left">Employee</th>
                   <th className="px-2.5 py-2 text-left">Title / Merchant</th>
+                  <th className="px-2.5 py-2 text-left">Cost Center</th>
                   <th className="px-2.5 py-2 text-left">Status</th>
                   <th className="px-2.5 py-2 text-right">Amount</th>
                   <th className="px-2.5 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               {activeTab === "pending" && (
-                <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} hideHeader noPadding embedded />
+                <PendingApprovalsPage
+                  key={`pending-${reloadKey}`}
+                  searchTerm={searchTerm}
+                  statusFilter={pendingShow}
+                  sortBy={pendingSort}
+                  hideHeader
+                  noPadding
+                  embedded
+                  onRowCount={reportExpenseRows}
+                  windowStart={expenseWindow.start}
+                  windowEnd={expenseWindow.end}
+                />
               )}
               {activeTab === "approved" && (
-                <ApprovalHistoryPage key={`approved-${reloadKey}`} outcome="APPROVED" searchTerm={searchTerm} embedded />
+                <ApprovalHistoryPage key={`approved-${reloadKey}`} outcome="APPROVED" searchTerm={searchTerm} embedded onRowCount={reportExpenseRows} windowStart={expenseWindow.start} windowEnd={expenseWindow.end} />
               )}
               {activeTab === "rejected" && (
-                <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" searchTerm={searchTerm} embedded />
+                <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" searchTerm={searchTerm} embedded onRowCount={reportExpenseRows} windowStart={expenseWindow.start} windowEnd={expenseWindow.end} />
               )}
               {(isManager || isFinance) && (
-                <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} embedded />
+                <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} embedded onRowCount={reportCashRows} windowStart={cashWindow.start} windowEnd={cashWindow.end} />
+              )}
+              {(isManager || isFinance) && (
+                <SupplementaryApprovalsList key={`supp-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} isManager={isManager} isFinance={isFinance} onRowCount={reportSuppRows} windowStart={suppWindow.start} windowEnd={suppWindow.end} />
+              )}
+              {showEmptyTable && (
+                <tbody>
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center">
+                      <p className="text-sm font-semibold text-gray-700">{EMPTY_TEXT[activeTab]?.[0]}</p>
+                      <p className="mt-1 text-xs text-gray-500">{EMPTY_TEXT[activeTab]?.[1]}</p>
+                    </td>
+                  </tr>
+                </tbody>
               )}
             </table>
           </div>
+          {combinedRows > 0 && (
+            <div className="flex flex-col items-center gap-2 border-t border-gray-100 px-4 py-3 sm:flex-row sm:justify-between">
+              <p className="text-xs text-gray-500">
+                Showing {winStart + 1}–{Math.min(winEnd, combinedRows)} of {combinedRows}
+              </p>
+              <Pagination
+                currentPage={safePage + 1}
+                totalPages={totalPages}
+                onPrevious={() => setPage(Math.max(safePage - 1, 0))}
+                onNext={() => setPage(Math.min(safePage + 1, totalPages - 1))}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

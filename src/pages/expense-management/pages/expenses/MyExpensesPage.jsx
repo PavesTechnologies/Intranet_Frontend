@@ -60,7 +60,7 @@ export default function MyExpensesPage() {
   const { hasRole } = useAuth();
   // Manager is read-only on the backend for report writes (ExpenseReportController
   // allows only ADMIN/GENERAL to create/update/delete/submit) — don't show write actions.
-  const canManage = hasRole(["General"]);
+  const canManage = hasRole(["General", "Manager"]);
  
   const [reports, setReports] = useState([]);
   const [isServerPaginated, setIsServerPaginated] = useState(false);
@@ -440,13 +440,12 @@ export default function MyExpensesPage() {
         {canManage && (
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Button
-              onClick={() => navigate("/expense-management/expenses/outdated")}
-              variant="secondary"
+              onClick={() => navigate("/expense-management/expenses/supplementary")}
+              variant="outline"
               size="small"
               className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
             >
-              <Paperclip size={14} />
-              Outdated expense
+              Supplementary claim
             </Button>
             <Button
               onClick={handleCreateClick}

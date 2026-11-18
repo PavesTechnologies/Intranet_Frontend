@@ -1,9 +1,8 @@
-import React, { useMemo, useState } from "react";
-import { AlertTriangle, Inbox, FileCheck2, Receipt, Building2, RotateCcw, Send, Wallet, BadgeCheck } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Inbox, FileCheck2, Receipt, Building2, RotateCcw, Wallet, BadgeCheck } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PageHeader from "@/components/ui/PageHeader";
 import FilterCard from "@/components/ui/FilterCard";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatCard from "@/components/Cards/StatCard";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -13,83 +12,96 @@ import Modal from "@/components/Modal/modal";
 import FormInput from "@/components/forms/FormInput";
 import { showStatusToast } from "@/components/toastfy/toast";
 import PolicyEmptyState from "@/pages/expense-management/components/policy/common/PolicyEmptyState";
-import SelectableStatCard from "@/pages/expense-management/components/common/SelectableStatCard";
-import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 import { formatMoney, formatDate, formatDateTime } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 import { useEligibleExpenses, useHandedOff, useHandoffSummary, useMarkHandedOff } from "./hooks/useInvoiceHandoff";
 import Pagination from "@/components/Pagination/pagination";
 
-const unknownClientKey = "__none__";
+// Both lists are read in full (up to the server's cap of 100 each) and shown as one table, so one pager covers them.
+const LIST_FETCH_SIZE = 100;
+const COMBINED_PAGE_SIZE = 10;
+
+const READY = "READY";
+const HANDED_OFF = "HANDED_OFF";
 
 const projectLabel = (item) => (item.projectCode ? `${item.projectCode} — ${item.projectName}` : "—");
 
-/** Ready expenses grouped by client — AR invoices per client; project is optional per expense. */
-function groupByClient(items) {
-  const groups = new Map();
-  items.forEach((item) => {
-    const key = item.resolvedClientId || unknownClientKey;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        key,
-        clientName: item.resolvedClientName,
-        currency: item.baseCurrencyCode,
-        total: 0,
-        items: [],
-      });
-    }
-    const g = groups.get(key);
-    g.items.push(item);
-    // Clients are billed the cost basis (gross less recoverable input tax); AR adds output tax.
-    g.total += Number(item.costBasis ?? item.baseAmount) || 0;
-  });
-  return [...groups.values()];
-}
+const dayOf = (value) => (value ? String(value).slice(0, 10) : "");
+
+/** Time used to order a row: the handoff time for handed-off rows, the expense date for ready rows. */
+const sortTime = (item) => new Date(item.__status === HANDED_OFF ? item.handedOffAt : item.expenseDate).getTime() || 0;
+
+const StatusBadge = ({ status }) =>
+  status === HANDED_OFF ? (
+    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+      Handed off
+    </span>
+  ) : (
+    <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
+      Ready to hand off
+    </span>
+  );
 
 /**
- * Client Billing - hand finance-verified, client-billable expenses to the invoicing team so the
- * client can be billed (Ready to hand off), and see what's already been handed off (Handed off).
- * Independent of employee reimbursement, which AP Payments handles.
+ * Client Billing: finance-verified, client-billable expenses. Ready expenses are handed to the invoicing team here, and
+ * handed-off expenses stay in the same table with a status badge. Independent of employee reimbursement (AP Payments).
  */
 export default function ClientBillingPage() {
-  const [tab, setTab] = useState("ready");
-  const [readyPage, setReadyPage] = useState(0);
-  const [historyPage, setHistoryPage] = useState(0);
-  const readySize = DEFAULT_PAGE_SIZE;
-  const historySize = DEFAULT_PAGE_SIZE;
+  const [page, setPage] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  // Handoff modal: `target` is the expense; `reprocess` is set when handing off again from history.
+  // Handoff modal: `target` is the expense; `reprocess` is set when handing off again from the handed-off rows.
   const [target, setTarget] = useState(null);
   const [invoiceReference, setInvoiceReference] = useState("");
   const [reprocess, setReprocess] = useState(false);
   const [reprocessReason, setReprocessReason] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState("");
 
-  const filters = useMemo(
-    () => ({ startDate: startDate || undefined, endDate: endDate || undefined }),
-    [startDate, endDate]
-  );
-
   const summaryQuery = useHandoffSummary();
-  const readyQuery = useEligibleExpenses(filters, readyPage, readySize);
-  const historyQuery = useHandedOff(historyPage, historySize);
+  const readyQuery = useEligibleExpenses({}, 0, LIST_FETCH_SIZE);
+  const historyQuery = useHandedOff(0, LIST_FETCH_SIZE);
   const markHandedOff = useMarkHandedOff();
 
   const summary = summaryQuery.data;
-  const matches = (item) => {
+
+  const matchesSearch = (item) => {
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
     return [item.reportNumber, item.employeeId, item.resolvedClientName, item.projectName, item.projectCode, item.categoryName, item.description]
       .some((v) => String(v || "").toLowerCase().includes(q));
   };
 
-  const readyItems = readyQuery.data?.content || [];
-  const readyGroups = groupByClient(readyItems.filter(matches));
-  const historyAll = historyQuery.data?.content || [];
-  const historyItems = historyAll.filter(matches);
+  const matchesDates = (item) => {
+    const day = dayOf(item.__status === HANDED_OFF ? item.handedOffAt : item.expenseDate);
+    if (!day) return !startDate && !endDate;
+    if (startDate && day < startDate) return false;
+    if (endDate && day > endDate) return false;
+    return true;
+  };
+
+  // One sequence: ready rows and handed-off rows, newest first, after search and date filters.
+  const combined = useMemo(() => {
+    const ready = (readyQuery.data?.content || []).map((item) => ({ ...item, __status: READY }));
+    const handed = (historyQuery.data?.content || []).map((item) => ({ ...item, __status: HANDED_OFF }));
+    return [...ready, ...handed]
+      .filter((item) => matchesSearch(item) && matchesDates(item))
+      .sort((a, b) => sortTime(b) - sortTime(a));
+    // matchesSearch / matchesDates read only the filter values listed below.
+  }, [readyQuery.data, historyQuery.data, searchTerm, startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalRows = combined.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / COMBINED_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const winStart = safePage * COMBINED_PAGE_SIZE;
+  const winEnd = winStart + COMBINED_PAGE_SIZE;
+  const visibleRows = combined.slice(winStart, winEnd);
+
+  // A new search or date range starts again from the first page.
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, startDate, endDate]);
 
   const openHandoff = (item, { again = false } = {}) => {
     setTarget(item);
@@ -131,49 +143,47 @@ export default function ClientBillingPage() {
     }
   };
 
-  const switchTab = (next) => {
-    setTab(next);
-    setSearchTerm("");
-  };
-
-  const activeQuery = tab === "ready" ? readyQuery : historyQuery;
-
-  const readyRows = (items) =>
-    items.map((item) => ({
-      date: formatDate(item.expenseDate),
+  const rowFor = (item) => {
+    const handed = item.__status === HANDED_OFF;
+    return {
+      status: <StatusBadge status={item.__status} />,
+      date: <span className="whitespace-nowrap text-xs text-gray-700">{handed ? formatDateTime(item.handedOffAt) : formatDate(item.expenseDate)}</span>,
+      client: <span className="text-xs text-gray-800">{item.resolvedClientName || "No client"}</span>,
       project: <span className="text-xs text-gray-700">{projectLabel(item)}</span>,
       employee: <EmployeeLabel employeeId={item.employeeId} />,
       expense: (
-        <div className="leading-tight text-left">
+        <div className="leading-tight">
           <span className="text-xs font-medium text-gray-800">{item.categoryName || "—"}</span>
-          {item.description && <span className="block max-w-[260px] truncate text-[11px] text-gray-500">{item.description}</span>}
+          {!handed && item.description && <span className="block max-w-[220px] truncate text-[11px] text-gray-500">{item.description}</span>}
+          {handed && item.remarks && <span className="block text-[11px] text-amber-700">{item.remarks}</span>}
         </div>
       ),
       report: <span className="font-mono text-xs text-gray-600">{item.reportNumber}</span>,
       amount: (
-        <div className="leading-tight text-right">
-          <span className="font-mono font-semibold text-gray-900">
-            {formatMoney(item.costBasis ?? item.baseAmount, item.baseCurrencyCode)}
-          </span>
-          {item.costBasis != null && Number(item.costBasis) !== Number(item.baseAmount) && (
-            <span className="block text-[11px] text-gray-400">
-              gross {formatMoney(item.baseAmount, item.baseCurrencyCode)} · ITC {formatMoney(item.recoverableTaxAmount, item.baseCurrencyCode)}
-            </span>
-          )}
-          {item.taxCode && <span className="block text-[11px] text-gray-400">input tax {item.taxCode}</span>}
-        </div>
-      ),
-      receipts: (
-        <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-          <Receipt size={13} /> {item.receiptCount}
+        <span className="font-mono text-xs font-semibold text-gray-900">
+          {formatMoney(handed ? item.baseAmount : item.costBasis ?? item.baseAmount, item.baseCurrencyCode)}
         </span>
       ),
-      action: (
+      invoiceRef: handed && item.invoiceReference ? (
+        <span className="font-mono text-xs text-gray-800">{item.invoiceReference}</span>
+      ) : (
+        <span className="text-xs text-gray-400">{handed ? "Not given" : "—"}</span>
+      ),
+      action: handed ? (
+        <Button size="small" variant="outline" onClick={() => openHandoff(item, { again: true })}>
+          <RotateCcw size={13} className="mr-1" /> Hand off again
+        </Button>
+      ) : (
         <Button size="small" variant="primary" onClick={() => openHandoff(item)}>
           <FileCheck2 size={13} className="mr-1" /> Hand off
         </Button>
       ),
-    }));
+    };
+  };
+
+  const listQueries = [readyQuery, historyQuery];
+  const isLoading = listQueries.some((q) => q.isLoading);
+  const isError = listQueries.some((q) => q.isError);
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
@@ -186,14 +196,12 @@ export default function ClientBillingPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SelectableStatCard
+        <StatCard
           title="Ready to hand off"
           value={summary ? summary.readyCount : "—"}
           subtitle="Expenses waiting"
-          icon={Send}
+          icon={FileCheck2}
           textColor="text-indigo-700"
-          active={tab === "ready"}
-          onClick={() => switchTab("ready")}
         />
         <StatCard
           title="Amount ready"
@@ -208,178 +216,86 @@ export default function ClientBillingPage() {
           subtitle="With ready expenses"
           icon={Building2}
         />
-        <SelectableStatCard
+        <StatCard
           title="Handed off"
           value={summary ? summary.handedOffCount : "—"}
           subtitle="All time"
           icon={BadgeCheck}
           textColor="text-emerald-700"
-          active={tab === "history"}
-          onClick={() => switchTab("history")}
         />
       </div>
 
-      <Tabs value={tab} onValueChange={switchTab}>
-        <TabsList className="h-auto flex-wrap">
-          <TabsTrigger value="ready">
-            Ready to hand off
-            <span className="ml-1.5 text-xs text-slate-400">({summary?.readyCount ?? 0})</span>
-          </TabsTrigger>
-          <TabsTrigger value="history">
-            Handed off
-            <span className="ml-1.5 text-xs text-slate-400">({summary?.handedOffCount ?? 0})</span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <FilterCard
-        title="Search & filters"
-        description={tab === "ready" ? "Search filters the current page; the dates filter the whole list." : "Filters the handoffs on the current page."}
-      >
+      <FilterCard title="Search & filters" description="Search and dates filter every expense in the table below.">
         <div className="w-full sm:max-w-sm">
           <SearchInput value={searchTerm} onSearch={(val) => setSearchTerm(val || "")} placeholder="Report, employee, project, category..." />
         </div>
-        {tab === "ready" && (
-          <>
-            <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-              From
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setReadyPage(0); }}
-                className="h-9 rounded-lg border border-gray-300 px-2.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-              To
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setReadyPage(0); }}
-                className="h-9 rounded-lg border border-gray-300 px-2.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </label>
-            {(startDate || endDate) && (
-              <Button size="small" variant="outline" onClick={() => { setStartDate(""); setEndDate(""); setReadyPage(0); }}>
-                Clear dates
-              </Button>
-            )}
-          </>
+        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+          From
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="h-9 rounded-lg border border-gray-300 px-2.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+          To
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="h-9 rounded-lg border border-gray-300 px-2.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </label>
+        {(startDate || endDate) && (
+          <Button size="small" variant="outline" onClick={() => { setStartDate(""); setEndDate(""); }}>
+            Clear dates
+          </Button>
         )}
       </FilterCard>
 
-      {activeQuery.isError ? (
+      {isError ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center px-4">
           <AlertTriangle className="h-6 w-6 text-rose-500" />
-          <p className="text-sm font-semibold text-rose-700">Couldn't load this list.</p>
-          <p className="text-xs text-rose-500 max-w-md">
-            {activeQuery.error?.response?.data?.message || activeQuery.error?.message || "Please check your connection and try again."}
-          </p>
-          <Button size="small" variant="outline" className="mt-2" onClick={() => activeQuery.refetch()}>
+          <p className="text-sm font-semibold text-rose-700">Couldn't load the client billing list.</p>
+          <Button size="small" variant="outline" className="mt-2" onClick={() => listQueries.forEach((q) => q.refetch())}>
             Retry
           </Button>
         </div>
-      ) : activeQuery.isLoading ? (
+      ) : isLoading ? (
         <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16">
           <LoadingSpinner text="Loading…" />
         </div>
-      ) : tab === "ready" ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-          {readyItems.length === 0 ? (
-            <PolicyEmptyState
-              icon={<Inbox className="h-10 w-10" />}
-              title="Nothing waiting to be handed off."
-              description="Client-billable expenses show up here as soon as Finance verifies them."
-            />
-          ) : readyGroups.length === 0 ? (
-            <PolicyEmptyState icon={<Inbox className="h-10 w-10" />} title="No expenses match the search." />
-          ) : (
-            <div className="space-y-4">
-              {readyGroups.map((g) => (
-                <section key={g.key}>
-                  <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Building2 size={15} className="shrink-0 text-indigo-500" />
-                      <span className="truncate text-sm font-semibold text-slate-800">
-                        {g.key === unknownClientKey ? "No client" : g.clientName || "Unnamed client"}
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-500">
-                      {g.items.length} expense{g.items.length === 1 ? "" : "s"} ·{" "}
-                      <span className="font-mono font-semibold text-slate-800">{formatMoney(g.total, g.currency)}</span>
-                    </span>
-                  </div>
-                  <div className="w-full overflow-x-auto">
-                    <GenericTable
-                      headers={["Date", "Project", "Employee", "Expense", "Report", "Cost basis", "Receipts", "Action"]}
-                      columns={["date", "project", "employee", "expense", "report", "amount", "receipts", "action"]}
-                      rows={readyRows(g.items)}
-                    />
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-          <div className="mt-4 flex justify-center">
-            <Pagination
-              currentPage={readyPage + 1}
-              totalPages={readyQuery.data?.totalPages ?? 0}
-              onPrevious={() => setReadyPage(Math.max(readyPage - 1, 0))}
-              onNext={() => setReadyPage(Math.min(readyPage + 1, (readyQuery.data?.totalPages ?? 0) - 1))}
-            />
-          </div>
-        </div>
       ) : (
         <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-          {historyAll.length === 0 ? (
+          {totalRows === 0 ? (
             <PolicyEmptyState
               icon={<Inbox className="h-10 w-10" />}
-              title="Nothing handed off yet."
-              description="Expenses you hand off from the Ready tab are listed here with their invoice reference."
+              title="Nothing to show yet."
+              description="Client-billable expenses show up here as soon as Finance verifies them."
             />
-          ) : historyItems.length === 0 ? (
-            <PolicyEmptyState icon={<Inbox className="h-10 w-10" />} title="No expenses match the search." />
           ) : (
             <div className="w-full overflow-x-auto">
               <GenericTable
-                headers={["Handed off", "Client", "Project", "Employee", "Expense", "Report", "Amount", "Invoice ref.", "Action"]}
-                columns={["handedOffAt", "client", "project", "employee", "expense", "report", "amount", "invoiceReference", "action"]}
-                rows={historyItems.map((item) => ({
-                  handedOffAt: <span className="whitespace-nowrap text-xs text-gray-600">{formatDateTime(item.handedOffAt)}</span>,
-                  client: item.resolvedClientName || "—",
-                  project: projectLabel(item),
-                  employee: <EmployeeLabel employeeId={item.employeeId} />,
-                  expense: (
-                    <div className="leading-tight">
-                      <span className="text-xs font-medium text-gray-800">{item.categoryName || "—"}</span>
-                      <span className="block text-[11px] text-gray-400">{formatDate(item.expenseDate)}</span>
-                      {item.remarks && <span className="block text-[11px] text-amber-700">{item.remarks}</span>}
-                    </div>
-                  ),
-                  report: <span className="font-mono text-xs text-gray-600">{item.reportNumber}</span>,
-                  amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(item.baseAmount, item.baseCurrencyCode)}</span>,
-                  invoiceReference: item.invoiceReference ? (
-                    <span className="font-mono text-xs text-gray-800">{item.invoiceReference}</span>
-                  ) : (
-                    <span className="text-xs text-gray-400">Not given</span>
-                  ),
-                  action: (
-                    <Button size="small" variant="outline" onClick={() => openHandoff(item, { again: true })}>
-                      <RotateCcw size={13} className="mr-1" /> Hand off again
-                    </Button>
-                  ),
-                }))}
+                headers={["Status", "Date", "Client", "Project", "Employee", "Expense", "Report", "Amount", "Invoice ref.", "Action"]}
+                columns={["status", "date", "client", "project", "employee", "expense", "report", "amount", "invoiceRef", "action"]}
+                rows={visibleRows.map(rowFor)}
               />
             </div>
           )}
-          <div className="mt-4 flex justify-center">
-            <Pagination
-              currentPage={historyPage + 1}
-              totalPages={historyQuery.data?.totalPages ?? 0}
-              onPrevious={() => setHistoryPage(Math.max(historyPage - 1, 0))}
-              onNext={() => setHistoryPage(Math.min(historyPage + 1, (historyQuery.data?.totalPages ?? 0) - 1))}
-            />
-          </div>
+          {totalRows > 0 && (
+            <div className="mt-4 flex flex-col items-center gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:justify-between">
+              <p className="text-xs text-gray-500">
+                Showing {winStart + 1}–{Math.min(winEnd, totalRows)} of {totalRows}
+              </p>
+              <Pagination
+                currentPage={safePage + 1}
+                totalPages={totalPages}
+                onPrevious={() => setPage(Math.max(safePage - 1, 0))}
+                onNext={() => setPage(Math.min(safePage + 1, totalPages - 1))}
+              />
+            </div>
+          )}
         </div>
       )}
 

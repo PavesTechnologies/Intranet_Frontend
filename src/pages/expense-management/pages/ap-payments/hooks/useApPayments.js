@@ -70,13 +70,19 @@ export const useApPaymentSummary = () =>
     staleTime: 30_000,
   });
 
-// AP's confirmation of the actual payment: { paymentReference, paymentMethod, paymentDate, amountPaid, remarks }.
-// Called directly (not via the accounts-payable apPaymentApi, whose completePayment sends no body).
-const completePayment = (reportId, payment) =>
-  api.post(`/xms/ap-payments/${reportId}/complete`, payment, {
+// AP's confirmation of the actual payment: { paymentReference, paymentMethod, paymentDate, amountPaid, remarks, paymentProof }.
+// Sent as multipart: the details as a JSON "request" part, and the proof of payment as the "paymentProof" file.
+// The server refuses the confirmation without a proof. Called directly (not via the accounts-payable apPaymentApi).
+const completePayment = (reportId, payment) => {
+  const { paymentProof, ...details } = payment;
+  const form = new FormData();
+  form.append("request", new Blob([JSON.stringify(details)], { type: "application/json" }));
+  form.append("paymentProof", paymentProof);
+  return api.post(`/xms/ap-payments/${reportId}/complete`, form, {
     baseURL: XMS_BASE_URL,
     headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
   });
+};
 
 /** mutate({ reportId, payment }) - the report shows as paid only once the server accepts this. */
 export const useCompletePayment = () => {

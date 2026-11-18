@@ -35,6 +35,7 @@ import { formatMoney, formatDate } from "../../approval-engine/constants/approva
 import Pagination from "@/components/Pagination/pagination";
 
 const TABS = [
+  { value: "ALL", label: "All" },
   { value: "PENDING", label: "To verify" },
   { value: "QUERIED", label: "Queried" },
   { value: "VERIFIED", label: "Verified & payments" },
@@ -48,10 +49,14 @@ const PAYMENT_FILTERS = [
 ];
 
 const EMPTY_TEXT = {
+  ALL: ["Nothing to show yet.", "Reports and cash advances at every stage appear here, newest first."],
   PENDING: ["Nothing to verify right now.", "Expense reports reach Finance after the manager approves them."],
   QUERIED: ["No open queries.", "Reports you send back to an employee for correction appear here until they resubmit."],
   VERIFIED: ["Nothing verified yet.", "Reports you verify appear here, with whether AP has paid the employee."],
 };
+
+// Rows read per status for the "All" view. Each status is paged on screen from this list.
+const ALL_FETCH_SIZE = 100;
 
 const merchantSummary = (lineItems) => {
   if (!lineItems?.length) return "—";
@@ -68,15 +73,12 @@ const isLineEligible = (line) => {
 
 const hasIneligibleLines = (lineItems) => (lineItems || []).some((l) => !isLineEligible(l));
 
-function PaymentCell({ status, paidAt }) {
+function PaymentCell({ status }) {
   if (status === "PAYMENT_COMPLETED") {
     return (
-      <div className="leading-tight">
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-          <BadgeCheck className="h-3 w-3" /> Paid
-        </span>
-        {paidAt && <span className="block text-[11px] text-gray-400 mt-0.5">{formatDate(paidAt)}</span>}
-      </div>
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+        <BadgeCheck className="h-3 w-3" /> Paid
+      </span>
     );
   }
   if (status === "APPROVED_FOR_PAYMENT") {
@@ -101,7 +103,7 @@ function PaymentCell({ status, paidAt }) {
  * /payment-summary. Verify / Query happen in FinanceReviewPanel (opened with Review).
  */
 export default function FinancePage() {
-  const [activeTab, setActiveTab] = useState("PENDING");
+  const [activeTab, setActiveTab] = useState("ALL");
   const [pageByTab, setPageByTab] = useState({});
   const pageSize = DEFAULT_PAGE_SIZE;
   const [reviewingReport, setReviewingReport] = useState(null);
@@ -111,9 +113,13 @@ export default function FinancePage() {
   const pageFor = (tab) => pageByTab[tab] ?? 0;
   const setPageFor = (tab, next) => setPageByTab((prev) => ({ ...prev, [tab]: next }));
 
-  const pendingQuery = useFinanceQueue(pageFor("PENDING"), pageSize);
-  const queriedQuery = useFinanceHistory("QUERIED", pageFor("QUERIED"), pageSize);
-  const verifiedQuery = useFinanceHistory("VERIFIED", pageFor("VERIFIED"), pageSize);
+  // "All" needs every row of each status, so it reads each status in one larger page and pages the merged list itself.
+  const allView = activeTab === "ALL";
+  const sourceSize = allView ? ALL_FETCH_SIZE : pageSize;
+  const sourcePage = (tab) => (allView ? 0 : pageFor(tab));
+  const pendingQuery = useFinanceQueue(sourcePage("PENDING"), sourceSize);
+  const queriedQuery = useFinanceHistory("QUERIED", sourcePage("QUERIED"), sourceSize);
+  const verifiedQuery = useFinanceHistory("VERIFIED", sourcePage("VERIFIED"), sourceSize);
   const { data: paymentSummary } = useFinancePaymentSummary();
   const { data: directory } = useEmployeeDirectory();
 
@@ -174,9 +180,35 @@ export default function FinancePage() {
   };
 
   const queriesByTab = { PENDING: pendingQuery, QUERIED: queriedQuery, VERIFIED: verifiedQuery };
-  const activeQuery = queriesByTab[activeTab];
+  const isAll = activeTab === "ALL";
+  const sourceQueries = [pendingQuery, queriedQuery, verifiedQuery];
+  // "All" reads the first page of each expense status and merges them; the pager is hidden for it.
+  const activeQuery = isAll
+    ? {
+        data: undefined,
+        isLoading: sourceQueries.some((q) => q.isLoading),
+        isError: sourceQueries.some((q) => q.isError),
+        error: sourceQueries.find((q) => q.error)?.error,
+        refetch: () => sourceQueries.forEach((q) => q.refetch()),
+      }
+    : queriesByTab[activeTab];
   const { data, isLoading, isError, error, refetch } = activeQuery;
-  const items = data?.content || [];
+
+  // Each expense row remembers its own status (__tab) so its badge, action and review step match that status.
+  const items = useMemo(() => {
+    if (!isAll) return (data?.content || []).map((item) => ({ ...item, __tab: activeTab }));
+    const tag = (q, tab) => (q.data?.content || []).map((item) => ({ ...item, __tab: tab }));
+    return [
+      ...tag(pendingQuery, "PENDING"),
+      ...tag(queriedQuery, "QUERIED"),
+      ...tag(verifiedQuery, "VERIFIED"),
+    ].sort((a, b) =>
+      String(b.submittedAt || b.actionedAt || "").localeCompare(String(a.submittedAt || a.actionedAt || ""))
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAll, activeTab, data, pendingQuery.data, queriedQuery.data, verifiedQuery.data]);
+
+  const tabOf = (item) => item.__tab || activeTab;
 
   const switchTab = (tab, payment = "") => {
     setActiveTab(tab);
@@ -193,9 +225,10 @@ export default function FinancePage() {
         (item.reportNumber || "").toLowerCase().includes(query) ||
         merchantSummary(item.pendingLineItems).toLowerCase().includes(query) ||
         empName.includes(query);
-      const matchesPayment = activeTab !== "VERIFIED" || !paymentFilter || item.paymentRoutingStatus === paymentFilter;
+      const matchesPayment = tabOf(item) !== "VERIFIED" || !paymentFilter || item.paymentRoutingStatus === paymentFilter;
       return matchesSearch && matchesPayment;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, searchTerm, paymentFilter, directory, activeTab]);
 
   const navigate = useNavigate();
@@ -214,11 +247,12 @@ export default function FinancePage() {
     );
 
   const expenseStatusCell = (item) => {
-    if (activeTab === "QUERIED") {
+    const tab = tabOf(item);
+    if (tab === "QUERIED") {
       return <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">Queried</span>;
     }
-    if (activeTab === "VERIFIED") {
-      return <PaymentCell status={item.paymentRoutingStatus} paidAt={item.paymentCompletedAt} />;
+    if (tab === "VERIFIED") {
+      return <PaymentCell status={item.paymentRoutingStatus} />;
     }
     return hasIneligibleLines(item.pendingLineItems) ? (
       <span
@@ -234,8 +268,14 @@ export default function FinancePage() {
 
   // Pending shows what Finance must act on; Verified shows what is done. Queried has only expense reports.
   const query = searchTerm.toLowerCase();
-  const advanceList =
-    activeTab === "PENDING" ? allAdvances.filter(advanceIsPending) : activeTab === "VERIFIED" ? allAdvances.filter(advanceIsDone) : [];
+  const advanceList = isAll
+    ? allAdvances.filter((adv) => advanceIsPending(adv) || advanceIsDone(adv))
+    : activeTab === "PENDING"
+    ? allAdvances.filter(advanceIsPending)
+    : activeTab === "VERIFIED"
+    ? allAdvances.filter(advanceIsDone)
+    : [];
+  const advanceTabOf = (adv) => (isAll ? (advanceIsPending(adv) ? "PENDING" : "VERIFIED") : activeTab);
   const visibleAdvances = advanceList.filter(
     (adv) =>
       !query ||
@@ -244,7 +284,7 @@ export default function FinancePage() {
 
   const headers = ["Type", "Reference", "Employee", "Amount", "Status", "Date", "Action"];
   const columns = ["type", "reference", "employee", "amount", "status", "date", "action"];
-  const rows = [
+  const allRows = [
     ...filteredItems.map((item) => ({
       type: typeBadge("EXPENSE"),
       reference: <span className="font-mono text-xs font-semibold text-gray-700">{item.reportNumber}</span>,
@@ -252,7 +292,7 @@ export default function FinancePage() {
       amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</span>,
       status: expenseStatusCell(item),
       date: formatDate(item.submittedAt || item.actionedAt),
-      action: reviewButton(item, activeTab === "PENDING" ? "Review" : "View", activeTab === "PENDING" ? "primary" : "outline"),
+      action: reviewButton(item, tabOf(item) === "PENDING" ? "Review" : "View", tabOf(item) === "PENDING" ? "primary" : "outline"),
     })),
     ...visibleAdvances.map((adv) => ({
       type: typeBadge("ADVANCE"),
@@ -272,7 +312,7 @@ export default function FinancePage() {
           >
             <Eye size={15} />
           </button>
-          {activeTab === "PENDING" && (
+          {advanceTabOf(adv) === "PENDING" && (
             <>
               <Button size="small" variant="primary" onClick={() => setApprovingAdvance(adv)}>Approve</Button>
               <Button size="small" variant="outline" onClick={() => setRejectingAdvance(adv)}>Reject</Button>
@@ -282,6 +322,11 @@ export default function FinancePage() {
       ),
     })),
   ];
+
+  const pagerTab = isAll ? "ALL" : activeTab;
+  const listPage = pageFor(pagerTab);
+  const rows = isAll ? allRows.slice(listPage * pageSize, (listPage + 1) * pageSize) : allRows;
+  const listTotalPages = isAll ? Math.ceil(allRows.length / pageSize) : data?.totalPages ?? 0;
 
   const errorStatus = error?.response?.status;
   const isAuthError = errorStatus === 401 || errorStatus === 403;
@@ -336,25 +381,30 @@ export default function FinancePage() {
         />
       </div>
 
-      <div className="flex items-center gap-2">
-        <label htmlFor="finance-status" className="text-xs font-medium text-slate-600">Status</label>
-        <select
-          id="finance-status"
-          value={activeTab}
-          onChange={(e) => switchTab(e.target.value)}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-        >
-          {TABS.map((tab) => (
-            <option key={tab.value} value={tab.value}>
-              {tab.label} ({queriesByTab[tab.value].data?.totalElements ?? 0})
-            </option>
-          ))}
-        </select>
-      </div>
-
       <FilterCard title="Search" description="Filters the reports on the current page.">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex shrink-0 items-center gap-2">
+            <label htmlFor="finance-status" className="text-xs font-medium text-slate-600">Status</label>
+            <select
+              id="finance-status"
+              value={activeTab}
+              onChange={(e) => switchTab(e.target.value)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              {TABS.map((tab) => (
+                <option key={tab.value} value={tab.value}>
+                  {tab.label} (
+                  {tab.value === "ALL"
+                    ? sourceQueries.reduce((sum, q) => sum + (q.data?.totalElements ?? 0), 0)
+                    : queriesByTab[tab.value].data?.totalElements ?? 0}
+                  )
+                </option>
+              ))}
+            </select>
+          </div>
         <div className="w-full sm:max-w-md">
           <SearchInput value={searchTerm} onSearch={(val) => setSearchTerm(val || "")} placeholder="Employee, merchant or report #..." />
+        </div>
         </div>
         {activeTab === "VERIFIED" && (
           <div className="flex items-center gap-1">
@@ -409,10 +459,10 @@ export default function FinancePage() {
           )}
           <div className="mt-4 flex justify-center">
             <Pagination
-              currentPage={pageFor(activeTab) + 1}
-              totalPages={data?.totalPages ?? 0}
-              onPrevious={() => setPageFor(activeTab, Math.max(pageFor(activeTab) - 1, 0))}
-              onNext={() => setPageFor(activeTab, Math.min(pageFor(activeTab) + 1, (data?.totalPages ?? 0) - 1))}
+              currentPage={listPage + 1}
+              totalPages={listTotalPages}
+              onPrevious={() => setPageFor(pagerTab, Math.max(listPage - 1, 0))}
+              onNext={() => setPageFor(pagerTab, Math.min(listPage + 1, listTotalPages - 1))}
             />
           </div>
         </div>
