@@ -3,7 +3,13 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import beachDay from "../../../components/icons/beach-day_cnsv.svg";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import StatusBadge from "../../../components/patterns/StatusBadge";
+import EmptyState from "../../../components/patterns/EmptyState";
+import BackButton from "../../../components/patterns/BackButton";
+import PageHeader from "../../../components/ui/PageHeader";
+import { Fonts } from "../../../components/Fonts/Fonts";
+import PageContainer from "../../../components/patterns/PageContainer";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -21,22 +27,6 @@ const formatLeaveNameFromParam = (name = "") => {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
-};
-
-// Helper to get styling for status badges
-const getStatusBadgeStyles = (status) => {
-  switch (status?.toUpperCase()) {
-    case "PENDING":
-      return "bg-yellow-100 text-yellow-800";
-    case "APPROVED":
-      return "bg-green-100 text-green-800";
-    case "REJECTED":
-      return "bg-red-100 text-red-800";
-    case "CANCELLED":
-      return "bg-gray-100 text-gray-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
 };
 
 export default function LeaveDetailsPage() {
@@ -180,13 +170,12 @@ export default function LeaveDetailsPage() {
   const pastRequests = leaveRequests.filter((req) => req.status !== "PENDING");
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+    <PageContainer density="comfortable" className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Column 1: Sidebar Navigation */}
           <aside className="lg:col-span-1">
             <div className="sticky top-6">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              <h2 className={`${Fonts.eyebrow} mb-3`}>
                 Leave Types
               </h2>
               <nav className="space-y-1">
@@ -213,16 +202,12 @@ export default function LeaveDetailsPage() {
           {/* Column 2: Main Content */}
           <main className="lg:col-span-3">
             {/* Page Header */}
-            <div className="flex items-center justify-between mb-8">
-              <h1 className="text-2xl font-bold text-gray-800">
-                {displayName || "Leave"} History - {new Date().getFullYear()}
-              </h1>
-              <button
-                onClick={() => navigate(-1)}
-                className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
-              >
-                &larr; Back
-              </button>
+            <div className="flex items-center gap-3 mb-8">
+              <BackButton onClick={() => navigate(-1)} />
+              <PageHeader
+                className="!mb-0"
+                title={`${displayName || "Leave"} History - ${new Date().getFullYear()}`}
+              />
             </div>
 
             {/* Render leave requests grouped by month */}
@@ -252,24 +237,20 @@ export default function LeaveDetailsPage() {
               </div>
             ) : (
               // Display this message if there are no leave requests at all
-              <div className="flex flex-col justify-center items-center p-8 bg-white rounded-lg border">
-                <img src={beachDay} alt="No Leave History" className="w-40" />
-                <p className="text-gray-500 mt-5">
-                  No requests found for {displayName} in{" "}
-                  {new Date().getFullYear()}.
-                </p>
-              </div>
+              <EmptyState
+                description={`No requests found for ${displayName} in ${new Date().getFullYear()}.`}
+              />
             )}
           </main>
         </div>
-      </div>
-    </div>
+    </PageContainer>
   );
 }
 
 // A reusable card component to display request details
 const RequestCard = ({ request }) => (
-  <div className="bg-white p-4 rounded-lg shadow-sm border">
+  <PageCard>
+    <PageCardContent className="p-4">
     <div className="flex flex-col sm:flex-row justify-between text-sm">
       <div>
         <p className="font-semibold text-gray-900">
@@ -284,11 +265,7 @@ const RequestCard = ({ request }) => (
         </p>
       </div>
       <div className="mt-3 sm:mt-0 text-left sm:text-right flex flex-col items-start sm:items-center">
-        <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeStyles(request.status)}`}
-        >
-          {request.status}
-        </span>
+        <StatusBadge status={request.status} />
         <p className="text-sm font-bold text-gray-800 mt-2">
           -{request.daysRequested} Day{request.daysRequested !== 1 ? "s" : ""}
         </p>
@@ -297,5 +274,6 @@ const RequestCard = ({ request }) => (
         </p>
       </div>
     </div>
-  </div>
+    </PageCardContent>
+  </PageCard>
 );

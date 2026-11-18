@@ -139,3 +139,51 @@ describe("recent activity", () => {
     expect(within(table).getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
   });
 });
+
+describe("recent activity filters", () => {
+  const ids = (container) => [...container.querySelectorAll("[data-activity-row]")].map((el) => el.getAttribute("data-activity-row"));
+
+  it("filters by status group, with a count beside each option", () => {
+    const { container } = renderIt();
+    const select = screen.getByLabelText("Filter by status");
+    expect(within(select).getByRole("option", { name: "Completed (2)" })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "Needs your action (1)" })).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: "done" } });
+    expect(ids(container)).toEqual([
+      "report-cccccccc-0000-0000-0000-000000000003",
+      "advance-aaaaaaaa-0000-0000-0000-000000000009",
+    ]);
+  });
+
+  it("searches reference and description", () => {
+    const { container } = renderIt();
+    fireEvent.change(screen.getByLabelText("Search activity"), { target: { value: "er-0007" } });
+    expect(ids(container)).toEqual([`report-${REP_ID}`]);
+    fireEvent.change(screen.getByLabelText("Search activity"), { target: { value: "client" } });
+    expect(ids(container)).toEqual([`advance-${ADV_ID}`]);
+  });
+
+  it("filters by period", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-12T12:00:00"));
+    const { container } = renderIt();
+    fireEvent.change(screen.getByLabelText("Filter by period"), { target: { value: "7" } });
+    expect(ids(container)).toEqual([`report-${REP_ID}`, `advance-${ADV_ID}`]);
+    vi.useRealTimers();
+  });
+
+  it("says when nothing matches, and Clear filters brings every row back", () => {
+    const { container } = renderIt();
+    fireEvent.change(screen.getByLabelText("Search activity"), { target: { value: "nothing like this" } });
+    expect(screen.getByTestId("activity-empty").textContent).toMatch(/Nothing matches these filters/);
+    fireEvent.click(screen.getByRole("button", { name: /Clear filters/ }));
+    expect(ids(container)).toHaveLength(4);
+  });
+
+  it("the footer shows how many rows match and their total", () => {
+    const { container } = renderIt();
+    fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "done" } });
+    expect(container.querySelector("[data-activity-summary]").textContent).toMatch(/Showing 2 of 2 matching \(of 4\).*2,800/);
+  });
+});

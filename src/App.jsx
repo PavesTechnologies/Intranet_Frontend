@@ -306,6 +306,7 @@ import InterviewFeedbackFormPage from "./pages/public/InterviewFeedbackFormPage.
 
 
 // ✅ Leave Management
+import PageContainer from "./components/patterns/PageContainer";
 import EmployeePanel from "./pages/leave_management/EmployeePanel";
 import AdminPanel from "./pages/leave_management/AdminPanel";
 import HRManageTools from "./pages/leave_management/HRManageTools";
@@ -362,7 +363,14 @@ import OnboardingSummaryPage from "./pages/employee-onboarding/summary-page/Summ
 
 
 
-const ProtectedRoute = ({ children, allowedRoles, requiredPermissions, orPermissions }) => {
+export const ProtectedRoute = ({
+  children,
+  allowedRoles,
+  requiredPermissions,
+  orPermissions,
+  anyPermissions,
+  permission,
+}) => {
   const { isAuthenticated, user, logout, hasAnyPermission } = useAuth();
   const location = useLocation();
   const isfirsttlogin = localStorage.getItem("isfirsttlogin");
@@ -402,14 +410,16 @@ const ProtectedRoute = ({ children, allowedRoles, requiredPermissions, orPermiss
     }
   }
 
-  // ✅ Permission-based restriction check (any-of) — for modules where UMS permission codes are
-  // the source of truth instead of a frontend role list (e.g. Invoice Management: a pure
-  // Approver or Finance user need not hold any of Admin/AP_Executive/Finance_Executive to be
-  // let in). Independent of allowedRoles above — a route may use either, not necessarily both.
-  if (requiredPermissions && requiredPermissions.length > 0) {
-    if (!hasAnyPermission(requiredPermissions)) {
-      return <Navigate to="/unauthorized" replace />;
-    }
+  // ✅ Permission-based restriction checks — for modules where UMS permission codes are the
+  // source of truth instead of a frontend role list (e.g. Invoice Management: a pure Approver or
+  // Finance user need not hold any of Admin/AP_Executive/Finance_Executive to be let in). A route
+  // may use these alone or on top of allowedRoles; when both are given, both must pass.
+  //   requiredPermissions / anyPermissions — any-of (two spellings in use across App.jsx)
+  //   permission                           — a single required code
+  // Each supplied prop is its own gate, so combining them can only narrow access.
+  const permissionGates = [requiredPermissions, anyPermissions, permission ? [permission] : null];
+  if (permissionGates.some((gate) => gate?.length > 0 && !hasAnyPermission(gate))) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
   // ✅ Default: render protected content
@@ -543,6 +553,12 @@ const AppRoutes = () => {
           />
 
           {/* Accounts Payable — page skeletons only, business logic lands in later phases */}
+          {/* Module root has no page: send it to the dashboard, whose own ProtectedRoute
+              applies the AP access check (non-AP users land on /unauthorized from there). */}
+          <Route
+            path={AP_ROUTES.ROOT}
+            element={<Navigate to={AP_ROUTES.DASHBOARD} replace />}
+          />
           <Route
             path={AP_ROUTES.GUIDE}
             element={
@@ -1464,7 +1480,9 @@ const AppRoutes = () => {
             path="/leave-management/manager"
             element={
               <ProtectedRoute allowedRoles={["Manager"]}>
-                <AdminPanel />
+                <PageContainer density="comfortable">
+                  <AdminPanel />
+                </PageContainer>
               </ProtectedRoute>
             }
           />
@@ -1472,7 +1490,9 @@ const AppRoutes = () => {
             path="/leave-management/hr"
             element={
               <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
-                <HRManageTools />
+                <PageContainer density="comfortable">
+                  <HRManageTools />
+                </PageContainer>
               </ProtectedRoute>
             }
           />

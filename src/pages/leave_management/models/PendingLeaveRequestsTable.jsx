@@ -1,12 +1,65 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "react-toastify";
 import api from "../../../api/axiosInstance";
-import { PencilIcon } from "lucide-react";
+import { PencilIcon, X } from "lucide-react";
 import EditLeaveModal from "./EditLeaveModal";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationModal from "./ConfirmationModal";
-const token = localStorage.getItem("token");
+import Button from "../../../components/Button/Button";
+import DataTable from "../../../components/patterns/DataTable";
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+
+// Visible cell is a single-line CSS ellipsis (`truncate`) — the table Reason
+// value must stay single-line so it can't force other columns' headers to
+// wrap. The complete reason is still available via the tooltip, which
+// reuses BirthdayAnniversaryPanel's visual design (bg-gray-900/90
+// text-white text-[10px] px-2.5 py-1.5 rounded-lg shadow-xl + pointer
+// triangle), adapted two ways: (1) the tooltip itself still wraps across
+// multiple lines (unlike Birthday's `whitespace-nowrap`, since names are
+// short but reasons aren't), and (2) it's shown/positioned via hover state
+// + a `document.body` portal instead of Birthday's pure `group-hover` CSS.
+// Birthday's trigger sits in plain page flow, so a same-flow `absolute`
+// tooltip never affects any ancestor's size. This trigger sits inside
+// DataTable's `overflow-x-auto` wrapper, where a same-flow `absolute`
+// tooltip would still be included in that ancestor's scrollable-overflow
+// box and could visually "resize" the table / introduce scrollbars — the
+// portal avoids that entirely.
+function ReasonCell({ reason }) {
+  const [show, setShow] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPosition({ top: rect.top - 8, left: rect.left + rect.width / 2 });
+    }
+    setShow(true);
+  };
+
+  return (
+    <div
+      ref={triggerRef}
+      className="relative block w-full min-w-0"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShow(false)}
+    >
+      <div className="truncate text-left">{reason}</div>
+      {show &&
+        createPortal(
+          <div
+            className="fixed z-20 max-w-xs -translate-x-1/2 -translate-y-full whitespace-normal break-words rounded-lg bg-gray-900/90 px-2.5 py-1.5 text-[10px] text-white shadow-xl pointer-events-none"
+            style={{ top: position.top, left: position.left }}
+          >
+            {reason}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-900/90" />
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
 
 /**
  * This is now a "presentational" component. It receives data and functions as props.
@@ -98,75 +151,122 @@ const PendingLeaveRequestsTable = ({
       .replace(/(^\w{1})|(\s+\w{1})/g, (letter) => letter.toUpperCase()); // Capitalizes each word
   };
 
+  // Column `w-[n%]` widths sum to 100% (required by the `table-fixed`
+  // layout below). Reason is the only column that ever gives up width —
+  // startDate/endDate/days/actions get whatever they need to never clip a
+  // value or a button (dates render as e.g. "Aug 27, 2026" plus an
+  // optional " (session)" suffix, so they carry no truncation classes at
+  // all), Leave Type gets enough to fit typical names (e.g. "Casual Leave")
+  // in full, and Reason absorbs whatever's left, truncating to one line
+  // with the complete value still available via its own tooltip.
+  const columns = [
+    {
+      key: "leaveType",
+      header: "Leave Type",
+      className: "w-[15%] truncate overflow-hidden whitespace-nowrap text-center",
+      render: (leave) => getLabelFromName(leave.leaveName),
+    },
+    {
+      key: "startDate",
+      header: "Start Date",
+      // Renders as e.g. "Aug 27, 2026" plus an optional " (session)" suffix
+      // — never truncate/clip this; the column is sized to always fit it.
+      className: "w-[17%] whitespace-nowrap text-center",
+      render: (leave) => (
+        <>
+          {new Date(leave.startDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+          {leave.startSession &&
+            leave.startSession !== "none" &&
+            leave.startSession !== "fullday" && (
+              <span className="ml-1 text-gray-500">
+                ({leave.startSession})
+              </span>
+            )}
+        </>
+      ),
+    },
+    {
+      key: "endDate",
+      header: "End Date",
+      // Same rationale as startDate above — must stay fully visible.
+      className: "w-[17%] whitespace-nowrap text-center",
+      render: (leave) => (
+        <>
+          {new Date(leave.endDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+          {leave.endSession &&
+            leave.endSession !== "none" &&
+            leave.endSession !== "fullday" && (
+              <span className="ml-1 text-gray-500">({leave.endSession})</span>
+            )}
+        </>
+      ),
+    },
+    {
+      key: "days",
+      header: "Days",
+      className: "w-[10%] whitespace-nowrap text-center",
+      render: (leave) => leave.daysRequested,
+    },
+    {
+      key: "reason",
+      header: "Reason",
+      className: "w-[25%] whitespace-nowrap text-center",
+      render: (leave) =>
+        leave.reason ? <ReasonCell reason={leave.reason} /> : "-",
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      className: "w-[16%] whitespace-nowrap text-center",
+      render: (leave) => (
+        <div className="flex items-center space-x-1 justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Edit leave request"
+            onClick={() => handleEdit(leave)}
+          >
+            <PencilIcon className="text-blue-700 w-4 h-4" />
+          </Button>
+          <Button
+            variant="danger"
+            size="icon"
+            aria-label="Cancel leave request"
+            onClick={() => handleCancel(leave.leaveId)}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="overflow-x-auto w-[100%]">
+    <div className="w-full">
       <div className="w-full max-w-screen-xl mx-auto">
-        <table className="w-full border-collapse rounded-lg overflow-hidden shadow-sm ">
-          <thead>
-            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs border-gray-100">
-              <th className="p-3">Leave Type</th>
-              <th className="p-3">Start Date</th>
-              <th className="p-3">End Date</th>
-              <th className="p-3">Days</th>
-              <th className="p-3">Reason</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* The component now just maps over the leaves it was given. */}
-            {pendingLeaves.map((leave) => (
-              <tr key={leave.leaveId} className="border-t text-xs">
-                <td className="p-3 text-center">
-                  {getLabelFromName(leave.leaveName)}
-                </td>
-                <td className="p-3 text-center">
-                  {new Date(leave.startDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                  {leave.startSession &&
-                    leave.startSession !== "none" &&
-                    leave.startSession !== "fullday" && (
-                      <span className="ml-1 text-gray-500">
-                        ({leave.startSession})
-                      </span>
-                    )}
-                </td>
-                <td className="p-3 text-center">
-                  {new Date(leave.endDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                  {leave.endSession &&
-                    leave.endSession !== "none" &&
-                    leave.endSession !== "fullday" && (
-                      <span className="ml-1 text-gray-500">
-                        ({leave.endSession})
-                      </span>
-                    )}
-                </td>
-                <td className="p-3 text-center">{leave.daysRequested}</td>
-                <td className="p-3 text-center">{leave.reason || "-"}</td>
-                <td className="p-3 text-center">
-                  <div className="flex items-center space-x-4 justify-center">
-                    <PencilIcon
-                      className="cursor-pointer text-blue-700 w-4 h-4"
-                      onClick={() => handleEdit(leave)}
-                    />
-                    <button
-                      className="text-red-500 hover:underline"
-                      onClick={() => handleCancel(leave.leaveId)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          columns={columns}
+          rows={pendingLeaves}
+          getRowKey={(leave) => leave.leaveId}
+          // Auto table layout sizes every column to its unwrapped content
+          // (every header/cell here is `whitespace-nowrap`), so the sum of
+          // those natural widths can exceed the section's available width
+          // and force DataTable's own `overflow-x-auto` to kick in. Fixed
+          // layout instead divides the table strictly by each column's own
+          // width class below, so the table always equals its container's
+          // width (100%) and never grows past it — no DataTable.jsx change
+          // needed, since this only targets this table's own descendant
+          // `<table>` element.
+          className="[&_table]:table-fixed"
+        />
       </div>
 
       {isEditModalOpen && (

@@ -72,7 +72,6 @@ export function mapInvoicePaymentSummary(raw) {
     paymentTermReason: raw.payment_term_reason ?? null,
     dueDateVerified: raw.due_date_verified ?? null,
     contractualDueDate: raw.contractual_due_date ?? null,
-    statutoryDueDate: raw.statutory_due_date ?? null,
   };
 }
 
