@@ -69,6 +69,7 @@ export function BillableClientFields({
   clientsError,
   onRetryClients,
   projectsLoading = false,
+  projectsError = "",
   errors = {},
   selectStyles,
   disabled,
@@ -142,10 +143,18 @@ export function BillableClientFields({
             isSearchable
             isClearable
             isLoading={projectsLoading}
-            noOptionsMessage={() => (projectsLoading ? "Loading..." : "You have no assigned projects for this client.")}
+            noOptionsMessage={() =>
+              projectsLoading ? "Loading..." : projectsError ? "Projects unavailable" : "No assigned projects for this client"
+            }
             styles={selectStyles}
             isDisabled={disabled || projectsLoading || !clientId}
           />
+          {projectsError && <span className="text-[11px] text-red-600 block mt-0.5">{projectsError}</span>}
+          {!projectsLoading && !projectsError && clientId && projectOptions.length === 0 && (
+            <span className="text-[11px] text-gray-500 block mt-0.5">
+              PMS has no project assigned to you for this client. Leave Project blank to save it for the client only.
+            </span>
+          )}
           {errors.projectId && <span className="text-[11px] text-red-600 block mt-0.5">{errors.projectId}</span>}
         </div>
       )}

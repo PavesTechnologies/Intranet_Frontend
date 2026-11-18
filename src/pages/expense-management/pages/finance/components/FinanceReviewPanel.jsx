@@ -446,7 +446,8 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
               </Section>
             )}
 
-            {(
+            {/* Only a report that was raised against a cash advance can be offset against one. */}
+            {fullReport?.cashAdvanceId && (
               <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Cash advance offset">
                 <CashAdvanceOffsetSection
                   reportId={reportId}

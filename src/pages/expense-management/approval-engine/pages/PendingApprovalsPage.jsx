@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Eye, Inbox, Layers, ShieldAlert, XCircle } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -17,13 +17,15 @@ import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
 import { formatMoney } from "../constants/approvalLabels";
 import { resolveQueueItem } from "../utils/approvalAmounts";
 import EmployeeLabel from "../components/EmployeeLabel";
-import SourceBadge from "../components/SourceBadge";
 import LineItemReviewPanel from "../components/LineItemReviewPanel";
 import CommentPromptModal from "../components/CommentPromptModal";
 import MyDelegateCard from "../components/MyDelegateCard";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
 import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
 import Pagination from "@/components/Pagination/pagination";
+
+// Embedded in the approvals table: the page owns paging, so this list fetches a full batch and shows the slice it is given.
+const EMBEDDED_FETCH_SIZE = 100;
 
 const hasPolicyIssue = (relevantLines) =>
   (relevantLines || []).some((l) => (l.source?.policyViolations?.length || 0) > 0);
@@ -67,16 +69,48 @@ export function ExpensesCell({ item }) {
  * (lineItemService.getAll + getLineItemReviews) that only reconstructed what the queue endpoint
  * already returned.
  */
-export default function PendingApprovalsPage({ searchTerm = "", hideHeader = false, noPadding = false, embedded = false }) {
+// Days since the request was submitted; a request is treated as overdue after three days.
+const waitingDays = (value) => {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : Math.floor((Date.now() - time) / 86400000);
+};
+
+const submittedLabel = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+// Which group a row belongs to, for the status filter.
+const statusGroup = (item) => {
+  if (item.reportStatus === "AWAITING_CORRECTION") return "AWAITING";
+  if (hasPolicyIssue(item.relevantLines)) return "FLAGGED";
+  return "PENDING";
+};
+
+export default function PendingApprovalsPage({
+  searchTerm = "",
+  statusFilter = "ALL",
+  sortBy = "NEWEST",
+  hideHeader = false,
+  noPadding = false,
+  embedded = false,
+  onRowCount,
+  windowStart = 0,
+  windowEnd,
+}) {
   const [page, setPage] = useState(0);
-  const pageSize = DEFAULT_PAGE_SIZE;
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const pageSize = embedded ? EMBEDDED_FETCH_SIZE : DEFAULT_PAGE_SIZE;
   const [expandedReportId, setExpandedReportId] = useState(null);
   const [rejectingReport, setRejectingReport] = useState(null);
   const [reviewingItem, setReviewingItem] = useState(null);
 
   useApprovalLiveSync();
 
-  const { data, isPending, isFetching, isError, refetch } = useMyQueue(page, pageSize);
+  const { data, isPending, isFetching, isError, refetch } = useMyQueue(embedded ? 0 : page, pageSize);
   const reviewLineItem = useReviewLineItem();
   const reviewSplit = useReviewSplit();
   const rejectReport = useRejectReport();
@@ -103,12 +137,38 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
       return reportNum.includes(q) || merchant.includes(q);
     });
 
-    return filtered.sort((a, b) => {
-      const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-      const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-      return timeB - timeA;
+    const byStatus = statusFilter === "ALL" ? filtered : filtered.filter((item) => statusGroup(item) === statusFilter);
+    const time = (value) => (value ? new Date(value).getTime() : 0);
+
+    if (sortBy === "AMOUNT_DESC") {
+      return [...byStatus].sort((a, b) => (b.relevantTotal ?? 0) - (a.relevantTotal ?? 0));
+    }
+    if (sortBy === "OLDEST") {
+      return [...byStatus].sort((a, b) => time(a.submittedAt) - time(b.submittedAt));
+    }
+    return [...byStatus].sort((a, b) => time(b.submittedAt) - time(a.submittedAt));
+  }, [resolvedItems, searchTerm, statusFilter, sortBy]);
+
+  // Only rows that can be approved in one click can be selected for a bulk approval.
+  const toggleSelected = (reportId) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(reportId)) next.delete(reportId);
+      else next.add(reportId);
+      return next;
     });
-  }, [resolvedItems, searchTerm]);
+
+  const approveSelected = async () => {
+    const ids = [...selectedIds];
+    const results = await Promise.allSettled(ids.map((id) => bulkApprove.mutateAsync(id)));
+    const failed = results.filter((result) => result.status === "rejected").length;
+    if (failed === 0) {
+      showStatusToast(`${ids.length} report${ids.length === 1 ? "" : "s"} approved`, "success");
+    } else {
+      showStatusToast(`${ids.length - failed} approved, ${failed} failed. Check the rest and try again.`, "error");
+    }
+    setSelectedIds(new Set());
+  };
 
   const isMutating =
     reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending || approveException.isPending;
@@ -168,20 +228,21 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
     const flagged = hasPolicyIssue(item.relevantLines);
     return (
       <div className="inline-flex flex-wrap items-center justify-end gap-2">
-        <Button size="small" variant="outline" disabled={isMutating} onClick={() => setReviewingItem(item)}>
-          Review
+        <Button size="small" variant="outline" disabled={isMutating} onClick={() => setReviewingItem(item)} title="Review" aria-label="Review">
+          <Eye className="h-4 w-4" />
         </Button>
         <Button
           size="small"
           variant="success"
           disabled={isMutating || !item.eligibleForBulkApprove}
-          title={!item.eligibleForBulkApprove ? "Has open policy violations — review and act line-by-line instead." : undefined}
+          title={!item.eligibleForBulkApprove ? "Has open policy violations — review and act line-by-line instead." : "Approve"}
+          aria-label="Approve"
           onClick={() => handleBulkApprove(item.reportId)}
         >
-          Approve
+          <CheckCircle2 className="h-4 w-4" />
         </Button>
-        <Button size="small" variant="outline" disabled={isMutating} onClick={() => setRejectingReport(item)}>
-          <XCircle className="h-3.5 w-3.5" /> Reject
+        <Button size="small" variant="outline" disabled={isMutating} onClick={() => setRejectingReport(item)} title="Reject" aria-label="Reject">
+          <XCircle className="h-4 w-4" />
         </Button>
         {flagged && (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
@@ -192,7 +253,9 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
     );
   };
 
-  const itemRows = filteredItems.map((item, index) => {
+  // Embedded: only the rows inside this page's window. The parent counts every row across both lists.
+  const windowItems = windowEnd === undefined ? filteredItems : filteredItems.slice(windowStart, windowEnd);
+  const itemRows = windowItems.map((item, index) => {
                     const isExpanded = expandedReportId === item.reportId;
                     const flagged = hasPolicyIssue(item.relevantLines);
                     const needsCorrection = item.reportStatus === "AWAITING_CORRECTION";
@@ -202,20 +265,40 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                           className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`}
                           onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}
                         >
-                          <td className="px-2.5 py-1.5">
-                            <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
+                          <td className="px-2.5 py-1.5 text-left align-middle">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="h-3.5 w-3.5 rounded border-gray-300 disabled:opacity-30"
+                                aria-label={`Select ${item.reportNumber}`}
+                                title={item.eligibleForBulkApprove ? "Select for bulk approval" : "Needs line-by-line review"}
+                                disabled={!item.eligibleForBulkApprove}
+                                checked={selectedIds.has(item.reportId)}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={() => toggleSelected(item.reportId)}
+                              />
+                              <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
+                            </div>
                           </td>
-                          <td className="px-2.5 py-1.5">
+                          <td className="px-2.5 py-1.5 text-left align-middle">
                             <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
-                            <SourceBadge cashAdvanceId={item.cashAdvanceId} />
+                            {item.submittedAt && (
+                              <div className={`mt-0.5 text-[11px] ${waitingDays(item.submittedAt) >= 3 ? "font-medium text-rose-600" : "text-gray-500"}`}>
+                                Submitted {submittedLabel(item.submittedAt)}
+                                {waitingDays(item.submittedAt) >= 3 && ` · waiting ${waitingDays(item.submittedAt)} days`}
+                              </div>
+                            )}
                           </td>
-                          <td className="px-2.5 py-1.5">
+                          <td className="px-2.5 py-1.5 text-left align-middle">
                             <span className="font-medium text-xs text-gray-900">
                               <EmployeeLabel employeeId={item.employeeId} />
                             </span>
                           </td>
-                          <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.relevantLines)}</td>
-                          <td className="px-2.5 py-1.5">
+                          <td className="px-2.5 py-1.5 text-left align-middle max-w-[220px]">
+                            <p className="font-semibold text-gray-900 truncate text-xs">{merchantSummary(item.relevantLines)}</p>
+                          </td>
+                          <td className="px-2.5 py-1.5 text-left align-middle text-xs text-gray-600 truncate">{item.costCenterName || "—"}</td>
+                          <td className="px-2.5 py-1.5 text-left align-middle">
                             {needsCorrection ? (
                               <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800">Awaiting employee</span>
                             ) : flagged ? (
@@ -238,7 +321,7 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={7} className="bg-gray-50/60 p-0">
+                            <td colSpan={8} className="bg-gray-50/60 p-0">
                               {flagged && (
                                 <p className="flex items-center gap-1.5 text-xs text-amber-700 px-4 pt-3">
                                   <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for one-click Approve.
@@ -296,43 +379,51 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
     document.body,
   );
 
+  // Tell the parent how many rows this list has, so the page can show one empty message for the whole table.
+  useEffect(() => {
+    if (!isPending && !isError && onRowCount) onRowCount(filteredItems.length);
+  }, [isPending, isError, filteredItems.length, onRowCount]);
+
   if (embedded) {
     return (
       <>
         {isPending && !data && (
           <tbody>
             <tr>
-              <td colSpan={7} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
+              <td colSpan={8} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
             </tr>
           </tbody>
         )}
         {isError && (
           <tbody>
             <tr>
-              <td colSpan={7} className="py-6 text-center text-xs text-rose-700">
+              <td colSpan={8} className="py-6 text-center text-xs text-rose-700">
                 Failed to load your queue. <button className="underline" onClick={() => refetch()}>Retry</button>
+              </td>
+            </tr>
+          </tbody>
+        )}
+        {selectedIds.size > 0 && (
+          <tbody>
+            <tr>
+              <td colSpan={7} className="bg-indigo-50 px-2.5 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-indigo-900">{selectedIds.size} selected</span>
+                  <div className="flex items-center gap-2">
+                    <Button size="small" variant="outline" onClick={() => setSelectedIds(new Set())}>
+                      Clear
+                    </Button>
+                    <Button size="small" variant="success" disabled={isMutating} loading={bulkApprove.isPending} onClick={approveSelected}>
+                      <CheckCircle2 className="h-4 w-4" /> Approve selected
+                    </Button>
+                  </div>
+                </div>
               </td>
             </tr>
           </tbody>
         )}
         {filteredItems.length > 0 && (
           <tbody className="divide-y divide-gray-100">{itemRows}</tbody>
-        )}
-        {data && (data.totalPages ?? 0) > 1 && (
-          <tbody>
-            <tr>
-              <td colSpan={7} className="py-2">
-                <div className="flex justify-center">
-                  <Pagination
-                    currentPage={page + 1}
-                    totalPages={data.totalPages ?? 0}
-                    onPrevious={() => setPage(Math.max(page - 1, 0))}
-                    onNext={() => setPage(Math.min(page + 1, (data.totalPages ?? 0) - 1))}
-                  />
-                </div>
-              </td>
-            </tr>
-          </tbody>
         )}
         {modals}
       </>
