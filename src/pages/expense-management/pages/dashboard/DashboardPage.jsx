@@ -8,6 +8,7 @@ import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { dashboardService } from "@/pages/expense-management/api/expenseReportsApi";
+import SupplementaryWaitingCard from "@/pages/expense-management/pages/dashboard/SupplementaryWaitingCard";
 import EmployeeMoneyFlow from "@/pages/expense-management/components/dashboard/EmployeeMoneyFlow";
 import RoleDashboard from "@/pages/expense-management/components/dashboard/RoleDashboard";
 import ApprovalsPanel from "@/pages/expense-management/components/dashboard/ApprovalsPanel";
@@ -65,8 +66,8 @@ const VIEWS = [
       { key: "submit", label: "Submit expense", hint: "Create an expense report", icon: "ReceiptText", to: "/expense-management/expenses/create", roles: ["GENERAL", "MANAGER"], primary: true },
       { key: "advance", label: "Request advance", hint: "Request travel or business funds", icon: "Banknote", to: "/expense-management/cash-advance/request", roles: ["GENERAL"] },
       { key: "reports", label: "My expense reports", hint: "Track submitted reports", icon: "FileText", to: "/expense-management/expenses/my", roles: ["GENERAL", "MANAGER"] },
+      { key: "supplementary", label: "Supplementary claims", hint: "Claim expenses missed on a settled report", icon: "FileText", to: "/expense-management/expenses/supplementary", roles: ["GENERAL", "MANAGER"] },
       { key: "advances", label: "My advances", hint: "Balances and settlements", icon: "Wallet", to: "/expense-management/cash-advance/my", roles: ["GENERAL"] },
-      { key: "outdated", label: "Outdated expense", hint: "Attach a receipt to a settled report", icon: "ScanLine", to: "/expense-management/expenses/outdated", roles: ["GENERAL"] },
     ],
     attentionTitle: "Needs your action",
     attentionEmpty: "Nothing needs you right now.",
@@ -123,7 +124,6 @@ const VIEWS = [
     activitySubtitle: "Reports you verified most recently",
     quickActions: [
       { key: "finance", label: "Finance verification", hint: "Reports waiting to be verified", icon: "ClipboardCheck", to: "/expense-management/finance", roles: ["FINANCE_EXECUTIVE"], primary: true },
-      { key: "lateReceipts", label: "Late receipts", hint: "Receipts found after settlement, to review", icon: "ScanLine", to: "/expense-management/finance/late-receipts", roles: ["FINANCE_EXECUTIVE", "FINANCE"] },
       { key: "settlement", label: "Cash advance settlement", hint: "Settle advances and review balances", icon: "Banknote", to: "/expense-management/cash-advance/settlement", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
       { key: "reports", label: "Expense reports", hint: "All reports, with their status", icon: "FileText", to: "/expense-management/reports", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
     ],
@@ -149,8 +149,8 @@ const VIEWS = [
     activitySubtitle: "Payments confirmed recently",
     quickActions: [
       { key: "queue", label: "Payment queue", hint: "Reports approved and waiting for payment", icon: "Wallet", to: "/expense-management/ap-payments/queue", roles: ["AP_EXECUTIVE"], primary: true },
+      { key: "supplementaryPayments", label: "Supplementary payments", hint: "Record payments for approved supplementary claims", icon: "Wallet", to: "/expense-management/ap/supplementary-payments", roles: ["AP_EXECUTIVE"] },
       { key: "notifications", label: "Notifications", hint: "Updates on payments and returns", icon: "Bell", to: "/expense-management/activity/notifications", roles: ["AP_EXECUTIVE"] },
-      { key: "lateReceipts", label: "Late receipts", hint: "Receipts found after settlement, to review", icon: "ScanLine", to: "/expense-management/finance/late-receipts", roles: ["AP_EXECUTIVE"] },
     ],
     actions: [],
   },
@@ -267,12 +267,15 @@ export default function DashboardPage() {
           </Button>
         </div>
       ) : data ? (
-        <DashboardBody
-          data={data}
-          config={active}
-          currency={currency}
-          approvals={showApprovals ? <ApprovalsPanel config={approvalsConfig} query={approvals} currency={currency} /> : null}
-        />
+        <>
+          {active.view === "finance" && <SupplementaryWaitingCard />}
+          <DashboardBody
+            data={data}
+            config={active}
+            currency={currency}
+            approvals={showApprovals ? <ApprovalsPanel config={approvalsConfig} query={approvals} currency={currency} /> : null}
+          />
+        </>
       ) : null}
     </div>
   );

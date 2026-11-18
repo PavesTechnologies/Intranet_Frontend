@@ -295,6 +295,7 @@ export default function LineItemEntryFlow({
     clientBillable: false,
     clientId: "",
     allocationReason: "",
+    employeePaymentMethod: "",
     projectId: "",
     ocrReceiptId: null,
     confidenceScore: null,
@@ -494,10 +495,12 @@ export default function LineItemEntryFlow({
       tax: taxValueFromOcr(taxNum > 0 ? taxNum.toFixed(2) : null),
       ocrTaxAmount: taxNum > 0 ? taxNum : null,
       costCenterId: report?.costCenterId || "",
-      clientBillable: false,
-      clientId: "",
+      // Same defaults as the manual entry: the report's client and project fill the line.
+      clientBillable: !!report?.clientId,
+      clientId: report?.clientId || "",
       allocationReason: "",
-      projectId: "",
+      employeePaymentMethod: "",
+      projectId: report?.projectId || "",
       ocrReceiptId: receiptId,
       confidenceScore: confidence,
       // What the scan read, kept even when the amount field is left blank, to compare the claim against.
@@ -752,6 +755,8 @@ export default function LineItemEntryFlow({
     if (!ocrReviewData.merchantName.trim()) errors.merchantName = "Merchant is required.";
     if (!ocrReviewData.currencyId) errors.currencyId = "Currency is required.";
     if (!ocrReviewData.categoryId) errors.categoryId = "Category is required.";
+    // The server refuses to submit a report with a line that has no payment method, so say so before saving.
+    if (!ocrReviewData.employeePaymentMethod) errors.employeePaymentMethod = "Choose how you paid for this expense.";
     if (!ocrReviewData.costCenterId) errors.costCenterId = "Cost center is required.";
     const expenseDateProblem = expenseDateError(ocrReviewData.expenseDate, dateRange);
     if (expenseDateProblem) errors.expenseDate = expenseDateProblem;
@@ -792,6 +797,7 @@ export default function LineItemEntryFlow({
       projectId: ocrReviewData.clientBillable ? (ocrReviewData.projectId || null) : null,
       clientBillable: !!ocrReviewData.clientBillable,
       allocationReason: ocrCrossDepartmentCostCenters.length > 0 ? (ocrReviewData.allocationReason || "").trim() || null : null,
+      employeePaymentMethod: ocrReviewData.employeePaymentMethod || null,
     };
 
     try {
@@ -1191,6 +1197,35 @@ export default function LineItemEntryFlow({
                       )}
                       {!ocrReviewErrors.expenseDate && (
                         <span className="text-[11px] text-gray-500 block mt-0.5">{expenseDateHint(dateRange)}</span>
+                      )}
+                    </div>
+
+                    {/* How the employee paid: required before submit */}
+                    <div className="space-y-1">
+                      <label htmlFor="ocrEmployeePaymentMethod" className="block text-xs font-semibold text-gray-600">
+                        How did you pay? <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        id="ocrEmployeePaymentMethod"
+                        name="employeePaymentMethod"
+                        value={ocrReviewData.employeePaymentMethod || ""}
+                        onChange={(e) => handleOcrSelectChange("employeePaymentMethod", e.target.value)}
+                        disabled={ocrSubmitting}
+                        className={`w-full px-2.5 py-1.5 rounded-md border text-xs transition focus:outline-none focus:ring-2 ${
+                          ocrReviewErrors.employeePaymentMethod
+                            ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                            : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+                        }`}
+                      >
+                        <option value="">Select how you paid</option>
+                        <option value="PERSONAL_CARD">Personal card</option>
+                        <option value="CASH">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="COMPANY_CARD">Company card</option>
+                        <option value="OTHER">Other</option>
+                      </select>
+                      {ocrReviewErrors.employeePaymentMethod && (
+                        <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.employeePaymentMethod}</span>
                       )}
                     </div>
 

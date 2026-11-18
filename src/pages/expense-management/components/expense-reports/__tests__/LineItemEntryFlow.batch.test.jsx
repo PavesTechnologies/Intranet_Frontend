@@ -59,6 +59,10 @@ const ocr = (merchantName, totalAmount) => ({
   },
 });
 
+// "How did you pay?" is required before a scanned line can be saved.
+const choosePaymentMethod = () =>
+  fireEvent.change(document.getElementById("ocrEmployeePaymentMethod"), { target: { value: "CASH" } });
+
 const renderFlow = (onSaved) =>
   render(
     <LineItemEntryFlow
@@ -110,6 +114,7 @@ describe("line item entry: several receipts", () => {
     await waitFor(() => expect(screen.getByDisplayValue("Cafe One")).toBeInTheDocument(), { timeout: 5000 });
     expect(screen.getByText("Receipt 1 of 2")).toBeInTheDocument();
 
+    choosePaymentMethod();
     fireEvent.click(screen.getByRole("button", { name: /Save & next|Save & Confirm/ }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith("/xms/employee/receipts/r1/confirm", expect.anything(), expect.anything()));
     expect(onSaved).not.toHaveBeenCalled(); // the page refreshes once, at the end
@@ -120,6 +125,7 @@ describe("line item entry: several receipts", () => {
     const uploads = api.post.mock.calls.filter(([url]) => url.endsWith("/receipts"));
     expect(uploads).toHaveLength(2);
 
+    choosePaymentMethod();
     fireEvent.click(screen.getByRole("button", { name: "Save & Confirm" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(api.post).toHaveBeenCalledWith("/xms/employee/receipts/r2/confirm", expect.anything(), expect.anything());
@@ -137,6 +143,7 @@ describe("line item entry: several receipts", () => {
     fireEvent.click(screen.getByRole("button", { name: "Skip this receipt" }));
 
     await waitFor(() => expect(screen.getByDisplayValue("Taxi Two")).toBeInTheDocument(), { timeout: 5000 });
+    choosePaymentMethod();
     fireEvent.click(screen.getByRole("button", { name: "Save & Confirm" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));

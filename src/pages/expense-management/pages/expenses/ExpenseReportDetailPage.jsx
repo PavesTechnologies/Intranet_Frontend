@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import ReportSupplementarySection from "@/pages/expense-management/pages/supplementary/ReportSupplementarySection";
 import { createPortal } from "react-dom";
 import {
   Plus,
@@ -95,7 +96,6 @@ import FormTextArea from "@/components/forms/FormTextArea";
 import FormDatePicker from "@/components/forms/FormDatePicker";
 import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
 import ReceiptDropzone from "@/pages/expense-management/components/expense-reports/ReceiptDropzone";
-import LateReceiptPanel from "@/pages/expense-management/components/expense-reports/LateReceiptPanel";
 import PolicyStatusBadge, {
   PolicyResultBanner,
   derivePolicyStatus,
@@ -1058,6 +1058,9 @@ export default function ExpenseReportDetailPage() {
             )}
           </ReportHeroCard>
 
+          {/* Supplementary claims: missed expenses claimed separately; this report itself is not changed */}
+          <ReportSupplementarySection reportId={report.reportId} />
+
           {/* Line Items */}
           <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_1px_2px_rgba(10,0,130,0.04),0_10px_30px_-18px_rgba(10,0,130,0.18)] sm:p-5" data-line-items>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1108,15 +1111,6 @@ export default function ExpenseReportDetailPage() {
               </div>
             )}
           </div>
-
-          {/* Late receipts: attached after approval without reopening the claim */}
-          <LateReceiptPanel
-            reportId={report.reportId}
-            reportStatus={report.reportStatus}
-            lineItems={lineItems}
-            tripStartDate={report.tripStartDate}
-            tripEndDate={report.tripEndDate}
-          />
         </div>
 
         {/* Right column */}
@@ -1132,6 +1126,8 @@ export default function ExpenseReportDetailPage() {
         reportId={reportId}
         lineItem={selectedLineItem}
         defaultCostCenterId={report.costCenterId}
+        defaultClientId={report.clientId}
+        defaultProjectId={report.projectId}
         categoryOptions={categoryOptions}
         costCenterOptions={costCenterOptions}
         currencyOptions={currencyOptions}
@@ -1601,7 +1597,8 @@ const compactSelectStyles = {
   menu: (base) => ({ ...base, zIndex: 9999 }),
 };
 
-const emptyForm = (defaultCostCenterId) => ({
+// A new line starts with the report's client and project, so a billable report needs no re-entry for each expense.
+const emptyForm = (defaultCostCenterId, defaultClientId, defaultProjectId) => ({
   categoryId: "",
   expenseDate: "",
   merchantName: "",
@@ -1610,11 +1607,11 @@ const emptyForm = (defaultCostCenterId) => ({
   currencyId: "",
   tax: emptyTaxValue,
   costCenterId: defaultCostCenterId || "",
-  clientBillable: false,
-  clientId: "",
+  clientBillable: !!defaultClientId,
+  clientId: defaultClientId || "",
   employeePaymentMethod: "",
   allocationReason: "",
-  projectId: "",
+  projectId: defaultProjectId || "",
 });
 
 export function LineItemDrawer({
@@ -1623,12 +1620,14 @@ export function LineItemDrawer({
   reportId,
   lineItem,
   defaultCostCenterId,
+  defaultClientId,
+  defaultProjectId,
   categoryOptions = [],
   costCenterOptions = [],
   currencyOptions = [],
   onSaved,
 }) {
-  const [formData, setFormData] = useState(emptyForm(defaultCostCenterId));
+  const [formData, setFormData] = useState(emptyForm(defaultCostCenterId, defaultClientId, defaultProjectId));
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [savedLineItem, setSavedLineItem] = useState(null);
@@ -1636,6 +1635,8 @@ export function LineItemDrawer({
   const [ocrReceiptId, setOcrReceiptId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  // A failed load is shown as an error, not as "no projects", so the two cases are never confused.
+  const [projectsError, setProjectsError] = useState("");
   const { clients, loading: loadingClients, error: clientsError, reload: loadClients } = useActiveClients();
   // The caller's home department, to tell when a chosen cost center needs a cross-department reason.
   const [homeDepartmentUuid, setHomeDepartmentUuid] = useState(null);
@@ -1697,10 +1698,12 @@ export function LineItemDrawer({
     const loadProjects = async () => {
       try {
         setLoadingProjects(true);
+        setProjectsError("");
         const list = await lookupService.getAssignedProjects();
         setProjects(Array.isArray(list) ? list : []);
       } catch (err) {
         console.error("Failed to load assigned projects:", err);
+        setProjectsError("Your assigned projects could not be loaded. You can save without a project.");
         showStatusToast("Could not load your assigned projects. Project is optional for billable expenses.", "error");
       } finally {
         setLoadingProjects(false);
@@ -1749,7 +1752,7 @@ export function LineItemDrawer({
         }
       }
     } else {
-      setFormData(emptyForm(defaultCostCenterId));
+      setFormData(emptyForm(defaultCostCenterId, defaultClientId, defaultProjectId));
       setTaxPreview(null);
       setSavedLineItem(null);
       setOcrReceiptId(null);
@@ -2404,6 +2407,7 @@ export function LineItemDrawer({
           clientsError={clientsError}
           onRetryClients={loadClients}
           projectsLoading={loadingProjects}
+          projectsError={projectsError}
           errors={formErrors}
           selectStyles={compactSelectStyles}
           disabled={submitting}

@@ -4,6 +4,7 @@ import Button from "@/components/Button/Button";
 import FormInput from "@/components/forms/FormInput";
 import { formatMoney } from "../../../approval-engine/constants/approvalLabels";
 import { toIsoDate } from "@/pages/expense-management/pages/reports/reportUtils";
+import { fileInputClass } from "@/pages/expense-management/components/common/fileInputClass";
 
 /** Mirrors the backend PaymentMethod enum. */
 const PAYMENT_METHODS = [
@@ -16,6 +17,17 @@ const PAYMENT_METHODS = [
 
 const today = () => toIsoDate(new Date());
 
+const PROOF_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+const PROOF_MAX_BYTES = 10 * 1024 * 1024;
+
+/** Message for a proof file that can't be used, or null when it can. */
+function proofProblem(file) {
+  if (!file) return "Attach the proof of payment (PDF, JPG or PNG).";
+  if (!PROOF_TYPES.includes(file.type)) return "Upload a PDF, JPG or PNG file.";
+  if (file.size > PROOF_MAX_BYTES) return "The file must be 10 MB or smaller.";
+  return null;
+}
+
 /**
  * AP records the payment it actually made. The report becomes "Paid" only when the server accepts
  * this - the amount must equal what the employee is owed, so a stale screen can't confirm the wrong
@@ -24,6 +36,8 @@ const today = () => toIsoDate(new Date());
 export default function ConfirmPaymentModal({ isOpen, onClose, onConfirm, isSaving, reportNumber, amountOwed, currencyCode }) {
   const [form, setForm] = useState({ paymentReference: "", paymentMethod: "BANK_TRANSFER", paymentDate: today(), amountPaid: "", remarks: "" });
   const [errors, setErrors] = useState({});
+  // Proof of payment: the bank confirmation, transaction screenshot or cheque copy. Required to confirm.
+  const [proofFile, setProofFile] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -34,6 +48,7 @@ export default function ConfirmPaymentModal({ isOpen, onClose, onConfirm, isSavi
         amountPaid: amountOwed != null ? Number(amountOwed).toFixed(2) : "",
         remarks: "",
       });
+      setProofFile(null);
       setErrors({});
     }
   }, [isOpen, amountOwed]);
@@ -55,6 +70,8 @@ export default function ConfirmPaymentModal({ isOpen, onClose, onConfirm, isSavi
     else if (amountOwed != null && Math.abs(amount - Number(amountOwed)) > 0.01) {
       next.amountPaid = `Must equal the amount owed (${formatMoney(amountOwed, currencyCode)}).`;
     }
+    const proofError = proofProblem(proofFile);
+    if (proofError) next.paymentProof = proofError;
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -67,6 +84,7 @@ export default function ConfirmPaymentModal({ isOpen, onClose, onConfirm, isSavi
       paymentDate: form.paymentDate,
       amountPaid: Number(form.amountPaid),
       remarks: form.remarks.trim() || null,
+      paymentProof: proofFile,
     });
   };
 
@@ -76,7 +94,7 @@ export default function ConfirmPaymentModal({ isOpen, onClose, onConfirm, isSavi
       onClose={isSaving ? undefined : onClose}
       title="Confirm payment"
       subtitle={`${reportNumber || "Expense report"} · ${formatMoney(amountOwed, currencyCode)} owed to the employee`}
-      size="md"
+      size="2xl"
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
@@ -147,6 +165,25 @@ export default function ConfirmPaymentModal({ isOpen, onClose, onConfirm, isSavi
             disabled={isSaving}
             onWheel={(e) => e.currentTarget.blur()}
           />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="paymentProof" className="block text-sm font-medium text-gray-700">
+            Proof of payment<span className="ml-1 text-red-500">*</span>
+          </label>
+          <input
+            id="paymentProof"
+            name="paymentProof"
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+            className={fileInputClass}
+            onChange={(e) => {
+              setProofFile(e.target.files?.[0] || null);
+              if (errors.paymentProof) setErrors((prev) => ({ ...prev, paymentProof: "" }));
+            }}
+            disabled={isSaving}
+          />
+          <p className="text-xs text-gray-500">The bank confirmation, transaction screenshot or cheque copy. PDF, JPG or PNG, up to 10 MB.</p>
+          {errors.paymentProof && <p className="text-xs text-red-600">{errors.paymentProof}</p>}
         </div>
         <FormInput
           label="Remarks (optional)"

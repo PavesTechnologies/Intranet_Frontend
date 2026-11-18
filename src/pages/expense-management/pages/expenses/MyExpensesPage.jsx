@@ -176,8 +176,8 @@ export default function MyExpensesPage() {
   const { hasRole } = useAuth();
   // Manager is read-only on the backend for report writes (ExpenseReportController
   // allows only ADMIN/GENERAL to create/update/delete/submit) — don't show write actions.
-  const canManage = hasRole(["General"]);
-
+  const canManage = hasRole(["General", "Manager"]);
+ 
   const [reports, setReports] = useState([]);
   const [isServerPaginated, setIsServerPaginated] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
@@ -689,12 +689,12 @@ export default function MyExpensesPage() {
               <>
                 <button
                   type="button"
-                  onClick={() => navigate("/expense-management/expenses/outdated")}
-                  title="Claim an expense older than the usual submission window"
+                  onClick={() => navigate("/expense-management/expenses/supplementary")}
+                  title="Claim an expense you missed on a report that has already been submitted"
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/15"
                 >
                   <Paperclip size={15} aria-hidden="true" />
-                  Outdated expense
+                  Supplementary claim
                 </button>
                 <button
                   type="button"

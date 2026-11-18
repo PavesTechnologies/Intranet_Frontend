@@ -9,7 +9,6 @@ import Board from "./UserBoard";
 import SprintBoard from "./UserSprint/SprintBoard";
 import Lists from "./UserLists";
 import Navbar from "../../../components/Navbar/Navbar";
-import ProjectMilestones from "../manager/milestones/ProjectMilestones";
 
 const ProjectTabs = () => {
   const { projectId } = useParams();
@@ -66,8 +65,6 @@ const ProjectTabs = () => {
         return <Board projectId={pid} projectName={projectName} />;
       case "sprint":
         return <SprintBoard projectId={pid} projectName={projectName} />;
-      case "milestones":
-        return <ProjectMilestones projectId={pid} projectName={projectName} />;
       case "lists":
         return <Lists projectId={pid} />;
       default:
@@ -88,7 +85,6 @@ const ProjectTabs = () => {
     { name: "Summary", tab: "summary" },
     { name: "Backlog", tab: "backlog" },
     { name: "Board", tab: "board" },
-    { name: "Milestones", tab: "milestones" },
     { name: "Sprints", tab: "sprint" },
     { name: "Lists", tab: "lists" },
   ];

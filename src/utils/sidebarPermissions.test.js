@@ -106,31 +106,3 @@ describe("AP sidebar — Internal Requests entry", () => {
     expect(labels).not.toContain("Internal Requests");
   });
 });
-
-describe("XMS sidebar — Late Receipts entry", () => {
-  // Same matching as AuthContext.hasRole: case-insensitive.
-  const labelsFor = async (roles) => {
-    const { XMS_SUBMENU } = await import("../config/sidebarConfig");
-    const held = roles.map((r) => r.toUpperCase());
-    return filterMenuByRole(XMS_SUBMENU, (allowed) => allowed.some((r) => held.includes(r.toUpperCase())))
-      .map((item) => item.label);
-  };
-
-  it("is shown to Finance, Finance Executive and AP Executive, the roles that can review late receipts", async () => {
-    for (const role of ["FINANCE", "FINANCE_EXECUTIVE", "AP_EXECUTIVE"]) {
-      expect(await labelsFor([role])).toContain("Late Receipts");
-    }
-  });
-
-  it("is hidden from employees, managers and admins, who cannot review them", async () => {
-    for (const role of ["GENERAL", "MANAGER", "ADMIN"]) {
-      expect(await labelsFor([role])).not.toContain("Late Receipts");
-    }
-  });
-
-  it("points at the review page, and Finance matches its own path only so both are not highlighted", async () => {
-    const { XMS_SUBMENU } = await import("../config/sidebarConfig");
-    expect(XMS_SUBMENU.find((i) => i.label === "Late Receipts").to).toBe("/expense-management/finance/late-receipts");
-    expect(XMS_SUBMENU.find((i) => i.label === "Finance").end).toBe(true);
-  });
-});

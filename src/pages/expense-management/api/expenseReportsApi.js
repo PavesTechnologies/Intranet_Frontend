@@ -129,41 +129,6 @@ export const splitService = {
     }),
 };
 
-// Late receipts: a receipt found after the report was approved, reimbursed or closed. Attaching one never changes the
-// expense's amount, status or payment. Mirrors the backend's LATE_ATTACHABLE set (ReceiptServiceImpl).
-export const LATE_RECEIPT_REPORT_STATUSES = ["APPROVED", "REIMBURSED", "CLOSED"];
-
-export const lateReceiptService = {
-  attach: (lineItemId, formData) =>
-    api.post(`/xms/employee/expense-line-items/${lineItemId}/late-receipts`, formData, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
-  forReport: (reportId) =>
-    api.get(`/xms/employee/expense-reports/${reportId}/late-receipts`, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
-  verify: (receiptId, note) =>
-    api.post(`/xms/finance/late-receipts/${receiptId}/verify`, { note }, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
-  reject: (receiptId, note) =>
-    api.post(`/xms/finance/late-receipts/${receiptId}/reject`, { note }, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
-  // Late receipts across all reports (Finance, Finance Executive, AP Executive). No status = waiting for review;
-  // "VERIFIED", "REJECTED" or "ALL" = the reviewed history.
-  pendingReview: (status) =>
-    api.get("/xms/finance/late-receipts", {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-      params: status ? { status } : undefined,
-    }),
-};
-
 export const receiptService = {
   // Every receipt on a report, all lines. Used to find lines that still have no receipt.
   listForReport: (reportId) =>

@@ -39,20 +39,21 @@ const normalizeViolations = (line) => {
   return [];
 };
 
+// One info card: a light header strip with the title, then its fields.
 const Section = ({ icon, title, children }) => (
-  <div className="rounded-xl border border-gray-200 bg-white p-4">
-    <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
+  <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <header className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-600">
       {icon}
       {title}
-    </div>
-    {children}
-  </div>
+    </header>
+    <div className="p-4">{children}</div>
+  </section>
 );
 
 const Field = ({ label, value }) => (
-  <div>
-    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
-    <p className="mt-0.5 text-sm font-medium text-gray-800 break-words">{value ?? "—"}</p>
+  <div className="min-w-0">
+    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+    <div className="mt-1 break-words text-sm text-gray-900">{value ?? "—"}</div>
   </div>
 );
 
@@ -390,26 +391,45 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
           </div>
 
           {canAct && (
-            <div className="sticky bottom-0 flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-gray-200 bg-white p-3 sm:p-4">
-              {queueItem?.eligibleForBulkApprove && (
-                <Button variant="success" disabled={isMutating} loading={bulkApprove.isPending} onClick={handleBulkApprove}>
-                  <Check className="h-4 w-4" /> Bulk Approve Report
-                </Button>
-              )}
-              <Button variant="outline" disabled={isMutating || !canActOnSelected} onClick={() => setFlaggingLine(selectedRelevant)}>
-                <MessageSquareWarning className="h-4 w-4" /> Request Correction
-              </Button>
+            <div className="sticky bottom-0 flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <Button
-                variant="success"
-                disabled={isMutating || !canActOnSelected}
-                loading={reviewLineItem.isPending || reviewSplit.isPending}
-                onClick={handleApprove}
+                variant="danger"
+                className="whitespace-nowrap"
+                disabled={isMutating}
+                onClick={() => setIsRejecting(true)}
               >
-                <Check className="h-4 w-4" /> {selectedRelevant?.isSplit ? "Approve My Allocation" : "Approve Line"}
+                <XCircle className="h-4 w-4" /> Reject report
               </Button>
-              <Button variant="danger" disabled={isMutating} onClick={() => setIsRejecting(true)}>
-                <XCircle className="h-4 w-4" /> Reject Report
-              </Button>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <Button
+                  variant="outline"
+                  className="whitespace-nowrap"
+                  disabled={isMutating || !canActOnSelected}
+                  onClick={() => setFlaggingLine(selectedRelevant)}
+                >
+                  <MessageSquareWarning className="h-4 w-4" /> Request correction
+                </Button>
+                <Button
+                  variant="success"
+                  className="whitespace-nowrap"
+                  disabled={isMutating || !canActOnSelected}
+                  loading={reviewLineItem.isPending || reviewSplit.isPending}
+                  onClick={handleApprove}
+                >
+                  <Check className="h-4 w-4" /> {selectedRelevant?.isSplit ? "Approve my allocation" : "Approve line"}
+                </Button>
+                {queueItem?.eligibleForBulkApprove && (
+                  <Button
+                    variant="success"
+                    className="whitespace-nowrap"
+                    disabled={isMutating}
+                    loading={bulkApprove.isPending}
+                    onClick={handleBulkApprove}
+                  >
+                    <Check className="h-4 w-4" /> Bulk approve report
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>

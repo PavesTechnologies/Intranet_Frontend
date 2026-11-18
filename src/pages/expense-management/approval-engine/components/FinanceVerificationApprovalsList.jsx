@@ -44,7 +44,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
     return (
       <tbody>
         <tr>
-          <td colSpan={7} className="py-6 text-center text-xs text-gray-500">Loading Finance verification queue…</td>
+          <td colSpan={8} className="py-6 text-center text-xs text-gray-500">Loading Finance verification queue…</td>
         </tr>
       </tbody>
     );
@@ -54,7 +54,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
     return (
       <tbody>
         <tr>
-          <td colSpan={7} className="py-6 text-center text-xs text-rose-700">
+          <td colSpan={8} className="py-6 text-center text-xs text-rose-700">
             Failed to load the Finance verification queue.{" "}
             <button type="button" className="underline" onClick={() => refetch()}>Retry</button>
           </td>
@@ -81,6 +81,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
                 </span>
               </td>
               <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.pendingLineItems)}</td>
+              <td className="px-2.5 py-1.5 text-gray-600 truncate text-xs">{item.costCenterName || item.costCenterCode || "—"}</td>
               <td className="px-2.5 py-1.5">
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">
                   Pending Finance Verification
@@ -101,7 +102,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
       {(data?.totalPages ?? 0) > 1 && (
         <tbody>
           <tr>
-            <td colSpan={7} className="py-2">
+            <td colSpan={8} className="py-2">
               <div className="flex justify-center">
                 <Pagination
                   currentPage={page + 1}
