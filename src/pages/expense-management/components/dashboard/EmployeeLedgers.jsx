@@ -50,7 +50,7 @@ function Check({ title, total, parts, label, byKey, currency }) {
 
 function Card({ ledger, byKey, currency, icon: Icon, tile, headline, anchor, children }) {
   return (
-    <section {...(anchor ? anchorProps(anchor) : {})} className={`${ANCHOR_CLASS} flex flex-col rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_1px_2px_rgba(10,0,130,0.04),0_10px_30px_-18px_rgba(10,0,130,0.18)] sm:p-6`}>
+    <section {...(anchor ? anchorProps(anchor) : {})} className={`${ANCHOR_CLASS} flex flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_1px_2px_rgba(10,0,130,0.04),0_10px_30px_-18px_rgba(10,0,130,0.18)] sm:p-5`}>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tile}`}>
@@ -64,7 +64,7 @@ function Card({ ledger, byKey, currency, icon: Icon, tile, headline, anchor, chi
         {headline}
       </header>
       <div className="flex-1">{children}</div>
-      <footer className="mt-5 border-t border-slate-100 pt-4">
+      <footer className="mt-3 border-t border-slate-100 pt-3">
         <Check
           title={ledger.title}
           total={ledger.check.total}
@@ -94,7 +94,7 @@ function Line({ kpi, label, note, byKey, currency, minus = false, indent = false
   return (
     <div
       data-kpi={kpi}
-      className={`flex items-end gap-3 ${result ? "my-1 rounded-xl bg-[#0A0082]/[0.04] px-3 py-3" : "py-2"} ${indent ? "pl-2" : ""} ${muted ? "opacity-75" : ""}`}
+      className={`flex items-end gap-3 ${result ? "my-1 rounded-xl bg-[#0A0082]/[0.04] px-3 py-2" : "py-1.5"} ${indent ? "pl-2" : ""} ${muted ? "opacity-75" : ""}`}
     >
       <div className="flex min-w-0 shrink-0 items-start gap-2">
         {dot && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dot }} aria-hidden="true" />}
@@ -184,7 +184,7 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
         />
       }
     >
-      <div className="mt-5">
+      <div className="mt-3">
         <SectionLabel>Received, split</SectionLabel>
         <div className="mt-2">
           <Bar base={received} parts={parts} label={`Settled ${share(settled, received)}%, outstanding ${share(outstanding, received)}%`} />
@@ -192,7 +192,7 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
         </div>
       </div>
 
-      <div className="mt-4 divide-y divide-dashed divide-slate-200">
+      <div className="mt-3 divide-y divide-dashed divide-slate-200">
         <div>
           <Line kpi="caRequested" label="Requested" note="What you asked for" muted {...shared} />
           <Line kpi="caApproved" label="Approved" note="Manager and Finance approved" muted {...shared} />
@@ -237,7 +237,7 @@ export function ReimbursementCard({ ledger, byKey, currency }) {
         />
       }
     >
-      <div className="mt-5 divide-y divide-dashed divide-slate-200">
+      <div className="mt-4 divide-y divide-dashed divide-slate-200">
         <div>
           <Line kpi="erClaimed" label="Claimed" note="Everything you submitted" strong {...shared} />
           <Line kpi="erNotApproved" label="Not approved yet" note="Pending, returned or rejected" minus {...shared} />
@@ -251,7 +251,7 @@ export function ReimbursementCard({ ledger, byKey, currency }) {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-3">
         <SectionLabel>Payable, by where it is</SectionLabel>
         <div className="mt-2">
           <Bar base={payable} parts={parts} label={`Paid ${share(paid, payable)}%, waiting for AP ${share(waiting, payable)}%, not yet with AP ${share(toSend, payable)}%`} />

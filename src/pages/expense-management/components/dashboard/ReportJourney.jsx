@@ -3,7 +3,7 @@ import { BadgeCheck, FilePen, Landmark, ShieldCheck, Undo2, UserCheck } from "lu
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 
 // Where the employee's expense reports are right now, as the five steps every report goes through.
-// Counts come from the backend's `pipeline`; the amount under each step is the matching stage KPI.
+// Counts come from the backend's `pipeline`. Amounts are left to the ledgers, so no figure is shown twice.
 // Reports sent back for correction sit outside the line, so they are shown as their own callout.
 
 const STEPS = {
@@ -22,7 +22,7 @@ export default function ReportJourney({ pipeline = [], byKey, currency }) {
   const returnedValue = byKey.action ? Number(byKey.action.value) || 0 : 0;
 
   return (
-    <div data-journey className="flex h-full flex-col gap-5">
+    <div data-journey className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0A0082]/5 px-3 py-1 text-slate-600">
           <span className="h-1.5 w-1.5 rounded-full bg-[#0A0082]" aria-hidden="true" />
@@ -43,15 +43,14 @@ export default function ReportJourney({ pipeline = [], byKey, currency }) {
           const count = Number(s.count || 0);
           const active = count > 0;
           const done = s.key === "paid";
-          const amount = byKey[step.kpi] ? byKey[step.kpi].value : null;
           return (
             <li key={s.key} data-stage={s.key} className="relative flex flex-col items-center text-center lg:px-2">
               {/* connector to the next step (wide screens only) */}
               {i < stages.length - 1 && (
-                <span aria-hidden="true" className="absolute left-1/2 top-6 hidden h-0.5 w-full bg-gradient-to-r from-[#0A0082]/25 to-[#0A0082]/10 lg:block" />
+                <span aria-hidden="true" className="absolute left-1/2 top-5 hidden h-0.5 w-full bg-gradient-to-r from-[#0A0082]/25 to-[#0A0082]/10 lg:block" />
               )}
               <span
-                className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl ring-4 ring-white transition ${
+                className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-2xl ring-4 ring-white transition ${
                   active
                     ? done
                       ? "bg-emerald-500 text-white shadow-[0_8px_20px_-8px_rgba(16,185,129,0.8)]"
@@ -59,18 +58,17 @@ export default function ReportJourney({ pipeline = [], byKey, currency }) {
                     : "bg-slate-100 text-slate-400"
                 }`}
               >
-                <Icon size={20} aria-hidden="true" />
+                <Icon size={18} aria-hidden="true" />
                 {active && (
                   <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff3d72] px-1 text-[10px] font-bold text-white ring-2 ring-white">
                     {count}
                   </span>
                 )}
               </span>
-              <p className={`mt-3 text-sm font-semibold ${active ? "text-[#0a174e]" : "text-slate-500"}`}>{s.label}</p>
+              <p className={`mt-2 text-sm font-semibold ${active ? "text-[#0a174e]" : "text-slate-500"}`}>{s.label}</p>
               <p className="text-[11px] text-slate-400">{step.caption}</p>
-              <p className={`mt-1.5 text-xs tabular-nums ${active ? "font-semibold text-slate-700" : "text-slate-400"}`}>
+              <p className={`mt-1 text-xs tabular-nums ${active ? "font-semibold text-slate-700" : "text-slate-400"}`}>
                 {count} report{count === 1 ? "" : "s"}
-                {amount !== null && <span className="block text-[11px] font-normal text-slate-500">{formatMoney(amount, currency)}</span>}
               </p>
             </li>
           );

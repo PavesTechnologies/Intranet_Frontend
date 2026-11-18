@@ -64,7 +64,22 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
     : "";
   const name = liveName || user?.name || user?.email || "User";
   const firstName = name.split(" ")[0];
-  //  const role = user?.roles?.join(", ") || "User";
+  // Roles arrive as codes (e.g. "FINANCE_ADMIN"), either an array or a comma-separated
+  // string — turn them into readable labels ("Finance Admin") for display under the name.
+  const rawRoles = user?.roles || user?.role || [];
+  const role =
+    (Array.isArray(rawRoles) ? rawRoles : String(rawRoles).split(","))
+      .map((r) =>
+        String(r)
+          .trim()
+          .replace(/^ROLE_/i, "")
+          .split(/[_\s]+/)
+          .filter(Boolean)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(" ")
+      )
+      .filter(Boolean)
+      .join(", ") || "User";
 
 
   const iconVariants = {
@@ -321,9 +336,10 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
                 <div className="h-8 w-8 bg-[#263383] rounded-full flex items-center justify-center flex-shrink-0">
                   <User className="h-4 w-4 text-white" />
                 </div>
-                <span className="hidden md:block text-sm font-medium text-gray-900 max-w-[140px] truncate">
-                  {name}
-                </span>
+                <div className="hidden md:block text-left max-w-[160px]">
+                  <p className="text-sm font-medium text-gray-900 leading-tight truncate">{name}</p>
+                  <p className="text-xs text-gray-500 leading-tight truncate" title={role}>{role}</p>
+                </div>
                 <ChevronDown
                   className={`h-4 w-4 text-gray-400 hidden md:block transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""
                     }`}
