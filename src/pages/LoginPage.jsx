@@ -323,7 +323,20 @@ const customCSS = `
 .login-page-container .lp-illus svg{width:100%;height:auto;max-height:62vh;display:block}
 .login-page-container .lp-ws{font-size:clamp(56px,5.2vw,84px)}
 @media (max-width:1100px){.login-page-container .lp-illus{display:none}}
-@media (max-height:760px){.login-page-container .lp-ws{margin-bottom:18px !important;font-size:clamp(44px,4.2vw,68px)}.login-page-container .lp-hero-p{margin-bottom:20px !important}.login-page-container .left-panel{padding-top:32px !important;padding-bottom:28px !important}.login-page-container .svc-cap{margin-top:12px}}
+@media (max-height:760px){
+  .login-page-container .left-panel{padding:28px 40px !important}
+  .login-page-container .lp-brand{margin-bottom:14px !important}
+  .login-page-container .lp-brand img{width:38px !important;height:38px !important}
+  .login-page-container .lp-ws{margin-bottom:14px !important;font-size:clamp(40px,8vh,64px)}
+  .login-page-container .lp-h1{font-size:20px !important;margin-bottom:8px !important}
+  .login-page-container .lp-hero-p{font-size:13px !important;line-height:1.6 !important;margin-bottom:18px !important}
+  .login-page-container .svc-grid{row-gap:10px}
+  .login-page-container .svc-cap{display:none}
+  .login-page-container .right-panel{padding:24px 40px !important}
+  .login-page-container .lp-form-head{margin-bottom:22px !important}
+  .login-page-container .lp-or{margin:14px 0 !important}
+  .login-page-container .lp-foot{padding-top:14px !important}
+}
 @keyframes wiBar   { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(.68)} }
 @keyframes wiDonut { 0%{stroke-dashoffset:76} 35%,85%{stroke-dashoffset:0} 100%{stroke-dashoffset:76} }
 @keyframes wiSteam { 0%{opacity:0;transform:translateY(4px)} 30%{opacity:.8} 100%{opacity:0;transform:translateY(-14px)} }
@@ -775,7 +788,7 @@ export default function LoginPage() {
       <div className="left-panel lp-grad-bg panel-l" style={{ width: "55%", height: "100vh", borderRight: "1px solid #E3E6F2", display: "flex", flexDirection: "column", padding: "48px", position: "relative", overflow: "hidden" }}>
         <InteractiveGrid />
         <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "28px", flexShrink: 0 }}>
+          <div className="lp-brand" style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "28px", flexShrink: 0 }}>
             <img src="/logo.png" alt="Logo" style={{ width: "48px", height: "48px", objectFit: "contain", borderRadius: "10px", flexShrink: 0 }} />
             <span className="head-font" style={{ fontSize: "20px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.01em" }}>Paves Enterprise App</span>
           </div>
@@ -785,8 +798,8 @@ export default function LoginPage() {
               <span className="ws-line"><span>Work</span></span>
               <span className="ws-line"><span>Space</span></span>
             </div>
-            <h1 className="head-font" style={{ fontSize: "24px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.3, marginBottom: "14px" }}>Your organization's<br />operational hub</h1>
-            <p className="lp-hero-p" style={{ fontSize: "14px", color: "#5B6479", lineHeight: 1.7, maxWidth: "440px", marginBottom: "40px" }}>Manage leave, track timesheets, handle projects, and access all your internal tools through a single gateway.</p>
+            <h1 className="head-font lp-h1" style={{ fontSize: "24px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.3, marginBottom: "14px" }}>Your organization's<br />operational hub</h1>
+            <p className="lp-hero-p" style={{ fontSize: "14px", color: "#5B6479", lineHeight: 1.7, maxWidth: "420px", marginBottom: "32px" }}>Leave, timesheets, projects and all your internal tools in one secure place.</p>
             <div className="svc-grid" onMouseLeave={() => setSvcPaused(false)}>
               {SERVICES.map(({ label, d }, i) => (
                 <div key={label} className={`svc-item${i === activeSvc ? " active" : ""}`}
@@ -812,12 +825,12 @@ export default function LoginPage() {
       </div>
 
       {/* RIGHT PANEL */}
-      <div className="right-panel panel-r" style={{ flex: 1, height: "100vh", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px", position: "relative" }}>
-        <div style={{ width: "100%", maxWidth: "360px" }}>
+      <div className="right-panel panel-r" style={{ flex: 1, height: "100vh", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", padding: "48px", position: "relative", overflowY: "auto" }}>
+        <div className="lp-form" style={{ width: "100%", maxWidth: "360px", margin: "auto 0" }}>
 
           {currentView === "login" ? (
             <>
-              <div className="a1" style={{ marginBottom: "40px" }}>
+              <div className="a1 lp-form-head" style={{ marginBottom: "40px" }}>
                 <span style={{ display: "block", width: "32px", height: "4px", borderRadius: "4px", background: "linear-gradient(90deg,var(--accent-600),var(--pink))", marginBottom: "18px" }} />
                 <h2 className="head-font" style={{ fontSize: "28px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.2, marginBottom: "8px" }}>Welcome back</h2>
                 <p style={{ fontSize: "14px", color: "var(--neutral-500)", lineHeight: 1.5, margin: 0 }}>Sign in to continue to your workspace</p>
@@ -830,7 +843,7 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <div className="a3" style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
+              <div className="a3 lp-or" style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
                 <div style={{ flex: 1, height: "1px", background: "var(--neutral-150)" }} />
                 <span style={{ fontSize: "11px", fontWeight: 500, color: "var(--neutral-300)", letterSpacing: ".1em", textTransform: "uppercase" }}>or</span>
                 <div style={{ flex: 1, height: "1px", background: "var(--neutral-150)" }} />
@@ -873,7 +886,7 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              <div className="a1" style={{ marginBottom: "40px" }}>
+              <div className="a1 lp-form-head" style={{ marginBottom: "40px" }}>
                 <span style={{ display: "block", width: "32px", height: "4px", borderRadius: "4px", background: "linear-gradient(90deg,var(--accent-600),var(--pink))", marginBottom: "18px" }} />
                 <h2 className="head-font" style={{ fontSize: "28px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.2, marginBottom: "8px" }}>Reset password</h2>
                 <p style={{ fontSize: "14px", color: "var(--neutral-500)", lineHeight: 1.5, margin: 0 }}>Enter your email to receive an OTP and set a new password</p>
@@ -925,7 +938,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div style={{ position: "absolute", bottom: "28px", display: "flex", alignItems: "center", gap: "14px" }}>
+        <div className="lp-foot" style={{ display: "flex", alignItems: "center", gap: "14px", paddingTop: "24px", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
             <svg width={10} height={10} viewBox="0 0 16 16" fill="none" stroke="var(--neutral-300)" strokeWidth={1.5}>
               <path d="M8 2L4 4v5c0 3 4 5 4 5s4-2 4-5V4L8 2z" />
