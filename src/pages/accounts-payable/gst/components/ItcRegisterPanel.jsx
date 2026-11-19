@@ -5,12 +5,46 @@ import { toast } from "react-toastify";
 import { Landmark } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import { AP_ROUTES } from "../../constants/routes";
-import { RISK } from "../../constants/gstItc";
+import { CLAIM_STATUS, RISK } from "../../constants/gstItc";
 import { formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { useGstr3bFilings, useGstRegister, useReclaimItc, useReverseItc, useSetIrn } from "../hooks/useGstItc";
+import { useGstr3bFilings, useGstRegister, useGstWorkflow, useReclaimItc, useReverseItc, useSetIrn } from "../hooks/useGstItc";
 import { currentPeriod, inr, monthDate, periodLabel, toPeriod } from "../utils/gstFormat";
-import { ConfirmDialog, ErrorBlock, LoadingBlock, SectionCard, TextArea } from "./GstUi";
+import { ComponentTable, ConfirmDialog, ErrorBlock, LoadingBlock, SectionCard, TextArea } from "./GstUi";
+
+/**
+ * The return period's ITC balances (GET /itc/workflow itc_register, approval and eligibility blocks) per component.
+ * Every amount is the backend's; approved, claimable and claimed credit are kept apart, and credit counts as claimed
+ * only once its GSTR-3B filing is verified.
+ */
+function PeriodRegister({ period }) {
+  const { data: w, isLoading, isError, error } = useGstWorkflow(period);
+  if (isLoading) return <LoadingBlock text="Loading the period's ITC balances..." />;
+  if (isError) return <ErrorBlock error={error} fallback="Could not load the period's ITC balances." />;
+  if (!w) return null;
+  const g = w.itc_register || {};
+  const statusCounts = Object.entries(g.claim_status_counts || {}).filter(([, n]) => n > 0);
+  return (
+    <SectionCard title={`ITC register · ${periodLabel(period)}`} bodyClassName="space-y-3 p-4">
+      <ComponentTable caption="ITC balances of the period" rows={[
+        { label: "Total ITC identified", hint: "GST on the period's purchase invoices", values: g.total_itc_identified },
+        { label: "Matched with GSTR-2B", values: g.total_matched_itc },
+        { label: "Eligible ITC", hint: "Approvable now", values: g.total_eligible_itc },
+        { label: "Pending review", hint: "Held - Finance review / GSTR-2B / IRN", values: w.itc_eligibility?.pending_itc },
+        { label: "Approved ITC", hint: "Internal approval, not claimed yet", values: g.total_approved_itc },
+        { label: "Pending approval", values: w.approval?.pending_approval_itc },
+        { label: "Claimed ITC", hint: "Verified GSTR-3B filings, net of reversals", values: g.total_claimed_itc, emphasis: true },
+        { label: "Reversed ITC", values: g.reversed_itc },
+        { label: "Remaining claimable ITC", hint: "Approved, not yet in a verified filing", values: g.remaining_claimable_itc, emphasis: true },
+      ]} />
+      {statusCounts.length > 0 && (
+        <p className="text-xs text-slate-500">
+          Invoices by claim status: {statusCounts.map(([k, n]) => `${CLAIM_STATUS[k]?.label || k} ${n}`).join(" · ")}
+        </p>
+      )}
+    </SectionCard>
+  );
+}
 
 function Tile({ label, value, hint, tone = "text-slate-800", children }) {
   return (
@@ -120,6 +154,8 @@ export default function ItcRegisterPanel({ period, canManage, onOpenItc, onRecor
   const s = data.summary;
   return (
     <div className="space-y-4">
+      <PeriodRegister period={period} />
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile label={`Claimable for ${periodLabel(s.claim_period)}`} value={inr(s.claimable_now)}
           hint={`${s.claimable_count} invoice(s) · GSTR-3B due ${formatDate(s.claim_due)}`

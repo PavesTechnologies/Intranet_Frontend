@@ -18,7 +18,7 @@ export const SUMMARY = {
   return_period: "2026-10", import_id: 3, import_status: "COMPLETED", file_name: "GSTR2B_102026.xlsx", imported_at: "2026-11-14T10:00:00Z",
   total_ap_invoices: 14, total_gstr2b_records: 15, matched: 9, matched_count: 8, amended_count: 1, partially_matched: 1,
   mismatched: 2, mismatched_count: 2, credit_note_mismatch_count: 0, missing_in_gstr2b: 1, missing_in_ap: 1, duplicates: 1,
-  review_required_count: 1,
+  review_required_count: 1, match_groups: { matched: 9, partially_matched: 3, unmatched: 1, review_required: 2 },
   eligible_itc: C(0, 51750, 51750), eligible_itc_unconfirmed: C(0, 0, 0), ineligible_itc: C(0, 900, 900),
   pending_review_itc: C(18000, 0, 0), pending_review_amount: 18000, eligibility_pending_review_count: 1,
   approved_for_gstr3b: C(0, 5715, 5715), approved_for_gstr3b_amount: 11430, approved_for_gstr3b_count: 1,
@@ -105,6 +105,62 @@ export const FILINGS = {
   total: 2, page: 1, page_size: 200,
 };
 
+/** POST /gstr2b/import/preview - an importable official workbook. */
+export const PREVIEW = {
+  file_name: "GSTR2B_102026.xlsx", import_mode: "OFFICIAL", is_demo: false, source_type: "GST_PORTAL_EXCEL", source_format: "XLSX",
+  return_period: "2026-10", total_records: 2, accepted_records: 2, skipped_records: 0, rejected_records: 0,
+  validation_errors: [], duplicate_records: [], blocking_errors: [], warnings: [], can_import: true,
+  replace_required: false, duplicate_file: false, existing_import: null, demo_notice: null,
+  records: [
+    { sheet: "B2B", row: 5, supplier_gstin: GSTIN, document_type: "INV", document_number: "WWIM/HYD/26-27/03001", document_date: "2026-10-01",
+      taxable_value: 63500, igst_amount: 0, cgst_amount: 5715, sgst_amount: 5715, cess_amount: 0, itc_available: true },
+    { sheet: "B2B", row: 6, supplier_gstin: GSTIN, document_type: "INV", document_number: "WWIM/HYD/26-27/03002", document_date: "2026-10-02",
+      taxable_value: 1000, igst_amount: 0, cgst_amount: 90, sgst_amount: 90, cess_amount: 0, itc_available: null },
+  ],
+};
+
+/** GET /itc/workflow?return_period=2026-10 - Backend GstItcWorkflowService.summary. */
+const T4 = (row, label, v) => ({ row, label, ...v });
+export const WORKFLOW = {
+  return_period: "2026-10", financial_year: "2026-27", as_of: "2026-11-18",
+  gstr2b_import: {
+    import_status: "COMPLETED", import_id: 3, file_name: "GSTR2B_102026.xlsx", imported_at: "2026-11-14T10:00:00Z", imported_by: "fin-maker",
+    source_type: "GST_PORTAL_EXCEL", total_records: 15, accepted_records: 15, rejected_records: 0, skipped_records: 0,
+    available_from: "2026-11-14", documents: 15, credit_notes: 0, superseded_by_amendment: 0, invoice_value: 1250000,
+    documents_without_invoice_value: 0, taxable_value: 1060000, igst: 18000, cgst: 86000, sgst: 86000, cess: 0, total_gst: 190000,
+  },
+  reconciliation: { total_records: 15, matched: 9, partially_matched: 3, unmatched: 1, review_required: 2, missing_in_gstr2b: 1,
+    accepted_after_review: 0, on_hold: 0, partially_matched_tax_difference: 500 },
+  itc_eligibility: {
+    invoices: 14, invoice_counts: { eligible: 8, ineligible: 1, pending_review: 3, already_claimed: 2 },
+    eligible_itc: C(0, 51750, 51750), ineligible_itc: C(0, 900, 900), pending_itc: C(18000, 0, 0), already_claimed_itc: C(0, 24300, 24300),
+    awaiting_finance_confirmation_itc: C(18000, 0, 0),
+    reasons: [{ position: "PENDING_REVIEW", code: "ELIGIBILITY_NOT_CONFIRMED", label: "System suggestion only - Finance has not confirmed the eligibility", invoices: 1, itc: 18000 }],
+  },
+  approval: { approved_itc: C(0, 5715, 5715), pending_approval_itc: C(0, 46035, 46035), rejected_itc: C(0, 0, 0),
+    counts: { approved: 1, pending_approval: 7, under_review: 0, rejected: 0 },
+    note: "Only ELIGIBLE credit can be approved, and only approved credit goes into a GSTR-3B filing" },
+  itc_register: { total_itc_identified: C(18000, 77850, 77850), total_matched_itc: C(0, 70000, 70000), total_eligible_itc: C(0, 51750, 51750),
+    total_approved_itc: C(0, 5715, 5715), total_claimed_itc: C(0, 24300, 24300), remaining_claimable_itc: C(0, 5715, 5715),
+    reversed_itc: C(0, 0, 0), claim_status_counts: { NOT_CLAIMED: 11, APPROVED_FOR_GSTR3B: 1, CLAIMED_IN_GSTR3B: 2 } },
+  gstr3b_claim: {
+    return_period: "2026-10", due_date: "2026-11-20", return_open: true, filing_status: "NOT_RECORDED", filing: null,
+    ready_for_claim_itc: C(0, 5715, 5715), ready_for_claim_count: 1, in_filing_awaiting_verification_itc: C(0, 0, 0),
+    claimed_itc: C(0, 0, 0), reclaimed_itc: C(0, 0, 0), reversed_itc: C(0, 0, 0), credit_note_itc: C(0, 0, 0),
+    table_4: { basis: "APPROVED_FOR_PERIOD", blocked_in_gstr2b: C(0, 0, 0), rows: [
+      T4("4A3", "4(A)(3) Inward supplies liable to reverse charge", C(0, 0, 0)),
+      T4("4A5", "4(A)(5) All other ITC", C(0, 5715, 5715)),
+      T4("4B1", "4(B)(1) Reversed - rules 38, 42, 43 and section 17(5)", C(0, 0, 0)),
+      T4("4B2", "4(B)(2) Reversed - others", C(0, 0, 0)),
+      T4("4C", "4(C) Net ITC available (A) - (B)", C(0, 5715, 5715)),
+      T4("4D1", "4(D)(1) ITC reclaimed which was reversed under 4(B)(2) in an earlier period", C(0, 0, 0)),
+      T4("4D2", "4(D)(2) Ineligible ITC under section 16(4) and ITC restricted due to place-of-supply rules", C(0, 0, 0)),
+    ] },
+    net_tax_payable: null, net_tax_payable_note: "Not computed: needs the output tax liability (GSTR-1 / sales), outside Accounts Payable",
+  },
+  next_step: "REVIEW_ELIGIBILITY",
+};
+
 export const query = (data, extra) => ({ data, isLoading: false, isError: false, isFetching: false, error: null, ...extra });
 export const mutation = (result = {}) => ({ mutateAsync: vi.fn().mockResolvedValue(result), isPending: false });
 
@@ -112,7 +168,7 @@ export const HOOK_NAMES = [
   "useGstRegister", "useItcDetail", "useItcDetails", "useItcHistory", "useSetIrn", "useSetEligibility", "useDecideApproval",
   "useReverseItc", "useReclaimItc", "useGstr3bFilings", "useGstr3bFiling", "useRecordFiling", "useVerifyFiling", "useGstPeriods",
   "useGstr2bSummary", "useGstr2bMatches", "useGstr2bMatchDetail", "useGstr2bImports", "useImportGstr2b", "useRematchGstr2b",
-  "useMapGstr2bMatch", "useReviewGstr2bMatch",
+  "useMapGstr2bMatch", "useReviewGstr2bMatch", "usePreviewGstr2b", "useGstWorkflow",
 ];
 
 /** Gives every mocked hook a default; returns the mutation mocks so tests can assert on them. */
@@ -120,6 +176,7 @@ export function setupGstHooks(hooks) {
   const m = {};
   hooks.useGstPeriods.mockReturnValue(query(PERIODS));
   hooks.useGstr2bSummary.mockReturnValue(query(SUMMARY));
+  hooks.useGstWorkflow.mockReturnValue(query(WORKFLOW));
   hooks.useGstr2bMatches.mockReturnValue(query({ items: MATCH_ITEMS, total: MATCH_ITEMS.length, page: 1, page_size: 25 }));
   hooks.useGstr2bMatchDetail.mockReturnValue(query(MATCH_DETAIL));
   hooks.useGstr2bImports.mockReturnValue(query([]));
@@ -130,8 +187,8 @@ export function setupGstHooks(hooks) {
   hooks.useGstr3bFilings.mockReturnValue(query(FILINGS));
   hooks.useGstr3bFiling.mockReturnValue(query({ ...FILINGS.items[0], allocations: [] }));
   for (const name of ["useSetIrn", "useSetEligibility", "useDecideApproval", "useReverseItc", "useReclaimItc", "useRecordFiling",
-    "useVerifyFiling", "useImportGstr2b", "useRematchGstr2b", "useMapGstr2bMatch", "useReviewGstr2bMatch"]) {
-    m[name] = mutation({});
+    "useVerifyFiling", "useImportGstr2b", "useRematchGstr2b", "useMapGstr2bMatch", "useReviewGstr2bMatch", "usePreviewGstr2b"]) {
+    m[name] = mutation(name === "usePreviewGstr2b" ? PREVIEW : {});
     hooks[name].mockReturnValue(m[name]);
   }
   return m;

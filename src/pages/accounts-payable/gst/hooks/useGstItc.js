@@ -19,6 +19,21 @@ function useGstMutation(mutationFn) {
   });
 }
 
+// ---------------------------------------------------------------- consolidated workflow
+/**
+ * GET /itc/workflow for one return period - the primary summary of the six stages and the backend's next_step.
+ * It sits under GST_ITC_KEY, so every GST mutation (upload, rematch, eligibility, approval, filing, verification)
+ * refreshes it.
+ */
+export function useGstWorkflow(returnPeriod) {
+  return useQuery({
+    queryKey: [...GST_ITC_KEY, "workflow", returnPeriod],
+    queryFn: () => gstItcService.workflow(returnPeriod),
+    enabled: Boolean(returnPeriod),
+    staleTime: 30_000,
+  });
+}
+
 // ---------------------------------------------------------------- ITC register / invoice credit
 export function useGstRegister(month) {
   return useQuery({
@@ -88,19 +103,21 @@ export function useGstPeriods() {
   return useQuery({ queryKey: [...GSTR2B_KEY, "periods"], queryFn: () => gstr2bService.periods(), staleTime: 60_000 });
 }
 
-export function useGstr2bSummary(returnPeriod) {
+export function useGstr2bSummary(returnPeriod, importMode = "OFFICIAL") {
   return useQuery({
-    queryKey: [...GSTR2B_KEY, "summary", returnPeriod],
-    queryFn: () => gstr2bService.summary(returnPeriod),
+    queryKey: [...GSTR2B_KEY, "summary", returnPeriod, importMode],
+    queryFn: () => gstr2bService.summary(returnPeriod, importMode),
     enabled: Boolean(returnPeriod),
     staleTime: 30_000,
   });
 }
 
-export function useGstr2bMatches({ returnPeriod, status, search, page = 1, pageSize = 25, enabled = true }) {
+export function useGstr2bMatches({
+  returnPeriod, status, matchGroup, search, page = 1, pageSize = 25, importMode = "OFFICIAL", enabled = true,
+}) {
   return useQuery({
-    queryKey: [...GSTR2B_KEY, "matches", returnPeriod, status || "", search || "", page, pageSize],
-    queryFn: () => gstr2bService.matches({ returnPeriod, status, search, page, pageSize }),
+    queryKey: [...GSTR2B_KEY, "matches", returnPeriod, status || "", matchGroup || "", search || "", page, pageSize, importMode],
+    queryFn: () => gstr2bService.matches({ returnPeriod, status, matchGroup, search, page, pageSize, importMode }),
     enabled: Boolean(returnPeriod) && enabled,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -115,15 +132,35 @@ export function useGstr2bMatchDetail(matchId) {
   });
 }
 
-export function useGstr2bImports({ returnPeriod, financialYear, enabled = true } = {}) {
+export function useGstr2bImports({ returnPeriod, financialYear, importMode, enabled = true } = {}) {
   return useQuery({
-    queryKey: [...GSTR2B_KEY, "imports", returnPeriod || "", financialYear || ""],
-    queryFn: () => gstr2bService.imports({ returnPeriod, financialYear }),
+    queryKey: [...GSTR2B_KEY, "imports", returnPeriod || "", financialYear || "", importMode || ""],
+    queryFn: () => gstr2bService.imports({ returnPeriod, financialYear, importMode }),
     enabled,
   });
 }
 
+/** Validates an upload without importing it - writes nothing, so nothing is invalidated. */
+export const usePreviewGstr2b = () => useMutation({ mutationFn: (body) => gstr2bService.previewImport(body) });
 export const useImportGstr2b = () => useGstMutation((body) => gstr2bService.importFile(body));
-export const useRematchGstr2b = () => useGstMutation((returnPeriod) => gstr2bService.rematch(returnPeriod));
+/**
+ * Re-matching is scoped to one return period by the backend, so only that period's queries are refreshed: its
+ * reconciliation summary / records, its workflow and its ITC register month ("YYYY-MM" or "YYYY-MM-01" in the key).
+ */
+export const isPeriodQuery = (queryKey, returnPeriod) =>
+  queryKey[0] === GST_ITC_KEY[0] && queryKey[1] === GST_ITC_KEY[1]
+  && queryKey.some((k) => typeof k === "string" && k.slice(0, 7) === returnPeriod && /^\d{4}-\d{2}/.test(k));
+
+export function useRematchGstr2b() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (returnPeriod) => gstr2bService.rematch(returnPeriod),
+    onSuccess: (_data, returnPeriod) => {
+      queryClient.invalidateQueries({ predicate: (q) => isPeriodQuery(q.queryKey, returnPeriod) });
+      queryClient.invalidateQueries({ queryKey: [...GST_ITC_KEY, "detail"] });
+      queryClient.invalidateQueries({ queryKey: ["accountsPayable", "actionCenter"] });
+    },
+  });
+}
 export const useMapGstr2bMatch = () => useGstMutation(({ matchId, ...body }) => gstr2bService.mapMatch(matchId, body));
 export const useReviewGstr2bMatch = () => useGstMutation(({ matchId, ...body }) => gstr2bService.reviewMatch(matchId, body));

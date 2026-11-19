@@ -5,13 +5,14 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import { AP_ROUTES } from "../../constants/routes";
 import {
-  ALLOCATION_TYPE, CLAIM_BLOCKERS, ELIGIBILITY_DECISIONS, GSTR2B_MATCH, IRN_STATUS, ITC_HISTORY_ACTIONS,
-  LEGACY_CLAIM_LABEL, TAX_COMPONENTS, TAX_COMPONENT_LABELS, approvalSpec, claimSpec, eligibilitySpec, filingSpec,
+  ALLOCATION_TYPE, CLAIM_BLOCKERS, ELIGIBILITY_DECISIONS, FINANCE_REVIEW_REASONS, GSTR2B_MATCH, IRN_STATUS, ITC_HISTORY_ACTIONS,
+  ITC_POSITION_ORDER, LEGACY_CLAIM_LABEL, TAX_COMPONENTS, TAX_COMPONENT_LABELS, approvalSpec, claimSpec, eligibilitySpec, filingSpec,
+  itcPositionSpec,
 } from "../../constants/gstItc";
 import { formatDate, formatDateTime } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { useDecideApproval, useItcDetail, useItcHistory, useSetEligibility } from "../hooks/useGstItc";
-import { amountError, currentPeriod, inr, monthDate, periodLabel, toPeriod } from "../utils/gstFormat";
+import { amountError, currentPeriod, inr, inrOrDash, monthDate, periodLabel, toPeriod } from "../utils/gstFormat";
 import {
   ComponentInputs, ComponentTable, ConfirmDialog, Drawer, ErrorBlock, Field, LoadingBlock, SelectInput, StatusPill, TextArea,
 } from "./GstUi";
@@ -51,6 +52,45 @@ function historyText(entry) {
     default:
       return "";
   }
+}
+
+/**
+ * Where the invoice's credit stands (GET /itc/{id} itc_position): ELIGIBLE / PENDING_REVIEW / INELIGIBLE /
+ * ALREADY_CLAIMED per component, with the backend's reasons. A GSTR-2B match alone never makes credit eligible,
+ * and nothing here is recalculated or overridden.
+ */
+export function ItcPosition({ position, basis }) {
+  if (!position) return null;
+  const reasons = position.reasons || [];
+  const financePending = basis === "SYSTEM_SUGGESTION" || reasons.some((r) => FINANCE_REVIEW_REASONS.includes(r.code));
+  return (
+    <section className="space-y-2" aria-label="ITC position">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold text-slate-800">ITC position</h3>
+        <StatusPill spec={itcPositionSpec(position.position)} />
+        {financePending && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+            <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Finance review pending
+          </span>
+        )}
+      </div>
+      <ComponentTable caption="ITC position by component" rows={ITC_POSITION_ORDER.map((p) => ({
+        label: itcPositionSpec(p).label, hint: itcPositionSpec(p).hint, values: position[p.toLowerCase()], emphasis: p === position.position,
+      }))} />
+      {reasons.length > 0 && (
+        <ul className="space-y-1 rounded-lg bg-slate-50 p-3 text-sm" aria-label="Eligibility reasons">
+          {reasons.map((r, i) => (
+            <li key={`${r.position}-${r.code}-${i}`} className="flex flex-wrap items-baseline gap-x-2">
+              <StatusPill spec={itcPositionSpec(r.position)} />
+              <span className="text-slate-700">{r.label || r.code}</span>
+              {r.detail && <span className="text-xs text-slate-500">· {r.detail}</span>}
+              <span className="ml-auto text-xs tabular-nums text-slate-500">{inrOrDash(r.itc)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function EligibilityForm({ detail, onDone }) {
@@ -230,7 +270,7 @@ function ApprovalForm({ detail, defaultPeriod }) {
         open={Boolean(pending)}
         title={{ APPROVE: "Approve for GSTR-3B?", REJECT: "Reject the credit for claim?", UNDER_REVIEW: "Mark the approval under review?", RESET: "Reset the approval?" }[pending] || ""}
         message={pending === "APPROVE"
-          ? `Approves the credit for the GSTR-3B of ${periodLabel(period)}. This is an internal approval - the credit counts as claimed only after the filing is recorded and verified by a second Finance user.`
+          ? `Approves the credit for the GSTR-3B of ${periodLabel(period)}. This is an internal approval - the credit counts as claimed only after the filing is recorded and then verified.`
           : "Any existing approval of this invoice is cleared."}
         confirmText={{ APPROVE: "Approve for GSTR-3B", REJECT: "Reject", UNDER_REVIEW: "Mark under review", RESET: "Reset" }[pending] || "Confirm"}
         variant={pending === "REJECT" ? "danger" : "primary"}
@@ -288,6 +328,8 @@ export default function ItcDetailDrawer({ invoiceId, period, canManage, onClose 
               </span>
             </Field>
           </dl>
+
+          <ItcPosition position={d.itc_position} basis={d.itc_eligibility_basis} />
 
           <ComponentTable caption="Credit by component" rows={[
             { label: "GST on the invoice", values: { ...pick(d), total: d.itc } },
