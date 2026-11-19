@@ -24,6 +24,8 @@ import {
 import { MIN_COMMENT_LENGTH, claimActions } from "@/pages/expense-management/pages/supplementary/supplementaryClaimActions";
 import ReceiptFirstExpense from "@/pages/expense-management/pages/supplementary/ReceiptFirstExpense";
 import ClaimExpenseDrawer from "@/pages/expense-management/pages/supplementary/ClaimExpenseDrawer";
+import SupplementaryFlowChart from "@/pages/expense-management/pages/supplementary/SupplementaryFlowChart";
+import { employeeActionStates } from "@/pages/expense-management/pages/supplementary/supplementaryClaimList";
 
 // Maps a claim status to the status pill the rest of Expense Management uses (the label is the claim's own wording).
 const PILL_STATUS = {
@@ -196,7 +198,6 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
   }
 
   const isReviewer = actions.canManagerReview || actions.canFinanceReview;
-  const hasSideActions = actions.canAcknowledge || actions.canSubmit || actions.canResubmit || actions.canCancel;
   const editingItem = editingId ? claim.items.find((i) => i.claimItemId === editingId) || null : null;
   const breadcrumbs = [
     { label: "Expense Management", to: "/expense-management/dashboard" },
@@ -204,6 +205,7 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
     { label: claim.claimNumber },
   ];
 
+  const workflow = employeeActionStates(claim);
   const withReceipt = claim.items.filter((i) => (i.receipts || []).length > 0).length;
   const addTitle = addMode === "manual" ? "Enter the expense" : addMode === "auto" ? "Add from a receipt" : "Add an expense";
 
@@ -272,6 +274,8 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
           <Detail label="Submitted" value={formatDateTime(claim.submittedAt)} />
         </dl>
       </section>
+
+      <SupplementaryFlowChart status={claim.status} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         {/* Left: the expenses. Adding one opens a dialog, as on the expense report. */}
@@ -342,36 +346,39 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
             </dl>
           </section>
 
-          {hasSideActions && (
+          {mode === "employee" && (
             <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="text-sm font-semibold text-gray-900">Next step</h2>
-              {actions.canAcknowledge && (
-                <Button variant="primary" size="small" className="w-full" disabled={busy}
-                  onClick={() => runAction(() => supplementaryClaimService.acknowledge(claimId), "Acknowledged. This does not approve the claim.")}>
-                  Acknowledge
-                </Button>
-              )}
-              {actions.canSubmit && (
-                <Button variant="primary" size="small" className="w-full" disabled={busy}
-                  onClick={() => runAction(() => supplementaryClaimService.submit(claimId), "Submitted to your manager.")}>
-                  Submit claim
-                </Button>
-              )}
-              {actions.canResubmit && (
-                <Button variant="primary" size="small" className="w-full" disabled={busy}
-                  onClick={() => runAction(() => supplementaryClaimService.resubmit(claimId), "Resubmitted.")}>
-                  Resubmit
-                </Button>
-              )}
-              {actions.canCancel && (
-                <Button variant="outline" size="small" className="w-full" disabled={busy}
-                  onClick={() => runAction(() => supplementaryClaimService.cancel(claimId), "Claim cancelled.")}>
-                  Cancel claim
-                </Button>
-              )}
-              {actions.canEditItems && claim.items.length === 0 && (
-                <p className="text-xs text-gray-500">Add at least one expense, with a receipt, before submitting.</p>
-              )}
+              <ul className="space-y-3">
+                <WorkflowAction
+                  label="Acknowledge"
+                  state={workflow.acknowledge}
+                  disabled={busy}
+                  variant="primary"
+                  onRun={() => runAction(() => supplementaryClaimService.acknowledge(claimId), "Acknowledged. This does not approve the claim.")}
+                />
+                <WorkflowAction
+                  label="Submit claim"
+                  state={workflow.submit}
+                  disabled={busy}
+                  variant="primary"
+                  onRun={() => runAction(() => supplementaryClaimService.submit(claimId), "Submitted to your manager.")}
+                />
+                <WorkflowAction
+                  label="Resubmit"
+                  state={workflow.resubmit}
+                  disabled={busy}
+                  variant="primary"
+                  onRun={() => runAction(() => supplementaryClaimService.resubmit(claimId), "Resubmitted.")}
+                />
+                <WorkflowAction
+                  label="Cancel claim"
+                  state={workflow.cancel}
+                  disabled={busy}
+                  variant="outline"
+                  onRun={() => runAction(() => supplementaryClaimService.cancel(claimId), "Claim cancelled.")}
+                />
+              </ul>
             </section>
           )}
 
@@ -602,12 +609,11 @@ function ExpenseRow({ claimId, item, categoryName, editable, busy, releasable, s
         </td>
         <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">{formatMoney(item.amount, item.currencyCode)}</td>
         <td className="px-2 py-3 text-center">
-          {editable && (
-            <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1">
               <button
                 type="button"
                 onClick={onEdit}
-                disabled={busy}
+                disabled={busy || !editable}
                 aria-label="Edit expense"
                 title="Edit expense"
                 className="flex h-8 w-8 items-center justify-center rounded-md text-blue-600 transition hover:bg-blue-50 hover:text-blue-800 disabled:opacity-50"
@@ -617,7 +623,7 @@ function ExpenseRow({ claimId, item, categoryName, editable, busy, releasable, s
               <button
                 type="button"
                 onClick={onDelete}
-                disabled={busy}
+                disabled={busy || !editable}
                 aria-label="Delete expense"
                 title="Delete expense"
                 className="flex h-8 w-8 items-center justify-center rounded-md text-red-600 transition hover:bg-red-50 hover:text-red-800 disabled:opacity-50"
@@ -625,7 +631,6 @@ function ExpenseRow({ claimId, item, categoryName, editable, busy, releasable, s
                 <Trash2 size={16} aria-hidden="true" />
               </button>
             </div>
-          )}
         </td>
       </tr>
       {(receipts.length > 0 || editable) && (
@@ -721,5 +726,25 @@ function BackButton({ onClick }) {
     >
       &larr; Back
     </button>
+  );
+}
+
+/** One workflow action. It is always shown; when it is not allowed it is disabled and the reason is written under it. */
+function WorkflowAction({ label, state, disabled, variant, onRun }) {
+  const allowed = state.allowed && !disabled;
+  return (
+    <li className="space-y-1">
+      <Button
+        variant={variant}
+        size="small"
+        className="w-full"
+        disabled={!allowed}
+        onClick={allowed ? onRun : undefined}
+        title={state.allowed ? "" : state.reason}
+      >
+        {label}
+      </Button>
+      {!state.allowed && <p className="text-[11px] leading-snug text-gray-500">{state.reason}</p>}
+    </li>
   );
 }

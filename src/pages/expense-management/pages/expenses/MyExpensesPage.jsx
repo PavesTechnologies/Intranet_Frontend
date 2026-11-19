@@ -348,6 +348,18 @@ export default function MyExpensesPage() {
   const headers = ["S.No", "Title", "Cost Center", "Currency", "Total Amount", "Status", "Created", "Actions"];
   const columns = ["serial_no", "title", "costCenter", "currency", "totalAmount", "status", "created", "actions"];
  
+  // Every row action stays visible. An action that does not apply to this report is disabled, and its tooltip says why.
+  const reportEditState = (r) => {
+    if (!canManage) return { allowed: false, reason: "Only the report owner can edit this report." };
+    if (!REPORT_EDITABLE_STATUSES.includes(r.reportStatus)) return { allowed: false, reason: "A report can be edited only while it is a draft or needs correction." };
+    return { allowed: true, reason: "Edit Report" };
+  };
+  const reportDeleteState = (r) => {
+    if (!canManage) return { allowed: false, reason: "Only the report owner can delete this report." };
+    if (!REPORT_DELETABLE_STATUSES.includes(r.reportStatus)) return { allowed: false, reason: "A report can be deleted only while it is a draft or cancelled." };
+    return { allowed: true, reason: "Delete Report" };
+  };
+
   const tableRows = displayedReports.map((r, index) => ({
     serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
     reportNumber: <span className="font-mono text-[11px] font-semibold text-gray-700">{r.reportNumber || "—"}</span>,

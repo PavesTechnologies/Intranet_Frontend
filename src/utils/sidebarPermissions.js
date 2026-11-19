@@ -31,9 +31,11 @@ export function filterMenuByRole(items, hasRole, hasAnyPermission = () => true) 
       || hasRole(item.roleOrPermissions.roles || [])
       || hasAnyPermission(item.roleOrPermissions.permissions || []);
     const passesRole = !item.allowedRoles || hasRole(item.allowedRoles);
+    // `hiddenForRoles`: hidden from users holding any of these roles, even when they also hold an allowed role.
+    const passesHidden = !item.hiddenForRoles || !hasRole(item.hiddenForRoles);
     const passesPermission = !item.requiredPermissions || hasAnyPermission(item.requiredPermissions);
     if (!passesEither) return acc;
-    if (!passesRole || !passesPermission) return acc;
+    if (!passesRole || !passesPermission || !passesHidden) return acc;
 
     if (item.children?.length) {
       const visibleChildren = filterMenuByRole(item.children, hasRole, hasAnyPermission);

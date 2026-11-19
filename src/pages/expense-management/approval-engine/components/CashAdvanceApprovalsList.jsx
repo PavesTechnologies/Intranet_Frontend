@@ -302,6 +302,24 @@ export const canApproveAdvance = (adv, user, hasRole) => {
  * "MANAGER" (the Approvals tab) shows advances waiting for the manager, "FINANCE" (the Finance tab)
  * shows advances waiting for Finance. Approved and rejected history is not split by stage.
  */
+// Statuses whose outstanding balance can be moved onto a new advance (same rule the server applies).
+const ROLLOVER_ELIGIBLE_STATUSES = ["DISBURSED", "IN_PROGRESS", "SETTLEMENT_PENDING", "PARTIALLY_SETTLED", "PARTIALLY_ADJUSTED", "ADJUSTED"];
+
+/**
+ * The three amounts of a Cash Advance + Outstanding request.
+ * eligible: outstanding balance moved onto this advance (no cash is paid for it).
+ * cash: cash Finance pays now, capped at the manager's approved amount.
+ * total: what this advance covers = eligible + cash.
+ */
+function outstandingFlowAmounts(advance, balance) {
+  const eligible = (balance?.otherOpenAdvances || [])
+    .filter((o) => ROLLOVER_ELIGIBLE_STATUSES.includes(String(o.status || "").toUpperCase()))
+    .reduce((sum, o) => sum + (Number(o.outstandingBalance) || 0), 0);
+  const requested = Number(advance.additionalAmountRequested ?? advance.amount) || 0;
+  const cash = advance.amount != null ? Math.min(Number(advance.amount), requested) : requested;
+  return { eligible, cash, total: eligible + cash };
+}
+
 export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", embedded = false, onRowCount, windowStart = 0, windowEnd }) {
   const { user, hasRole } = useAuth();
   const ws = useApprovalWebSocket();
@@ -689,19 +707,28 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-5 text-xs text-gray-700 space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Employee exposure</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {approvingAdvance.requestType === "ADVANCE_PLUS_OUTSTANDING" ? "Amounts for this request" : "Outstanding balance"}
+                  </p>
                   {!approvalBalance && <p className="text-gray-500">Loading balance...</p>}
                   {approvalBalance?.error && <p className="text-rose-700">Could not load the balance. Check it before deciding.</p>}
                   {approvalBalance && !approvalBalance.error && (
                     <>
-                      <Row label="Outstanding in other advances" value={approvalBalance.pendingBalanceTotal} />
-                      <Row label="Approved or pending, not yet paid" value={approvalBalance.committedAmount} />
-                      <Row label="This request" value={approvingAdvance.amount} />
-                      <Row label="Total exposure" value={approvalBalance.potentialExposure} strong />
-                      {approvalBalance.exposureLimit != null ? (
-                        <Row label="Company limit" value={approvalBalance.exposureLimit} />
-                      ) : (
-                        <p className="text-gray-500">No exposure limit is configured.</p>
+                      {approvingAdvance.requestType === "ADVANCE_PLUS_OUTSTANDING" ? (() => {
+                        const f = outstandingFlowAmounts(approvingAdvance, approvalBalance);
+                        return (
+                          <>
+                            <Row label="Outstanding balance moved onto this advance" value={f.eligible} />
+                            <Row label="Cash paid now" value={f.cash} />
+                            <Row label="Total on this advance" value={f.total} strong />
+                            <p className="text-gray-500">
+                              Outstanding balance: the unpaid balance of the employee's earlier advances. It moves onto this advance when Finance approves, so no cash is paid for it.
+                              Cash paid now: what Finance pays out, never more than the manager approves. Total: outstanding balance + cash paid now.
+                            </p>
+                          </>
+                        );
+                      })() : (
+                        <Row label="Employee's outstanding balance" value={approvalBalance.pendingBalanceTotal} strong />
                       )}
                       {approvalBalance.exceedsLimit && (
                         <p className="rounded bg-rose-50 p-2 font-semibold text-rose-700">

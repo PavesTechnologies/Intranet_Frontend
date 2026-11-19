@@ -38,30 +38,35 @@ const PENDING_SORT_OPTIONS = [
   { label: "Amount, high to low", value: "AMOUNT_DESC" },
 ];
 
+const STATUS_ORDER = ["pending", "approved", "rejected"];
+const ROW_KINDS = ["expense", "cash", "supp"];
+const STATUS_OPTIONS = [
+  { label: "All", value: "all" },
+  { label: "Pending", value: "pending" },
+  { label: "Approved", value: "approved" },
+  { label: "Rejected", value: "rejected" },
+];
+
 export default function ApprovalsPage() {
   const { hasRole } = useAuth();
 
   // -----------------------------
   // State
   // -----------------------------
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState("all");
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [pendingShow, setPendingShow] = useState("ALL");
   // Rows each list currently shows, keyed by tab, so the page can show one empty message for the whole table.
   const [rowCounts, setRowCounts] = useState({});
-  const reportExpenseRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-expense`] === count ? prev : { ...prev, [`${activeTab}-expense`]: count })),
-    [activeTab]
-  );
-  const reportCashRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-cash`] === count ? prev : { ...prev, [`${activeTab}-cash`]: count })),
-    [activeTab]
-  );
-  const reportSuppRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-supp`] === count ? prev : { ...prev, [`${activeTab}-supp`]: count })),
-    [activeTab]
-  );
+  // Each list reports its row count under its own status, so "All" can show every status in one table.
+  const counters = {};
+  for (const sub of STATUS_ORDER) {
+    for (const kind of ROW_KINDS) {
+      const key = `${sub}-${kind}`;
+      counters[key] = (count) => setRowCounts((prev) => (prev[key] === count ? prev : { ...prev, [key]: count }));
+    }
+  }
 
   const [pendingSort, setPendingSort] = useState("NEWEST");
 
@@ -71,22 +76,29 @@ export default function ApprovalsPage() {
   useEffect(() => {
     setPage(0);
   }, [activeTab, searchTerm, pendingShow, pendingSort]);
-  const expenseCount = rowCounts[`${activeTab}-expense`] ?? 0;
-  const cashCount = rowCounts[`${activeTab}-cash`] ?? 0;
-  const suppCount = rowCounts[`${activeTab}-supp`] ?? 0;
-  const combinedRows = expenseCount + cashCount + suppCount;
+  const subTabs = activeTab === "all" ? STATUS_ORDER : [activeTab];
+  const blocks = [];
+  let runningOffset = 0;
+  for (const sub of subTabs) {
+    for (const kind of ROW_KINDS) {
+      const count = rowCounts[`${sub}-${kind}`] ?? 0;
+      blocks.push({ sub, kind, count, offset: runningOffset });
+      runningOffset += count;
+    }
+  }
+  const combinedRows = runningOffset;
   const totalPages = Math.max(1, Math.ceil(combinedRows / APPROVALS_PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const winStart = safePage * APPROVALS_PAGE_SIZE;
   const winEnd = winStart + APPROVALS_PAGE_SIZE;
-  // Each source covers its own slice of the one sequence: expense reports, then cash advances, then supplementary claims.
-  const windowFor = (offset, count) => ({
-    start: Math.max(Math.min(winStart - offset, count), 0),
-    end: Math.max(Math.min(winEnd - offset, count), 0),
-  });
-  const expenseWindow = windowFor(0, expenseCount);
-  const cashWindow = windowFor(expenseCount, cashCount);
-  const suppWindow = windowFor(expenseCount + cashCount, suppCount);
+  const blockWindow = (sub, kind) => {
+    const block = blocks.find((b) => b.sub === sub && b.kind === kind);
+    if (!block) return { start: 0, end: 0 };
+    return {
+      start: Math.max(Math.min(winStart - block.offset, block.count), 0),
+      end: Math.max(Math.min(winEnd - block.offset, block.count), 0),
+    };
+  };
 
   // -----------------------------
   // Role check
@@ -110,11 +122,12 @@ export default function ApprovalsPage() {
     ? hasRole(["Finance", "FINANCE", "Finance_Executive", "FINANCE_EXECUTIVE"])
     : false;
 
-  const mountedLists = ["expense", ...(isManager || isFinance ? ["cash", "supp"] : [])];
-  const allReported = mountedLists.every((key) => rowCounts[`${activeTab}-${key}`] !== undefined);
-  const totalRows = mountedLists.reduce((sum, key) => sum + (rowCounts[`${activeTab}-${key}`] ?? 0), 0);
-  const showEmptyTable = allReported && totalRows === 0;
+  const isApprover = isManager || isFinance;
+  const mountedBlocks = blocks.filter((b) => b.kind === "expense" || isApprover);
+  const allReported = mountedBlocks.every((b) => rowCounts[`${b.sub}-${b.kind}`] !== undefined);
+  const showEmptyTable = allReported && combinedRows === 0;
   const EMPTY_TEXT = {
+    all: ["No approvals yet.", "Items that come to you, and items you have decided, will show here."],
     pending: ["No approvals are awaiting you.", "Nothing needs your decision right now."],
     approved: ["No approved items yet.", "Items you approve will show here."],
     rejected: ["No rejected items yet.", "Items you reject will show here."],
@@ -215,27 +228,6 @@ export default function ApprovalsPage() {
     {
       label: "Rejected",
       value: "rejected",
-    },
-  ];
-
-  // -----------------------------
-  // Tabs
-  // -----------------------------
-  const tabs = [
-    {
-      key: "pending",
-      label: "Pending",
-      icon: Clock,
-    },
-    {
-      key: "approved",
-      label: "Approved",
-      icon: CheckCircle2,
-    },
-    {
-      key: "rejected",
-      label: "Rejected",
-      icon: XCircle,
     },
   ];
 
@@ -344,42 +336,17 @@ export default function ApprovalsPage() {
       {/* Filters */}
       <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          {/* Tabs */}
-          <div className="flex w-fit space-x-1 rounded-lg bg-gray-50 p-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${
-                    isActive
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  <Icon size={16} />
-
-                  {tab.label}
-
-                  {tab.key === "pending" &&
-                    pendingCount > 0 && (
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                          isActive
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-200 text-gray-600"
-                        }`}
-                      >
-                        {pendingCount}
-                      </span>
-                    )}
-                </button>
-              );
-            })}
+          {/* Status: All, or one status. Every status can be chosen from this one control. */}
+          <div className="w-full lg:w-44">
+            <FormSelect
+              label="Status"
+              name="status"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              options={STATUS_OPTIONS}
+              className="[&>label]:mb-1 [&>label]:text-xs"
+              buttonClassName="!px-3 !py-1.5 !text-xs"
+            />
           </div>
 
           {/* Search */}
@@ -392,21 +359,8 @@ export default function ApprovalsPage() {
             />
           </div>
 
-          {/* Status */}
-          <div className="w-full lg:w-40">
-            <FormSelect
-              label="Status"
-              name="activeTab"
-              value={activeTab}
-              onChange={(e) => setActiveTab(e.target.value)}
-              options={statusFilterOptions}
-              className="[&>label]:mb-1 [&>label]:text-xs"
-              buttonClassName="!px-3 !py-1.5 !text-xs"
-            />
-          </div>
-
           {/* Pending only: which rows to show, and their order */}
-          {activeTab === "pending" && (
+          {subTabs.includes("pending") && (
             <>
               <div className="w-full lg:w-44">
                 <FormSelect
@@ -437,7 +391,7 @@ export default function ApprovalsPage() {
 
       {/* One table for expense reports and cash advances. The Type and Status badges tell them apart. */}
       <div className="approvals-tab-container space-y-4">
-        {activeTab === "pending" && <MyDelegateCard />}
+        {subTabs.includes("pending") && <MyDelegateCard />}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full table-fixed text-sm text-left">
@@ -464,7 +418,7 @@ export default function ApprovalsPage() {
                   <th className="px-2.5 py-2 text-right">Actions</th>
                 </tr>
               </thead>
-              {activeTab === "pending" && (
+              {subTabs.includes("pending") && (
                 <PendingApprovalsPage
                   key={`pending-${reloadKey}`}
                   searchTerm={searchTerm}
@@ -473,23 +427,58 @@ export default function ApprovalsPage() {
                   hideHeader
                   noPadding
                   embedded
-                  onRowCount={reportExpenseRows}
-                  windowStart={expenseWindow.start}
-                  windowEnd={expenseWindow.end}
+                  onRowCount={counters["pending-expense"]}
+                  windowStart={blockWindow("pending", "expense").start}
+                  windowEnd={blockWindow("pending", "expense").end}
                 />
               )}
-              {activeTab === "approved" && (
-                <ApprovalHistoryPage key={`approved-${reloadKey}`} outcome="APPROVED" searchTerm={searchTerm} embedded onRowCount={reportExpenseRows} windowStart={expenseWindow.start} windowEnd={expenseWindow.end} />
+              {subTabs.includes("approved") && (
+                <ApprovalHistoryPage
+                  key={`approved-${reloadKey}`}
+                  outcome="APPROVED"
+                  searchTerm={searchTerm}
+                  embedded
+                  onRowCount={counters["approved-expense"]}
+                  windowStart={blockWindow("approved", "expense").start}
+                  windowEnd={blockWindow("approved", "expense").end}
+                />
               )}
-              {activeTab === "rejected" && (
-                <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" searchTerm={searchTerm} embedded onRowCount={reportExpenseRows} windowStart={expenseWindow.start} windowEnd={expenseWindow.end} />
+              {subTabs.includes("rejected") && (
+                <ApprovalHistoryPage
+                  key={`rejected-${reloadKey}`}
+                  outcome="REJECTED"
+                  searchTerm={searchTerm}
+                  embedded
+                  onRowCount={counters["rejected-expense"]}
+                  windowStart={blockWindow("rejected", "expense").start}
+                  windowEnd={blockWindow("rejected", "expense").end}
+                />
               )}
-              {(isManager || isFinance) && (
-                <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} embedded onRowCount={reportCashRows} windowStart={cashWindow.start} windowEnd={cashWindow.end} />
-              )}
-              {(isManager || isFinance) && (
-                <SupplementaryApprovalsList key={`supp-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} isManager={isManager} isFinance={isFinance} onRowCount={reportSuppRows} windowStart={suppWindow.start} windowEnd={suppWindow.end} />
-              )}
+              {isApprover &&
+                subTabs.map((sub) => (
+                  <CashAdvanceApprovalsList
+                    key={`cash-${sub}-${reloadKey}`}
+                    activeTab={sub}
+                    searchTerm={searchTerm}
+                    embedded
+                    onRowCount={counters[`${sub}-cash`]}
+                    windowStart={blockWindow(sub, "cash").start}
+                    windowEnd={blockWindow(sub, "cash").end}
+                  />
+                ))}
+              {isApprover &&
+                subTabs.map((sub) => (
+                  <SupplementaryApprovalsList
+                    key={`supp-${sub}-${reloadKey}`}
+                    activeTab={sub}
+                    searchTerm={searchTerm}
+                    isManager={isManager}
+                    isFinance={isFinance}
+                    onRowCount={counters[`${sub}-supp`]}
+                    windowStart={blockWindow(sub, "supp").start}
+                    windowEnd={blockWindow(sub, "supp").end}
+                  />
+                ))}
               {showEmptyTable && (
                 <tbody>
                   <tr>

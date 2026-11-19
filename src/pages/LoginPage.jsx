@@ -27,7 +27,7 @@ const SERVICES = [
 
 function SvcIcon({ d }) {
   return (
-    <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="#57534E" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={18} height={18} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={d} />
     </svg>
   );
@@ -55,11 +55,7 @@ function FloatingInput({ id, label, type = "text", value, onChange, onKeyDown, e
           placeholder=" "
         />
         <label htmlFor={id} className={labelClass}>{label}</label>
-        {hasSuffix && (
-          <div style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", zIndex: 2 }}>
-            {children}
-          </div>
-        )}
+        {hasSuffix && <div className="field-suffix">{children}</div>}
       </div>
       {error && <p id={`${id}-err`} role="alert" className="err-msg">{error}</p>}
     </div>
@@ -69,9 +65,9 @@ function FloatingInput({ id, label, type = "text", value, onChange, onKeyDown, e
 // ─── Loading dots ─────────────────────────────────────────────────
 function Dots() {
   return (
-    <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+    <div className="dots">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="dot" style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(255,255,255,.85)", animationDelay: `${i * 145}ms` }} />
+        <span key={i} className="dot" style={{ animationDelay: `${i * 145}ms` }} />
       ))}
     </div>
   );
@@ -80,147 +76,186 @@ function Dots() {
 // ─── Styles ───────────────────────────────────────────────────────
 const customCSS = `
 .login-page-container {
-  --neutral-950: #0C0A09; --neutral-800: #292524; --neutral-600: #57534E;
-  --neutral-500: #78716C; --neutral-400: #A8A29E; --neutral-300: #C4C0BC;
-  --neutral-200: #E7E5E4; --neutral-150: #F0EFED; --neutral-100: #F5F4F3;
-  --neutral-50:  #FAFAF9; --accent-700: #1D40AF;  --accent-600: #1B4ED8;
-  --accent-100: #DBEAFE;  --error-600: #DC2626;   --error-50: #FFF5F5;
+  --brand-950: #141B4D; --brand-900: #1E2A6B; --brand-700: #283C9A;
+  --brand-600: #2F4BB8; --brand-500: #4A65D0; --brand-50: #F1F4FD;
+  --rose-500: #E0345B;
+  --ink-900: #0F172A; --ink-700: #334155; --ink-500: #64748B; --ink-400: #94A3B8;
+  --line: #D5DBE7; --line-soft: #E9EDF4; --surface: #FFFFFF; --page: #F6F7FB;
+  --danger: #DC2626;
   --ff: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-family: var(--ff); background: var(--neutral-100);
+  font-family: var(--ff); background: var(--page); color: var(--ink-900);
+  min-height: 100vh; display: flex; overflow: hidden;
 }
-@keyframes panelL  { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
-@keyframes panelR  { from{opacity:0;transform:translateX(20px)}  to{opacity:1;transform:translateX(0)} }
-@keyframes fadeUp  { from{opacity:0;transform:translateY(10px)}  to{opacity:1;transform:translateY(0)} }
-@keyframes fadeIn  { from{opacity:0} to{opacity:1} }
-@keyframes slideUp { from{opacity:0;transform:translateY(4px)}   to{opacity:1;transform:translateY(0)} }
-@keyframes shake   { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)} 40%{transform:translateX(5px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
-@keyframes dot     { 0%,80%,100%{transform:translateY(0);opacity:.4} 40%{transform:translateY(-6px);opacity:1} }
-@keyframes svcIn   { from{opacity:0;transform:translateY(6px)} to{opacity:.55;transform:translateY(0)} }
-.login-page-container .panel-l { animation: panelL 420ms cubic-bezier(0,0,0.2,1) both; }
-.login-page-container .panel-r { animation: panelR 420ms cubic-bezier(0,0,0.2,1) 80ms both; }
-.login-page-container .a1{animation:fadeUp 300ms cubic-bezier(0,0,0.2,1) 160ms both}
-.login-page-container .a2{animation:fadeUp 300ms cubic-bezier(0,0,0.2,1) 220ms both}
-.login-page-container .a3{animation:fadeIn 260ms ease 275ms both}
-.login-page-container .a4{animation:fadeUp 300ms cubic-bezier(0,0,0.2,1) 280ms both}
-.login-page-container .a5{animation:fadeUp 300ms cubic-bezier(0,0,0.2,1) 330ms both}
-.login-page-container .a6{animation:fadeUp 300ms cubic-bezier(0,0,0.2,1) 375ms both}
-.login-page-container .a7{animation:fadeUp 300ms cubic-bezier(0,0,0.2,1) 415ms both}
-.login-page-container .a8{animation:fadeUp 300ms cubic-bezier(0,0,0.2,1) 450ms both}
-.login-page-container .svc-item{animation:svcIn 350ms cubic-bezier(0,0,0.2,1) both}
-.login-page-container .svc-item:nth-child(1){animation-delay:550ms}
-.login-page-container .svc-item:nth-child(2){animation-delay:600ms}
-.login-page-container .svc-item:nth-child(3){animation-delay:645ms}
-.login-page-container .svc-item:nth-child(4){animation-delay:685ms}
+
+/* ── Animations ── */
+@keyframes panelL { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
+@keyframes panelR { from{opacity:0;transform:translateX(20px)}  to{opacity:1;transform:translateX(0)} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)}  to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{opacity:0;transform:translateY(4px)}  to{opacity:1;transform:translateY(0)} }
+@keyframes shake  { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)} 40%{transform:translateX(5px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
+@keyframes dot    { 0%,80%,100%{transform:translateY(0);opacity:.4} 40%{transform:translateY(-5px);opacity:1} }
+@keyframes svcIn  { from{opacity:0;translate:0 8px} to{opacity:1;translate:0 0} }
+@keyframes drift  { 0%,100%{transform:translate(0,0)} 50%{transform:translate(18px,-14px)} }
+
+/* ── Left brand panel ── */
+.login-page-container .left-panel {
+  flex: 0 0 55%; height: 100vh; position: relative; overflow: hidden;
+  background: linear-gradient(155deg, var(--brand-950) 0%, var(--brand-900) 45%, var(--brand-700) 100%);
+  color: #fff; padding: 48px 56px; display: flex; flex-direction: column;
+  animation: panelL 420ms cubic-bezier(0,0,0.2,1) both;
+}
+.login-page-container .left-panel::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(255,255,255,.14) 1px, transparent 1px);
+  background-size: 24px 24px; opacity: .6;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+}
+.login-page-container .orb { position: absolute; border-radius: 50%; filter: blur(60px); pointer-events: none; animation: drift 14s ease-in-out infinite; }
+.login-page-container .orb-1 { width: 380px; height: 380px; right: -120px; top: -100px; background: rgba(224,52,91,.35); }
+.login-page-container .orb-2 { width: 320px; height: 320px; left: -100px; bottom: -120px; background: rgba(74,101,208,.55); animation-delay: -6s; }
+.login-page-container .left-inner { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; }
+
+.login-page-container .brand { display: flex; align-items: center; gap: 14px; animation: fadeUp 300ms cubic-bezier(0,0,0.2,1) 120ms both; }
+.login-page-container .brand-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 12px; background: #fff; padding: 4px; flex-shrink: 0; }
+.login-page-container .brand span { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+
+.login-page-container .hero { margin: auto 0; max-width: 520px; animation: fadeUp 360ms cubic-bezier(0,0,0.2,1) 180ms both; }
+.login-page-container .eyebrow { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #FFB4C4; background: rgba(224,52,91,.18); border: 1px solid rgba(224,52,91,.35); padding: 6px 12px; border-radius: 999px; margin-bottom: 22px; }
+.login-page-container .hero h1 { font-size: 44px; font-weight: 700; line-height: 1.12; letter-spacing: -0.03em; margin: 0 0 18px; }
+.login-page-container .hero p { font-size: 16px; line-height: 1.7; color: rgba(255,255,255,.78); margin: 0; max-width: 460px; }
+
+.login-page-container .svc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; max-width: 480px; }
+.login-page-container .svc-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: rgba(255,255,255,.92); animation: svcIn 350ms cubic-bezier(0,0,0.2,1) both; transition: transform 160ms ease, background 160ms ease, border-color 160ms ease; cursor: default; }
+.login-page-container .svc-item:nth-child(1){animation-delay:520ms}
+.login-page-container .svc-item:nth-child(2){animation-delay:570ms}
+.login-page-container .svc-item:nth-child(3){animation-delay:620ms}
+.login-page-container .svc-item:nth-child(4){animation-delay:670ms}
 .login-page-container .svc-item:nth-child(5){animation-delay:720ms}
-.login-page-container .svc-item:nth-child(6){animation-delay:750ms}
-.login-page-container .svc-item:hover{transform:translateY(-2px) !important;opacity:1 !important}
-.login-page-container .svc-item{transition:transform 150ms cubic-bezier(.34,1.56,.64,1),opacity 150ms ease;cursor:default}
-.login-page-container .shake{animation:shake 380ms cubic-bezier(0.4,0,0.2,1) both !important}
-.login-page-container .btn-ms{width:100%;height:48px;background:#2F2F2F;color:#fff;border:none;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14px;font-weight:500;font-family:var(--ff);letter-spacing:.005em;cursor:pointer;transition:transform 140ms cubic-bezier(.34,1.56,.64,1),box-shadow 140ms ease,background 120ms ease}
-.login-page-container .btn-ms:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,0,0,.22);background:#1A1A1A}
-.login-page-container .btn-ms:active:not(:disabled){transform:translateY(0);box-shadow:none}
-.login-page-container .btn-ms:disabled{opacity:.6;cursor:not-allowed}
-.login-page-container .btn-ms:focus-visible{outline:2px solid var(--accent-600);outline-offset:2px}
-.login-page-container .btn-primary{width:100%;height:48px;background:var(--accent-600);color:#fff;border:none;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;font-family:var(--ff);letter-spacing:.01em;cursor:pointer;transition:transform 140ms cubic-bezier(.34,1.56,.64,1),box-shadow 140ms ease,background 120ms ease}
-.login-page-container .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(27,78,216,.3);background:var(--accent-700)}
-.login-page-container .btn-primary:active:not(:disabled){transform:translateY(0);box-shadow:none}
-.login-page-container .btn-primary:disabled{opacity:.75;cursor:not-allowed}
-.login-page-container .btn-primary:focus-visible{outline:2px solid var(--accent-600);outline-offset:2px}
-.login-page-container .lnk{background:none;border:none;cursor:pointer;font-family:var(--ff);transition:color 120ms ease;padding:0}
-.login-page-container .lnk:hover{color:var(--accent-600) !important}
-.login-page-container .lnk:focus-visible{outline:2px solid var(--accent-600);outline-offset:2px;border-radius:2px}
-.login-page-container .pw-btn{background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:var(--neutral-300);transition:color 120ms ease}
-.login-page-container .pw-btn:hover{color:var(--neutral-500)}
-.login-page-container .dot{animation:dot 700ms ease-in-out infinite}
-.login-page-container .dot:nth-child(2){animation-delay:145ms}
-.login-page-container .dot:nth-child(3){animation-delay:290ms}
-.login-page-container .field-wrap{position:relative;height:56px;border-radius:6px;background:#fff;transition:box-shadow 140ms cubic-bezier(0.4,0,0.2,1)}
-.login-page-container .field-wrap.focused{box-shadow:inset 0 0 0 2px var(--accent-600)}
-.login-page-container .field-wrap.errored{box-shadow:inset 0 0 0 2px var(--error-600)}
-.login-page-container .field-wrap.default{box-shadow:inset 0 0 0 1px var(--neutral-200)}
-.login-page-container .field-wrap:not(.focused):not(.errored):hover{box-shadow:inset 0 0 0 1px var(--neutral-400)}
-.login-page-container .field-label{position:absolute;left:14px;pointer-events:none;white-space:nowrap;font-size:15px;font-family:var(--ff);font-weight:400;line-height:1;z-index:1;transition:top 180ms cubic-bezier(0,0,0.2,1),transform 180ms cubic-bezier(0,0,0.2,1),color 140ms ease;transform-origin:left top;top:50%;transform:translateY(-50%) scale(1);color:var(--neutral-400)}
+.login-page-container .svc-item:nth-child(6){animation-delay:770ms}
+.login-page-container .svc-item:hover { transform: translateY(-2px); background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.26); }
+.login-page-container .svc-tile { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.login-page-container .svc-item span { font-size: 13px; font-weight: 500; }
+
+/* ── Right form panel ── */
+.login-page-container .right-panel {
+  flex: 1; min-height: 100vh; height: 100vh; overflow-y: auto; background: var(--surface);
+  display: flex; flex-direction: column; padding: 32px 24px 28px; position: relative;
+  animation: panelR 420ms cubic-bezier(0,0,0.2,1) 80ms both;
+}
+.login-page-container .form-wrap { margin: auto; width: 100%; max-width: 380px; padding: 24px 0; }
+.login-page-container .mobile-brand { display: none; align-items: center; gap: 10px; margin-bottom: 32px; font-size: 16px; font-weight: 600; color: var(--ink-900); }
+.login-page-container .mobile-brand img { width: 36px; height: 36px; object-fit: contain; border-radius: 10px; }
+
+.login-page-container .a1 { animation: fadeUp 300ms cubic-bezier(0,0,0.2,1) 160ms both; margin-bottom: 36px; }
+.login-page-container .a2 { animation: fadeUp 300ms cubic-bezier(0,0,0.2,1) 220ms both; }
+.login-page-container .a3 { animation: fadeIn 260ms ease 275ms both; }
+.login-page-container .a4 { animation: fadeUp 300ms cubic-bezier(0,0,0.2,1) 280ms both; }
+.login-page-container .a5 { animation: fadeUp 300ms cubic-bezier(0,0,0.2,1) 330ms both; }
+.login-page-container .a6 { animation: fadeUp 300ms cubic-bezier(0,0,0.2,1) 375ms both; }
+.login-page-container .a7 { animation: fadeUp 300ms cubic-bezier(0,0,0.2,1) 415ms both; }
+.login-page-container .a8 { animation: fadeUp 300ms cubic-bezier(0,0,0.2,1) 450ms both; }
+.login-page-container .shake { animation: shake 380ms cubic-bezier(0.4,0,0.2,1) both !important; }
+
+.login-page-container .form-title { font-size: 30px; font-weight: 700; color: var(--ink-900); letter-spacing: -0.025em; line-height: 1.2; margin: 0 0 8px; }
+.login-page-container .form-sub { font-size: 14.5px; color: var(--ink-500); line-height: 1.55; margin: 0; }
+
+/* Buttons */
+.login-page-container .btn-ms { width: 100%; height: 50px; background: #fff; color: var(--ink-900); border: 1px solid var(--line); border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14.5px; font-weight: 600; font-family: var(--ff); cursor: pointer; transition: transform 140ms ease, box-shadow 140ms ease, background 120ms ease, border-color 120ms ease; }
+.login-page-container .btn-ms:hover:not(:disabled) { background: #F8FAFC; border-color: #B9C2D3; box-shadow: 0 4px 14px rgba(15,23,42,.08); transform: translateY(-1px); }
+.login-page-container .btn-ms:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+.login-page-container .btn-ms:disabled { opacity: .6; cursor: not-allowed; }
+
+.login-page-container .btn-primary { width: 100%; height: 50px; background: linear-gradient(135deg, var(--brand-600) 0%, var(--brand-700) 100%); color: #fff; border: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; font-family: var(--ff); letter-spacing: .01em; cursor: pointer; box-shadow: 0 6px 18px rgba(47,75,184,.28); transition: transform 140ms ease, box-shadow 140ms ease, filter 120ms ease; }
+.login-page-container .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(47,75,184,.36); filter: brightness(1.06); }
+.login-page-container .btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: 0 3px 10px rgba(47,75,184,.3); }
+.login-page-container .btn-primary:disabled { opacity: .75; cursor: not-allowed; }
+
+.login-page-container .btn-ms:focus-visible, .login-page-container .btn-primary:focus-visible, .login-page-container .lnk:focus-visible, .login-page-container .pw-btn:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+
+.login-page-container .divider { display: flex; align-items: center; gap: 14px; margin: 26px 0; }
+.login-page-container .divider::before, .login-page-container .divider::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
+.login-page-container .divider span { font-size: 11px; font-weight: 600; color: var(--ink-400); letter-spacing: .12em; text-transform: uppercase; }
+
+.login-page-container .lnk { background: none; border: none; cursor: pointer; font-family: var(--ff); transition: color 120ms ease; padding: 0; }
+.login-page-container .lnk:hover { color: var(--brand-600) !important; }
+.login-page-container .lnk:focus-visible { border-radius: 4px; }
+.login-page-container .forgot { font-size: 13.5px; font-weight: 500; color: var(--ink-500); }
+.login-page-container .back { font-size: 13.5px; font-weight: 500; color: var(--ink-500); }
+
+.login-page-container .pw-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; padding: 4px; color: var(--ink-400); transition: color 120ms ease; }
+.login-page-container .pw-btn:hover { color: var(--ink-700); }
+
+.login-page-container .dots { display: flex; gap: 5px; align-items: center; }
+.login-page-container .dots .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.9); animation: dot 700ms ease-in-out infinite; }
+.login-page-container .dots .dot:nth-child(2) { animation-delay: 145ms; }
+.login-page-container .dots .dot:nth-child(3) { animation-delay: 290ms; }
+
+/* Inputs (floating label) */
+.login-page-container .field-wrap { position: relative; height: 56px; border-radius: 12px; background: #fff; transition: box-shadow 140ms ease, background 140ms ease; }
+.login-page-container .field-wrap.default { box-shadow: inset 0 0 0 1px var(--line); }
+.login-page-container .field-wrap:not(.focused):not(.errored):hover { box-shadow: inset 0 0 0 1px #B9C2D3; }
+.login-page-container .field-wrap.focused { box-shadow: inset 0 0 0 2px var(--brand-600), 0 0 0 4px rgba(47,75,184,.12); }
+.login-page-container .field-wrap.errored { box-shadow: inset 0 0 0 1.5px var(--danger); background: #FFF8F8; }
+.login-page-container .field-suffix { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 2; }
+.login-page-container .field-label { position: absolute; left: 16px; pointer-events: none; white-space: nowrap; font-size: 15px; font-weight: 400; line-height: 1; z-index: 1; transition: top 180ms cubic-bezier(0,0,0.2,1), transform 180ms cubic-bezier(0,0,0.2,1), color 140ms ease; transform-origin: left top; top: 50%; transform: translateY(-50%) scale(1); color: var(--ink-500); }
 .login-page-container .field-input:focus ~ .field-label,
 .login-page-container .field-input:not(:placeholder-shown) ~ .field-label,
-.login-page-container .field-input:-webkit-autofill ~ .field-label{top:10px;transform:scale(0.775)}
-.login-page-container .field-input:focus ~ .field-label.fc{color:var(--accent-600)}
-.login-page-container .field-input:not(:placeholder-shown) ~ .field-label.nfc{color:var(--neutral-400)}
-.login-page-container .field-input ~ .field-label.err{color:var(--error-600)}
-.login-page-container .field-input{position:absolute;inset:0;width:100%;height:100%;padding-left:14px;padding-right:14px;padding-bottom:0;font-size:15px;font-family:var(--ff);font-weight:400;color:var(--neutral-950);background:transparent;border:none;outline:none;border-radius:6px;transition:padding-top 180ms cubic-bezier(0,0,0.2,1);padding-top:2px}
-.login-page-container .field-input.has-suffix{padding-right:46px}
-.login-page-container .field-input:focus,
-.login-page-container .field-input:not(:placeholder-shown),
-.login-page-container .field-input:-webkit-autofill{padding-top:18px}
-.login-page-container .err-msg{margin:5px 0 0;font-size:12px;color:var(--error-600);font-family:var(--ff);animation:slideUp 200ms cubic-bezier(0,0,0.2,1) both}
-@media (max-width:820px){.login-page-container .left-panel{display:none !important}.login-page-container .right-panel{min-height:100vh}}
-@media (prefers-reduced-motion:reduce){.login-page-container *,.login-page-container *::before,.login-page-container *::after{animation-duration:1ms !important;transition-duration:1ms !important}}
+.login-page-container .field-input:-webkit-autofill ~ .field-label { top: 12px; transform: scale(0.78); }
+.login-page-container .field-input:focus ~ .field-label.fc { color: var(--brand-600); }
+.login-page-container .field-input ~ .field-label.err { color: var(--danger); }
+.login-page-container .field-input { position: absolute; inset: 0; width: 100%; height: 100%; padding: 2px 16px 0; font-size: 15px; font-family: var(--ff); font-weight: 400; color: var(--ink-900); background: transparent; border: none; outline: none; border-radius: 12px; transition: padding-top 180ms cubic-bezier(0,0,0.2,1); }
+.login-page-container .field-input.has-suffix { padding-right: 48px; }
+.login-page-container .field-input:focus, .login-page-container .field-input:not(:placeholder-shown), .login-page-container .field-input:-webkit-autofill { padding-top: 20px; }
+.login-page-container .err-msg { margin: 6px 0 0; font-size: 12.5px; color: var(--danger); animation: slideUp 200ms cubic-bezier(0,0,0.2,1) both; }
+
+/* Footer */
+.login-page-container .page-footer { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; padding-top: 16px; font-size: 12px; color: var(--ink-400); }
+.login-page-container .page-footer .sep { color: #CBD2DE; }
+.login-page-container .page-footer .secure { display: flex; align-items: center; gap: 6px; }
+
+/* ── 3D depth layer ── */
+
+.login-page-container .left-inner { transform: perspective(1200px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)); transform-style: preserve-3d; transition: transform 450ms cubic-bezier(.2,.7,.2,1); }
+.login-page-container .brand-logo { transform: translateZ(30px); box-shadow: 0 6px 0 rgba(6,10,40,.45), 0 18px 30px rgba(6,10,40,.45); }
+.login-page-container .hero h1 { text-shadow: 0 1px 0 #3A4AA6, 0 2px 0 #323F93, 0 3px 0 #2A3584, 0 4px 0 #222C74, 0 18px 30px rgba(5,8,30,.5); }
+.login-page-container .svc-grid { transform-style: preserve-3d; }
+.login-page-container .svc-item { transform-style: preserve-3d; box-shadow: 0 8px 0 rgba(6,10,40,.4), 0 16px 26px rgba(6,10,40,.35); transition: transform 200ms cubic-bezier(.2,.7,.2,1), box-shadow 200ms ease, background 160ms ease, border-color 160ms ease; }
+.login-page-container .svc-item:hover { transform: translateY(-6px) rotateX(10deg) rotateY(-6deg); box-shadow: 0 14px 0 rgba(6,10,40,.4), 0 26px 36px rgba(6,10,40,.45); }
+.login-page-container .svc-tile { transform: translateZ(18px); box-shadow: 0 4px 0 rgba(6,10,40,.35), 0 8px 14px rgba(6,10,40,.3); }
+
+/* form card tilt */
+.login-page-container .form-wrap { transform: perspective(1400px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)); transform-style: preserve-3d; transition: transform 450ms cubic-bezier(.2,.7,.2,1); }
+
+/* extruded 3D buttons */
+.login-page-container .btn-primary { box-shadow: 0 6px 0 #1B2E86, 0 16px 26px rgba(47,75,184,.35); }
+.login-page-container .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 #1B2E86, 0 20px 30px rgba(47,75,184,.4); filter: brightness(1.05); }
+.login-page-container .btn-primary:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 #1B2E86, 0 6px 12px rgba(47,75,184,.3); }
+.login-page-container .btn-ms { box-shadow: 0 5px 0 #CDD4E1, 0 10px 18px rgba(15,23,42,.06); }
+.login-page-container .btn-ms:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 0 #C2CBDB, 0 16px 24px rgba(15,23,42,.12); }
+.login-page-container .btn-ms:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 #CDD4E1; }
+
+/* depth on inputs */
+.login-page-container .field-wrap.default { box-shadow: inset 0 0 0 1px var(--line), 0 4px 0 #E2E7F0, 0 10px 18px rgba(15,23,42,.05); }
+.login-page-container .field-wrap.focused { transform: translateZ(12px); box-shadow: inset 0 0 0 2px var(--brand-600), 0 0 0 4px rgba(47,75,184,.12), 0 6px 0 #C9D3F0, 0 18px 26px rgba(47,75,184,.18); }
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .login-page-container .hero h1 { font-size: 36px; }
+  .login-page-container .left-panel { padding: 40px; }
+}
+@media (max-width: 820px) {
+  .login-page-container { display: block; overflow-y: auto; height: auto; }
+  .login-page-container .left-panel { display: none; }
+  .login-page-container .right-panel { height: auto; min-height: 100vh; overflow: visible; padding: 28px 20px 24px; }
+  .login-page-container .mobile-brand { display: flex; }
+  .login-page-container .form-wrap { padding: 8px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-page-container *, .login-page-container *::before, .login-page-container *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; animation-iteration-count: 1 !important; }
+}
 `;
-
-// ─── Interactive dot grid ─────────────────────────────────────────
-const InteractiveGrid = () => {
-  const canvasRef = useRef(null);
-  const mouseRef = useRef({ x: -1000, y: -1000 });
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    let frameId;
-    const spacing = 25;
-    const radius = 1.5;
-    const dots = [];
-
-    const resize = () => {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-      dots.length = 0;
-      for (let x = 0; x < canvas.width; x += spacing)
-        for (let y = 0; y < canvas.height; y += spacing)
-          dots.push({ ox: x, oy: y, x, y });
-    };
-    window.addEventListener("resize", resize);
-    resize();
-
-    const parent = canvas.parentElement;
-    const onMove = (e) => { const r = parent.getBoundingClientRect(); mouseRef.current = { x: e.clientX - r.left, y: e.clientY - r.top }; };
-    const onLeave = () => { mouseRef.current = { x: -1000, y: -1000 }; };
-    parent.addEventListener("mousemove", onMove);
-    parent.addEventListener("mouseleave", onLeave);
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const { x: mx, y: my } = mouseRef.current;
-      for (const dot of dots) {
-        const dx = dot.ox - mx, dy = dot.oy - my;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const maxD = 140;
-        if (dist < maxD) {
-          const f = (maxD - dist) / maxD;
-          ctx.fillStyle = `rgb(${Math.round(231 - (231 - 120) * f)},${Math.round(229 - (229 - 113) * f)},${Math.round(228 - (228 - 108) * f)})`;
-          const angle = Math.atan2(dy, dx);
-          dot.x += (dot.ox + Math.cos(angle) * f * 15 - dot.x) * 0.2;
-          dot.y += (dot.oy + Math.sin(angle) * f * 15 - dot.y) * 0.2;
-        } else {
-          ctx.fillStyle = "#E7E5E4";
-          dot.x += (dot.ox - dot.x) * 0.1;
-          dot.y += (dot.oy - dot.y) * 0.1;
-        }
-        ctx.beginPath(); ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2); ctx.fill();
-      }
-      frameId = requestAnimationFrame(draw);
-    };
-    draw();
-
-    return () => {
-      window.removeEventListener("resize", resize);
-      parent.removeEventListener("mousemove", onMove);
-      parent.removeEventListener("mouseleave", onLeave);
-      cancelAnimationFrame(frameId);
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} />;
-};
 
 // ─── Main component ───────────────────────────────────────────────
 export default function LoginPage() {
@@ -446,51 +481,69 @@ export default function LoginPage() {
   const EYE_OPEN = "M13.5 7s-2 3.5-5.5 3.5S2.5 7 2.5 7 4.5 3.5 8 3.5 13.5 7 13.5 7zM8 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4z";
   const EYE_CLOSED = "M13.5 7s-2 3.5-5.5 3.5S2.5 7 2.5 7 4.5 3.5 8 3.5 13.5 7 13.5 7zM8 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM2 2l12 12";
   const EyeIcon = ({ show }) => (
-    <svg width={17} height={17} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={18} height={18} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
       <path d={show ? EYE_CLOSED : EYE_OPEN} />
     </svg>
   );
 
+  // ── 3D tilt (sets CSS vars only; no re-render) ──────────────────
+  const tilt = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    e.currentTarget.style.setProperty("--rx", `${(-y * 8).toFixed(2)}deg`);
+    e.currentTarget.style.setProperty("--ry", `${(x * 10).toFixed(2)}deg`);
+  };
+  const untilt = (e) => {
+    e.currentTarget.style.setProperty("--rx", "0deg");
+    e.currentTarget.style.setProperty("--ry", "0deg");
+  };
+
   // ── Render ──────────────────────────────────────────────────────
   return (
-    <div className="login-page-container" style={{ height: "100vh", display: "flex", overflow: "hidden" }}>
+    <div className="login-page-container">
       <style>{customCSS}</style>
 
-      {/* LEFT PANEL */}
-      <div className="left-panel panel-l" style={{ width: "55%", height: "100vh", background: "var(--neutral-100)", borderRight: "1px solid var(--neutral-200)", display: "flex", flexDirection: "column", padding: "48px", position: "relative", overflow: "hidden" }}>
-        <InteractiveGrid />
-        <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "40px" }}>
-            <img src="/logo.png" alt="Logo" style={{ width: "48px", height: "48px", objectFit: "contain", borderRadius: "10px", flexShrink: 0 }} />
-            <span style={{ fontSize: "20px", fontWeight: 600, color: "var(--neutral-800)", letterSpacing: "-0.01em" }}>Paves Enterprise App</span>
+      {/* LEFT BRAND PANEL */}
+      <aside className="left-panel" onMouseMove={tilt} onMouseLeave={untilt}>
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="left-inner">
+          <div className="brand">
+            <img src="/logo.png" alt="Logo" className="brand-logo" />
+            <span>Paves Enterprise App</span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: "84px", fontWeight: 700, lineHeight: 0.88, color: "#d8d3c8ff", letterSpacing: "-0.05em", marginBottom: "40px", userSelect: "none", pointerEvents: "none" }}>Work<br />Space</div>
-            <h1 style={{ fontSize: "24px", fontWeight: 700, color: "var(--neutral-950)", letterSpacing: "-0.022em", lineHeight: 1.25, marginBottom: "14px" }}>Your organization's<br />operational hub</h1>
-            <p style={{ fontSize: "14px", color: "var(--neutral-500)", lineHeight: 1.7, maxWidth: "550px", marginBottom: "48px" }}>Manage leave, track timesheets, handle projects, and access all your internal tools through a single gateway.</p>
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-              {SERVICES.map(({ label, d }) => (
-                <div key={label} className="svc-item" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "7px", opacity: 0.55 }}>
-                  <div style={{ width: "38px", height: "38px", borderRadius: "9px", background: "#fff", border: "1px solid var(--neutral-200)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 2px rgba(12,10,9,.05)" }}>
-                    <SvcIcon d={d} />
-                  </div>
-                  <span style={{ fontSize: "10px", fontWeight: 500, color: "var(--neutral-500)", letterSpacing: ".06em", textTransform: "uppercase" }}>{label}</span>
-                </div>
-              ))}
-            </div>
+
+          <div className="hero">
+            <span className="eyebrow">Internal workspace</span>
+            <h1>Your organization's operational hub</h1>
+            <p>Manage leave, track timesheets, handle projects, and access all your internal tools through a single gateway.</p>
+          </div>
+
+          <div className="svc-grid">
+            {SERVICES.map(({ label, d }) => (
+              <div key={label} className="svc-item">
+                <div className="svc-tile"><SvcIcon d={d} /></div>
+                <span>{label}</span>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </aside>
 
-      {/* RIGHT PANEL */}
-      <div className="right-panel panel-r" style={{ flex: 1, height: "100vh", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px", position: "relative" }}>
-        <div style={{ width: "100%", maxWidth: "360px" }}>
+      {/* RIGHT FORM PANEL */}
+      <main className="right-panel">
+        <div className="form-wrap" onMouseMove={tilt} onMouseLeave={untilt}>
+          <div className="mobile-brand">
+            <img src="/logo.png" alt="Logo" />
+            <span>Paves Enterprise App</span>
+          </div>
 
           {currentView === "login" ? (
             <>
-              <div className="a1" style={{ marginBottom: "40px" }}>
-                <h2 style={{ fontSize: "28px", fontWeight: 700, color: "var(--neutral-950)", letterSpacing: "-0.022em", lineHeight: 1.2, marginBottom: "8px" }}>Welcome back</h2>
-                <p style={{ fontSize: "14px", color: "var(--neutral-500)", lineHeight: 1.5, margin: 0 }}>Sign in to continue to your workspace</p>
+              <div className="a1">
+                <h2 className="form-title">Welcome back</h2>
+                <p className="form-sub">Sign in to continue to your workspace</p>
               </div>
 
               <div className="a2">
@@ -500,10 +553,8 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <div className="a3" style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
-                <div style={{ flex: 1, height: "1px", background: "var(--neutral-150)" }} />
-                <span style={{ fontSize: "11px", fontWeight: 500, color: "var(--neutral-300)", letterSpacing: ".1em", textTransform: "uppercase" }}>or</span>
-                <div style={{ flex: 1, height: "1px", background: "var(--neutral-150)" }} />
+              <div className="a3 divider">
+                <span>or</span>
               </div>
 
               <div className={`a4${shake === "email" ? " shake" : ""}`} style={{ marginBottom: "16px" }}>
@@ -516,14 +567,14 @@ export default function LoginPage() {
                 <FloatingInput id="password" label="Password" type={showPw ? "text" : "password"} value={pw}
                   onChange={(e) => { setPw(e.target.value); clrErr("pw"); }}
                   onKeyDown={onKey} error={errors.pw} autoComplete="current-password" hasSuffix>
-                  <button type="button" className="pw-btn" tabIndex={-1} onClick={() => setShowPw((v) => !v)}>
+                  <button type="button" className="pw-btn" tabIndex={-1} aria-label={showPw ? "Hide password" : "Show password"} onClick={() => setShowPw((v) => !v)}>
                     <EyeIcon show={showPw} />
                   </button>
                 </FloatingInput>
               </div>
 
-              <div className="a6" style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
-                <button type="button" className="lnk" style={{ fontSize: "13px", fontWeight: 500, color: "var(--neutral-400)" }} onClick={() => setCurrentView("forgot")}>
+              <div className="a6" style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
+                <button type="button" className="lnk forgot" onClick={() => setCurrentView("forgot")}>
                   Forgot password?
                 </button>
               </div>
@@ -534,18 +585,18 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <div className="a8" style={{ marginTop: "16px", textAlign: "center" }}>
-                <p style={{ fontSize: "11px", color: "var(--neutral-300)", lineHeight: 1.6, margin: 0 }}>
+              <div className="a8" style={{ marginTop: "20px", textAlign: "center" }}>
+                <p style={{ fontSize: "12px", color: "var(--ink-400)", lineHeight: 1.6, margin: 0 }}>
                   By signing in, you agree to the{" "}
-                  <button type="button" className="lnk" style={{ fontSize: "11px", color: "var(--neutral-400)", textDecoration: "underline", textUnderlineOffset: "2px" }}>User Policy</button>
+                  <button type="button" className="lnk" style={{ fontSize: "12px", color: "var(--ink-500)", textDecoration: "underline", textUnderlineOffset: "3px" }}>User Policy</button>
                 </p>
               </div>
             </>
           ) : (
             <>
-              <div className="a1" style={{ marginBottom: "40px" }}>
-                <h2 style={{ fontSize: "28px", fontWeight: 700, color: "var(--neutral-950)", letterSpacing: "-0.022em", lineHeight: 1.2, marginBottom: "8px" }}>Reset password</h2>
-                <p style={{ fontSize: "14px", color: "var(--neutral-500)", lineHeight: 1.5, margin: 0 }}>Enter your email to receive an OTP and set a new password</p>
+              <div className="a1">
+                <h2 className="form-title">Reset password</h2>
+                <p className="form-sub">Enter your email to receive an OTP and set a new password</p>
               </div>
 
               <div className={`a2${forgotShake === "email" ? " shake" : ""}`} style={{ marginBottom: "16px" }}>
@@ -571,7 +622,7 @@ export default function LoginPage() {
                     <FloatingInput id="newPassword" label="New Password" type={showNewPw ? "text" : "password"} value={newPassword}
                       onChange={(e) => { setNewPassword(e.target.value); clrForgotErr("newPassword"); }}
                       onKeyDown={onForgotKey} error={forgotErrors.newPassword} autoComplete="new-password" hasSuffix>
-                      <button type="button" className="pw-btn" tabIndex={-1} onClick={() => setShowNewPw((v) => !v)}>
+                      <button type="button" className="pw-btn" tabIndex={-1} aria-label={showNewPw ? "Hide password" : "Show password"} onClick={() => setShowNewPw((v) => !v)}>
                         <EyeIcon show={showNewPw} />
                       </button>
                     </FloatingInput>
@@ -585,7 +636,7 @@ export default function LoginPage() {
               )}
 
               <div className="a6" style={{ marginTop: "24px", textAlign: "center" }}>
-                <button type="button" className="lnk" style={{ fontSize: "13px", fontWeight: 500, color: "var(--neutral-400)" }} onClick={() => setCurrentView("login")}>
+                <button type="button" className="lnk back" onClick={() => setCurrentView("login")}>
                   ← Back to login
                 </button>
               </div>
@@ -594,19 +645,19 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div style={{ position: "absolute", bottom: "28px", display: "flex", alignItems: "center", gap: "14px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <svg width={10} height={10} viewBox="0 0 16 16" fill="none" stroke="var(--neutral-300)" strokeWidth={1.5}>
+        <footer className="page-footer">
+          <span className="secure">
+            <svg width={11} height={11} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
               <path d="M8 2L4 4v5c0 3 4 5 4 5s4-2 4-5V4L8 2z" />
             </svg>
-            <span style={{ fontSize: "11px", color: "var(--neutral-300)" }}>Secured with TLS</span>
-          </div>
-          <span style={{ fontSize: "11px", color: "#DDDAD7" }}>·</span>
-          <button type="button" className="lnk" style={{ fontSize: "11px", color: "var(--neutral-300)" }}>IT Support</button>
-          <span style={{ fontSize: "11px", color: "#DDDAD7" }}>·</span>
-          <button type="button" className="lnk" style={{ fontSize: "11px", color: "var(--neutral-300)" }}>Privacy Policy</button>
-        </div>
-      </div>
+            Secured with TLS
+          </span>
+          <span className="sep">·</span>
+          <button type="button" className="lnk" style={{ fontSize: "12px", color: "var(--ink-400)" }}>IT Support</button>
+          <span className="sep">·</span>
+          <button type="button" className="lnk" style={{ fontSize: "12px", color: "var(--ink-400)" }}>Privacy Policy</button>
+        </footer>
+      </main>
     </div>
   );
 }

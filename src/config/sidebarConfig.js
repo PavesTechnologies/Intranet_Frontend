@@ -52,6 +52,9 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 // the /expense-management/* routes in App.jsx.
 const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
+// Finance users do not see the employee claims page in the sidebar. A Finance user who is also an employee still reaches
+// their own claims by URL, and the backend decides what each user may open.
+const XMS_FINANCE_ROLES = [ROLES.FINANCE, ROLES.FINANCE_EXECUTIVE];
 // Finance Verification and Client Billing both require exactly FINANCE_EXECUTIVE on the backend
 // (FinanceVerificationController / InvoiceHandoffQueueController @PreAuthorize) — the generic
 // "Finance" viewing role does NOT satisfy them, so including it would let a Finance-role user into
@@ -219,7 +222,7 @@ export const XMS_SUBMENU = [
     collapseSingleChild: true,
     children: [
       { label: "My Expenses",     to: "/expense-management/expenses/my" },
-      { label: "Supplementary Claims", to: "/expense-management/expenses/supplementary" },
+      { label: "Supplementary Claims", to: "/expense-management/expenses/supplementary", hiddenForRoles: XMS_FINANCE_ROLES },
       { label: "Supplementary Review", to: "/expense-management/manager/supplementary-claims", allowedRoles: XMS_MANAGER },
       { label: "All Expenses",    to: "/expense-management/expenses/all",     allowedRoles: XMS_MANAGER },
       { label: "Expense Reports", to: "/expense-management/expenses/reports", allowedRoles: XMS_MANAGER },
@@ -247,7 +250,8 @@ export const XMS_SUBMENU = [
     // Not XMS_MANAGER-only (§1.5): any employee can be a resolved approver (NAMED_USER/
     // DEPARTMENT_OWNER/COST_CENTER_OWNER), so a General-role approver still needs a way in.
     // "My Approvals" is presence-based - visible to everyone, empty for anyone with nothing pending.
-    allowedRoles: XMS_EVERYONE,
+    // Finance users do not get this menu item: Finance approvals are on the Finance tab. The page itself stays reachable by URL.
+    allowedRoles: XMS_EVERYONE.filter((role) => !XMS_FINANCE_ROLES.includes(role)),
   },
   {
     // One page: verify, queried, and verified reports with their AP payment status.
