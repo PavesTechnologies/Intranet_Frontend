@@ -1,100 +1,175 @@
-import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
-import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { useCallback, useMemo, useState } from "react";
+import { AlertCircle, Inbox, RefreshCw } from "lucide-react";
+import CollapsiblePanel from "./CollapsiblePanel";
 import { useInvoiceHistory } from "../hooks/useInvoiceHistory";
+import { useInvoiceApproval } from "../hooks/useInvoiceApprovals";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { formatDate, formatTime } from "../../utils/formatters";
 import { useEmployeeDirectory, resolveEmployeeName } from "../../../expense-management/approval-engine/hooks/useEmployeeDirectory";
-
-// Backend action codes -> plain-language labels (invoice_process_service.py /
-// invoice_approval_service.py — see InvoiceHistoryEventDTO). Falls back to the raw code
-// unchanged for anything not listed here, so a new backend event never disappears silently.
-const ACTION_LABELS = {
-  INVOICE_CREATED: "Invoice uploaded",
-  INVOICE_OCR_REVIEWED: "OCR reviewed",
-  INVOICE_RESUBMITTED: "Invoice resubmitted after review",
-  INVOICE_SENT_FOR_APPROVAL: "Sent for approval",
-  INVOICE_APPROVAL_STEP_DECISION: "Approval decision recorded",
-  INVOICE_SENT_BACK: "Sent back for review",
-  INVOICE_REJECTED: "Invoice rejected",
-  INVOICE_APPROVED: "Invoice approved",
-  INVOICE_READY_FOR_PAYMENT: "Marked ready for payment",
-  INVOICE_PAYMENT_SCHEDULED: "Payment scheduled",
-  INVOICE_PAYMENT_SENT: "Payment sent to bank",
-  INVOICE_PAYMENT_CLEARED: "Payment cleared",
-  INVOICE_PAYMENT_FAILED: "Payment attempt failed",
-};
-
-function formatCurrencyAmount(value) {
-  const amount = Number(value);
-  return Number.isFinite(amount) ? amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value;
-}
-
-function describeEvent(event) {
-  const values = event.new_values || {};
-  if (event.action === "INVOICE_APPROVAL_STEP_DECISION" && values.level_number) {
-    return `Level ${values.level_number} — ${values.decision}${values.comments ? `: "${values.comments}"` : ""}`;
-  }
-  if (event.action === "INVOICE_SENT_BACK" && values.comments) {
-    return `Reason: "${values.comments}"`;
-  }
-  if (event.action === "INVOICE_REJECTED" && values.comments) {
-    return `Reason: "${values.comments}"`;
-  }
-  if (
-    ["INVOICE_PAYMENT_SCHEDULED", "INVOICE_PAYMENT_SENT", "INVOICE_PAYMENT_CLEARED", "INVOICE_PAYMENT_FAILED"].includes(
-      event.action,
-    ) &&
-    values.allocated_amount != null
-  ) {
-    return `₹${formatCurrencyAmount(values.allocated_amount)}${values.payment_id ? ` · Payment #${values.payment_id}` : ""}`;
-  }
-  return null;
-}
+import {
+  ACTIVITY_FILTERS,
+  buildActivityItems,
+  countByCategory,
+  groupItemsByDate,
+} from "../utils/invoiceActivityEvents";
+import { deriveWorkflowStages } from "../utils/invoiceWorkflowProgress";
+import InvoiceWorkflowTracker from "./activity/InvoiceWorkflowTracker";
+import ActivityTimeline from "./activity/ActivityTimeline";
+import ActivityEventDetails from "./activity/ActivityEventDetails";
 
 /**
- * Real lifecycle history — GET /invoice-details/invoice/{id}/history, backed by the generic
- * ap.audit_log table (table_name='invoice'). Invoice creation/OCR-review/resubmission, every
- * approval decision (including Send Back), and every payment lifecycle event that touches this
- * invoice (scheduled/sent/cleared/failed) are all recorded there per this invoice's own
- * record_id — a payment covering several invoices writes one such entry per invoice, alongside
- * its own separate audit trail under table_name='payment' (see PaymentService).
+ * Invoice Activity — workflow progress tracker and business-friendly activity timeline (filters,
+ * date groups, expandable details).
+ *
+ * Data (no new endpoints, no extra requests):
+ *  - GET /invoice-details/invoice/{id}/history (useInvoiceHistory) — ap.audit_log rows for this
+ *    invoice (table_name='invoice'), oldest first. The raw records are never modified.
+ *  - GET /invoice/{id}/approval (useInvoiceApproval) — same query key InvoiceApprovalPanel uses,
+ *    so React Query serves it from cache; only used for "Level N of M". A 404 just means the
+ *    invoice hasn't been sent for approval yet.
+ *  - invoice.status / amountPaid / netAmount from the already-loaded invoice detail.
+ * changed_by is the JWT's numeric employee id, resolved to a name through the employee directory;
+ * service actors (AP_AUTOMATION, RECURRING_SCHEDULE, …) are shown as automated.
+ *
+ * Collapsible like the other Invoice Details cards (see CollapsiblePanel) — collapsed unless `defaultOpen`.
+ *
+ * @param {{invoice: {id: number, invoiceNumber?: string, status: string, amountPaid?: number|null, netAmount?: number|null}, defaultOpen?: boolean}} props
  */
-export default function InvoiceAuditHistory({ invoiceId }) {
-  const { data: history, isLoading, error } = useInvoiceHistory(invoiceId);
-  // changed_by is the JWT's numeric employee id (str(user_id) — see InvoiceApprovalService/
-  // PaymentService's _record_audit calls), the same id space the Employee Onboarding directory
-  // is keyed by (see useEmployeeDirectory) — resolves to a real name instead of a bare id.
+export default function InvoiceAuditHistory({ invoice, defaultOpen = false }) {
+  const invoiceId = invoice?.id;
+  const { data: history, isLoading, error, refetch, isFetching } = useInvoiceHistory(invoiceId);
+  const { data: approval } = useInvoiceApproval(invoiceId);
   const { data: employeeDirectory } = useEmployeeDirectory();
+  const [filter, setFilter] = useState("all");
+
+  const resolveName = useCallback((id) => resolveEmployeeName(employeeDirectory, id), [employeeDirectory]);
+  const records = useMemo(() => (Array.isArray(history) ? history : []), [history]);
+
+  const stages = useMemo(
+    () =>
+      deriveWorkflowStages({
+        status: invoice?.status,
+        history: records,
+        approval,
+        amountPaid: invoice?.amountPaid,
+        netAmount: invoice?.netAmount,
+      }),
+    [invoice?.status, invoice?.amountPaid, invoice?.netAmount, records, approval],
+  );
+
+  const items = useMemo(() => buildActivityItems(records, { resolveName }), [records, resolveName]);
+  const counts = useMemo(() => countByCategory(items), [items]);
+  const visibleItems = useMemo(() => (filter === "all" ? items : items.filter((item) => item.category === filter)), [items, filter]);
+  const groups = useMemo(() => groupItemsByDate(visibleItems), [visibleItems]);
+
+  const activeFilterLabel = ACTIVITY_FILTERS.find((entry) => entry.key === filter)?.label;
+
+  const summary = isLoading || error ? null : `${items.length} ${items.length === 1 ? "activity" : "activities"}`;
 
   return (
-    <PageCard>
-      <PageCardContent>
-        <h3 className="mb-3 text-sm font-semibold text-gray-700">Activity</h3>
-        {isLoading ? (
-          <LoadingSpinner text="Loading activity..." />
-        ) : error ? (
-          <p className="text-sm text-red-600">{getApiErrorMessage(error, "Unable to load activity right now.")}</p>
-        ) : !history || history.length === 0 ? (
-          <p className="text-sm italic text-gray-500">No activity recorded yet.</p>
-        ) : (
-          <ol className="space-y-3 border-l border-gray-200 pl-4">
-            {history.map((event, index) => {
-              const detail = describeEvent(event);
+    <CollapsiblePanel
+      title="Activity"
+      subtitle="Workflow progress and the full history of this invoice."
+      badge={summary}
+      defaultOpen={defaultOpen}
+      bodyClassName="space-y-5"
+    >
+      <div className="rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-4">
+        <InvoiceWorkflowTracker stages={stages} />
+      </div>
+
+      {isLoading ? (
+        <TimelineSkeleton />
+      ) : error ? (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3">
+          <p className="flex items-center gap-2 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {getApiErrorMessage(error, "Unable to load activity right now.")}
+          </p>
+          {error?.status !== 403 && error?.status !== 404 && (
+            <button
+              type="button"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} aria-hidden="true" />
+              Retry
+            </button>
+          )}
+        </div>
+      ) : records.length === 0 ? (
+        <EmptyState title="No activity recorded yet." />
+      ) : (
+        <>
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="Filter activities by category">
+            {ACTIVITY_FILTERS.map((entry) => {
+              const active = filter === entry.key;
+              const count = counts[entry.key] || 0;
               return (
-                <li key={`${event.action}-${event.changed_at}-${index}`} className="relative">
-                  <span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-[#0A0082]" />
-                  <p className="text-sm font-medium text-gray-900">{ACTION_LABELS[event.action] || event.action}</p>
-                  <p className="text-xs text-gray-500">
-                    {formatDate(event.changed_at)} {formatTime(event.changed_at)}
-                    {event.changed_by ? ` · ${resolveEmployeeName(employeeDirectory, event.changed_by)}` : ""}
-                  </p>
-                  {detail && <p className="mt-0.5 text-xs text-gray-600">{detail}</p>}
-                </li>
+                <button
+                  key={entry.key}
+                  type="button"
+                  onClick={() => setFilter(entry.key)}
+                  aria-pressed={active}
+                  className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40 ${
+                    active ? "border-[#0A0082] bg-[#0A0082] text-white" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {entry.label}
+                  <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                    {count}
+                  </span>
+                </button>
               );
             })}
-          </ol>
-        )}
-      </PageCardContent>
-    </PageCard>
+          </div>
+
+          {visibleItems.length === 0 ? (
+            <EmptyState
+              title={`No ${activeFilterLabel?.toLowerCase() || "matching"} activity yet.`}
+              action={
+                <button type="button" onClick={() => setFilter("all")} className="text-xs font-medium text-[#0A0082] hover:underline">
+                  Show all activities
+                </button>
+              }
+            />
+          ) : (
+            <ActivityTimeline groups={groups} renderDetails={(item) => <ActivityEventDetails item={item} />} />
+          )}
+        </>
+      )}
+    </CollapsiblePanel>
+  );
+}
+
+function EmptyState({ title, action }) {
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center">
+      <Inbox className="h-6 w-6 text-gray-300" aria-hidden="true" />
+      <p className="text-sm text-gray-500">{title}</p>
+      {action}
+    </div>
+  );
+}
+
+function TimelineSkeleton() {
+  return (
+    <div role="status" aria-label="Loading activity" className="space-y-4">
+      <div className="flex gap-2">
+        {[0, 1, 2, 3].map((key) => (
+          <div key={key} className="h-6 w-20 animate-pulse rounded-full bg-gray-100" />
+        ))}
+      </div>
+      {[0, 1, 2].map((key) => (
+        <div key={key} className="flex gap-3">
+          <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-gray-100" />
+          <div className="flex-1 space-y-2 py-1">
+            <div className="h-3 w-1/3 animate-pulse rounded bg-gray-100" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-gray-100" />
+          </div>
+        </div>
+      ))}
+      <span className="sr-only">Loading activity...</span>
+    </div>
   );
 }

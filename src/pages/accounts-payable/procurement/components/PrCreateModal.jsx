@@ -10,6 +10,12 @@ import { PR_PRIORITY_OPTIONS } from "../constants/procurementStatus";
 import { useCreatePurchaseRequisition } from "../hooks/usePurchaseRequisitionMutations";
 import useDepartments from "../../system-configuration/hooks/useDepartments";
 import { usePurchaseCategoriesByDepartment } from "../../system-configuration/hooks/usePurchaseCategories";
+import {
+  REQUIRED_BY_IN_PAST_MESSAGE,
+  getRequiredByApiError,
+  isRequiredByInPast,
+  todayIsoDate,
+} from "../utils/requiredBy";
 
 const emptyForm = () => ({
   departmentId: "",
@@ -75,6 +81,7 @@ export default function PrCreateModal({ isOpen, onClose, onCreated }) {
     const nextErrors = {};
     if (!form.departmentId) nextErrors.departmentId = "Department is required.";
     if (!form.purchaseCategoryId) nextErrors.purchaseCategoryId = "Purchase category is required.";
+    if (isRequiredByInPast(form.requiredBy)) nextErrors.requiredBy = REQUIRED_BY_IN_PAST_MESSAGE;
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -105,6 +112,8 @@ export default function PrCreateModal({ isOpen, onClose, onCreated }) {
       handleClose();
       onCreated?.(result.id);
     } catch (err) {
+      const requiredByError = getRequiredByApiError(err);
+      if (requiredByError) setErrors((prev) => ({ ...prev, requiredBy: requiredByError }));
       toast.error(getApiErrorMessage(err, "Failed to create purchase requisition."));
     }
   };
@@ -182,6 +191,8 @@ export default function PrCreateModal({ isOpen, onClose, onCreated }) {
             type="date"
             value={form.requiredBy}
             onChange={handleChange}
+            min={todayIsoDate()}
+            error={errors.requiredBy}
           />
         </div>
 

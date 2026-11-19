@@ -2,20 +2,23 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileText,
-  RefreshCw,
-  Search,
   CheckCircle2,
-  Layers,
-  DollarSign,
-  Filter,
+  FolderKanban,
+  Clock,
+  XCircle,
+  Send,
   Eye,
   AlertCircle,
   MailCheck,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
-import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import Button from "../../../components/Button/Button";
+import SearchInput from "../../../components/filter/Searchbar";
+import { PageCard } from "../../../components/Cards/PageCard";
+import ARKPICard from "../components/common/ARKPICard";
+import ARKPIStatusTabs from "../components/common/ARKPIStatusTabs";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
+import { cn } from "@/lib/utils";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
 import Pagination from "../../../components/Pagination/pagination";
@@ -26,7 +29,7 @@ import ActionMenu from "../components/common/ActionMenu";
 
 import { formatCurrency, formatDisplayDate } from "../utils/format";
 import {
-  getInvoices,
+  getInvoiceGenerationWorkspace,
   getInvoiceErrorMessage,
   submitInvoiceForApproval,
   sendInvoiceToClient,
@@ -37,15 +40,36 @@ import {
   DEMO_DELIVERY_STATUS,
   DEMO_SENT_BY,
 } from "../utils/invoiceDemoData";
+import { interpretSendResult, describeDelivery, DELIVERY_OUTCOME } from "../utils/invoiceDelivery";
 
 const PAGE_SIZE = 6;
+const RECEIVABLES_PATH = "/account-receivable/receivables";
+
+const PIPELINE_STAGES = [
+  { key: "READY_FOR_INVOICE", label: "Ready for Invoice", countKey: "readyForInvoiceCount" },
+  { key: "GENERATED", label: "Generated", countKey: "generatedCount" },
+  { key: "PENDING_APPROVAL", label: "Pending Approval", countKey: "pendingApprovalCount" },
+  { key: "APPROVED", label: "Approved", countKey: "approvedCount" },
+  { key: "REJECTED", label: "Rejected", countKey: "rejectedCount" },
+  { key: "INVOICED", label: "Invoiced", countKey: "invoicedCount" },
+];
+
+const PIPELINE_EMPTY_MESSAGES = {
+  ALL: "No invoice records available in workspace.",
+  READY_FOR_INVOICE: "No candidates currently ready for invoice generation.",
+  GENERATED: "No generated invoices awaiting review or approval.",
+  PENDING_APPROVAL: "No invoices currently pending approval.",
+  APPROVED: "No approved invoices awaiting client delivery.",
+  REJECTED: "No rejected invoices requiring correction.",
+  INVOICED: "No finalized invoiced records.",
+};
 
 export default function InvoiceGeneration() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  const [invoices, setInvoices] = useState([]);
+  const [workspaceItems, setWorkspaceItems] = useState([]);
   const [backendSummary, setBackendSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,11 +84,8 @@ export default function InvoiceGeneration() {
   const [sendTarget, setSendTarget] = useState(null);
   const [sendLoading, setSendLoading] = useState(false);
 
-  // Demo delivery map: invoiceId → { deliveryStatus, sentAt, sentBy }
-  // Loaded from localStorage on mount and after each refresh
-  const [demoDeliveryMap, setDemoDeliveryMap] = useState(() =>
-    loadDemoDeliveryMap()
-  );
+  // Delivery map: invoiceId → { deliveryStatus }, derived from backend receivables
+  const [deliveryMap, setDeliveryMap] = useState({});
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,18 +94,23 @@ export default function InvoiceGeneration() {
   const handleKpiClick = (type) => {
     if (type === "TOTAL") {
       setStatusFilter("ALL");
-    }
-
-    if (type === "GENERATED") {
-      setStatusFilter("GENERATED");
+    } else {
+      setStatusFilter(type);
     }
   };
 
-  // Route forwarder: if snapshotId is provided as a query parameter or state,
-  // forward to the dedicated workflow
+  // Route forwarder: if snapshotId or occurrenceId / billingScheduleId is provided as a query parameter or state,
+  // forward to the dedicated invoice-generation detail workflow
   const targetSnapshotId =
     searchParams.get("snapshotId") ||
     location.state?.snapshotId ||
+    null;
+
+  const targetOccurrenceId =
+    searchParams.get("occurrenceId") ||
+    searchParams.get("billingScheduleId") ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
     null;
 
   useEffect(() => {
@@ -96,8 +122,16 @@ export default function InvoiceGeneration() {
           source: "invoice-generation",
         },
       });
+    } else if (targetOccurrenceId) {
+      navigate(`/account-receivable/invoice-generation/occurrence/${targetOccurrenceId}`, {
+        replace: true,
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
     }
-  }, [targetSnapshotId, navigate]);
+  }, [targetSnapshotId, targetOccurrenceId, navigate]);
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -106,26 +140,26 @@ export default function InvoiceGeneration() {
     setError(null);
 
     try {
-      const { invoices: fetchedInvoices, summary } = await getInvoices();
+      const { rows, summary } = await getInvoiceGenerationWorkspace();
 
-      setInvoices(fetchedInvoices || []);
+      setWorkspaceItems(rows || []);
       setBackendSummary(summary || null);
 
-      // Re-sync demo delivery map on each data refresh
-      setDemoDeliveryMap(loadDemoDeliveryMap());
+      // Re-sync delivery state from the backend on each data refresh
+      setDeliveryMap(await loadSentDeliveryMap());
 
       if (isManualRefresh) {
         showStatusToast(
-          "Invoice generation queue refreshed.",
+          "Invoice generation workspace refreshed.",
           "success"
         );
       }
     } catch (err) {
-      console.error("[InvoiceGeneration] Error loading invoices:", err);
+      console.error("[InvoiceGeneration] Error loading workspace:", err);
 
       const message = getInvoiceErrorMessage(
         err,
-        "Failed to load invoices."
+        "Failed to load invoice generation workspace."
       );
 
       setError(message);
@@ -140,106 +174,224 @@ export default function InvoiceGeneration() {
     loadData();
   }, []);
 
-  const handleViewInvoice = (inv) => {
-    const targetId =
-      inv.billingSnapshotId ||
-      inv.snapshotId ||
-      inv.invoiceId;
+  const handleGenerateInvoice = (item) => {
+    if (item.snapshotId || item.billingSnapshotId) {
+      const sId = item.snapshotId || item.billingSnapshotId;
+      navigate(`/account-receivable/invoice-generation/${sId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+          snapshotId: sId,
+          item,
+        },
+      });
+    } else if (item.billingScheduleId || item.occurrenceId) {
+      const occId = item.billingScheduleId || item.occurrenceId;
+      navigate(`/account-receivable/invoice-generation/occurrence/${occId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+          occurrenceId: occId,
+          billingScheduleId: occId,
+          item,
+        },
+      });
+    } else {
+      showStatusToast("Identifier is missing for invoice generation.", "error");
+    }
+  };
 
-    if (!targetId) {
-      showStatusToast(
-        "Identifier is missing for this invoice.",
-        "error"
-      );
+  const handleViewInvoice = (inv) => {
+    if (inv.invoiceId) {
+      navigate(`/account-receivable/invoices/${inv.invoiceId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
       return;
     }
 
-    navigate(`/account-receivable/invoices/${targetId}`, {
-      state: {
-        from: "invoice-generation",
-        source: "invoice-generation",
-      },
-    });
+    if (inv.snapshotId || inv.billingSnapshotId) {
+      const sId = inv.snapshotId || inv.billingSnapshotId;
+      navigate(`/account-receivable/invoices/${sId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
+      return;
+    }
+
+    if (inv.billingScheduleId || inv.occurrenceId) {
+      const occId = inv.billingScheduleId || inv.occurrenceId;
+      navigate(`/account-receivable/invoices/occurrence/${occId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
+      return;
+    }
+
+    showStatusToast(
+      "Identifier is missing for this invoice.",
+      "error"
+    );
   };
 
-  // Filtered invoices
+  // Filtered invoices/workspace rows
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      const st = (inv.invoiceStatus || "").toUpperCase();
+    return workspaceItems.filter((item) => {
+      const wsStatus = (item.workspaceStatus || item.invoiceStatus || "").toUpperCase();
 
-      // Status filter
+      // Status filter against authoritative workspaceStatus
       if (statusFilter !== "ALL") {
-        if (st !== statusFilter) return false;
+        if (wsStatus !== statusFilter) return false;
       }
 
-      // Search query
+      // Search query supports invoice number, project name, client name, snapshot number, and schedule reference
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
 
-        const num = (inv.invoiceNumber || "").toLowerCase();
-        const client = (inv.clientName || "").toLowerCase();
-        const project = (inv.projectName || "").toLowerCase();
-        const snapNum = (inv.snapshotNumber || "").toLowerCase();
+        const num = (item.invoiceNumber || "").toLowerCase();
+        const client = (item.clientName || "").toLowerCase();
+        const project = (item.projectName || "").toLowerCase();
+        const snapNum = (item.snapshotNumber || "").toLowerCase();
+        const schedId = (item.billingScheduleId ? String(item.billingScheduleId) : "").toLowerCase();
+        const schedRef = (
+          item.billingScheduleNumber ||
+          item.scheduleReference ||
+          item.reference ||
+          (item.periodNumber ? `period ${item.periodNumber}` : "") ||
+          ""
+        ).toLowerCase();
+        const period = (item.billingPeriod || "").toLowerCase();
 
         const matches =
           num.includes(q) ||
           client.includes(q) ||
           project.includes(q) ||
-          snapNum.includes(q);
+          snapNum.includes(q) ||
+          schedId.includes(q) ||
+          schedRef.includes(q) ||
+          period.includes(q);
 
         if (!matches) return false;
       }
 
       return true;
     });
-  }, [invoices, statusFilter, searchQuery]);
+  }, [workspaceItems, statusFilter, searchQuery]);
 
-  // Invoice KPIs
+  // Invoice KPIs and pipeline counts
   const kpis = useMemo(() => {
-    if (backendSummary) {
-      return {
-        totalInvoices:
-          backendSummary.totalInvoices ?? invoices.length,
+    const countByStatus = (status) =>
+      workspaceItems.filter((row) => row.workspaceStatus === status).length;
+    const readyForInvoiceCount = countByStatus("READY_FOR_INVOICE");
+    const generatedCount = countByStatus("GENERATED");
+    const pendingApprovalCount = countByStatus("PENDING_APPROVAL");
+    const approvedCount = countByStatus("APPROVED");
+    const rejectedCount = countByStatus("REJECTED");
+    const invoicedCount = countByStatus("INVOICED");
 
-        generatedInvoices:
-          backendSummary.generatedInvoices ??
-          invoices.filter(
-            (i) =>
-              (i.invoiceStatus || "").toUpperCase() ===
-              "GENERATED"
-          ).length,
+    // Counts must use the same rows as the table and status filters.
+    const allCount = workspaceItems.length;
+    const totalInvoices = workspaceItems.length;
 
-        totalInvoicedAmount:
-          backendSummary.totalInvoicedAmount ?? 0,
+    // Total Invoiced Amount: summary.totalInvoicedAmount (strictly excludes Ready for Invoice candidate amount)
+    const totalInvoicedAmount =
+      backendSummary?.totalInvoicedAmount ??
+      workspaceItems
+        .filter((r) => r.workspaceStatus !== "READY_FOR_INVOICE")
+        .reduce((sum, r) => sum + (Number(r.grandTotal) || 0), 0);
 
-        currency: invoices[0]?.currency || "USD",
-      };
-    }
-
-    const totalInvoices = invoices.length;
-
-    const generatedInvoices = invoices.filter(
-      (i) =>
-        (i.invoiceStatus || "").toUpperCase() ===
-        "GENERATED"
-    ).length;
-
-    const totalInvoicedAmount = invoices.reduce(
-      (sum, inv) =>
-        sum + (Number(inv.grandTotal) || 0),
-      0
-    );
-
-    const primaryCurrency =
-      invoices[0]?.currency || "USD";
+    const currency = workspaceItems[0]?.currency || "USD";
 
     return {
+      allCount,
       totalInvoices,
-      generatedInvoices,
+      readyForInvoiceCount,
+      generatedCount,
+      pendingApprovalCount,
+      approvedCount,
+      rejectedCount,
+      invoicedCount,
       totalInvoicedAmount,
-      currency: primaryCurrency,
+      currency,
     };
-  }, [invoices, backendSummary]);
+  }, [workspaceItems, backendSummary]);
+
+  // Grouped KPIs — Approval Status (5 cards) and Invoice Status (2 cards)
+  const approvalKpis = [
+    {
+      key: "TOTAL",
+      label: "Total Invoices",
+      subLabel: null,
+      value: kpis.totalInvoices,
+      icon: FolderKanban,
+      color: "bg-[#0A0082] text-white",
+      active: statusFilter === "ALL",
+      isTotal: true,
+    },
+    {
+      key: "GENERATED",
+      label: "Generated",
+      subLabel: null,
+      value: kpis.generatedCount,
+      icon: CheckCircle2,
+      color: "bg-emerald-600 text-white",
+      active: statusFilter === "GENERATED",
+    },
+    {
+      key: "PENDING_APPROVAL",
+      label: "Pending Approval",
+      subLabel: null,
+      value: kpis.pendingApprovalCount,
+      icon: Clock,
+      color: "bg-amber-500 text-white",
+      active: statusFilter === "PENDING_APPROVAL",
+    },
+    {
+      key: "APPROVED",
+      label: "Approved",
+      subLabel: null,
+      value: kpis.approvedCount,
+      icon: CheckCircle2,
+      color: "bg-teal-600 text-white",
+      active: statusFilter === "APPROVED",
+    },
+    {
+      key: "REJECTED",
+      label: "Rejected",
+      subLabel: null,
+      value: kpis.rejectedCount,
+      icon: XCircle,
+      color: "bg-rose-600 text-white",
+      active: statusFilter === "REJECTED",
+    },
+  ];
+
+  const invoiceStatusKpis = [
+    {
+      key: "READY_FOR_INVOICE",
+      label: "Ready for Invoice",
+      subLabel: null,
+      value: kpis.readyForInvoiceCount,
+      icon: FileText,
+      color: "bg-amber-500 text-white",
+      active: statusFilter === "READY_FOR_INVOICE",
+    },
+    {
+      key: "INVOICED",
+      label: "Invoiced",
+      subLabel: null,
+      value: kpis.invoicedCount,
+      icon: Send,
+      color: "bg-blue-600 text-white",
+      active: statusFilter === "INVOICED",
+    },
+  ];
 
   // Reset page when filters change
   useEffect(() => {
@@ -280,6 +432,12 @@ export default function InvoiceGeneration() {
     }
   };
 
+  const handleClearFilters = () => {
+    setStatusFilter("ALL");
+    setSearchQuery("");
+    setCurrentPage(1);
+  };
+
   const handleConfirmSend = async () => {
     if (!sendTarget) return;
     const invId = sendTarget.invoiceId || sendTarget.billingSnapshotId || sendTarget.snapshotId;
@@ -303,24 +461,33 @@ export default function InvoiceGeneration() {
 
       const clientEmail =
         backendResult?.recipientEmail ||
-        backendResult?.email ||
         sendTarget.email ||
         sendTarget.clientEmail ||
         null;
 
-      saveDemoDelivery(invId, {
-        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
-        sentAt: new Date().toISOString(),
-        sentBy: DEMO_SENT_BY,
-        recipientEmail: clientEmail,
-      });
+      // The backend answers 200 for every attempt; only a SENT result may be shown as sent.
+      const outcome = interpretSendResult(backendResult, { recipientEmail: clientEmail, sentBy: DEMO_SENT_BY });
+      if (outcome.kind !== DELIVERY_OUTCOME.SENT) {
+        if (outcome.entry) {
+          saveDemoDelivery(invId, outcome.entry);
+          setDemoDeliveryMap(loadDemoDeliveryMap());
+        }
+        showStatusToast(outcome.message, outcome.toastType);
+        setSendTarget(null);
+        return;
+      }
+
+      saveDemoDelivery(invId, outcome.entry);
       setDemoDeliveryMap(loadDemoDeliveryMap());
       showStatusToast(
-        backendResult?.message ||
-          `Invoice ${sendTarget.invoiceNumber || invId} sent${clientEmail ? ` to ${clientEmail}` : ""} successfully.`,
+        `Invoice ${sendTarget.invoiceNumber || invId} sent${clientEmail ? ` to ${clientEmail}` : ""} successfully.`,
         "success"
       );
       setSendTarget(null);
+      // Sending creates the receivable — continue the workflow there.
+      navigate(RECEIVABLES_PATH, {
+        state: { sentInvoiceId: invId, from: "invoice-generation" },
+      });
     } catch (err) {
       const msg = getInvoiceErrorMessage(err, "Failed to send invoice to client.");
       showStatusToast(msg, "error");
@@ -341,7 +508,7 @@ export default function InvoiceGeneration() {
   }
 
   const tableHeaders = [
-    "Invoice Number",
+    "Invoice / Snapshot",
     "Client",
     "Project",
     "Billing Period",
@@ -370,44 +537,62 @@ export default function InvoiceGeneration() {
     invoiceNumber: "left",
     client: "left",
     project: "left",
-    billingPeriod: "center",
-    invoiceDate: "center",
-    dueDate: "center",
-    currency: "center",
-    grandTotal: "right",
+    billingPeriod: "left",
+    invoiceDate: "left",
+    dueDate: "left",
+    currency: "left",
+    grandTotal: "left",
     status: "center",
     actions: "center",
   };
 
   const tableRows = paginatedInvoices.map((item) => {
-    const st = (item.invoiceStatus || "").toUpperCase();
+    const isReady =
+      item.workspaceStatus === "READY_FOR_INVOICE" ||
+      item.workspaceStatus === "READY_FOR_TAX" ||
+      item.workspaceStatus === "TAX_COMPLETED";
+    const st = (item.workspaceStatus || item.invoiceStatus || "").toUpperCase();
 
     const iid =
       item.invoiceId ||
+      item.snapshotId ||
       item.billingSnapshotId ||
-      item.snapshotId;
+      item.billingScheduleId ||
+      item.occurrenceId;
+
+    const candidateRef =
+      item.snapshotNumber ||
+      item.billingScheduleNumber ||
+      item.scheduleReference ||
+      item.reference ||
+      (item.periodNumber ? `Period ${item.periodNumber}` : null) ||
+      (item.billingScheduleId ? String(item.billingScheduleId) : null);
 
     const delivery =
-      demoDeliveryMap[iid] || {
+      deliveryMap[iid] || {
         deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
       };
 
-    const isSent =
-      delivery.deliveryStatus ===
-      DEMO_DELIVERY_STATUS.SENT_TO_CLIENT;
+    const sendActionLabel = describeDelivery(delivery).rowActionLabel;
 
     return {
-      onRowClick: () => handleViewInvoice(item),
+      onRowClick: () => (isReady ? handleGenerateInvoice(item) : handleViewInvoice(item)),
 
       invoiceNumber: (
         <div className="text-left">
-          <span className="font-mono font-bold text-indigo-700">
-            {item.invoiceNumber || "—"}
-          </span>
+          {item.invoiceNumber ? (
+            <span className="font-mono font-bold text-indigo-700">
+              {item.invoiceNumber}
+            </span>
+          ) : (
+            <span className="font-mono font-medium text-slate-400">
+              —
+            </span>
+          )}
 
-          {item.snapshotNumber && (
-            <div className="text-xs font-mono text-slate-400">
-              {item.snapshotNumber}
+          {candidateRef && (
+            <div className={`text-xs font-mono ${isReady ? "text-indigo-600 font-semibold" : "text-slate-400"}`}>
+              {candidateRef}
             </div>
           )}
         </div>
@@ -415,14 +600,14 @@ export default function InvoiceGeneration() {
 
       client: (
         <div className="text-left font-semibold text-slate-800">
-          {item.clientName || "Account Management"}
+          {item.clientName || "—"}
         </div>
       ),
 
       project: (
         <div className="text-left">
           <div className="font-bold text-slate-900">
-            {item.projectName || "Website Redesign"}
+            {item.projectName || "—"}
           </div>
 
           {item.projectCode && (
@@ -434,13 +619,13 @@ export default function InvoiceGeneration() {
       ),
 
       billingPeriod: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.billingPeriod || "—"}
         </div>
       ),
 
       invoiceDate: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.invoiceDate
             ? formatDisplayDate(item.invoiceDate)
             : "—"}
@@ -448,7 +633,7 @@ export default function InvoiceGeneration() {
       ),
 
       dueDate: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.dueDate
             ? formatDisplayDate(item.dueDate)
             : "—"}
@@ -456,15 +641,15 @@ export default function InvoiceGeneration() {
       ),
 
       currency: (
-        <div className="flex items-center justify-center font-semibold text-slate-700">
+        <div className="flex items-center justify-start font-semibold text-slate-700">
           {item.currency || "USD"}
         </div>
       ),
 
       grandTotal: (
-        <div className="text-right font-mono font-bold text-slate-900">
+        <div className="text-left tabular-nums font-bold text-slate-900">
           {formatCurrency(
-            item.grandTotal || 0,
+            item.grandTotal || item.amount || 0,
             item.currency || "USD"
           )}
         </div>
@@ -473,7 +658,7 @@ export default function InvoiceGeneration() {
       status: (
         <div className="flex flex-col items-center justify-center gap-1">
           <StatusBadge
-            label={item.invoiceStatus || "GENERATED"}
+            label={item.workspaceStatus}
             size="sm"
           />
 
@@ -498,29 +683,29 @@ export default function InvoiceGeneration() {
           <ActionMenu
             items={[
               {
+                label: "View",
+                icon: <Eye className="h-4 w-4 text-slate-600" />,
+                hidden: !isReady,
+                onClick: () => handleGenerateInvoice(item),
+              },
+              {
                 label: "View Invoice",
                 icon: <Eye className="h-4 w-4 text-slate-600" />,
+                hidden: isReady,
                 onClick: () => handleViewInvoice(item),
               },
-
               {
                 label: "Submit for Approval",
                 icon: <CheckCircle2 className="h-4 w-4 text-indigo-600" />,
                 hidden: st !== "GENERATED",
                 onClick: () => setSubmitTarget(item),
               },
-
               {
-                label: isSent
-                  ? "Resend to Client"
-                  : "Send to Client",
+                label: sendActionLabel,
                 icon: <MailCheck className="h-4 w-4 text-emerald-600" />,
                 hidden: st !== "APPROVED",
-                onClick: () => {
-                  setSendTarget(item);
-                },
+                onClick: () => setSendTarget(item),
               },
-
               {
                 label: "Review Rejection",
                 icon: <AlertCircle className="h-4 w-4 text-rose-600" />,
@@ -540,22 +725,7 @@ export default function InvoiceGeneration() {
       {/* Page Header */}
       <PageHeader
         title="Invoice Generation"
-        subtitle="Workspace containing generated invoices created from completed tax calculations."
-        action={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-          >
-            <RefreshCw
-              className={`mr-1.5 h-3.5 w-3.5 ${
-                refreshing ? "animate-spin" : ""
-              }`}
-            />
-            Refresh
-          </Button>
-        }
+        subtitle="Workspace containing invoice-ready billing candidates and created invoices."
       />
 
       {/* Inline Error Notice if data fetch failed */}
@@ -571,172 +741,137 @@ export default function InvoiceGeneration() {
             <div>{error}</div>
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => loadData(true)}
-            className="text-xs bg-white text-rose-700 border-rose-300 hover:bg-rose-50 font-semibold shrink-0"
-          >
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-            Retry
-          </Button>
         </div>
       )}
 
-      {/* KPI Section */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {/* Total Invoices */}
-        <button
-          type="button"
-          onClick={() => handleKpiClick("TOTAL")}
-          className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
-        >
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md cursor-pointer">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Total Invoices
-              </span>
-
-              <Layers className="h-4 w-4 text-indigo-600" />
-            </div>
-
-            <div className="mt-2 text-2xl font-extrabold text-slate-900">
-              {kpis.totalInvoices}
-            </div>
+      {/* 2. Grouped KPI Sections — divided into Approval Status and Invoice Status */}
+      <div className="space-y-3">
+        {/* Section 1: Approval Status */}
+        <div className="space-y-1.5">
+          <h3 className="text-sm font-bold text-slate-800 px-0.5 select-none">
+            Approval Status
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {approvalKpis.map((kpi) => (
+              <button
+                key={kpi.key}
+                type="button"
+                onClick={() => handleKpiClick(kpi.key)}
+                className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+              >
+                <ARKPICard
+                  label={kpi.label}
+                  subLabel={kpi.subLabel}
+                  value={loading ? "…" : kpi.value}
+                  icon={<kpi.icon className="h-5 w-5" />}
+                  color={kpi.color}
+                  active={kpi.active}
+                  className="h-full w-full"
+                />
+              </button>
+            ))}
           </div>
-        </button>
+        </div>
 
-        {/* Generated Invoices */}
-        <button
-          type="button"
-          onClick={() => handleKpiClick("GENERATED")}
-          className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
-        >
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm transition-all hover:shadow-md cursor-pointer">
-            <div className="flex items-center justify-between text-emerald-700">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                Generated Invoices
-              </span>
-
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            </div>
-
-            <div className="mt-2 text-2xl font-extrabold text-emerald-900">
-              {kpis.generatedInvoices}
-            </div>
-          </div>
-        </button>
-
-        {/* Total Invoiced Amount */}
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-indigo-700">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">
-              Total Invoiced Amount
-            </span>
-
-            <DollarSign className="h-4 w-4 text-indigo-600" />
-          </div>
-
-          <div className="mt-2 text-2xl font-extrabold text-indigo-950 font-mono">
-            {formatCurrency(
-              kpis.totalInvoicedAmount,
-              kpis.currency
-            )}
+        {/* Section 2: Invoice Status */}
+        <div className="space-y-1.5">
+          <h3 className="text-sm font-bold text-slate-800 px-0.5 select-none">
+            Invoice Status
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {invoiceStatusKpis.map((kpi) => (
+              <button
+                key={kpi.key}
+                type="button"
+                onClick={() => handleKpiClick(kpi.key)}
+                className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+              >
+                <ARKPICard
+                  label={kpi.label}
+                  subLabel={kpi.subLabel}
+                  value={loading ? "…" : kpi.value}
+                  icon={<kpi.icon className="h-5 w-5" />}
+                  color={kpi.color}
+                  active={kpi.active}
+                  className="h-full w-full"
+                />
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Controls & Invoice Queue Table */}
+      {/* Invoice Pipeline Section */}
       <PageCard>
-        <PageCardContent className="space-y-4 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-
-              <input
-                type="text"
-                placeholder="Search by invoice number, project, client, or snapshot..."
+        {/* Title */}
+        <div className="flex flex-col gap-3 px-4 pt-4 sm:px-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Invoice Pipeline</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Track invoice candidates and approval status from invoice generation through approval.
+            </p>
+          </div>
+          <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+            <div className="min-w-0 flex-1">
+              <SearchInput
                 value={searchQuery}
-                onChange={(e) =>
-                  setSearchQuery(e.target.value)
-                }
-                className="w-full rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search by invoice number, project, client, snapshot..."
               />
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                <Filter className="h-3.5 w-3.5" />
-                Status:
-              </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value)
-                }
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="ALL">
-                  All Statuses
-                </option>
-
-                <option value="GENERATED">
-                  Invoice Generated
-                </option>
-
-                <option value="PENDING_APPROVAL">
-                  Pending Approval
-                </option>
-
-                <option value="APPROVED">
-                  Approved
-                </option>
-
-                <option value="REJECTED">
-                  Rejected
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <div className="border-t border-slate-100 pt-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800">
-                Invoice Queue
-              </h3>
-
-              <span className="text-xs text-slate-400 font-medium">
-                {filteredInvoices.length}{" "}
-                {filteredInvoices.length === 1
-                  ? "Invoice"
-                  : "Invoices"}
-              </span>
-            </div>
-
-            <ARTable
-              headers={tableHeaders}
-              columns={tableColumns}
-              rows={tableRows}
-              alignments={tableAlignments}
-              emptyMessage={
-                searchQuery ||
-                statusFilter !== "ALL"
-                  ? "No invoices match your search or filter."
-                  : "No invoices generated yet"
-              }
-            />
-
-            {!loading && filteredInvoices.length > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
-                onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+            {(searchQuery || statusFilter !== "ALL") && (
+              <ARClearFiltersButton
+                onClick={handleClearFilters}
+                label="Clear filters"
               />
             )}
           </div>
-        </PageCardContent>
+        </div>
+
+        {/* Pipeline Stage Tabs */}
+        <ARKPIStatusTabs
+          label="Invoice pipeline stages"
+          loading={loading}
+          className="mt-3"
+          items={[
+            { key: "ALL", label: "All", value: kpis.allCount, active: statusFilter === "ALL", onClick: () => setStatusFilter("ALL") },
+            ...PIPELINE_STAGES.map((s) => ({
+              key: s.key,
+              label: s.label,
+              value: kpis[s.countKey],
+              active: statusFilter === s.key,
+              onClick: () => setStatusFilter(s.key),
+            })),
+          ]}
+        />
+
+        {/* Invoice Queue Table */}
+        <div className="border-t border-slate-100 p-4 sm:p-5 space-y-3">
+
+          <ARTable
+            headers={tableHeaders}
+            columns={tableColumns}
+            rows={tableRows}
+            alignments={tableAlignments}
+            emptyMessage={
+              searchQuery.trim()
+                ? "No invoices match your search."
+                : PIPELINE_EMPTY_MESSAGES[statusFilter] || "No invoice records available"
+            }
+          />
+
+          {!loading && filteredInvoices.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+              onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+            />
+          )}
+        </div>
       </PageCard>
 
       {/* Submit for Approval Modal */}

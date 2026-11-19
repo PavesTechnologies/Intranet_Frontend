@@ -14,6 +14,7 @@ import {
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { expenseReportService, lineItemService } from "@/pages/expense-management/api/expenseReportsApi";
+import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { PolicyResultBanner } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import ApprovalStatusPill from "../../../approval-engine/components/ApprovalStatusPill";
 import EmployeeLabel from "../../../approval-engine/components/EmployeeLabel";
@@ -21,7 +22,11 @@ import LineReviewStatusBadge, { deriveLineReviewState } from "../../../approval-
 import FinanceApprovalLevelTimeline from "./FinanceApprovalLevelTimeline";
 import ReceiptViewer from "../../../approval-engine/components/ReceiptViewer";
 import CommentPromptModal from "../../../approval-engine/components/CommentPromptModal";
-import { useFinanceStatus, useFinanceReviews, useVerifyLineItem, useQueryLineItem } from "../hooks/useFinanceVerification";
+import { useFinanceStatus, useFinanceReviews, useVerifyLineItem, useQueryLineItem, useAdjustLineTax } from "../hooks/useFinanceVerification";
+import CashAdvanceOffsetSection from "./CashAdvanceOffsetSection";
+import FinanceTaxPanel, { AdjustTaxModal, needsTaxConfirmation } from "./FinanceTaxPanel";
+import LineAllocationDetails from "@/pages/expense-management/components/expense-reports/LineAllocationDetails";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatMoney, formatDate } from "../../../approval-engine/constants/approvalLabels";
 
 const isLineEligible = (line) => {
@@ -58,6 +63,115 @@ const Field = ({ label, value }) => (
   </div>
 );
 
+const glLabel = (code, name) => [code, name].filter(Boolean).join(" — ");
+
+/**
+ * Pre-filled text for a tax correction: what the receipt says vs. what the expense says, so the
+ * employee knows exactly what to fix. Finance can edit it before sending. Kept short on purpose.
+ */
+const taxCorrectionText = (line) => {
+  const tax = line?.tax || {};
+  const ccy = line?.currencyCode || "";
+  const entered = `${formatMoney(line?.taxAmount ?? tax.taxAmount, ccy)}${tax.taxCode ? ` (${tax.taxCode})` : ""}`;
+  const split = (tax.components || [])
+    .map((c) => `${c.componentCode || c.code} ${formatMoney(c.taxAmount ?? c.amount, ccy)}`)
+    .join(" + ");
+  const parts = [];
+  if (tax.ocrTaxAmount != null) {
+    parts.push(`Tax mismatch: the receipt shows ${formatMoney(tax.ocrTaxAmount, ccy)} of GST but the expense has ${entered}${split ? ` = ${split}` : ""}.`);
+  } else {
+    parts.push(`Tax mismatch: the expense has ${entered}${split ? ` = ${split}` : ""}, which doesn't match the receipt.`);
+  }
+  if ((tax.validationReasons || []).includes("SUPPLY_TYPE_MISMATCH")) {
+    parts.push(
+      tax.taxType === "IGST"
+        ? "The supplier is in our state, so the bill should be CGST + SGST, not IGST."
+        : "The supplier is in another state, so the bill should be IGST, not CGST + SGST."
+    );
+  }
+  parts.push("Please correct the tax to match the receipt and resubmit.");
+  return parts.join(" ");
+};
+
+// GL detail for the selected line. Pending lines carry the full account and the posting split
+// (FinancePendingLineItemResponse.glAccount); a line already reviewed only has the GL code that
+// was recorded when Finance verified it.
+const GlAccountDetails = ({ line, review }) => {
+  const gl = line?.glAccount;
+  const recordedCode = review?.glAccountCodeSnapshot;
+
+  if (!gl) {
+    const code = recordedCode || line?.glAccountCode;
+    return code ? (
+      <div className="space-y-1">
+        <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-800">
+          <Landmark className="h-3 w-3" /> {code}
+        </span>
+        {recordedCode && <p className="text-xs text-gray-500">Recorded when this line was verified.</p>}
+      </div>
+    ) : (
+      <p className="text-sm text-gray-400">No GL account is mapped to this line's category.</p>
+    );
+  }
+
+  const active = String(gl.status || "").toUpperCase() === "ACTIVE";
+  const hasInputTax = Number(gl.inputTaxAmount) > 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-800">
+          <Landmark className="h-3 w-3" /> {gl.glAccountCode}
+        </span>
+        <span className="text-sm font-medium text-gray-800">{gl.glAccountName}</span>
+        <span
+          className={`rounded px-2 py-0.5 text-xs font-semibold ${
+            active ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+          }`}
+        >
+          {active ? "Active" : gl.status || "Inactive"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Account Type" value={gl.accountType} />
+        {recordedCode && recordedCode !== gl.glAccountCode && <Field label="Recorded at Verification" value={recordedCode} />}
+      </div>
+      {gl.description && <Field label="Description" value={gl.description} />}
+
+      <div className="border-t border-gray-100 pt-3">
+        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-400">Posting on verification</p>
+        <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 text-sm">
+          <div className="flex items-start justify-between gap-3 px-3 py-2">
+            <div className="min-w-0">
+              <p className="font-medium text-gray-800 break-words">{glLabel(gl.glAccountCode, gl.glAccountName)}</p>
+              <p className="text-xs text-gray-500">Expense, incl. non-recoverable tax</p>
+            </div>
+            <span className="shrink-0 font-semibold text-gray-900">{formatMoney(gl.expenseAmount, gl.currencyCode)}</span>
+          </div>
+          {hasInputTax && (
+            <div className="flex items-start justify-between gap-3 px-3 py-2">
+              <div className="min-w-0">
+                <p className="font-medium text-gray-800 break-words">
+                  {gl.inputTaxGlAccountCode ? glLabel(gl.inputTaxGlAccountCode, gl.inputTaxGlAccountName) : "Input tax GL not mapped"}
+                </p>
+                <p className="text-xs text-gray-500">Recoverable input tax (ITC)</p>
+              </div>
+              <span className="shrink-0 font-semibold text-gray-900">{formatMoney(gl.inputTaxAmount, gl.currencyCode)}</span>
+            </div>
+          )}
+        </div>
+        {hasInputTax && !gl.inputTaxGlAccountCode && (
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            This line's tax code has no input tax GL account, so its recoverable tax will post as unmapped. Map one in Tax Configuration.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueItem }) {
   const [selectedLineItemId, setSelectedLineItemId] = useState(null);
   const [queryingLine, setQueryingLine] = useState(null);
@@ -67,6 +181,13 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   
   const verifyLineItem = useVerifyLineItem();
   const queryLineItem = useQueryLineItem();
+  const adjustLineTax = useAdjustLineTax();
+  const { hasRole } = useAuth();
+  // Per-line tax adjustment is FINANCE_EXECUTIVE only; global tax configuration stays with Admin.
+  const canAdjustTax = hasRole(["Finance_Executive"]);
+  const [adjustingLine, setAdjustingLine] = useState(null);
+  // Line ids whose flagged tax Finance has confirmed checking (required to verify them).
+  const [taxCheckedIds, setTaxCheckedIds] = useState(() => new Set());
 
   const { data: fullReport } = useQuery({
     queryKey: ["expenseReviewReport", reportId],
@@ -146,9 +267,12 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   const costCenterName = queueItem?.costCenterName || queueItem?.costCenter || queueItem?.costCenterCode || queueItem?.departmentName || fullReport?.costCenterName || fullReport?.costCenter;
   const submittedAt = queueItem?.submittedAt || queueItem?.createdAt || queueItem?.submittedDate || fullReport?.submittedAt || fullReport?.createdAt;
   const totalAmount = queueItem?.totalAmount ?? fullReport?.totalAmount;
-  const currencyCode = queueItem?.currencyCode || fullReport?.currencyCode;
+  // Report totals are in the base currency (queue items and report.baseCurrencyCode say so).
+  const currencyCode = queueItem?.currencyCode || fullReport?.baseCurrencyCode || fullReport?.currencyCode;
 
-  const isMutating = verifyLineItem.isPending || queryLineItem.isPending;
+  const isMutating = verifyLineItem.isPending || queryLineItem.isPending || adjustLineTax.isPending;
+  const taxNeedsConfirmation = needsTaxConfirmation(selectedLine);
+  const taxChecked = !!selectedLine && taxCheckedIds.has(selectedLine.lineItemId);
   const canAct = reportStatus === "PENDING_FINANCE_VERIFICATION";
 
   if (!isOpen) return null;
@@ -156,10 +280,26 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   const handleVerify = () => {
     if (!selectedLine) return;
     verifyLineItem.mutate(
-      { reportId, lineItemId: selectedLine.lineItemId },
+      { reportId, lineItemId: selectedLine.lineItemId, taxChecked },
       {
-        onSuccess: () => showStatusToast("Line item verified successfully", "success"),
+        onSuccess: async () => {
+          showStatusToast("Line item verified successfully", "success");
+        },
         onError: (err) => showStatusToast(err.response?.data?.message || "Failed to verify line item", "error"),
+      }
+    );
+  };
+
+  const handleAdjustTax = (payload) => {
+    if (!adjustingLine) return;
+    adjustLineTax.mutate(
+      { reportId, lineItemId: adjustingLine.lineItemId, payload },
+      {
+        onSuccess: () => {
+          showStatusToast("Tax adjusted", "success");
+          setAdjustingLine(null);
+        },
+        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to adjust tax", "error"),
       }
     );
   };
@@ -241,17 +381,6 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                       label="Verification Status"
                       value={<LineReviewStatusBadge state={deriveLineReviewState(selectedReview, hasPolicyWarnings)} />}
                     />
-                    
-                    {selectedLine.glAccountCode && (
-                      <Field
-                        label="GL Account"
-                        value={
-                          <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-800">
-                            <Landmark className="h-3 w-3" /> {selectedLine.glAccountCode}
-                          </span>
-                        }
-                      />
-                    )}
 
                     {selectedLine.clientBillable && (
                       <Field
@@ -270,6 +399,12 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                     </div>
                   )}
 
+                  <LineAllocationDetails
+                    lineItemId={selectedLine.lineItemId}
+                    allocationReason={selectedLine.allocationReason}
+                    baseCurrencyCode={selectedLine.baseCurrencyCode || selectedLine.currencyCode}
+                  />
+
                   {!isLineEligible(selectedLine) && selectedLine.ineligibleReason && (
                     <div className="mt-3 border-t border-gray-100 pt-3 flex items-start gap-2 text-sm text-rose-700 font-medium bg-rose-50 p-2.5 rounded-lg border border-rose-200">
                       <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -281,21 +416,46 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                   )}
                 </Section>
 
+                <Section icon={<Landmark className="h-4 w-4 text-gray-400" />} title="GL Account">
+                  <GlAccountDetails line={selectedLine} review={selectedReview} />
+                </Section>
+
                 <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Amount">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Field label="Line Amount" value={formatMoney(selectedLine.amount, selectedLine.currencyCode)} />
-                    {selectedLine.taxAmount != null && <Field label="Tax / GST" value={formatMoney(selectedLine.taxAmount, selectedLine.currencyCode)} />}
                     <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
                   </div>
                 </Section>
 
+                <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Tax">
+                  <FinanceTaxPanel
+                    line={selectedLine}
+                    reportId={reportId}
+                    canAdjust={canAct && canAdjustTax && !!selectedLine.tax}
+                    onAdjust={() => setAdjustingLine(selectedLine)}
+                  />
+                </Section>
+
                 {selectedViolations.length > 0 && (
-                  <PolicyResultBanner lineStatus={selectedLine.lineStatus} policyWarnings={selectedViolations} />
+                  <PolicyResultBanner lineStatus={selectedLine.lineStatus} policyWarnings={selectedViolations} audience="reviewer" />
                 )}
               </>
             ) : (
               <Section icon={<FileText className="h-4 w-4 text-gray-400" />} title="Expense Information">
                 <p className="text-sm text-gray-400">No line item details available for this report.</p>
+              </Section>
+            )}
+
+            {/* Only a report that was raised against a cash advance can be offset against one. */}
+            {fullReport?.cashAdvanceId && (
+              <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Cash advance offset">
+                <CashAdvanceOffsetSection
+                  reportId={reportId}
+                  employeeId={fullReport?.employeeId}
+                  reportTotal={fullReport?.totalAmount}
+                  currencyCode={fullReport?.currencyCode}
+                  onApplied={() => {}}
+                />
               </Section>
             )}
 
@@ -313,9 +473,35 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
               >
                 <MessageSquareWarning className="h-4 w-4" /> Request Correction
               </Button>
+              {selectedLine?.tax && (
+                <Button
+                  variant="outline"
+                  disabled={isMutating}
+                  onClick={() => setQueryingLine({ ...selectedLine, correctionCategory: "TAX_MISMATCH" })}
+                >
+                  <MessageSquareWarning className="h-4 w-4" /> Request Tax Correction
+                </Button>
+              )}
+              {taxNeedsConfirmation && (
+                <label className="mr-auto flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={taxChecked}
+                    onChange={(e) =>
+                      setTaxCheckedIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(selectedLine.lineItemId);
+                        else next.delete(selectedLine.lineItemId);
+                        return next;
+                      })
+                    }
+                  />
+                  I checked this line's tax against the receipt
+                </label>
+              )}
               <Button
                 variant="success"
-                disabled={isMutating || !selectedLine || !isLineEligible(selectedLine)}
+                disabled={isMutating || !selectedLine || !isLineEligible(selectedLine) || (taxNeedsConfirmation && !taxChecked)}
                 loading={verifyLineItem.isPending}
                 onClick={handleVerify}
               >
@@ -323,21 +509,33 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
               </Button>
             </div>
           )}
+
         </div>
       </div>
 
+      <AdjustTaxModal
+        isOpen={!!adjustingLine}
+        onClose={() => setAdjustingLine(null)}
+        line={adjustingLine}
+        onSubmit={handleAdjustTax}
+        submitting={adjustLineTax.isPending}
+      />
+
       <CommentPromptModal
+        // Remount per request so a tax correction's pre-filled text never carries over.
+        key={queryingLine ? `${queryingLine.lineItemId}-${queryingLine.correctionCategory || "OTHER"}` : "closed"}
         isOpen={!!queryingLine}
-        title="Request correction"
+        title={queryingLine?.correctionCategory === "TAX_MISMATCH" ? "Request tax correction" : "Request correction"}
         description="The employee will see this comment and can fix the line item details, then resubmit the report."
         contextLabel={queryingLine ? `Correcting: ${queryingLine.merchantName || queryingLine.categoryName || "Line item"} — ${formatMoney(queryingLine.amount, queryingLine.currencyCode)}` : ""}
+        initialValue={queryingLine?.correctionCategory === "TAX_MISMATCH" ? taxCorrectionText(queryingLine) : ""}
         confirmLabel="Request Correction"
         confirmVariant="danger"
         isLoading={queryLineItem.isPending}
         onCancel={() => setQueryingLine(null)}
         onConfirm={(reason) => {
           queryLineItem.mutate(
-            { reportId, lineItemId: queryingLine.lineItemId, reason },
+            { reportId, lineItemId: queryingLine.lineItemId, reason, category: queryingLine.correctionCategory || "OTHER" },
             {
               onSuccess: () => {
                 showStatusToast("Correction requested — the report has been returned to the employee.", "success");

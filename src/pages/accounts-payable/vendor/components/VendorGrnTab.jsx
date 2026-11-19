@@ -7,12 +7,14 @@ import GenericTable from "../../../../components/Table/table";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatDate } from "../../utils/formatters";
 import { getDocumentAvailability, downloadBlob } from "../../utils/documentUpload";
-import { usePurchaseOrders, usePurchaseOrderDetail } from "../../purchase-order/hooks/usePurchaseOrders";
-import { useGoodsReceipts } from "../../goods-receipt/hooks/useGoodsReceipts";
+import { usePurchaseOrderDetail } from "../../purchase-order/hooks/usePurchaseOrders";
+import { useVendorPurchaseOrders, useVendorGrns } from "../hooks/useVendorCollections";
 import { useCreateGoodsReceipt, useUploadGoodsReceiptDocument } from "../../goods-receipt/hooks/useGoodsReceiptMutations";
 import goodsReceiptService from "../../goods-receipt/services/goodsReceiptService";
 import VendorGrnForm, { DEFAULT_GRN_FORM, DEFAULT_GRN_LINE } from "./VendorGrnForm";
 import VendorDocumentUploadModal from "./VendorDocumentUploadModal";
+import VendorCollectionPanel from "./VendorCollectionPanel";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
 const toNumber = (value) => {
   const num = Number(value);
@@ -46,6 +48,7 @@ const buildGrnPayload = (formData, lines, vendorId) => ({
  * @param {string} vendorName
  */
 const VendorGrnTab = ({ vendorId, vendorName }) => {
+  const { canEditVendor } = useApPermissions();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(DEFAULT_GRN_FORM);
   const [lines, setLines] = useState([{ ...DEFAULT_GRN_LINE }]);
@@ -57,8 +60,21 @@ const VendorGrnTab = ({ vendorId, vendorName }) => {
   const [uploadedDocs, setUploadedDocs] = useState({}); // grn_id -> { fileName } — immediate feedback before refetch lands
   const [downloadingGrnId, setDownloadingGrnId] = useState(null);
 
-  const { goodsReceipts, isLoading, isError, error } = useGoodsReceipts(vendorId);
-  const { purchaseOrders } = usePurchaseOrders(vendorId);
+  // Goods receipts from the vendor-scoped collection endpoint GET /apm/vendor/{vendor_id}/grns,
+  // whose items are the goods-receipt module's own GoodsReceiptDTO — the same shape this tab
+  // already rendered. `count` is the backend's number, shared with the Vendor Activity card.
+  const {
+    items: goodsReceipts,
+    count,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useVendorGrns(vendorId);
+
+  // The PO picker in the Add GRN form reuses the vendor's PO collection, so no extra request is
+  // made for it.
+  const { items: purchaseOrders } = useVendorPurchaseOrders(vendorId);
   const { poLines } = usePurchaseOrderDetail(formData.po_id || null);
   const createMutation = useCreateGoodsReceipt(vendorId);
   const uploadMutation = useUploadGoodsReceiptDocument(vendorId);
@@ -172,42 +188,42 @@ const VendorGrnTab = ({ vendorId, vendorName }) => {
         >
           <Download className="h-3.5 w-3.5" /> Download
         </Button>
-      ) : (
+      ) : canEditVendor ? (
         <Button size="small" variant="outline" onClick={() => openUploadModal(grn)}>
           <Upload className="h-3.5 w-3.5" /> Upload
         </Button>
+      ) : (
+        "—"
       ),
     };
   });
 
-  if (isError) {
-    return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
-        {getApiErrorMessage(error, "Unable to load goods receipts right now.")}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4" /> Add GRN
-        </Button>
-      </div>
-
-      {!isLoading && goodsReceipts.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
-          No goods receipts found for this vendor.
-        </div>
-      ) : (
+      <VendorCollectionPanel
+        title="Goods Receipts"
+        count={count}
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        onRetry={refetch}
+        isEmpty={goodsReceipts.length === 0}
+        emptyMessage="No goods receipts found for this vendor."
+        errorMessage="Unable to load goods receipts right now."
+        actions={
+          canEditVendor ? (
+            <Button onClick={openAdd}>
+              <Plus className="h-4 w-4" /> Add GRN
+            </Button>
+          ) : null
+        }
+      >
         <GenericTable
           headers={["GRN Number", "Receipt Date", "PO Reference", "Line Count", "Document"]}
           columns={["grnNumber", "receiptDate", "poReference", "lineCount", "document"]}
           rows={rows}
-          loading={isLoading}
         />
-      )}
+      </VendorCollectionPanel>
 
       <Modal
         isOpen={isModalOpen}

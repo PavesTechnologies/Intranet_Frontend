@@ -19,16 +19,25 @@ const TONE_BY_STATUS = {
   PENDING_FINANCE_VERIFICATION: "bg-blue-100 text-blue-800",
 };
 
-export default function ApprovalStatusPill({ status, label }) {
+// An approver's Needs Correction and a Finance query both leave a report AWAITING_CORRECTION;
+// ApprovalStatusResponse.correctionRequestedBy ("APPROVER" | "FINANCE") says which it was.
+const correctionLabel = (correctionRequestedBy) =>
+  correctionRequestedBy === "FINANCE"
+    ? "Finance Requested Correction"
+    : correctionRequestedBy === "APPROVER"
+    ? "Manager Requested Correction"
+    : "Correction Requested";
+
+export default function ApprovalStatusPill({ status, label, correctionRequestedBy }) {
   const tone = TONE_BY_STATUS[status] || "bg-gray-100 text-gray-700";
   const displayLabel =
     label ||
     (status === "PENDING_FINANCE_VERIFICATION"
       ? "Pending Finance Verification"
       : status === "AWAITING_CORRECTION"
-      ? "Manager Requested Correction"
+      ? correctionLabel(correctionRequestedBy)
       : status === "QUERY_RAISED"
-      ? "Finance Executive Requested Correction"
+      ? "Finance Requested Correction"
       : status);
   return (
     <span className={classNames("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", tone)}>

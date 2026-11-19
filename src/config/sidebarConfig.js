@@ -1,6 +1,17 @@
 import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
 import { INVOICE_PERMISSIONS } from "../pages/accounts-payable/constants/invoicePermissions";
+import { PAYMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/paymentPermissions";
+import { AP_MANAGEMENT_ANY, AP_MANAGEMENT_PERMISSIONS } from "../pages/accounts-payable/constants/paymentTerms";
+import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/tdsTrackingPermissions";
+import { VENDOR_ANY_PERMISSIONS } from "../pages/accounts-payable/constants/vendorPermissions";
+import { AP_AUTOMATION_PERMISSIONS } from "../pages/accounts-payable/constants/apAutomation";
+import { PROCUREMENT_ANY_VIEW_PERMISSIONS, ONBOARDING_ANY } from "../pages/accounts-payable/constants/procurementPermissions";
+import { RECURRING_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/recurring";
+import { GST_ITC_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/gstItc";
+import { ACCOUNTING_EXPORT_PERMISSIONS } from "../pages/accounts-payable/constants/accountingExport";
+import { VENDOR_NOTE_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/vendorNotes";
+import { WORK_ASSIGN_LEAD_PERMISSIONS } from "../pages/accounts-payable/constants/workAssignment";
 
 /**
  * Canonical role identifiers.
@@ -22,7 +33,7 @@ export const ROLES = {
   FINANCE:           "Finance",
   // Accounts Receivable (AR) Maker-Checker roles.
   // FINANCE_EXECUTIVE mirrors the ad-hoc "Finance_Executive" literal already used
-  // by XMS_FINANCE/XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
+  // by XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
   // backend role, now also exposed as a named constant for AR's own use.
   // FINANCE_MANAGER is AR's Checker role (approve/reject billing configurations);
   // it does not exist anywhere else in the app.
@@ -41,16 +52,14 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 // the /expense-management/* routes in App.jsx.
 const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
-const XMS_FINANCE    = [ROLES.FINANCE, "Finance_Executive"];
-// Finance Verification's own action surface requires exactly FINANCE_EXECUTIVE on the backend
-// (FinanceVerificationController's @PreAuthorize) — unlike XMS_FINANCE above (used by Client
-// Billing, a read/placeholder area), the generic "Finance" viewing role does NOT satisfy this
-// controller, so including it here would let a Finance-role user into a page where every action
-// 403s. Kept separate from XMS_FINANCE so Client Billing's own role list is unaffected.
+// Finance Verification and Client Billing both require exactly FINANCE_EXECUTIVE on the backend
+// (FinanceVerificationController / InvoiceHandoffQueueController @PreAuthorize) — the generic
+// "Finance" viewing role does NOT satisfy them, so including it would let a Finance-role user into
+// pages where every action 403s.
 const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
-const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
+export const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 
 /**
  * Accounts Receivable (AR) Maker-Checker role groups.
@@ -69,7 +78,7 @@ const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", .
  * wizard. See App.jsx route guards and Sidebar.jsx's AR submenu split.
  */
 export const AR_MAKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_EXECUTIVE];
-export const AR_CHECKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_MANAGER];
+export const AR_CHECKER_ROLES = [ROLES.FINANCE_MANAGER];
 export const AR_ALL_ROLES = [...new Set([...AR_MAKER_ROLES, ...AR_CHECKER_ROLES])];
 
 /**
@@ -81,6 +90,21 @@ export const AR_ALL_ROLES = [...new Set([...AR_MAKER_ROLES, ...AR_CHECKER_ROLES]
  */
 export const FINANCE_ALL_ROLES = [
   ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ...AR_ALL_ROLES, ROLES.SUPER_ADMIN]),
+];
+
+/**
+ * Roles allowed to see the company-wide consolidated figures on the Finance
+ * Management landing page (KPIs, cash flow, GST/TDS, action center, activity).
+ * Deliberately narrower than FINANCE_ALL_ROLES: an ordinary employee (General)
+ * or a people Manager reaches /finance/dashboard for their Expense module card,
+ * but must not see organisation-wide receivables/payables. Composed only from
+ * existing role constants — no new roles.
+ */
+export const FINANCE_OVERVIEW_ROLES = [
+  ROLES.FINANCE,
+  ROLES.FINANCE_EXECUTIVE,
+  ROLES.FINANCE_MANAGER,
+  ...ADMIN_ROLES,
 ];
 
 /**
@@ -178,37 +202,44 @@ export const XMS_SUBMENU = [
   {
     label: "Dashboard",
     to: "/expense-management/dashboard",
-    allowedRoles: XMS_EVERYONE,
+    // Every XMS role has its own dashboard view, AP Executive included.
+    allowedRoles: [...XMS_EVERYONE, ROLES.REPORTING_MANAGER, AP_ROLES.AP_EXECUTIVE],
+  },
+  {
+    label: "Notifications",
+    to: "/expense-management/activity/notifications",
+    allowedRoles: [...XMS_EVERYONE, ROLES.REPORTING_MANAGER, AP_ROLES.AP_EXECUTIVE],
   },
   {
     label: "Expenses",
     to: "/expense-management/expenses/my",
     allowedRoles: [...XMS_EMPLOYEE, ...XMS_MANAGER],
+    // No "Create Expense" entry: My Expenses has its own create button. Employees therefore see a
+    // single child, which collapses to a plain "Expenses" link; managers keep the submenu.
+    collapseSingleChild: true,
     children: [
-      { label: "Create Expense",  to: "/expense-management/expenses/create" },
       { label: "My Expenses",     to: "/expense-management/expenses/my" },
+      { label: "Supplementary Claims", to: "/expense-management/expenses/supplementary" },
+      { label: "Supplementary Review", to: "/expense-management/manager/supplementary-claims", allowedRoles: XMS_MANAGER },
       { label: "All Expenses",    to: "/expense-management/expenses/all",     allowedRoles: XMS_MANAGER },
       { label: "Expense Reports", to: "/expense-management/expenses/reports", allowedRoles: XMS_MANAGER },
     ],
   },
+  // Cash advance pages are top-level entries of their own, outside the Expenses group.
   {
-    label: "Receipts",
-    to: "/expense-management/receipts/library",
-    allowedRoles: XMS_EMPLOYEE,
-    children: [
-      { label: "Receipt Library",  to: "/expense-management/receipts/library" },
-      { label: "OCR Processing",   to: "/expense-management/receipts/ocr-processing" },
-    ],
+    label: "Request Advance",
+    to: "/expense-management/cash-advance/request",
+    allowedRoles: XMS_EVERYONE,
   },
   {
-    label: "Cash Advance",
+    label: "My Advances",
     to: "/expense-management/cash-advance/my",
-    allowedRoles: XMS_EMPLOYEE,
-    children: [
-      { label: "Request Advance", to: "/expense-management/cash-advance/request" },
-      { label: "My Advances",     to: "/expense-management/cash-advance/my" },
-      { label: "Settlement",      to: "/expense-management/cash-advance/settlement" },
-    ],
+    allowedRoles: XMS_EVERYONE,
+  },
+  {
+    label: "Settlement",
+    to: "/expense-management/cash-advance/settlement",
+    allowedRoles: XMS_EVERYONE,
   },
   {
     label: "Approvals",
@@ -219,14 +250,12 @@ export const XMS_SUBMENU = [
     allowedRoles: XMS_EVERYONE,
   },
   {
+    // One page: verify, queried, and verified reports with their AP payment status.
     label: "Finance",
-    to: "/expense-management/finance/verification",
+    to: "/expense-management/finance",
     allowedRoles: XMS_FINANCE_VERIFICATION,
-    children: [
-      { label: "Verification",    to: "/expense-management/finance/verification" },
-      { label: "Reimbursements",  to: "/expense-management/finance/reimbursements" },
-      { label: "Payment Status",  to: "/expense-management/finance/payment-status" },
-    ],
+    // Exact match, so "Finance" is not highlighted as well on its sub-pages (e.g. /finance/supplementary-claims).
+    end: true,
   },
   {
     // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")
@@ -237,14 +266,11 @@ export const XMS_SUBMENU = [
     allowedRoles: [AP_ROLES.AP_EXECUTIVE],
   },
   {
+    // One page: the invoice-handoff queue + history. The backend only accepts FINANCE_EXECUTIVE
+    // (InvoiceHandoffQueueController), so the generic Finance role would 403 on every action.
     label: "Client Billing",
-    to: "/expense-management/client-billing/billable-expenses",
-    allowedRoles: XMS_FINANCE,
-    children: [
-      { label: "Billable Expenses", to: "/expense-management/client-billing/billable-expenses" },
-      { label: "Invoice Handoff",   to: "/expense-management/client-billing/invoice-handoff" },
-      { label: "Invoice Status",    to: "/expense-management/client-billing/invoice-status" },
-    ],
+    to: "/expense-management/client-billing",
+    allowedRoles: XMS_FINANCE_VERIFICATION,
   },
   {
     label: "Masters",
@@ -253,8 +279,6 @@ export const XMS_SUBMENU = [
     children: [
       { label: "Categories & Ledger Account", to: "/expense-management/masters/expense-categories" },
       { label: "Cost Center & Budget Management", to: "/expense-management/masters/cost-center-management" },
-      { label: "Projects",            to: "/expense-management/masters/projects" },
-      { label: "Clients",             to: "/expense-management/masters/clients" },
       { label: "Currency Management", to: "/expense-management/masters/currency-management" },
       { label: "Tax Configuration",   to: "/expense-management/masters/tax-configuration" },
     ],
@@ -281,14 +305,16 @@ export const XMS_SUBMENU = [
       { label: "Assignments",         to: "/expense-management/policy-engine/assignments" },
       { label: "Rules",               to: "/expense-management/policy-engine/rules" },
       { label: "Severity Thresholds", to: "/expense-management/policy-engine/severity-thresholds" },
+      { label: "Carry Forward",        to: "/expense-management/policy-engine/carry-forward" },
       { label: "Version History",     to: "/expense-management/policy-engine/versions" },
     ],
   },
-  // {
-  //   label: "Reports",
-  //   to: "/expense-management/reports",
-  //   allowedRoles: XMS_REPORT_VIEWERS,
-  // },
+  {
+    // Organization-wide for Finance/Admin; a manager sees their own team (ExpenseReportingController).
+    label: "Reports",
+    to: "/expense-management/reports",
+    allowedRoles: XMS_REPORT_VIEWERS,
+  },
   // {
   //   label: "Activity",
   //   to: "/expense-management/activity/notifications",
@@ -298,11 +324,11 @@ export const XMS_SUBMENU = [
   //     { label: "Audit Logs",    to: "/expense-management/activity/audit-logs", allowedRoles: XMS_ADMIN },
   //   ],
   // },
-  // {
-  //   label: "Settings",
-  //   to: "/expense-management/settings",
-  //   allowedRoles: XMS_ADMIN,
-  // },
+  {
+    label: "Settings",
+    to: "/expense-management/settings",
+    allowedRoles: XMS_ADMIN,
+  },
 ];
 
 /**
@@ -315,14 +341,10 @@ export const XMS_SUBMENU = [
  * additionally gates the entire flyout <li> on hasRole(AP_ALL_ROLES) (see Sidebar.jsx),
  * matching the Account Receivable module's pattern rather than EO/XMS's ungated one.
  *
- * Deliberately 5 flat items, not 9 — each links to that area's primary list/overview page,
- * which carries its own "create new" action as a page-level button (e.g. VendorListPage's
- * "Register Vendor", InvoiceListPage's "Upload Invoice") rather than as a separate sidebar
- * entry. Sub-views reached from within a page (Vendor Onboarding/Detail/Update, OCR Review
- * Queue, Validation Queue, Payment History, Mark as Paid) still have their own routes from
- * Phase 2 — they're just no longer direct sidebar destinations. System Configuration is the
- * exception: it's a masters/admin screen, not a business-object list, so it stays a direct
- * sidebar destination on its own.
+ * Dashboard and Notifications are direct links; everything else sits in four sections (see
+ * AP_SUBMENU). Each page links to its area's primary list/overview, which carries its own
+ * "create new" action as a page-level button; sub-views reached from within a page (Vendor
+ * Onboarding/Detail, OCR Review, Payment History, ...) have routes but no sidebar entry.
  *
  * Per-item role differentiation (e.g. Vendor Management restricted to Admin/Vendor_Intake)
  * is deferred to the business-logic phases — see constants/permissions.js's
@@ -336,11 +358,76 @@ export const XMS_SUBMENU = [
 // missing it shouldn't see a nav item whose page will just 403 on its own data.
 const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
 
+// Grouped into four sections (hover a section for its pages; Sidebar.jsx opens the second level).
+// Each page keeps its own gate; a section whose pages are all hidden disappears, and a section left
+// with one page renders as a plain link to it (collapseSingleChild). A section links to its first
+// visible page. Routes are unchanged, so Action Center / dashboard / bookmarked links still work.
 export const AP_SUBMENU = [
-  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
-  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
-  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
-  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
-  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
+  // AP roles see their role views; management users (no AP role) see the read-only Management view.
+  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
+  // Every AP user has their own notifications; the backend decides which from the JWT.
+  { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
+  // The whole AP flow by role, with links into each step, plus the terms used (guide/pages/ApGuidePage.jsx).
+  { label: "How It Works", to: AP_ROUTES.GUIDE, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
+  {
+    label: "Invoices & Vendors",
+    to: AP_ROUTES.INVOICE_LIST,
+    collapseSingleChild: true,
+    children: [
+      // INVOICE_VIEW: the one permission every AP invoice group (intake / approver / finance) carries.
+      { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
+      // Rent / subscription schedules: expected, received, missing (recurring_route.py).
+      { label: "Recurring Invoices", to: AP_ROUTES.RECURRING, requiredPermissions: RECURRING_VIEW_PERMISSIONS },
+      // Vendor credit notes / our debit notes, set off against unpaid invoices (vendor_note_route.py).
+      { label: "Credit & Debit Notes", to: AP_ROUTES.VENDOR_NOTES, requiredPermissions: VENDOR_NOTE_VIEW_PERMISSIONS },
+      // VENDOR_VIEW / VENDOR_MANAGE / VENDOR_BANK_MANAGE (vendor_permissions.py).
+      { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES, requiredPermissions: VENDOR_ANY_PERMISSIONS },
+      // Internal vendor requests raised from approved PRs — same any-of gate as GET /vendor-onboarding-requests.
+      { label: "Internal Requests", to: AP_ROUTES.VENDOR_INTERNAL_REQUESTS, allowedRoles: AP_ALL_ROLES, requiredPermissions: ONBOARDING_ANY.VIEW },
+      // Same gate as the Procurement route: an AP role plus any Procurement view permission.
+      { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES, requiredPermissions: PROCUREMENT_ANY_VIEW_PERMISSIONS },
+    ],
+  },
+  {
+    label: "Payments & Tax",
+    to: AP_ROUTES.PAYMENT_READY,
+    collapseSingleChild: true,
+    children: [
+      // Ready for Payment / Payment History (cross-linked from each page).
+      { label: "Payment Management", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: PAYMENT_ANY_VIEW_PERMISSIONS },
+      { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
+      // ITC register + GSTR-2B match (gst_itc_route.py, gstr2b_route.py).
+      { label: "GST Input Credit", to: AP_ROUTES.GST_ITC, requiredPermissions: GST_ITC_VIEW_PERMISSIONS },
+      // Paid outside the intranet: drop the receipts, each is matched to its invoice (bulk_import_route.py).
+      { label: "Upload Receipts", to: AP_ROUTES.BULK_IMPORT, requiredPermissions: ["PAYMENT_PROCESS"] },
+    ],
+  },
+  {
+    label: "Reports & Accounting",
+    to: AP_ROUTES.REPORTS,
+    collapseSingleChild: true,
+    children: [
+      // The page lists only the reports the backend says this user may run (reports_route.py).
+      { label: "Reports", to: AP_ROUTES.REPORTS, requiredPermissions: [...PAYMENT_ANY_VIEW_PERMISSIONS, AP_MANAGEMENT_PERMISSIONS.REPORTS_VIEW] },
+      // Invoices, payments, notes and TDS deposits as Tally / Zoho Books vouchers (accounting_export_route.py).
+      { label: "Accounting Export", to: AP_ROUTES.ACCOUNTING_EXPORT, requiredPermissions: ACCOUNTING_EXPORT_PERMISSIONS },
+    ],
+  },
+  {
+    label: "Settings",
+    to: AP_ROUTES.SYSTEM_CONFIG,
+    collapseSingleChild: true,
+    children: [
+      // Two role-exclusive entries for the same route: System Configuration's tabs are Admin-only /
+      // Finance_Executive-only (SystemConfigurationPage.jsx), so each sees it labelled for what they get.
+      { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.ADMIN] },
+      { label: "TDS Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.FINANCE_EXECUTIVE] },
+      // Touchless PO invoices, segregation of duties (backend-enforced on /ap-automation).
+      { label: "AP Automation", to: AP_ROUTES.AP_AUTOMATION, requiredPermissions: [AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE] },
+      // AP lead: team workload, routing rules, leave cover (work_assignment_route.py).
+      { label: "AP Team", to: AP_ROUTES.WORK_ASSIGNMENT, requiredPermissions: WORK_ASSIGN_LEAD_PERMISSIONS },
+      // One-time: past challans / quarterly filings from a sheet when setting up or catching up.
+      { label: "Import Past TDS Records", to: AP_ROUTES.TDS_HISTORY_IMPORT, requiredPermissions: ["TDS_TRACKING_UPDATE"] },
+    ],
+  },
 ];

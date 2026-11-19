@@ -34,7 +34,7 @@ export function formatCurrency(amount, currencySymbol = "₹") {
  * @param {string} isoString
  * @returns {Date}
  */
-function parseBackendDateTime(isoString) {
+export function parseBackendDateTime(isoString) {
   const hasTimeComponent = isoString.includes("T");
   const hasTimezoneDesignator = /Z$|[+-]\d{2}:?\d{2}$/.test(isoString);
   const normalized = hasTimeComponent && !hasTimezoneDesignator ? `${isoString}Z` : isoString;
@@ -111,4 +111,12 @@ export function isOverdue(dueDate, netAmount, amountPaid) {
   const due = new Date(dueDate);
   if (Number.isNaN(due.getTime())) return false;
   return due.getTime() < Date.now() && calculateBalance(netAmount, amountPaid) > 0;
+}
+
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-09-01" -> "Sep 2026" (fixed English abbreviations - the en-IN locale writes "Sept"). */
+export function formatMonth(isoDate, placeholder = "") {
+  const match = /^(\d{4})-(\d{2})/.exec(String(isoDate || ""));
+  return match ? `${SHORT_MONTHS[Number(match[2]) - 1]} ${match[1]}` : placeholder;
 }

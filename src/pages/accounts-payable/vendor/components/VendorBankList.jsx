@@ -9,6 +9,8 @@ import { getApiErrorMessage } from "../../utils/apiError";
 import { formatDate } from "../../utils/formatters";
 import VendorBankForm, { DEFAULT_BANK_FORM } from "./VendorBankForm";
 import { useCreateBank, useUpdateBank, useDeleteBank } from "../hooks/useVendorMutations";
+import { useApPermissions } from "../../hooks/useApPermissions";
+import BankVerificationCell, { useBankVerifications } from "./BankVerificationCell";
 
 const validateBankForm = (formData) => {
   const errors = {};
@@ -39,6 +41,9 @@ const maskAccountNumber = (accountNumber) => {
  * instead of deleting it, so closed accounts still show up here.
  */
 const VendorBankList = ({ vendorId, banks = [] }) => {
+  // VENDOR_BANK_MANAGE only - a payee's bank account is the payment-fraud path (backend-enforced).
+  const { canManageVendorBanks, canVerifyVendorBanks } = useApPermissions();
+  const { data: verifications = {} } = useBankVerifications(vendorId);
   const [modalTarget, setModalTarget] = useState(null); // { bank: null | bank }
   const [formData, setFormData] = useState(DEFAULT_BANK_FORM);
   const [errors, setErrors] = useState({});
@@ -121,7 +126,11 @@ const VendorBankList = ({ vendorId, banks = [] }) => {
       <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Active</span>
     ),
     effective: `${formatDate(bank.effective_from)}${bank.effective_to ? ` – ${formatDate(bank.effective_to)}` : ""}`,
-    actions: (
+    verification: isClosed(bank) ? "—" : (
+      <BankVerificationCell vendorId={vendorId} bankId={bank.vendor_bank_id} verification={verifications[bank.vendor_bank_id]}
+        canVerify={canVerifyVendorBanks} />
+    ),
+    actions: canManageVendorBanks ? (
       <span className="flex justify-center gap-1.5">
         <Button size="small" variant="outline" onClick={() => openEdit(bank)}>
           <Pencil className="h-3.5 w-3.5" /> Edit
@@ -130,21 +139,25 @@ const VendorBankList = ({ vendorId, banks = [] }) => {
           <Trash2 className="h-3.5 w-3.5" /> Delete
         </Button>
       </span>
+    ) : (
+      "—"
     ),
     rowClass: isClosed(bank) ? "opacity-60" : "",
   }));
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4" /> Add Bank Account
-        </Button>
-      </div>
+      {canManageVendorBanks && (
+        <div className="flex justify-end">
+          <Button onClick={openAdd}>
+            <Plus className="h-4 w-4" /> Add Bank Account
+          </Button>
+        </div>
+      )}
 
       <GenericTable
-        headers={["Bank", "Account Holder", "Account Number", "Status", "Effective", "Actions"]}
-        columns={["bankName", "accountHolder", "accountNumber", "status", "effective", "actions"]}
+        headers={["Bank", "Account Holder", "Account Number", "Status", "Effective", "Verification", "Actions"]}
+        columns={["bankName", "accountHolder", "accountNumber", "status", "effective", "verification", "actions"]}
         rows={rows}
       />
 

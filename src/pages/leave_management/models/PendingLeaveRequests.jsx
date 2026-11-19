@@ -1,24 +1,25 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import api from "../../../api/axiosInstance";
 import PendingLeaveRequestsTable from "./PendingLeaveRequestsTable";
-import SkeletonTable from "./SkeletonTable";
+import { TableSkeleton } from "../../../components/patterns/Loaders";
 import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import NoPendingLeaves from "../../../components/icons/no_pending_leaves.svg";
+import { Fonts } from "../../../components/Fonts/Fonts";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
 // ✅ Removed refreshKey prop — self-sufficient now
 const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
-  const [pendingLeaves, setPendingLeaves]   = useState([]);
-  const [leaveTypes, setLeaveTypes]         = useState([]);
-  const [leaveBalances, setLeaveBalances]   = useState({});
-  const [loading, setLoading]               = useState(true);
-  const [error, setError]                   = useState(null);
-  const [currentPage, setCurrentPage]       = useState(1);
+  const [pendingLeaves, setPendingLeaves] = useState([]);
+  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [leaveBalances, setLeaveBalances] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const employeeId   = useAuth()?.user?.user_id;
-  const BASE_URL     = window.__APP_CONFIG__.BASE_URL;
+  const employeeId = useAuth()?.user?.user_id;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
   const ITEMS_PER_PAGE = 5;
 
   // ─── Single stable fetchData ──────────────────────────────────────────
@@ -82,7 +83,7 @@ const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
   }, [fetchData]);
 
   // ─── Pagination ───────────────────────────────────────────────────────
-  const totalPages      = Math.ceil(pendingLeaves.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(pendingLeaves.length / ITEMS_PER_PAGE);
   const paginatedLeaves = pendingLeaves.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
@@ -91,19 +92,19 @@ const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
   return (
     <>
       {loading ? (
-        <SkeletonTable rows={5} columns={6} />
+        <TableSkeleton rows={5} columns={6} />
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : pendingLeaves.length === 0 ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="text-3xl leading-none">
-            <img src={NoPendingLeaves} alt="No Pending Leaves" className="w-20" />
-          </div>
-          <div className="pl-4 leading-snug">
-            <h2 className="text-xl font-semibold">
-              Cheers! No pending leave requests.
-            </h2>
-            <p className="text-sm text-gray-600">Request leave on the above!</p>
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="flex flex-row items-center justify-center gap-4 text-left">
+            <div className="flex items-center justify-center">
+              <img src={NoPendingLeaves} alt="" className="h-24 w-24 object-contain" />
+            </div>
+            <div>
+              <p className={Fonts.subheading}>Cheers! No pending leave requests.</p>
+              <p className="max-w-sm text-sm text-gray-500">Request leave on the above!</p>
+            </div>
           </div>
         </div>
       ) : (

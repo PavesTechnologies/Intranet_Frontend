@@ -52,10 +52,11 @@ export const usePurchaseRequisitions = (filters = {}) => {
  * Unpaginated fetch used to populate PR selectors (Quotation / Vendor Selection tabs),
  * which need the whole eligible set to filter by status code client-side, not a page of it.
  */
-export const useAllPurchaseRequisitions = (limit = 200) =>
+export const useAllPurchaseRequisitions = (limit = 200, { enabled = true } = {}) =>
   useQuery({
     queryKey: PR_LIST_KEY({ all: true, limit }),
     queryFn: () => procurementService.getPurchaseRequisitions({ limit }),
+    enabled,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: 1,

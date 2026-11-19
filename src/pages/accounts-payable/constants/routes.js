@@ -1,11 +1,18 @@
 const BASE = "/accounts-payable";
 
 export const AP_ROUTES = {
+  // Module root — has no page of its own; App.jsx redirects it to DASHBOARD.
+  ROOT: BASE,
   DASHBOARD: `${BASE}/dashboard`,
+  GUIDE: `${BASE}/guide`,
+  DASHBOARD_ACTIVITY: `${BASE}/dashboard/activity`,
 
   // The single vendor onboarding entry point: Register Vendor (intake) followed by
   // Pre-Screen, both steps on this one route.
   VENDOR_ONBOARD: `${BASE}/vendors/onboard`,
+  // Same intake page, opened for an internal vendor request.
+  VENDOR_ONBOARD_FOR_REQUEST: (requestId) =>
+    `${BASE}/vendors/onboard?onboardingRequestId=${encodeURIComponent(requestId)}`,
 
   VENDOR_LIST: `${BASE}/vendors`,
 
@@ -20,7 +27,12 @@ export const AP_ROUTES = {
     `${BASE}/vendors/${vendorId}/edit`,
 
   INVOICE_UPLOAD: `${BASE}/invoices/upload`,
+  INVOICE_BULK_UPLOAD: `${BASE}/invoices/bulk-upload`,
+  INVOICE_BULK_BATCH: (batchId = ":batchId") =>
+    `${BASE}/invoices/bulk-upload/${batchId}`,
   INVOICE_OCR_REVIEW: `${BASE}/invoices/ocr-review`,
+  INVOICE_REVIEW_WORKBENCH: `${BASE}/invoices/review-workbench`,
+  AP_AUTOMATION: `${BASE}/automation`,
   INVOICE_VALIDATION: `${BASE}/invoices/validation`,
   INVOICE_LIST: `${BASE}/invoices`,
   INVOICE_DETAIL: (invoiceId = ":invoiceId") =>
@@ -34,6 +46,25 @@ export const AP_ROUTES = {
   PAYMENT_HISTORY: `${BASE}/payments/history`,
   PAYMENT_MARK_PAID: (invoiceId = ":invoiceId") =>
     `${BASE}/payments/mark-paid/${invoiceId}`,
+  // Invoice-level payment detail: summary + every recorded payment and its receipts.
+  PAYMENT_DETAIL: (invoiceId = ":invoiceId") =>
+    `${BASE}/payments/invoice/${invoiceId}`,
+
+  TDS_TRACKING: `${BASE}/tds/tracking`,
+  TDS_CHALLANS: `${BASE}/tds/challans`,
+  RECURRING: `${BASE}/recurring`,
+  GST_ITC: `${BASE}/gst`,
+  ACCOUNTING_EXPORT: `${BASE}/accounting-export`,
+  VENDOR_NOTES: `${BASE}/vendor-notes`,
+  WORK_ASSIGNMENT: `${BASE}/work-assignment`,
+  BULK_IMPORT: `${BASE}/bulk-import`,
+  // one-time loading of past challans / quarterly filings (Settings); routine TDS uses Record challan / filing
+  TDS_HISTORY_IMPORT: `${BASE}/tds/history-import`,
+  BULK_IMPORT_JOB: (jobId = ":jobId") => `${BASE}/bulk-import/${jobId}`,
+  TDS_CHALLAN_NEW: `${BASE}/tds/challans/new`,
+  TDS_FILING_NEW: `${BASE}/tds/filings/new`,
+  TDS_TRACKING_DETAIL: (invoiceId = ":invoiceId") =>
+    `${BASE}/tds/tracking/${invoiceId}`,
 
   PAYMENT_QUEUE: `${BASE}/payment-queue`,
   PAYMENT_QUEUE_DETAIL: (reportId = ":reportId") =>
@@ -45,6 +76,9 @@ export const AP_ROUTES = {
   SYSTEM_CONFIG_APPROVAL_POLICY_NEW: `${BASE}/system-configuration/approval-policies/new`,
   SYSTEM_CONFIG_APPROVAL_POLICY_EDIT: (policyId = ":policyId") =>
     `${BASE}/system-configuration/approval-policies/${policyId}/edit`,
+
+  // Notification Center — the authenticated user's own AP notifications.
+  NOTIFICATIONS: `${BASE}/notifications`,
 
   PROCUREMENT: `${BASE}/procurement`,
   PROCUREMENT_PR_DETAIL: (prId = ":prId") => `${BASE}/procurement/requisitions/${prId}`,

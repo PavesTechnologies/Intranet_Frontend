@@ -1,4 +1,5 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Shared service layer for Expense Report / Line Item / Receipt / lookup calls.
@@ -7,7 +8,7 @@ import api from "@/api/axiosInstance";
  * style already used by the sibling masters pages (CostCentersPage, etc.).
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -30,6 +31,12 @@ export const expenseReportService = {
     }),
   getById: (reportId) =>
     api.get(`/xms/employee/expense-reports/${reportId}`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // Every workflow event across correction rounds, oldest first: [{ action, performedBy, performedAt, comment }].
+  getHistory: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/history`, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
@@ -61,6 +68,12 @@ export const lineItemService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // The dates a line on this report may carry. Same rules the server applies when a line is saved.
+  getExpenseDateRange: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/line-items/expense-date-range`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
   create: (reportId, payload) =>
     api.post(`/xms/employee/expense-reports/${reportId}/line-items`, payload, {
       baseURL: EXPENSE_API_BASE,
@@ -84,6 +97,14 @@ export const lineItemService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // The employee's explanation of one policy violation (min 20 characters). Returns the updated
+  // PolicyWarningResponse; the report must be editable (Draft / Awaiting Correction / Query Raised).
+  justifyPolicyWarning: (reportId, lineItemId, violationId, justification) =>
+    api.post(
+      `/xms/employee/expense-reports/${reportId}/line-items/${lineItemId}/policy-warnings/${violationId}/justify`,
+      { justification },
+      { baseURL: EXPENSE_API_BASE, headers: authHeaders() }
+    ),
 };
 
 // Whole-set replace, not per-row CRUD — PUT always sends the complete split list for the line
@@ -100,9 +121,21 @@ export const splitService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // Read-only view for Finance verification / AP payment (any report, not just the caller's own).
+  getForReview: (lineItemId) =>
+    api.get(`/xms/finance/expense-line-items/${lineItemId}/splits`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
 };
 
 export const receiptService = {
+  // Every receipt on a report, all lines. Used to find lines that still have no receipt.
+  listForReport: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/receipts`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
   getAll: (lineItemId) =>
     api.get(`/xms/employee/expense-line-items/${lineItemId}/receipts`, {
       baseURL: EXPENSE_API_BASE,
@@ -163,6 +196,83 @@ const normalizeList = (data, key) => {
 
 const isActive = (status) => (status || "").toString().toUpperCase() === "ACTIVE";
 
+// Tax Configuration master (input-tax rates). Expense categories reference a code by value;
+// its rate pre-fills GST on line items (surfaced as category.taxRate).
+export const taxCodeService = {
+  getAll: () => api.get("/xms/admin/tax-codes", { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  getActive: () => api.get("/xms/admin/tax-codes/active", { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  create: (payload) => api.post("/xms/admin/tax-codes", payload, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  update: (id, payload) => api.put(`/xms/admin/tax-codes/${id}`, payload, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  delete: (id) => api.delete(`/xms/admin/tax-codes/${id}`, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+};
+
+// Dated category -> tax code mappings (which code applies on an expense date). Admin writes.
+export const categoryTaxMappingService = {
+  list: (categoryId) =>
+    api.get(`/xms/admin/expense-categories/${categoryId}/tax-mappings`, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  create: (categoryId, payload) =>
+    api.post(`/xms/admin/expense-categories/${categoryId}/tax-mappings`, payload, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  update: (categoryId, mappingId, payload) =>
+    api.put(`/xms/admin/expense-categories/${categoryId}/tax-mappings/${mappingId}`, payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  delete: (categoryId, mappingId) =>
+    api.delete(`/xms/admin/expense-categories/${categoryId}/tax-mappings/${mappingId}`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+};
+
+// Expense tax is calculated by the server only; forms preview it through the same engine the save uses.
+export const taxService = {
+  // payload: { amount, currencyId, expenseDate, categoryId?, taxCodeId?, enteredTax? }
+  calculate: (payload) => api.post("/xms/tax/calculate", payload, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  // Codes an employee may pick on the date, plus the category's default.
+  applicable: (categoryId, date) =>
+    api.get("/xms/tax-codes/applicable", {
+      baseURL: EXPENSE_API_BASE,
+      params: { ...(categoryId ? { categoryId } : {}), ...(date ? { date } : {}) },
+      headers: authHeaders(),
+    }),
+};
+
+// Tax analysis over submitted lines (base currency). params: { from, to, groupBy: month|taxCode|component|category, categoryId, taxCodeId }
+export const taxReportService = {
+  get: (params) => api.get("/xms/reports/tax", { baseURL: EXPENSE_API_BASE, params, headers: authHeaders() }),
+};
+
+// Tax audit history of one record, newest first. entity: tax-codes | tax-mappings | line-items
+export const taxAuditService = {
+  history: (entity, id) => api.get(`/xms/tax/audit/${entity}/${id}`, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+};
+
+// Tax journal (ERP read model) for reports approved between from and to (yyyy-mm-dd).
+export const taxJournalService = {
+  get: (params) => api.get("/xms/finance/tax-journal", { baseURL: EXPENSE_API_BASE, params, headers: authHeaders() }),
+};
+
+// Role dashboards: view is employee | manager | finance | ap | admin (DashboardController).
+export const dashboardService = {
+  get: (view) => api.get(`/xms/dashboard/${view}`, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+};
+
+// Notification Center (NotificationController): the caller's personal notifications + team inboxes.
+export const notificationService = {
+  // params: status (all|read|unread), category, eventType, from, to (yyyy-mm-dd), q, page, size
+  search: (params) => api.get("/xms/notifications", { baseURL: EXPENSE_API_BASE, params, headers: authHeaders() }),
+  unreadCount: () => api.get("/xms/notifications/unread-count", { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  markRead: (id) => api.post(`/xms/notifications/${id}/read`, {}, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+  markAllRead: () => api.post("/xms/notifications/read-all", {}, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+};
+
+// Audit trail (AuditLogController, Admin only, read-only): newest first.
+export const auditLogService = {
+  // params: entityName, entityId, action, performedBy, source, from, to (yyyy-mm-dd), q, page, size
+  search: (params) => api.get("/xms/admin/audit-logs", { baseURL: EXPENSE_API_BASE, params, headers: authHeaders() }),
+  facets: () => api.get("/xms/admin/audit-logs/facets", { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+};
+
 export const lookupService = {
   getActiveCostCenters: async () => {
     const res = await api.get("/xms/admin/cost-centers", {
@@ -187,6 +297,81 @@ export const lookupService = {
     });
     return normalizeList(res.data, "expenseCategories");
   },
+  // Epic 8 (client-billable expenses): the caller's own PMS-assigned ACTIVE/PLANNING projects —
+  // distinct from /xms/admin/projects (org-wide master data, used by the Masters > Projects
+  // admin page). Never assume all org projects are selectable for billing; only what this
+  // returns is.
+  //
+  // Deliberately calls THIS SERVICE's own endpoint, not PMS directly (unlike the Backlog/Board
+  // components elsewhere in this app, which do call window.__APP_CONFIG__.PMS_BASE_URL directly
+  // for PMS-native features). EMS's /xms/employee/projects/assigned does real work the browser
+  // cannot: it resolves the caller's numeric UMS user id from their JWT (PMS's /api/my-work
+  // requires that as a ?userId= query param, and it is not something the frontend has), calls
+  // PMS on the employee's behalf, and upserts the result into EMS's own project_cache so it can
+  // return a stable local UUID — the same id ExpenseLineItemRequest.projectId expects. Calling
+  // PMS directly from here would return PMS's raw numeric project ids with no userId supplied at
+  // all, which cannot be submitted as a client-billable expense's project.
+  getAssignedProjects: async () => {
+    const res = await api.get("/xms/employee/projects/assigned", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    });
+    return normalizeList(res.data, "data");
+  },
+  // Active clients for a client-billable line item: [{ clientId, clientName }], sorted by name.
+  // XMS calls RMS with the user's own token, so only roles RMS allows (Admin / Resource Manager /
+  // Project Manager) get a list; others get 403.
+  // { homeDepartmentUuid } for the caller — lets the expense form ask for a reason when a chosen
+  // cost center (or split share) belongs to another department.
+  getAllocationContext: async () => {
+    const res = await api.get("/xms/employee/allocation-context", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    });
+    return res.data?.data || null;
+  },
+  getActiveClients: async () => {
+    const res = await api.get("/xms/clients", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    });
+    return normalizeList(res.data, "data");
+  },
+};
+
+// Client invoice handoff queue (Epic 8) — separate from AP reimbursement (ApPaymentPage).
+// Restricted server-side to the FINANCE_EXECUTIVE role.
+export const invoiceHandoffService = {
+  getEligibleExpenses: (params) =>
+    api.get("/xms/finance/invoice-handoff-queue/eligible-expenses", {
+      baseURL: EXPENSE_API_BASE,
+      params,
+      headers: authHeaders(),
+    }),
+  markHandedOff: (lineItemId, payload) =>
+    api.post(`/xms/finance/invoice-handoff-queue/${lineItemId}/handoff`, payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  getHistory: (lineItemId) =>
+    api.get(`/xms/finance/invoice-handoff-queue/${lineItemId}/history`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // InvoiceHandoffSummaryResponse: readyCount, readyBaseAmount, readyProjectCount, handedOffCount, baseCurrencyCode,
+  // readyClientCount
+  getSummary: () =>
+    api.get("/xms/finance/invoice-handoff-queue/summary", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // PageResponse<InvoiceHandoffRecordResponse>, newest handoff first
+  getHandedOff: (params) =>
+    api.get("/xms/finance/invoice-handoff-queue/handed-off", {
+      baseURL: EXPENSE_API_BASE,
+      params,
+      headers: authHeaders(),
+    }),
 };
 
 export { EXPENSE_API_BASE };

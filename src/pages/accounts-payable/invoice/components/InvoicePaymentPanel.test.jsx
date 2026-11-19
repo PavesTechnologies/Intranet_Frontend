@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import InvoicePaymentPanel from "./InvoicePaymentPanel";
 import { useMarkReadyForPaymentMutation } from "../../payment/hooks/usePaymentMutations";
 import { useInvoiceTds } from "../hooks/useInvoiceTds";
+import { useInvoicePaymentTerms } from "../hooks/useInvoicePaymentTerms";
 import { useApPermissions } from "../../hooks/useApPermissions";
 
 vi.mock("../../payment/hooks/usePaymentMutations", () => ({
@@ -13,6 +14,10 @@ vi.mock("../../payment/hooks/usePaymentMutations", () => ({
 
 vi.mock("../hooks/useInvoiceTds", () => ({
   useInvoiceTds: vi.fn(),
+}));
+
+vi.mock("../hooks/useInvoicePaymentTerms", () => ({
+  useInvoicePaymentTerms: vi.fn(),
 }));
 
 vi.mock("../../hooks/useApPermissions", () => ({
@@ -36,6 +41,33 @@ beforeEach(() => {
   // existed) keep exercising Mark Ready for Payment as before — the TDS-specific describe block
   // overrides this per case.
   useInvoiceTds.mockReturnValue({ data: { determination_status: "VERIFIED" }, isLoading: false, error: null });
+  // Payment terms default to compliant so the pre-existing cases keep their meaning; the
+  // payment-terms describe block below overrides this.
+  useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: true, validation_status: "COMPLIANT" } });
+});
+
+describe("InvoicePaymentPanel — payment-term gate", () => {
+  it.each(["MISMATCH", "REVIEW_REQUIRED"])("disables Mark Ready for Payment while terms are %s and says why", (status) => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true, canViewPaymentTerms: true });
+    useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: true, validation_status: status } });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeDisabled();
+    expect(screen.getByText(/Payment terms confirmed/)).toBeInTheDocument();
+  });
+
+  it("offers Mark Ready for Payment once terms are verified by Finance", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true, canViewPaymentTerms: true });
+    useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: true, validation_status: "VERIFIED_OVERRIDE" } });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeInTheDocument();
+  });
+
+  it("does not block a legacy invoice that has not been evaluated (the backend checks it at mark-ready)", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true, canViewPaymentTerms: true });
+    useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: false } });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeInTheDocument();
+  });
 });
 
 describe("InvoicePaymentPanel", () => {
@@ -93,19 +125,19 @@ describe("InvoicePaymentPanel", () => {
 });
 
 describe("InvoicePaymentPanel — TDS gate (Phase 1 frontend-only sequencing)", () => {
-  it("hides Mark Ready for Payment when Approved but TDS is only DETERMINED, not VERIFIED", () => {
+  it("disables Mark Ready for Payment when Approved but TDS is only DETERMINED, not VERIFIED", () => {
     useApPermissions.mockReturnValue({ canMarkPaid: true });
     useInvoiceTds.mockReturnValue({ data: { determination_status: "DETERMINED" }, isLoading: false, error: null });
     renderPanel({ ...baseInvoice, status: "Approved" });
-    expect(screen.queryByRole("button", { name: /mark ready for payment/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/TDS must be verified/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeDisabled();
+    expect(screen.getByText(/TDS verified/)).toBeInTheDocument();
   });
 
-  it("hides Mark Ready for Payment when Approved and TDS hasn't been determined at all (404)", () => {
+  it("disables Mark Ready for Payment when Approved and TDS hasn't been determined at all (404)", () => {
     useApPermissions.mockReturnValue({ canMarkPaid: true });
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
     renderPanel({ ...baseInvoice, status: "Approved" });
-    expect(screen.queryByRole("button", { name: /mark ready for payment/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeDisabled();
   });
 
   it("offers Mark Ready for Payment once TDS is VERIFIED", () => {
@@ -115,22 +147,86 @@ describe("InvoicePaymentPanel — TDS gate (Phase 1 frontend-only sequencing)", 
     expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeInTheDocument();
   });
 
-  it("shows Net Vendor Payable as Net Amount minus TDS once a tds_amount exists", () => {
+  it("shows Net Vendor Payable straight from invoice.payableAmount (backend-enforced, not re-derived)", () => {
     useApPermissions.mockReturnValue({ canMarkPaid: false });
     useInvoiceTds.mockReturnValue({
       data: { determination_status: "VERIFIED", tds_amount: 100 },
       isLoading: false,
       error: null,
     });
-    renderPanel({ ...baseInvoice, status: "Approved", netAmount: 1000, amountPaid: 0 });
+    renderPanel({ ...baseInvoice, status: "Approved", netAmount: 1000, amountPaid: 0, payableAmount: 900 });
     expect(screen.getByText("Net Vendor Payable")).toBeInTheDocument();
     expect(screen.getByText("₹900.00")).toBeInTheDocument();
   });
 
-  it("does not show Net Vendor Payable before TDS has any amount (not yet determined)", () => {
+  it("does not show Net Vendor Payable before TDS has been determined (payableAmount is null)", () => {
     useApPermissions.mockReturnValue({ canMarkPaid: false });
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
-    renderPanel({ ...baseInvoice, status: "Approved" });
+    renderPanel({ ...baseInvoice, status: "Approved", payableAmount: null });
     expect(screen.queryByText("Net Vendor Payable")).not.toBeInTheDocument();
+  });
+});
+
+describe("InvoicePaymentPanel — TDS Deducted summary", () => {
+  const determinedTds = {
+    determination_status: "DETERMINED",
+    tds_applicable: true,
+    tds_amount: 17700,
+    tds_rate: 10,
+    tds_rule: {
+      rule_name: "TDS - Professional or Technical Services",
+      legal_reference: "Section 194J, Income-tax Act (FY2026-27)",
+    },
+    determination_reason: "TDS - Professional or Technical Services applies.",
+  };
+
+  it("shows the amount and one-line basis, without needing to scroll to the TDS panel", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: false });
+    useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByText("TDS Deducted")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "₹17,700.00 — 10% under TDS - Professional or Technical Services (Section 194J, Income-tax Act (FY2026-27))",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("reveals the full determination reason on demand, without navigating away", async () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: false });
+    useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
+    const user = userEvent.setup();
+    renderPanel({ ...baseInvoice, status: "Approved" });
+
+    expect(screen.queryByText(determinedTds.determination_reason)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /why this determination/i }));
+    expect(screen.getByText(determinedTds.determination_reason)).toBeInTheDocument();
+  });
+
+  it("shows 'Not yet verified' before verification, and Verified by/on after", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: false });
+    useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
+    const { rerender } = renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByText("Not yet verified")).toBeInTheDocument();
+
+    useInvoiceTds.mockReturnValue({
+      data: { ...determinedTds, determination_status: "VERIFIED", verified_by: "Finance Executive", verified_at: "2026-01-02T00:00:00Z" },
+      isLoading: false,
+      error: null,
+    });
+    rerender(<InvoicePaymentPanel invoice={{ ...baseInvoice, status: "Approved" }} />);
+    expect(screen.getByText(/Verified by Finance Executive on/)).toBeInTheDocument();
+  });
+
+  it("shows 'No TDS deducted' plainly when tds_applicable is false, rather than hiding the section", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: false });
+    useInvoiceTds.mockReturnValue({
+      data: { determination_status: "VERIFIED", tds_applicable: false },
+      isLoading: false,
+      error: null,
+    });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByText("TDS Deducted")).toBeInTheDocument();
+    expect(screen.getByText("No TDS deducted")).toBeInTheDocument();
   });
 });

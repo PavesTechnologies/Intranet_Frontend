@@ -110,3 +110,98 @@ export const isDuplicateEngagementError = (error) => {
 export const DUPLICATE_ENGAGEMENT_MESSAGE =
   "This vendor is already engaged for the selected department and purchase category. " +
   "The same vendor can be onboarded again under a different department or category.";
+
+/**
+ * Outcome of a failed POST /apm/vendor-intake that carried `onboarding_request_id`
+ * (vendor_intake_route.create_intake):
+ *  - 404 — the internal vendor request does not exist;
+ *  - 409 — the request already has its intake (or is no longer eligible), UNLESS the detail
+ *    is the duplicate-engagement conflict the normal intake also raises;
+ *  - 422 — validation / business-rule failure, shown with the backend's own detail.
+ */
+export const ONBOARDING_INTAKE_ERROR = {
+  REQUEST_NOT_FOUND: "REQUEST_NOT_FOUND",
+  REQUEST_NOT_ELIGIBLE: "REQUEST_NOT_ELIGIBLE",
+  DUPLICATE_ENGAGEMENT: "DUPLICATE_ENGAGEMENT",
+  OTHER: "OTHER",
+};
+
+export const ONBOARDING_REQUEST_NOT_FOUND_MESSAGE =
+  "This internal vendor request could not be found. It may have been removed.";
+
+export const ONBOARDING_REQUEST_NOT_ELIGIBLE_MESSAGE =
+  "This internal vendor request has already been processed or is no longer eligible for " +
+  "vendor intake. The request details have been refreshed.";
+
+/** @returns {keyof typeof ONBOARDING_INTAKE_ERROR} */
+export const classifyOnboardingIntakeError = (error) => {
+  const status = error?.response?.status;
+
+  if (status === 404) return ONBOARDING_INTAKE_ERROR.REQUEST_NOT_FOUND;
+
+  if (status === 409) {
+    const detail = error?.response?.data?.detail;
+    const isDuplicate =
+      typeof detail === "string" && detail.toLowerCase().includes("engagement already exists");
+    return isDuplicate
+      ? ONBOARDING_INTAKE_ERROR.DUPLICATE_ENGAGEMENT
+      : ONBOARDING_INTAKE_ERROR.REQUEST_NOT_ELIGIBLE;
+  }
+
+  if (isDuplicateEngagementError(error)) return ONBOARDING_INTAKE_ERROR.DUPLICATE_ENGAGEMENT;
+
+  return ONBOARDING_INTAKE_ERROR.OTHER;
+};
+
+/**
+ * Builds the body for PUT /apm/vendor-intake/{engagement_id} from the Edit Engagement form.
+ *
+ * The endpoint is a PARTIAL update keyed off which fields are PRESENT in the body, so:
+ *  - an unchanged field is OMITTED entirely (the backend keeps its current value);
+ *  - a cleared Purpose is sent as an explicit `null`, which is what clears it;
+ *  - department_id/category_id are NOT NULL on the engagement, so they are only ever sent as
+ *    numbers, never null.
+ *
+ * NDA fields are deliberately never part of this payload - the NDA decision has its own
+ * endpoint (PATCH /{engagement_id}/nda-decision).
+ *
+ * @param {{department_id:number|string, category_id:number|string, purpose_of_onboarding:string}} form
+ * @param {{department_id:number, category_id:number, purpose_of_onboarding:string|null}} engagement
+ * @returns {{department_id?:number, category_id?:number, purpose_of_onboarding?:string|null}}
+ */
+export const buildEngagementUpdatePayload = (form, engagement) => {
+  const payload = {};
+
+  const departmentId = Number(form.department_id);
+  if (Number.isFinite(departmentId) && departmentId !== engagement?.department_id) {
+    payload.department_id = departmentId;
+  }
+
+  const categoryId = Number(form.category_id);
+  if (Number.isFinite(categoryId) && categoryId !== engagement?.category_id) {
+    payload.category_id = categoryId;
+  }
+
+  // "" and "   " both mean "cleared" -> explicit null. Comparison is against the trimmed value
+  // because the backend itself stores the purpose trimmed.
+  const purpose = (form.purpose_of_onboarding || "").trim();
+  const currentPurpose = (engagement?.purpose_of_onboarding || "").trim();
+  if (purpose !== currentPurpose) {
+    payload.purpose_of_onboarding = purpose === "" ? null : purpose;
+  }
+
+  return payload;
+};
+
+/**
+ * The NDA requirement that stands for an engagement today: the recorded decision wins over the
+ * screening-rule recommendation, exactly as the backend resolves it. Null means Pre-Screen has
+ * not produced a recommendation and no decision has been recorded.
+ * @param {{nda_final_required?:boolean|null, nda_recommended?:boolean|null}} engagement
+ * @returns {boolean|null}
+ */
+export const effectiveNdaRequired = (engagement) =>
+  engagement?.nda_final_required ?? engagement?.nda_recommended ?? null;
+
+/** True when a save was rejected because the target department/category is already engaged. */
+export const isEngagementConflictError = (error) => error?.response?.status === 409;

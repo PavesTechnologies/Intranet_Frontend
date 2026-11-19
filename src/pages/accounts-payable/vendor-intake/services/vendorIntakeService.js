@@ -17,9 +17,15 @@ const authHeaders = () => ({
 export const vendorIntakeService = {
   /**
    * POST /apm/vendor-intake — saves the intake and creates (or reuses) the vendor master.
+   *
+   * With `onboarding_request_id` in the payload the backend runs the intake against that
+   * internal vendor request (linking it and moving its status) and echoes the request id and
+   * its new `onboarding_status_code`. Without it, this is the normal intake, unchanged.
+   *
    * @param {object} payload VendorIntakeCreateRequest
    * @returns {Promise<{engagement_id:number, vendor_id:number, vendor_created:boolean,
-   *   pre_screen_status:string, gst_status?:string, message:string}>}
+   *   pre_screen_status:string, gst_status?:string, message:string,
+   *   onboarding_request_id?:number|null, onboarding_status_code?:string|null}>}
    */
   createVendorIntake: async (payload) => {
     const res = await api.post(`${BASE}/vendor-intake`, payload, { headers: authHeaders() });
@@ -29,6 +35,28 @@ export const vendorIntakeService = {
   /** GET /apm/vendor-intake/{engagement_id} — VendorEngagementDTO. */
   getVendorIntake: async (engagementId) => {
     const res = await api.get(`${BASE}/vendor-intake/${engagementId}`, { headers: authHeaders() });
+    return res.data;
+  },
+
+  /**
+   * PUT /apm/vendor-intake/{engagement_id} - edits an engagement's department, category and
+   * onboarding purpose.
+   *
+   * PARTIAL update: a key left OUT of `payload` keeps its current value, while an explicit
+   * `purpose_of_onboarding: null` clears it. Callers must therefore send only the fields that
+   * actually changed - see buildEngagementUpdatePayload in constants/vendorIntake.js.
+   *
+   * NDA fields are deliberately not accepted here; the NDA decision has its own endpoint
+   * (updateNdaDecision below), which is the only place that logic lives.
+   *
+   * @param {number|string} engagementId
+   * @param {{department_id?:number, category_id?:number, purpose_of_onboarding?:string|null}} payload
+   * @returns {Promise<object>} the updated VendorEngagementDTO
+   */
+  updateVendorEngagement: async (engagementId, payload) => {
+    const res = await api.put(`${BASE}/vendor-intake/${engagementId}`, payload, {
+      headers: authHeaders(),
+    });
     return res.data;
   },
 

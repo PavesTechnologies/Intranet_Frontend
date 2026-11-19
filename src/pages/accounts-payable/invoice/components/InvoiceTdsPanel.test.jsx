@@ -89,13 +89,13 @@ describe("InvoiceTdsPanel — visibility", () => {
   it("renders nothing when the user has no TDS view access at all", () => {
     setPermissions({ canViewTds: false });
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
-    const { container } = render(<InvoiceTdsPanel invoice={invoice} />);
+    const { container } = render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows a loading state while the determination is being fetched", () => {
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: true, error: null });
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("Loading TDS status...")).toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe("InvoiceTdsPanel — visibility", () => {
       isLoading: false,
       error: { status: 500, response: { data: { detail: "Database unavailable" } } },
     });
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("Database unavailable")).toBeInTheDocument();
   });
 });
@@ -113,7 +113,7 @@ describe("InvoiceTdsPanel — visibility", () => {
 describe("InvoiceTdsPanel — Determine", () => {
   it("shows 'not yet determined' with a Determine TDS button once OCR Reviewed, for a permitted user", () => {
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
     expect(screen.getByText(/TDS not yet determined/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /determine tds/i })).toBeInTheDocument();
   });
@@ -121,13 +121,13 @@ describe("InvoiceTdsPanel — Determine", () => {
   it("hides Determine TDS for a user without canDetermineTds", () => {
     setPermissions({ canDetermineTds: false });
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
     expect(screen.queryByRole("button", { name: /determine tds/i })).not.toBeInTheDocument();
   });
 
   it("hides Determine TDS while still at OCR Review Pending (too early — no confirmed vendor/amounts yet)", () => {
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "OCR Review Pending" }} />);
+    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "OCR Review Pending" }} defaultOpen />);
     expect(screen.queryByRole("button", { name: /determine tds/i })).not.toBeInTheDocument();
   });
 
@@ -136,7 +136,7 @@ describe("InvoiceTdsPanel — Determine", () => {
     const mutate = vi.fn();
     useDetermineTdsMutation.mockReturnValue({ mutate, isPending: false });
     const user = userEvent.setup();
-    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "OCR Reviewed" }} defaultOpen />);
 
     await user.click(screen.getByRole("button", { name: /determine tds/i }));
     expect(mutate).toHaveBeenCalledWith(
@@ -149,7 +149,7 @@ describe("InvoiceTdsPanel — Determine", () => {
 describe("InvoiceTdsPanel — DETERMINED: read-only fields and correction", () => {
   it("shows the calculated fields read-only, with Payment Nature resolved by name", () => {
     useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
     expect(screen.getByText("Professional Services")).toBeInTheDocument();
     expect(screen.getByText("TDS - Professional or Technical Services")).toBeInTheDocument();
     expect(screen.getByText("Section 194J, Income-tax Act (FY2026-27)")).toBeInTheDocument();
@@ -164,7 +164,7 @@ describe("InvoiceTdsPanel — DETERMINED: read-only fields and correction", () =
     const mutate = vi.fn();
     useUpdateTdsMutation.mockReturnValue({ mutate, isPending: false });
     const user = userEvent.setup();
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
 
     await user.click(screen.getByRole("button", { name: /correct payment nature/i }));
     await selectOption(user, "Payment Nature", "Rent");
@@ -179,7 +179,17 @@ describe("InvoiceTdsPanel — DETERMINED: read-only fields and correction", () =
   it("hides Correct Payment Nature for a user without canEditTds (e.g. Finance)", () => {
     setPermissions({ canEditTds: false });
     useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
+    expect(screen.queryByRole("button", { name: /correct payment nature/i })).not.toBeInTheDocument();
+  });
+
+  // Regression: once the invoice has actually been sent for approval, the payment nature is what
+  // the approvers are reviewing against — correcting it after that point would silently
+  // invalidate an in-flight or completed approval decision. Correction is only ever offered while
+  // still at OCR Reviewed, the same window Determine itself is offered in.
+  it("hides Correct Payment Nature once the invoice has moved past OCR Reviewed (e.g. Pending Approval), even with canEditTds", () => {
+    useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
+    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "Pending Approval" }} defaultOpen />);
     expect(screen.queryByRole("button", { name: /correct payment nature/i })).not.toBeInTheDocument();
   });
 });
@@ -187,14 +197,14 @@ describe("InvoiceTdsPanel — DETERMINED: read-only fields and correction", () =
 describe("InvoiceTdsPanel — Verify (Finance)", () => {
   it("offers Verify TDS for a user with canVerifyTds once DETERMINED", () => {
     useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
     expect(screen.getByRole("button", { name: /verify tds/i })).toBeInTheDocument();
   });
 
   it("hides Verify TDS for a user without canVerifyTds (e.g. AP Executive)", () => {
     setPermissions({ canVerifyTds: false });
     useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: /verify tds/i })).not.toBeInTheDocument();
   });
 
@@ -203,7 +213,7 @@ describe("InvoiceTdsPanel — Verify (Finance)", () => {
     const mutate = vi.fn();
     useVerifyTdsMutation.mockReturnValue({ mutate, isPending: false });
     const user = userEvent.setup();
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
 
     await user.click(screen.getByRole("button", { name: /verify tds/i }));
     await user.type(screen.getByLabelText(/remarks/i), "Confirmed against Finance review");
@@ -226,7 +236,7 @@ describe("InvoiceTdsPanel — VERIFIED (locked)", () => {
 
   it("hides Determine/Correct/Verify actions and shows the verified banner", () => {
     useInvoiceTds.mockReturnValue({ data: verifiedTds, isLoading: false, error: null });
-    render(<InvoiceTdsPanel invoice={invoice} />);
+    render(<InvoiceTdsPanel invoice={invoice} defaultOpen />);
     expect(screen.queryByRole("button", { name: /determine tds/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /correct payment nature/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /verify tds/i })).not.toBeInTheDocument();

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Eye } from "lucide-react";
+import { Eye, UserPlus } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
 import StatusPill from "../../vendor-intake/components/PreScreenStatusBadge";
@@ -115,9 +115,10 @@ export default function InternalRequestsTable({
       request.requested_vendor_name ||
       vendorNameById?.get(Number(request.vendor_id)) ||
       "—",
-    prNumber: prNumberById?.get(Number(request.pr_id)) || `PR #${request.pr_id}`,
-    department: departmentName(request.department_id),
-    category: categoryName(request.purchase_category_id),
+    prNumber:
+      request.pr_number || prNumberById?.get(Number(request.pr_id)) || `PR #${request.pr_id}`,
+    department: request.department_name || departmentName(request.department_id),
+    category: request.purchase_category_name || categoryName(request.purchase_category_id),
     requestedBy: requesterLabel(request.created_by),
     created: request.created_at ? formatDate(request.created_at) : "—",
     status: (
@@ -127,18 +128,29 @@ export default function InternalRequestsTable({
       />
     ),
     ndaStatus: <NdaStatusCell request={request} />,
-    action: (
-      <Button
-        size="small"
-        variant={
-          canProcessOnboarding && isOnboardingOpen(request.status_code) ? "primary" : "outline"
-        }
-        onClick={() => navigate(AP_ROUTES.VENDOR_INTERNAL_REQUEST_DETAIL(request.id))}
-      >
-        <Eye className="h-3.5 w-3.5" />{" "}
-        {canProcessOnboarding ? actionLabel(request.status_code) : "View"}
-      </Button>
-    ),
+    // Onboard Vendor only while the backend reports the request as awaiting intake; the
+    // intake endpoint re-checks eligibility and permissions regardless.
+    action:
+      canProcessOnboarding && request.awaiting_intake ? (
+        <Button
+          size="small"
+          variant="primary"
+          onClick={() => navigate(AP_ROUTES.VENDOR_ONBOARD_FOR_REQUEST(request.id))}
+        >
+          <UserPlus className="h-3.5 w-3.5" /> Onboard Vendor
+        </Button>
+      ) : (
+        <Button
+          size="small"
+          variant={
+            canProcessOnboarding && isOnboardingOpen(request.status_code) ? "primary" : "outline"
+          }
+          onClick={() => navigate(AP_ROUTES.VENDOR_INTERNAL_REQUEST_DETAIL(request.id))}
+        >
+          <Eye className="h-3.5 w-3.5" />{" "}
+          {canProcessOnboarding ? actionLabel(request.status_code) : "View"}
+        </Button>
+      ),
   }));
 
   return <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={loading} />;

@@ -55,4 +55,54 @@ describe("filterMenuByRole", () => {
     const result = filterMenuByRole(withChildren, () => true, () => false);
     expect(result).toHaveLength(0);
   });
+
+  describe("collapseSingleChild", () => {
+    const menu = [
+      {
+        label: "Expenses",
+        to: "/expenses/my",
+        collapseSingleChild: true,
+        children: [
+          { label: "My Expenses", to: "/expenses/my" },
+          { label: "All Expenses", to: "/expenses/all", allowedRoles: ["MANAGER"] },
+        ],
+      },
+    ];
+
+    it("renders a plain link when only one child survives the role filter", () => {
+      const [expenses] = filterMenuByRole(menu, (roles) => !roles.includes("MANAGER"));
+      expect(expenses.children).toBeUndefined();
+      expect(expenses.to).toBe("/expenses/my");
+      expect(expenses.label).toBe("Expenses");
+    });
+
+    it("keeps the submenu when more than one child survives", () => {
+      const [expenses] = filterMenuByRole(menu, () => true);
+      expect(expenses.children.map((c) => c.label)).toEqual(["My Expenses", "All Expenses"]);
+    });
+  });
+});
+
+describe("AP sidebar — Internal Requests entry", () => {
+  const findLabels = (items) =>
+    items.flatMap((item) => [item.label, ...(item.children ? findLabels(item.children) : [])]);
+
+  const visibleFor = async (permissions) => {
+    const { AP_SUBMENU } = await import("../config/sidebarConfig");
+    const held = new Set(permissions);
+    return findLabels(
+      filterMenuByRole(AP_SUBMENU, () => true, (list = []) => list.some((p) => held.has(p))),
+    );
+  };
+
+  it("is shown to a Vendor Intake user next to Vendor Management", async () => {
+    const labels = await visibleFor(["VENDOR_VIEW", "VENDOR_MANAGE"]);
+    expect(labels).toContain("Vendor Management");
+    expect(labels).toContain("Internal Requests");
+  });
+
+  it("is hidden from a user with no vendor, onboarding or quotation permission", async () => {
+    const labels = await visibleFor(["INVOICE_VIEW"]);
+    expect(labels).not.toContain("Internal Requests");
+  });
 });

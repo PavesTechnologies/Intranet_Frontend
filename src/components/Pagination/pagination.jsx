@@ -14,7 +14,7 @@ const Pagination = ({ currentPage, totalPages, onPrevious, onNext, className }) 
           "flex items-center justify-center h-8 w-8 rounded-lg border transition-all duration-200",
           currentPage === 1
             ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
-            : "bg-white border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 hover:shadow-sm active:scale-90"
+            : "bg-white border-slate-200 text-slate-600 hover:border-brand-primary hover:text-brand-primary hover:shadow-sm active:scale-90"
         )}
         aria-label="Previous page"
       >
@@ -24,7 +24,7 @@ const Pagination = ({ currentPage, totalPages, onPrevious, onNext, className }) 
       <div className="flex items-center gap-2 px-3 py-1 bg-slate-100/50 rounded-full border border-slate-200/60">
         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Page</span>
         <div className="flex items-center gap-1.5 min-w-[60px] justify-center">
-          <span className="text-sm font-bold text-indigo-600 tabular-nums">{currentPage}</span>
+          <span className="text-sm font-bold text-brand-primary tabular-nums">{currentPage}</span>
           <span className="text-xs font-medium text-slate-400">of</span>
           <span className="text-sm font-bold text-slate-700 tabular-nums">{totalPages}</span>
         </div>
@@ -37,7 +37,7 @@ const Pagination = ({ currentPage, totalPages, onPrevious, onNext, className }) 
           "flex items-center justify-center h-8 w-8 rounded-lg border transition-all duration-200",
           currentPage === totalPages
             ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
-            : "bg-white border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 hover:shadow-sm active:scale-90"
+            : "bg-white border-slate-200 text-slate-600 hover:border-brand-primary hover:text-brand-primary hover:shadow-sm active:scale-90"
         )}
         aria-label="Next page"
       >

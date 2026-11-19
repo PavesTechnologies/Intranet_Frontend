@@ -21,6 +21,7 @@ import LineReviewStatusBadge, { deriveLineReviewState } from "./LineReviewStatus
 import ApprovalLevelTimeline from "./ApprovalLevelTimeline";
 import ReceiptViewer from "./ReceiptViewer";
 import CommentPromptModal from "./CommentPromptModal";
+import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
 import {
   useApprovalStatus,
   useLineItemReviews,
@@ -38,20 +39,21 @@ const normalizeViolations = (line) => {
   return [];
 };
 
+// One info card: a light header strip with the title, then its fields.
 const Section = ({ icon, title, children }) => (
-  <div className="rounded-xl border border-gray-200 bg-white p-4">
-    <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
+  <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <header className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-600">
       {icon}
       {title}
-    </div>
-    {children}
-  </div>
+    </header>
+    <div className="p-4">{children}</div>
+  </section>
 );
 
 const Field = ({ label, value }) => (
-  <div>
-    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
-    <p className="mt-0.5 text-sm font-medium text-gray-800 break-words">{value ?? "—"}</p>
+  <div className="min-w-0">
+    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+    <div className="mt-1 break-words text-sm text-gray-900">{value ?? "—"}</div>
   </div>
 );
 
@@ -168,7 +170,9 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
   const costCenterName = queueItem?.costCenterName || queueItem?.costCenter || queueItem?.costCenterCode || queueItem?.departmentName || historyItem?.costCenterName || historyItem?.costCenter || fullReport?.costCenterName || fullReport?.costCenter;
   const submittedAt = queueItem?.submittedAt || queueItem?.createdAt || queueItem?.submittedDate || historyItem?.submittedAt || historyItem?.createdAt || fullReport?.submittedAt || fullReport?.createdAt;
   const totalAmount = queueItem?.totalAmount ?? historyItem?.totalAmount ?? fullReport?.totalAmount;
-  const currencyCode = queueItem?.currencyCode || historyItem?.currencyCode || fullReport?.currencyCode;
+  // Report totals are in the organization base currency. Queue items already label them with it;
+  // report responses carry it as baseCurrencyCode (their currencyCode is the report's own currency).
+  const currencyCode = queueItem?.currencyCode || historyItem?.baseCurrencyCode || fullReport?.baseCurrencyCode || historyItem?.currencyCode || fullReport?.currencyCode;
 
   const isMutating = reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending;
   const canAct = isQueueMode && reportStatus !== "APPROVED" && reportStatus !== "REJECTED";
@@ -180,14 +184,15 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
 
   const handleApprove = () => {
     if (!selectedRelevant) return;
+    const onSuccess = () => showStatusToast("Approved", "success");
     const onError = (err) => showStatusToast(err.response?.data?.message || "Failed to approve", "error");
     if (selectedRelevant.isSplit) {
       Promise.all(
         selectedRelevant.mySplits.map((s) => reviewSplit.mutateAsync({ reportId, splitId: s.splitId, decision: "APPROVED" }))
-      ).catch(onError);
+      ).then(onSuccess).catch(onError);
       return;
     }
-    reviewLineItem.mutate({ reportId, lineItemId: selectedRelevant.lineItemId, decision: "APPROVED" }, { onError });
+    reviewLineItem.mutate({ reportId, lineItemId: selectedRelevant.lineItemId, decision: "APPROVED" }, { onSuccess, onError });
   };
 
   const handleBulkApprove = () => {
@@ -326,17 +331,41 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                         </p>
                         {selectedRelevant.mySplits.map((s) => (
                           <p key={s.splitId} className="text-sm font-semibold text-indigo-700">
-                            {s.costCenterName} — {formatMoney(s.allocatedAmount, selectedLine.currencyCode)}{" "}
+                            {/* Split amounts are held in the organization base currency, not the line's own. */}
+                            {s.costCenterName} — {formatMoney(s.allocatedAmount, selectedLine.baseCurrencyCode || currencyCode)}{" "}
                             <span className="text-xs font-normal text-indigo-500">(your allocation)</span>
                           </p>
                         ))}
                       </div>
+                      {selectedLine.allocationReason && (
+                        <Field label="Cross-department reason" value={selectedLine.allocationReason} />
+                      )}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <Field label="Line Amount" value={formatMoney(selectedLine.amount, selectedLine.currencyCode)} />
-                      {selectedLine.taxAmount != null && <Field label="Tax / GST" value={formatMoney(selectedLine.taxAmount, selectedLine.currencyCode)} />}
+                      {selectedLine.taxAmount != null && (
+                        <div>
+                          <Field
+                            label="Tax"
+                            value={`${formatMoney(selectedLine.taxAmount, selectedLine.currencyCode)}${
+                              selectedLine.tax?.taxCode ? ` · ${selectedLine.tax.taxCode}` : ""
+                            }`}
+                          />
+                          <div className="mt-1">
+                            <TaxStatusBadge tax={selectedLine.tax} />
+                          </div>
+                        </div>
+                      )}
+                      {selectedLine.netAmount != null && (
+                        <Field label="Before Tax" value={formatMoney(selectedLine.netAmount, selectedLine.currencyCode)} />
+                      )}
                       <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
+                    </div>
+                  )}
+                  {!selectedRelevant?.isSplit && selectedLine.allocationReason && (
+                    <div className="mt-3">
+                      <Field label="Cross-department reason" value={selectedLine.allocationReason} />
                     </div>
                   )}
                   {isQueueMode && !selectedRelevant && (
@@ -347,7 +376,7 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                 </Section>
 
                 {selectedViolations.length > 0 && (
-                  <PolicyResultBanner lineStatus={selectedLine.lineStatus} policyWarnings={selectedViolations} />
+                  <PolicyResultBanner lineStatus={selectedLine.lineStatus} policyWarnings={selectedViolations} audience="reviewer" />
                 )}
               </>
             ) : (
@@ -362,26 +391,45 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
           </div>
 
           {canAct && (
-            <div className="sticky bottom-0 flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-gray-200 bg-white p-3 sm:p-4">
-              {queueItem?.eligibleForBulkApprove && (
-                <Button variant="success" disabled={isMutating} loading={bulkApprove.isPending} onClick={handleBulkApprove}>
-                  <Check className="h-4 w-4" /> Bulk Approve Report
-                </Button>
-              )}
-              <Button variant="outline" disabled={isMutating || !canActOnSelected} onClick={() => setFlaggingLine(selectedRelevant)}>
-                <MessageSquareWarning className="h-4 w-4" /> Request Correction
-              </Button>
+            <div className="sticky bottom-0 flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <Button
-                variant="success"
-                disabled={isMutating || !canActOnSelected}
-                loading={reviewLineItem.isPending || reviewSplit.isPending}
-                onClick={handleApprove}
+                variant="danger"
+                className="whitespace-nowrap"
+                disabled={isMutating}
+                onClick={() => setIsRejecting(true)}
               >
-                <Check className="h-4 w-4" /> {selectedRelevant?.isSplit ? "Approve My Allocation" : "Approve Line"}
+                <XCircle className="h-4 w-4" /> Reject report
               </Button>
-              <Button variant="danger" disabled={isMutating} onClick={() => setIsRejecting(true)}>
-                <XCircle className="h-4 w-4" /> Reject Report
-              </Button>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <Button
+                  variant="outline"
+                  className="whitespace-nowrap"
+                  disabled={isMutating || !canActOnSelected}
+                  onClick={() => setFlaggingLine(selectedRelevant)}
+                >
+                  <MessageSquareWarning className="h-4 w-4" /> Request correction
+                </Button>
+                <Button
+                  variant="success"
+                  className="whitespace-nowrap"
+                  disabled={isMutating || !canActOnSelected}
+                  loading={reviewLineItem.isPending || reviewSplit.isPending}
+                  onClick={handleApprove}
+                >
+                  <Check className="h-4 w-4" /> {selectedRelevant?.isSplit ? "Approve my allocation" : "Approve line"}
+                </Button>
+                {queueItem?.eligibleForBulkApprove && (
+                  <Button
+                    variant="success"
+                    className="whitespace-nowrap"
+                    disabled={isMutating}
+                    loading={bulkApprove.isPending}
+                    onClick={handleBulkApprove}
+                  >
+                    <Check className="h-4 w-4" /> Bulk approve report
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
