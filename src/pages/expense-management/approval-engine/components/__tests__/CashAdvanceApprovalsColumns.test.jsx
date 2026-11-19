@@ -66,7 +66,10 @@ describe('CashAdvanceApprovalsList - columns', () => {
 
     expect(screen.getByRole('columnheader', { name: /^report$/i })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /^employee$/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /^amount$/i })).toBeInTheDocument();
+    // Amount is split into what was asked for, what was approved and what was paid.
+    expect(screen.getByRole('columnheader', { name: /^requested$/i })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^approved$/i })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^paid$/i })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /^actions$/i })).toBeInTheDocument();
   });
 });

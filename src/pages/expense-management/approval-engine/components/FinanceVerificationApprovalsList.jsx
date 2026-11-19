@@ -44,7 +44,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
     return (
       <tbody>
         <tr>
-          <td colSpan={8} className="py-6 text-center text-xs text-gray-500">Loading Finance verification queue…</td>
+          <td colSpan={10} className="py-6 text-center text-xs text-gray-500">Loading Finance verification queue…</td>
         </tr>
       </tbody>
     );
@@ -54,7 +54,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
     return (
       <tbody>
         <tr>
-          <td colSpan={8} className="py-6 text-center text-xs text-rose-700">
+          <td colSpan={10} className="py-6 text-center text-xs text-rose-700">
             Failed to load the Finance verification queue.{" "}
             <button type="button" className="underline" onClick={() => refetch()}>Retry</button>
           </td>
@@ -90,6 +90,8 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
               <td className="px-2.5 py-1.5 whitespace-nowrap text-right text-xs">
                 <span className="font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</span>
               </td>
+              <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
+              <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
               <td className="px-2.5 py-1.5 text-right text-xs">
                 <Button size="small" variant="primary" onClick={() => setReviewingItem(item)}>
                   Review
@@ -102,7 +104,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
       {(data?.totalPages ?? 0) > 1 && (
         <tbody>
           <tr>
-            <td colSpan={8} className="py-2">
+            <td colSpan={10} className="py-2">
               <div className="flex justify-center">
                 <Pagination
                   currentPage={page + 1}

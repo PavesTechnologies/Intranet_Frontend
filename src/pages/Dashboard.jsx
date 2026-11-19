@@ -393,7 +393,7 @@ export default function Dashboard() {
           </div> */}
           <div className="col-span-4">
             {/* <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">Holidays & Leave</p> */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3" data-tour="dash-kpis">
               {STATS.map((s) => (
                 <KPICard
                   key={s.id}
@@ -406,8 +406,8 @@ export default function Dashboard() {
               ))}
             </div>
 
+            <div className="mt-4" data-tour="dash-quick-actions">
             <AppCard
-              className="mt-4"
               density="comfortable"
               renderHeader={() => (
                 <div className="flex items-center gap-2">
@@ -442,10 +442,11 @@ export default function Dashboard() {
                 </Button>
               </div>
             </AppCard>
-            <div className="mt-4">
+            </div>
+            <div className="mt-4" data-tour="dash-on-leave">
               <TodayOnLeavePanel />
             </div>
-            <div className="mt-4">
+            <div className="mt-4" data-tour="dash-leave-balance">
               <AppCard
                 density="comfortable"
                 renderHeader={() => (
@@ -495,10 +496,10 @@ export default function Dashboard() {
           </div>
           <div className="col-span-4">
             {/* <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">Quick Updates</p> */}
-            <div>
+            <div data-tour="dash-holidays">
               <UpcomingHolidays year={year} />
             </div>
-            <div className="mt-4">
+            <div className="mt-4" data-tour="dash-celebrations">
               <BirthdayAnniversaryPanel />
             </div>
           </div>

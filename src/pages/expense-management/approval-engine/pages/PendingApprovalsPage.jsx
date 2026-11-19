@@ -315,13 +315,15 @@ export default function PendingApprovalsPage({
                               <span className="ml-1 text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)}</span>
                             )}
                           </td>
+                          <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
+                          <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
                           <td className="px-2.5 py-1.5 text-right text-xs" onClick={(e) => e.stopPropagation()}>
                             {renderActions(item)}
                           </td>
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={8} className="bg-gray-50/60 p-0">
+                            <td colSpan={10} className="bg-gray-50/60 p-0">
                               {flagged && (
                                 <p className="flex items-center gap-1.5 text-xs text-amber-700 px-4 pt-3">
                                   <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for one-click Approve.
@@ -390,14 +392,14 @@ export default function PendingApprovalsPage({
         {isPending && !data && (
           <tbody>
             <tr>
-              <td colSpan={8} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
+              <td colSpan={10} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
             </tr>
           </tbody>
         )}
         {isError && (
           <tbody>
             <tr>
-              <td colSpan={8} className="py-6 text-center text-xs text-rose-700">
+              <td colSpan={10} className="py-6 text-center text-xs text-rose-700">
                 Failed to load your queue. <button className="underline" onClick={() => refetch()}>Retry</button>
               </td>
             </tr>
@@ -406,7 +408,7 @@ export default function PendingApprovalsPage({
         {selectedIds.size > 0 && (
           <tbody>
             <tr>
-              <td colSpan={7} className="bg-indigo-50 px-2.5 py-2">
+              <td colSpan={9} className="bg-indigo-50 px-2.5 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="font-semibold text-indigo-900">{selectedIds.size} selected</span>
                   <div className="flex items-center gap-2">
