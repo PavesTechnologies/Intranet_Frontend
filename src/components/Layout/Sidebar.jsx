@@ -545,7 +545,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
       {/* Branding */}
       <div className="p-6 border-b border-[#0f1a3a] flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <img src="logo.png" alt="Logo" className="h-10 w-10 shrink-0" />
+          <img src="/logo.png" alt="Logo" className="h-10 w-10 shrink-0" />
           {!isCollapsed && (
             <div>
               <h1 className="text-base font-bold leading-none">Paves Tech</h1>
@@ -945,6 +945,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                       >
                         <NavLink
                           to={item.to}
+                          end={Boolean(item.end)}
                           onClick={(e) => { if (item.children) e.preventDefault(); }}
                           className={({ isActive }) =>
                             `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive

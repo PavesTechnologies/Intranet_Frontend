@@ -194,7 +194,7 @@ export default function ReceiptDropzone({ lineItemId }) {
             ref={inputRef}
             type="file"
             multiple
-            accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+            id="receipt-dropzone-input" name="receipts" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
             className="hidden"
             onChange={(e) => {
               uploadFiles(e.target.files);

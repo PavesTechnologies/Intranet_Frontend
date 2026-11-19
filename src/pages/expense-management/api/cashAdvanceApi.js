@@ -137,6 +137,13 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }).then((res) => res.data?.data ?? res.data),
 
+  // Finance's approval of a Cash Advance + Outstanding request: rollover, approved cash and any overdue exception.
+  approveAllocation: (advanceId, body) =>
+    api.post(`/xms/employee/cash-advances/${advanceId}/approve-allocation`, body, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
   approve: (advanceId) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/approve`, null, {
       baseURL: EXPENSE_API_BASE,
@@ -145,7 +152,10 @@ export const cashAdvanceApi = {
 
   // The manager's decision: APPROVE_FULL, APPROVE_REDUCED, SET_OFF, DEFER or REJECT. The server re-checks every rule.
   managerDecision: (advanceId, body) =>
-    api.post(`/xms/employee/cash-advances/${advanceId}/manager-decision`, body),
+    api.post(`/xms/employee/cash-advances/${advanceId}/manager-decision`, body, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
 
   reject: (advanceId, reason) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/reject`, null, {

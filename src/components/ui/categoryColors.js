@@ -11,7 +11,7 @@ export const CATEGORY_PALETTE = [
   "#f59e0b", // amber
   "#16a34a", // green
   "#ea580c", // orange
-  "#8b5a2b", // brown
+  "#be123c", // crimson (replaced brown, which fell below the chroma floor and read as grey)
   "#65a30d", // lime
 ];
 export const OTHER_CATEGORY_COLOR = "#94a3b8";

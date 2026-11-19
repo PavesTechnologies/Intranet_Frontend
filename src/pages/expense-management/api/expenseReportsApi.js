@@ -130,6 +130,12 @@ export const splitService = {
 };
 
 export const receiptService = {
+  // Every receipt on a report, all lines. Used to find lines that still have no receipt.
+  listForReport: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/receipts`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
   getAll: (lineItemId) =>
     api.get(`/xms/employee/expense-line-items/${lineItemId}/receipts`, {
       baseURL: EXPENSE_API_BASE,

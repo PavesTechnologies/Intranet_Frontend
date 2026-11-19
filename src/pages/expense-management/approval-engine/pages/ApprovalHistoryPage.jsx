@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from "react";
-import { AlertTriangle, Inbox } from "lucide-react";
+import React, { useEffect, useState, useMemo } from "react";
+import { AlertTriangle, Eye, Inbox } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import ApprovalStatusPill from "../components/ApprovalStatusPill";
-import SourceBadge from "../components/SourceBadge";
 import EmployeeLabel from "../components/EmployeeLabel";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
 import { useMyHistory } from "../hooks/useApprovalWorkflow";
@@ -27,15 +26,16 @@ const OUTCOME_OPTIONS = [
  * defaults to both/undefined). Rows open the same ExpenseReviewPanel used by the pending queue, in
  * read-only "history" mode.
  */
-export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, breadcrumbLabel, searchTerm = "", hideHeader = false, allowOutcomeFilter = false, noPadding = false }) {
+export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, breadcrumbLabel, searchTerm = "", hideHeader = false, embedded = false, allowOutcomeFilter = false, noPadding = false, onRowCount, windowStart = 0, windowEnd }) {
   const [page, setPage] = useState(0);
-  const pageSize = DEFAULT_PAGE_SIZE;
+  // Embedded in the approvals table: fetch a full batch; the parent pages across both lists.
+  const pageSize = embedded ? 100 : DEFAULT_PAGE_SIZE;
   const [outcomeFilter, setOutcomeFilter] = useState(fixedOutcome || "");
   const [reviewingItem, setReviewingItem] = useState(null);
   useApprovalLiveSync();
 
   const outcome = allowOutcomeFilter ? outcomeFilter || undefined : fixedOutcome;
-  const { data, isPending, isError, refetch } = useMyHistory(outcome, page, pageSize);
+  const { data, isPending, isError, refetch } = useMyHistory(outcome, embedded ? 0 : page, pageSize);
   const items = data?.content || [];
 
   const filteredItems = useMemo(() => {
@@ -56,6 +56,57 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
       return timeB - timeA;
     });
   }, [items, searchTerm]);
+
+  // Embedded: only the rows inside this page's window (the parent counts every row across both lists).
+  const windowItems = windowEnd === undefined ? filteredItems : filteredItems.slice(windowStart, windowEnd);
+
+  // Embedded: only the rows, inside the approvals page table (its header is shared with the cash advance rows).
+  // Tell the parent how many rows this list has, so the page can show one empty message for the whole table.
+  useEffect(() => {
+    if (!isPending && !isError && onRowCount) onRowCount(filteredItems.length);
+  }, [isPending, isError, filteredItems.length, onRowCount]);
+
+  if (embedded) {
+    return (
+      <>
+        {isPending && (
+          <tbody><tr><td colSpan={8} className="py-10 text-center text-xs text-gray-500">Loading…</td></tr></tbody>
+        )}
+        {!isPending && !isError && filteredItems.length > 0 && (
+          <tbody className="divide-y divide-gray-100">
+            {windowItems.map((report, index) => (
+              <tr key={report.reportId} className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setReviewingItem(report)}>
+                <td className="px-2.5 py-1.5 text-left"><span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span></td>
+                <td className="px-2.5 py-1.5 text-left font-mono text-[11px] font-semibold text-gray-700 whitespace-nowrap">{report.reportNumber}</td>
+                <td className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-900 whitespace-nowrap"><EmployeeLabel employeeId={report.employeeId} /></td>
+                <td className="px-2.5 py-1.5 text-left max-w-[220px]">
+                  <p className="font-semibold text-gray-900 truncate text-xs">{report.title || "—"}</p>
+                  <p className="text-[11px] text-gray-500 truncate mt-0.5">Created {formatDate(report.createdAt)}</p>
+                </td>
+                <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate">{report.costCenterName || "—"}</td>
+                <td className="px-2.5 py-1.5 text-left whitespace-nowrap"><ApprovalStatusPill status={report.reportStatus} /></td>
+                <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
+                <td className="px-2.5 py-1.5 text-right">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setReviewingItem(report);
+                    }}
+                    aria-label={`View ${report.reportNumber}`}
+                    title="View"
+                    className="rounded p-1 text-blue-700 hover:bg-blue-50"
+                  >
+                    <Eye size={16} aria-hidden="true" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className={noPadding ? "" : "p-4 sm:p-6"}>
@@ -122,13 +173,13 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
               <table className="w-full text-sm">
                 <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                   <tr>
-                    <th className="px-2.5 py-2">Report</th>
-                    <th className="px-2.5 py-2">Title</th>
-                    <th className="px-2.5 py-2">Employee</th>
-                    <th className="px-2.5 py-2">Cost Center</th>
-                    <th className="px-2.5 py-2">Submitted</th>
-                    <th className="px-2.5 py-2">Amount</th>
-                    <th className="px-2.5 py-2">Status</th>
+                    <th className="px-2.5 py-2 text-left">Report</th>
+                    <th className="px-2.5 py-2 text-left">Title</th>
+                    <th className="px-2.5 py-2 text-left">Employee</th>
+                    <th className="px-2.5 py-2 text-left">Cost Center</th>
+                    <th className="px-2.5 py-2 text-left">Submitted</th>
+                    <th className="px-2.5 py-2 text-left">Amount</th>
+                    <th className="px-2.5 py-2 text-left">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -136,7 +187,6 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                     <tr key={report.reportId} className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setReviewingItem(report)}>
                       <td className="px-2.5 py-1.5">
                         <span className="font-mono text-[11px] font-semibold text-gray-700">{report.reportNumber}</span>
-                        <SourceBadge cashAdvanceId={report.cashAdvanceId} />
                       </td>
                       <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{report.title || "—"}</td>
                       <td className="px-2.5 py-1.5 text-xs">
@@ -146,7 +196,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                       </td>
                       <td className="px-2.5 py-1.5 text-gray-600 text-xs">{report.costCenterName || "—"}</td>
                       <td className="px-2.5 py-1.5 text-gray-600 whitespace-nowrap text-xs">{formatDate(report.createdAt)}</td>
-                      <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
+                      <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-right text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
                       <td className="px-2.5 py-1.5">
                         <ApprovalStatusPill status={report.reportStatus} />
                       </td>

@@ -68,6 +68,10 @@ export default function ReportFormFields({
   currencyOptions = [],
   disabled = false,
   lookupsLoading = false,
+  projectOptions = [],
+  clientOptions = [],
+  showClient = false,
+  onShowClientChange,
 }) {
   const selectedCostCenter = costCenterOptions.find((o) => o.value === formData.costCenterId) || null;
   const selectedCurrency = currencyOptions.find((o) => o.value === formData.currencyId) || null;
@@ -77,7 +81,7 @@ export default function ReportFormFields({
       <FormInput
         label="Report Title"
         name="title"
-        placeholder="e.g. US Business Trip"
+        placeholder="e.g. US Business Event"
         value={formData.title}
         onChange={onInputChange}
         requiredMark

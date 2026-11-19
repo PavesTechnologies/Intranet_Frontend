@@ -219,6 +219,8 @@ export const XMS_SUBMENU = [
     collapseSingleChild: true,
     children: [
       { label: "My Expenses",     to: "/expense-management/expenses/my" },
+      { label: "Supplementary Claims", to: "/expense-management/expenses/supplementary" },
+      { label: "Supplementary Review", to: "/expense-management/manager/supplementary-claims", allowedRoles: XMS_MANAGER },
       { label: "All Expenses",    to: "/expense-management/expenses/all",     allowedRoles: XMS_MANAGER },
       { label: "Expense Reports", to: "/expense-management/expenses/reports", allowedRoles: XMS_MANAGER },
     ],
@@ -252,6 +254,8 @@ export const XMS_SUBMENU = [
     label: "Finance",
     to: "/expense-management/finance",
     allowedRoles: XMS_FINANCE_VERIFICATION,
+    // Exact match, so "Finance" is not highlighted as well on its sub-pages (e.g. /finance/supplementary-claims).
+    end: true,
   },
   {
     // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")

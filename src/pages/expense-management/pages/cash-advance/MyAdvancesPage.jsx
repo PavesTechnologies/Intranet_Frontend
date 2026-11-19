@@ -90,6 +90,10 @@ const getAgingDays = (adv) => {
   return Math.max(0, Math.floor((today - due) / 86400000));
 };
 
+// Only paid-out advances are owed. Drafts and requests awaiting approval are not, and the server does not count them.
+const OWED_STATUSES = ["DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "SETTLEMENT_PENDING",
+  "PARTIALLY_SETTLED", "PARTIALLY_ADJUSTED", "ADJUSTED", "AWAITING_REIMBURSEMENT", "OVERDUE"];
+
 export default function MyAdvancesPage() {
   const navigate = useNavigate();
 
@@ -172,8 +176,10 @@ export default function MyAdvancesPage() {
         const advAmt = Number(adv.amount) || 0;
         const authoritativeOutstanding =
           adv.outstandingBalance ?? adv.outstanding_balance ?? adv.balance;
-        const outstandingBalance =
-          authoritativeOutstanding != null
+        const owedNow = OWED_STATUSES.includes((adv.status || "").toUpperCase());
+        const outstandingBalance = !owedNow
+          ? 0
+          : authoritativeOutstanding != null
             ? Math.max(0, Number(authoritativeOutstanding) || 0)
             : Math.max(0, advAmt - verifiedExpenseAmount);
 
@@ -255,7 +261,7 @@ export default function MyAdvancesPage() {
       .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
 
     const outstandingBalance = advances
-      .filter((a) => !["SETTLED", "CLOSED", "CANCELLED", "REJECTED"].includes((a.status || "").toUpperCase()))
+      .filter((a) => OWED_STATUSES.includes((a.status || "").toUpperCase()))
       .reduce((sum, a) => sum + (Number(a.outstandingBalance) || 0), 0);
 
     const overdueCount = advances.filter(isOverdue).length;

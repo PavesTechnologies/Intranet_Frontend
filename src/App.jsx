@@ -233,6 +233,12 @@ import OfferGeneratedPreview from "./pages/employee-onboarding/offer-generated-p
 // ✅ Expense Management (XMS)
 import XmsDashboardPage from "./pages/expense-management/pages/dashboard/DashboardPage.jsx";
 import XmsCreateExpensePage from "./pages/expense-management/pages/expenses/CreateExpensePage.jsx";
+import XmsSupplementaryClaimsPage from "./pages/expense-management/pages/supplementary/SupplementaryClaimsPage.jsx";
+import XmsSupplementaryClaimDetailPage from "./pages/expense-management/pages/supplementary/SupplementaryClaimDetailPage.jsx";
+import XmsSupplementaryQueuePage from "./pages/expense-management/pages/supplementary/SupplementaryQueuePage.jsx";
+import XmsFinanceCreateSupplementaryPage from "./pages/expense-management/pages/supplementary/FinanceCreateSupplementaryPage.jsx";
+import XmsFinanceReceiptReleasePage from "./pages/expense-management/pages/supplementary/FinanceReceiptReleasePage.jsx";
+import XmsApSupplementaryPaymentsPage from "./pages/expense-management/pages/supplementary/ApSupplementaryPaymentsPage.jsx";
 import XmsMyExpensesPage from "./pages/expense-management/pages/expenses/MyExpensesPage.jsx";
 import XmsAllExpensesPage from "./pages/expense-management/pages/expenses/AllExpensesPage.jsx";
 import XmsExpenseReportsPage from "./pages/expense-management/pages/expenses/ExpenseReportsPage.jsx";
@@ -1951,6 +1957,9 @@ const AppRoutes = () => {
           <Route path="/expense-management/filters" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsAdvancedFilterPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
+          {/* Supplementary claims: employee screens. The backend checks the report, the period and every action. */}
+          <Route path="/expense-management/expenses/supplementary" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Finance_Executive", "Admin"]}><XmsSupplementaryClaimsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/supplementary/:claimId" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Finance_Executive", "Admin"]}><XmsSupplementaryClaimDetailPage mode="employee" /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports/:reportId" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsExpenseReportDetailPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
@@ -1985,6 +1994,17 @@ const AppRoutes = () => {
               the generic "Finance" role passes this route gate but then 403s on every API call,
               so it's deliberately excluded here (see sidebarConfig.js's XMS_FINANCE_VERIFICATION). */}
           <Route path="/expense-management/finance" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsFinancePage /></ProtectedRoute>} />
+          {/* Supplementary claims: manager queue and review. Only the employee's own reporting manager is accepted by the backend. */}
+          <Route path="/expense-management/manager/supplementary-claims" element={<ProtectedRoute allowedRoles={["Manager", "Reporting_manager"]}><XmsSupplementaryQueuePage variant="manager" /></ProtectedRoute>} />
+          <Route path="/expense-management/manager/supplementary-claims/:claimId" element={<ProtectedRoute allowedRoles={["Manager", "Reporting_manager"]}><XmsSupplementaryClaimDetailPage mode="manager" /></ProtectedRoute>} />
+          {/* Supplementary claims: Finance. Each route needs the Finance role AND its UMS permission (fails closed). */}
+          <Route path="/expense-management/finance/supplementary-claims" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsSupplementaryQueuePage variant="finance" /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/supplementary-claims/new" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]} requiredPermissions={["SUPP_CLAIM_CREATE_FOR_EMPLOYEE"]}><XmsFinanceCreateSupplementaryPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/supplementary-claims/:claimId" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsSupplementaryClaimDetailPage mode="finance" /></ProtectedRoute>} />
+          {/* Receipt release: the request and the decision are separate permissions; the backend refuses self-approval. */}
+          <Route path="/expense-management/finance/receipt-releases" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]} requiredPermissions={["RECEIPT_RELEASE_REQUEST", "RECEIPT_RELEASE_APPROVE"]}><XmsFinanceReceiptReleasePage /></ProtectedRoute>} />
+          {/* AP payment for approved supplementary claims. Settlement happens only when AP confirms a payment. */}
+          <Route path="/expense-management/ap/supplementary-payments" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApSupplementaryPaymentsPage /></ProtectedRoute>} />
           {/* Old Verification / Reimbursements / Payment Status URLs, merged into the one page above. */}
           <Route path="/expense-management/finance/*" element={<Navigate to="/expense-management/finance" replace />} />
           <Route path="/expense-management/ap-payments/queue" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApPaymentQueuePage /></ProtectedRoute>} />

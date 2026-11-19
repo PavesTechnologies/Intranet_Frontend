@@ -302,7 +302,7 @@ export const canApproveAdvance = (adv, user, hasRole) => {
  * "MANAGER" (the Approvals tab) shows advances waiting for the manager, "FINANCE" (the Finance tab)
  * shows advances waiting for Finance. Approved and rejected history is not split by stage.
  */
-export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", embedded = false }) {
+export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", embedded = false, onRowCount, windowStart = 0, windowEnd }) {
   const { user, hasRole } = useAuth();
   const ws = useApprovalWebSocket();
   const [advances, setAdvances] = useState([]);
@@ -547,7 +547,9 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
     }
   };
 
-  const rowNodes = filteredAdvances.map((adv) => {
+  // Only the advances inside this page's window; the parent counts every row across both lists.
+  const windowAdvances = windowEnd === undefined ? filteredAdvances : filteredAdvances.slice(windowStart, windowEnd);
+  const rowNodes = windowAdvances.map((adv) => {
                   const advId = adv.advanceId || adv.id;
                   const isActionable = canApproveAdvance(adv, user, hasRole);
                   // Show the buttons on every awaiting-approval row; disable them when this user can't act yet
@@ -567,25 +569,24 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
-                      <td className="px-2.5 py-1.5" />
-                      <td className="px-2.5 py-1.5 font-mono font-medium text-blue-700 whitespace-nowrap">
-                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-emerald-800">Cash Advance</span>
+                      <td className="px-2.5 py-1.5 text-left">
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Cash advance</span>
                       </td>
-                      <td className="px-2.5 py-1.5 font-medium text-gray-900 whitespace-nowrap">
+                      <td className="px-2.5 py-1.5 text-left font-mono text-[11px] font-semibold text-gray-700 whitespace-nowrap">{adv.advanceNumber || `#${String(advId).slice(0, 8).toUpperCase()}`}</td>
+                      <td className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-900 whitespace-nowrap">
                         <EmployeeLabel employeeId={empId} />
                       </td>
-                      <td className="px-2.5 py-1.5 max-w-[220px]">
+                      <td className="px-2.5 py-1.5 text-left max-w-[220px]">
                         <p className="font-semibold text-gray-900 truncate text-xs">{adv.title || "Cash Advance"}</p>
                         <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                          {getCostCenterValue(adv, costCentersMap)} · Needed by {formatDate(getNeededByDateValue(adv))}
+                          Needed by {formatDate(getNeededByDateValue(adv))}
                         </p>
                       </td>
-                      <td className="px-2.5 py-1.5 whitespace-nowrap">
+                      <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate">{getCostCenterValue(adv, costCentersMap)}</td>
+                      <td className="px-2.5 py-1.5 text-left whitespace-nowrap">
                         {getStatusBadge(adv.status)}
                       </td>
-                      <td className="px-2.5 py-1.5 text-xs text-gray-400">—</td>
-                      <td className="px-2.5 py-1.5 text-xs text-gray-400">—</td>
-                      <td className="px-2.5 py-1.5 font-bold text-gray-900 whitespace-nowrap text-xs">
+                      <td className="px-2.5 py-1.5 font-semibold text-gray-900 whitespace-nowrap text-right text-xs">
                         {formatMoney(adv.amount, adv.currencyCode || "INR")}
                       </td>
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
@@ -600,25 +601,26 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
 
                           {showActions && (
                             <>
-                              <Button
-                                size="sm"
-                                variant="primary"
+                              <button
+                                type="button"
                                 onClick={() => handleApprove(adv)}
                                 disabled={actionLoading || !isActionable}
-                                className="!py-1 !px-2.5 !text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
+                                aria-label={`Approve ${adv.title || "cash advance"}`}
+                                title={isActionable ? "Approve" : "Not yet your turn to approve"}
+                                className="p-1.5 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
                               >
-                                Approve
-                              </Button>
-
-                              <Button
-                                size="sm"
-                                variant="danger"
+                                <CheckCircle2 size={16} aria-hidden="true" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => setRejectingAdvance(adv)}
                                 disabled={actionLoading || !isActionable}
-                                className="!py-1 !px-2.5 !text-[11px]"
+                                aria-label={`Reject ${adv.title || "cash advance"}`}
+                                title={isActionable ? "Reject" : "Not yet your turn to reject"}
+                                className="p-1.5 rounded text-rose-600 hover:bg-rose-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
                               >
-                                Reject
-                              </Button>
+                                <XCircle size={16} aria-hidden="true" />
+                              </button>
                             </>
                           )}
                         </div>
@@ -645,31 +647,49 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
           : null;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50 sticky top-0">
-                <h3 className="font-bold text-gray-900 text-sm">Decide on Cash Advance Request</h3>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white sticky top-0 z-10">
+                <h3 className="font-bold text-gray-900 text-base">Decide on Cash Advance Request</h3>
                 <button onClick={() => setApprovingAdvance(null)} className="text-gray-400 hover:text-gray-600 p-1">
                   <XCircle size={18} />
                 </button>
               </div>
-              <form onSubmit={handleConfirmApprove} className="p-5 space-y-4">
-                <div className="rounded-lg border border-gray-200 p-3 text-xs text-gray-700 space-y-1.5">
-                  <p className="font-semibold text-gray-900">Request {formatAdvanceNumber(approvingAdvance)}</p>
-                  <p><span className="text-gray-500">Purpose: </span>{approvingAdvance.purpose || "Not given"}</p>
-                  <p>
-                    <span className="text-gray-500">Trip: </span>
-                    {approvingAdvance.expectedTripStartDate
-                      ? `${new Date(approvingAdvance.expectedTripStartDate).toLocaleDateString("en-IN")} to ${approvingAdvance.expectedTripEndDate ? new Date(approvingAdvance.expectedTripEndDate).toLocaleDateString("en-IN") : "—"}`
-                      : "Not given"}
-                  </p>
-                  {approvingAdvance.notes && (
-                    <p><span className="text-gray-500">Employee's justification: </span>{approvingAdvance.notes}</p>
-                  )}
-                  <p className="pt-1">Requested: <strong className="text-gray-900">{formatMoney(approvingAdvance.amount, cur)}</strong></p>
+              <form onSubmit={handleConfirmApprove} className="p-6 space-y-5">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 text-xs text-gray-700">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Request</p>
+                      <p className="font-mono text-sm font-semibold text-gray-900 break-all">{formatAdvanceNumber(approvingAdvance)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Requested</p>
+                      <strong className="block text-base font-bold text-gray-900">{formatMoney(approvingAdvance.amount, cur)}</strong>
+                    </div>
+                  </div>
+                  <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <dt className="text-[11px] uppercase tracking-wide text-gray-500">Purpose</dt>
+                      <dd className="mt-0.5 leading-relaxed">{approvingAdvance.purpose || "Not given"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] uppercase tracking-wide text-gray-500">Trip dates</dt>
+                      <dd className="mt-0.5">
+                        {approvingAdvance.expectedTripStartDate
+                          ? `${new Date(approvingAdvance.expectedTripStartDate).toLocaleDateString("en-IN")} to ${approvingAdvance.expectedTripEndDate ? new Date(approvingAdvance.expectedTripEndDate).toLocaleDateString("en-IN") : "—"}`
+                          : "Not given"}
+                      </dd>
+                    </div>
+                    {approvingAdvance.notes && (
+                      <div className="sm:col-span-2">
+                        <dt className="text-[11px] uppercase tracking-wide text-gray-500">Employee's justification</dt>
+                        <dd className="mt-0.5 leading-relaxed">{approvingAdvance.notes}</dd>
+                      </div>
+                    )}
+                  </dl>
                 </div>
 
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1.5">
-                  <p className="font-semibold text-gray-900">Employee exposure</p>
+                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-5 text-xs text-gray-700 space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Employee exposure</p>
                   {!approvalBalance && <p className="text-gray-500">Loading balance...</p>}
                   {approvalBalance?.error && <p className="text-rose-700">Could not load the balance. Check it before deciding.</p>}
                   {approvalBalance && !approvalBalance.error && (
@@ -702,21 +722,26 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                   )}
                 </div>
 
-                <fieldset className="space-y-2">
-                  <legend className="text-xs font-medium text-gray-700 mb-1">Your decision</legend>
-                  {[
-                    ["FULL", "Approve the full amount", "Option A. Both advances stay separate. Finance pays exactly this amount."],
-                    ["REDUCED", "Approve a lower amount", "Finance pays the reduced amount. The requested amount is kept on record."],
-                    ["SET_OFF", "Set off an earlier outstanding balance", "Option B. Recommended only. Finance proposes and approves the carry-forward, and disbursement waits for it."],
-                  ].map(([code, label, help]) => (
-                    <label key={code} className={`flex gap-2 rounded-md border p-2.5 text-xs cursor-pointer ${decision === code ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}>
-                      <input type="radio" name="decision" checked={decision === code} onChange={() => setDecision(code)} className="mt-0.5" />
-                      <span>
-                        <span className="font-semibold text-gray-900 block">{label}</span>
-                        <span className="text-gray-500">{help}</span>
-                      </span>
-                    </label>
-                  ))}
+                <fieldset>
+                  <legend className="text-xs font-semibold text-gray-800 mb-2">Your decision</legend>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {[
+                      ["FULL", "Approve the full amount", "Option A. Both advances stay separate. Finance pays exactly this amount."],
+                      ["REDUCED", "Approve a lower amount", "Finance pays the reduced amount. The requested amount is kept on record."],
+                      ["SET_OFF", "Set off an earlier outstanding balance", "Option B. Recommended only. Finance proposes and approves the carry-forward, and disbursement waits for it."],
+                    ].map(([code, label, help]) => (
+                      <label
+                        key={code}
+                        className={`flex items-start gap-3 rounded-xl border p-4 text-xs cursor-pointer transition-colors ${decision === code ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500" : "border-gray-200 hover:border-gray-300"}`}
+                      >
+                        <input type="radio" name="decision" checked={decision === code} onChange={() => setDecision(code)} className="mt-0.5 shrink-0" />
+                        <span className="space-y-1">
+                          <span className="font-semibold text-gray-900 block">{label}</span>
+                          <span className="text-gray-500 block leading-relaxed">{help}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </fieldset>
 
                 {decision === "REDUCED" && (
@@ -864,13 +889,18 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
     document.body,
   );
 
+  // Tell the parent how many rows this list has, so the page can show one empty message for the whole table.
+  useEffect(() => {
+    if (!loading && onRowCount) onRowCount(filteredAdvances.length);
+  }, [loading, filteredAdvances.length, onRowCount]);
+
   if (embedded) {
     return (
       <>
         {loading && (
           <tbody>
             <tr>
-              <td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
+              <td colSpan={8} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
             </tr>
           </tbody>
         )}
@@ -899,16 +929,14 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-gray-700">
-              <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+              <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                 <tr>
                   <th className="w-8 px-2.5 py-2" />
-                  <th className="px-2.5 py-2">Report</th>
-                  <th className="px-2.5 py-2">Employee</th>
-                  <th className="px-2.5 py-2">Title / Merchant</th>
-                  <th className="px-2.5 py-2">Level / Status</th>
-                  <th className="px-2.5 py-2">Expenses</th>
-                  <th className="px-2.5 py-2">Policy</th>
-                  <th className="px-2.5 py-2">Amount</th>
+                  <th className="px-2.5 py-2 text-left">Report</th>
+                  <th className="px-2.5 py-2 text-left">Employee</th>
+                  <th className="px-2.5 py-2 text-left">Title / Merchant</th>
+                  <th className="px-2.5 py-2 text-left">Level / Status</th>
+                  <th className="px-2.5 py-2 text-left">Amount</th>
                   <th className="px-2.5 py-2 text-right">Actions</th>
                 </tr>
               </thead>

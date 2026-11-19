@@ -52,6 +52,8 @@ import {
   DEMO_TAX_CONTEXT,
   DEMO_TERMS,
   DEMO_DELIVERY_STATUS,
+  DEMO_SENT_BY,
+  saveDemoDelivery,
 } from "../utils/invoiceDemoData";
 import { interpretSendResult, describeDelivery, DELIVERY_OUTCOME } from "../utils/invoiceDelivery";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
@@ -617,7 +619,7 @@ export default function InvoiceDetail() {
 
   // Delivery history is the source of truth for "sent" — load it once the invoice is known.
   useEffect(() => {
-    if (invoice?.invoiceId && invoice?.invoiceStatus === "APPROVED") {
+    if (invoice?.invoiceId && (invoice?.invoiceStatus === "APPROVED" || invoice?.invoiceStatus === "READY_TO_SEND")) {
       loadDeliveryState(invoice.invoiceId);
     }
   }, [invoice?.invoiceId, invoice?.invoiceStatus]);
@@ -816,7 +818,7 @@ export default function InvoiceDetail() {
       </div>
 
       {/* Delivery Status Banner — APPROVED invoices only */}
-      {invoice?.invoiceStatus === "APPROVED" && (
+      {(invoice?.invoiceStatus === "APPROVED" || invoice?.invoiceStatus === "READY_TO_SEND") && (
         <div
           className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
               ? "border-teal-200 bg-teal-50/70"
@@ -1329,7 +1331,7 @@ export default function InvoiceDetail() {
         </p>
       </div>
 
-      {(invoice?.invoiceStatus === "PENDING_APPROVAL" || invoice?.invoiceStatus === "APPROVED") && (
+      {(invoice?.invoiceStatus === "PENDING_APPROVAL" || invoice?.invoiceStatus === "APPROVED" || invoice?.invoiceStatus === "READY_TO_SEND") && (
         <div className="mt-8 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-5">
           {invoice.invoiceStatus === "PENDING_APPROVAL" && (
             <>
@@ -1357,7 +1359,7 @@ export default function InvoiceDetail() {
             </>
           )}
 
-          {invoice.invoiceStatus === "APPROVED" && (
+          {(invoice.invoiceStatus === "APPROVED" || invoice.invoiceStatus === "READY_TO_SEND") && (
             <Button
               variant="primary"
               size="small"

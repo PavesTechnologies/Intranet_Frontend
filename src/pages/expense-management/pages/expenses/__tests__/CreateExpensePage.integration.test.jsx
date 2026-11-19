@@ -102,6 +102,7 @@ describe('CreateExpensePage - EP04-S4: Expense-Advance Integration', () => {
     cashAdvanceApi.getMyAdvances.mockResolvedValue({
       data: { data: mockAdvances },
     });
+    lookupService.getActiveClients.mockResolvedValue([]);
     lookupService.getActiveCostCenters.mockResolvedValue([
       { costCenterId: 'cc-1', costCenterCode: 'ENG', costCenterName: 'Engineering' },
     ]);

@@ -72,6 +72,7 @@ export default function CashAdvanceDetailPage() {
   ];
 
   const [advance, setAdvance] = useState(null);
+  const [loadError, setLoadError] = useState("");
   const [settlement, setSettlement] = useState(null);
   const [utilization, setUtilization] = useState(null);
   // Amount Payroll has actually deducted for this advance, summed for the money-movement cards.
@@ -110,11 +111,14 @@ export default function CashAdvanceDetailPage() {
       response = await cashAdvanceApi.getById(advanceId);
     } catch (error) {
       console.error("Failed to load cash advance:", error);
+      // Show the server's reason (for example, a permission message) instead of implying the record is missing.
+      setLoadError(error.response?.data?.message || "Cash advance not found.");
       setAdvance(null);
       setLoading(false);
       return;
     }
 
+    setLoadError("");
     setAdvance(response?.data?.data ?? response?.data ?? null);
 
     // Figures load on both the employee and the settlement routes, so the same balance is shown in each.
@@ -153,7 +157,7 @@ export default function CashAdvanceDetailPage() {
         <Breadcrumb items={breadcrumbs} />
 
         <div className="rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-sm text-gray-700">Cash advance not found.</p>
+          <p className="text-sm text-gray-700">{loadError || "Cash advance not found."}</p>
 
           <Button variant="outline" onClick={() => navigate(backPath)} className="mt-4 text-xs">
             {backLabel}
