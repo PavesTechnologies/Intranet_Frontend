@@ -70,6 +70,7 @@ export const claimSpec = (code) => CLAIM_STATUS[code] || UNKNOWN(code);
 export const LEGACY_CLAIM_LABEL = "Legacy Claim – No Filing Recorded";
 
 export const FILING_STATUS = {
+  NOT_RECORDED: { label: "Not recorded", tone: TONE.slate },
   FILED: { label: "Awaiting verification", tone: TONE.amber },
   VERIFIED: { label: "Verified", tone: TONE.green },
 };
@@ -84,6 +85,36 @@ export const IMPORT_STATUS = {
   NOT_IMPORTED: { label: "Not imported", tone: TONE.slate },
 };
 export const importSpec = (code) => IMPORT_STATUS[code] || UNKNOWN(code);
+
+/** GSTR-2B import modes (backend import_mode). DEMO data is never a supplier filing and never feeds ITC. */
+export const GSTR2B_IMPORT_MODES = {
+  OFFICIAL: { label: "Official", tone: TONE.indigo, title: "Official GST Portal Excel" },
+  DEMO: { label: "DEMO", tone: TONE.amber, title: "Demo Excel Template", hint: "Demo data - not a supplier filing, never used for ITC" },
+};
+export const importModeSpec = (code) => GSTR2B_IMPORT_MODES[code] || UNKNOWN(code);
+
+/** Where an import came from (backend source_type). */
+export const GSTR2B_SOURCE_TYPES = {
+  GST_PORTAL_EXCEL: "GST portal Excel",
+  GST_PORTAL_JSON: "GST portal JSON",
+  CSV_TEMPLATE: "CSV template",
+  AP_DEMO_EXCEL: "AP demo Excel template",
+};
+
+/** The AP demo Excel template - Backend gstr2b_excel.DEMO_COLUMNS. */
+export const GSTR2B_DEMO_COLUMNS = [
+  { header: "Supplier GSTIN", required: true }, { header: "Supplier Name" }, { header: "Document Type" },
+  { header: "Document Number", required: true }, { header: "Document Date", required: true },
+  { header: "Taxable Value", required: true }, { header: "IGST", required: true }, { header: "CGST", required: true },
+  { header: "SGST", required: true }, { header: "Cess" }, { header: "ITC Available" }, { header: "Reason" },
+];
+
+/** Field names in GSTR-2B validation errors -> labels. */
+export const GSTR2B_FIELD_LABELS = {
+  supplier_gstin: "Supplier GSTIN", document_number: "Document number", document_date: "Document date",
+  document_type: "Document type", taxable_value: "Taxable value", igst_amount: "IGST", cgst_amount: "CGST",
+  sgst_amount: "SGST", cess_amount: "Cess", itc_available: "ITC available", original_document_number: "Original document number",
+};
 
 export const IRN_STATUS = {
   PRESENT: { label: "IRN ✓", tone: "text-emerald-700" },
@@ -176,6 +207,69 @@ export const RECON_FILTERS = [
   { value: "AMENDED", countKey: "amended_count", optional: true },
   { value: "CREDIT_NOTE_MISMATCH", countKey: "credit_note_mismatch_count", optional: true },
 ];
+
+/**
+ * The four reconciliation outcomes (`match_group` on GET /gstr2b/matches rows, `match_groups` counts on the
+ * summary / import / workflow) - Backend gstr2b_service.MATCH_GROUP. The detailed status stays on each row.
+ * `countKey` is the key in `match_groups`. AP invoices missing in GSTR-2B have no group.
+ */
+export const MATCH_GROUPS = [
+  { value: "MATCHED", countKey: "matched", label: "Matched", hint: "Agrees with the books (incl. amended)", tone: TONE.green },
+  { value: "PARTIALLY_MATCHED", countKey: "partially_matched", label: "Partially matched", hint: "Differences to check", tone: TONE.sky },
+  { value: "UNMATCHED", countKey: "unmatched", label: "Unmatched", hint: "Filed by the supplier, not in AP", tone: TONE.slate },
+  { value: "REVIEW_REQUIRED", countKey: "review_required", label: "Review required", hint: "Ambiguous - resolve by hand", tone: TONE.amber },
+];
+export const matchGroupSpec = (code) => MATCH_GROUPS.find((g) => g.value === code) || UNKNOWN(code);
+
+/**
+ * State of the AP invoice matching stage on the workflow dashboard - read off the backend's import status, its
+ * match-group counts and next_step (see reconciliationState in ItcOverview), never from the counts' values.
+ */
+export const RECON_STAGE_STATE = {
+  NOT_IMPORTED: { label: "Awaiting GSTR-2B import", tone: TONE.slate },
+  PENDING: { label: "Reconciliation pending", tone: TONE.sky },
+  REVIEW: { label: "Requires review", tone: TONE.amber },
+  COMPLETED: { label: "Reconciled", tone: TONE.green },
+};
+
+/** Where an invoice's credit stands (`itc_position.position` on GET /itc/{id}) - Backend ITC_POSITIONS. */
+export const ITC_POSITION = {
+  ELIGIBLE: { label: "Eligible", hint: "Approvable for GSTR-3B now", tone: TONE.green },
+  PENDING_REVIEW: { label: "Pending review", hint: "Held - see the reasons", tone: TONE.amber },
+  INELIGIBLE: { label: "Ineligible", tone: TONE.rose },
+  ALREADY_CLAIMED: { label: "Already claimed", hint: "Claimed in a verified GSTR-3B", tone: TONE.indigo },
+};
+export const ITC_POSITION_ORDER = ["ELIGIBLE", "PENDING_REVIEW", "INELIGIBLE", "ALREADY_CLAIMED"];
+export const itcPositionSpec = (code) => ITC_POSITION[code] || UNKNOWN(code);
+/** itc_position reason codes meaning Finance has not reviewed / confirmed the eligibility yet. */
+export const FINANCE_REVIEW_REASONS = ["ELIGIBILITY_NOT_CONFIRMED", "ELIGIBILITY_REVIEW"];
+
+/**
+ * The six stages of GET /itc/workflow, in order. `step` lists the backend next_step codes that point at the stage;
+ * `tab` is the GstItcPage tab that holds it.
+ */
+export const WORKFLOW_STAGES = [
+  { key: "gstr2b_import", label: "GSTR-2B upload", tab: "gstr2b", steps: ["UPLOAD_GSTR2B"] },
+  { key: "reconciliation", label: "AP invoice matching", tab: "gstr2b", steps: ["RESOLVE_RECONCILIATION"] },
+  { key: "itc_eligibility", label: "ITC eligibility", tab: "review", steps: ["REVIEW_ELIGIBILITY"] },
+  { key: "approval", label: "ITC approval", tab: "review", steps: ["APPROVE_ITC"] },
+  { key: "itc_register", label: "ITC register", tab: "register", steps: [] },
+  { key: "gstr3b_claim", label: "GSTR-3B filing", tab: "filings", steps: ["RECORD_GSTR3B_FILING", "VERIFY_GSTR3B_FILING"] },
+];
+
+/**
+ * Backend `next_step` (GstItcWorkflowService._next_step) -> the action offered. The backend decides the step; this
+ * only says where it is done. `view` pre-selects the eligibility worklist view.
+ */
+export const NEXT_STEPS = {
+  UPLOAD_GSTR2B: { label: "Upload GSTR-2B", tab: "gstr2b", action: "import" },
+  RESOLVE_RECONCILIATION: { label: "Resolve GSTR-2B reconciliation", tab: "gstr2b" },
+  REVIEW_ELIGIBILITY: { label: "Review ITC eligibility", tab: "review", view: "eligibility" },
+  APPROVE_ITC: { label: "Approve ITC", tab: "review", view: "ready" },
+  RECORD_GSTR3B_FILING: { label: "Record GSTR-3B filing", tab: "filings", action: "record" },
+  VERIFY_GSTR3B_FILING: { label: "Verify GSTR-3B filing", tab: "filings", action: "verify" },
+  COMPLETE: { label: "Workflow completed", tab: "register", done: true },
+};
 
 /** Finance's decision on a reconciliation record (PATCH /gstr2b/matches/{id}/review). */
 export const RECON_REVIEW = {

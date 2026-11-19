@@ -2,17 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import { toast } from "react-toastify";
-import { ArrowDown, ArrowUp, FileDown, RefreshCw, Search, Upload } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, FileDown, RefreshCw, Search, Upload } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
 import { AP_ROUTES } from "../../constants/routes";
-import { RECON_FILTERS, RECON_REVIEW, reconSpec } from "../../constants/gstItc";
+import { MATCH_GROUPS, RECON_FILTERS, RECON_REVIEW, importModeSpec, matchGroupSpec, reconSpec } from "../../constants/gstItc";
 import { Empty } from "../../dashboard/components/insights";
 import { formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { downloadBlob } from "../../utils/documentUpload";
 import { useGstr2bMatches, useGstr2bSummary, useRematchGstr2b } from "../hooks/useGstItc";
-import gstr2bService from "../services/gstr2bService";
+import gstr2bService, { IMPORT_MODE } from "../services/gstr2bService";
 import { financialYearOf, inr, periodLabel } from "../utils/gstFormat";
 import { ErrorBlock, LoadingBlock, SectionCard, StatusPill } from "./GstUi";
 import Gstr2bImportModal from "./Gstr2bImportModal";
@@ -42,12 +42,19 @@ function SortHeader({ label, sortKey, sort, onSort, align }) {
   );
 }
 
+const DEMO_BANNER = "DEMO data from the AP demo Excel template - not a supplier filing and not an official GSTR-2B. "
+  + "It is kept apart from official reconciliation and never used for ITC eligibility, GSTR-3B approval or claims.";
+
 /**
  * GSTR-2B reconciliation for one return period: import, the backend's matching results with
  * status filters and search, exception resolution (detail drawer: review / manual mapping) and
  * export. Matching is never done here - rows show exactly what GET /gstr2b/matches returned.
+ * The official import is shown by default; a period's demo import (AP demo Excel template) is only
+ * shown when "Demo data" is chosen, always under a DEMO banner.
  */
-export default function Gstr2bPanel({ period, periods, canManage, status, onStatusChange, onOpenItc }) {
+export default function Gstr2bPanel({
+  period, periods, canManage, status, onStatusChange, group = "", onGroupChange = () => {}, importRequested, onImportHandled, onOpenItc,
+}) {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -55,15 +62,26 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
   const [detailId, setDetailId] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
   const [exporting, setExporting] = useState(null);
-  const summary = useGstr2bSummary(period);
-  const matches = useGstr2bMatches({ returnPeriod: period, status, search, page, pageSize: PAGE_SIZE });
+  const [view, setView] = useState(IMPORT_MODE.OFFICIAL);
+  const demoView = view === IMPORT_MODE.DEMO;
+  const summary = useGstr2bSummary(period, view);
+  const matches = useGstr2bMatches({
+    returnPeriod: period, status, matchGroup: group || undefined, search, page, pageSize: PAGE_SIZE, importMode: view,
+  });
   const rematch = useRematchGstr2b();
+  const hasDemo = Boolean(periods?.find((p) => p.period === period)?.demo_imported);
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
-  useEffect(() => setPage(1), [period, status, search]);
+  useEffect(() => setPage(1), [period, status, group, search, view]);
+  useEffect(() => setView(IMPORT_MODE.OFFICIAL), [period]); // a new period always opens on its official data
+  useEffect(() => { // the workflow's "Upload GSTR-2B" step
+    if (!importRequested) return;
+    if (canManage) setImportOpen(true);
+    onImportHandled?.();
+  }, [importRequested, canManage, onImportHandled]);
 
   const rows = useMemo(() => {
     const items = matches.data?.items || [];
@@ -86,7 +104,7 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
   const doExport = async (format) => {
     setExporting(format);
     try {
-      const { blob, fileName } = await gstr2bService.exportMatches({ returnPeriod: period, status, search, format });
+      const { blob, fileName } = await gstr2bService.exportMatches({ returnPeriod: period, status, search, format, importMode: view });
       downloadBlob(blob, fileName);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not export the reconciliation."));
@@ -113,17 +131,44 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
     }
   };
 
+  // The four outcomes (match_group) are the primary filter; the detailed backend status stays available.
+  const groups = s.match_groups || {};
   const chips = [
     { value: "", label: "All" },
-    { value: NEEDS_ACTION, label: "Needs action" },
+    ...MATCH_GROUPS.map((g) => ({ value: g.value, label: g.label, count: groups[g.countKey], hint: g.hint })),
+  ];
+  const statusOptions = [
+    { value: NEEDS_ACTION, label: "Needs action (not reconciled)" },
     ...RECON_FILTERS.filter((f) => !f.optional || Number(s[f.countKey]) > 0)
       .map((f) => ({ value: f.value, label: reconSpec(f.value).label, count: s[f.countKey] })),
   ];
+  const filtered = Boolean(search || status || group);
 
   return (
     <div className="space-y-4">
+      {(hasDemo || demoView) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-slate-500">Showing</span>
+          <div role="group" aria-label="GSTR-2B data source" className="inline-flex overflow-hidden rounded-md ring-1 ring-slate-200">
+            {[[IMPORT_MODE.OFFICIAL, "Official GSTR-2B"], [IMPORT_MODE.DEMO, "Demo data"]].map(([key, label]) => (
+              <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}
+                className={clsx("px-3 py-1 font-medium transition", view === key
+                  ? (key === IMPORT_MODE.DEMO ? "bg-amber-500 text-white" : "bg-[#0A0082] text-white")
+                  : "bg-white text-slate-600 hover:bg-slate-50")}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {demoView && (
+        <p role="note" className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span><StatusPill spec={importModeSpec(IMPORT_MODE.DEMO)} className="mr-1.5" />{s.demo_notice || DEMO_BANNER}</span>
+        </p>
+      )}
       <SectionCard
-        title={`GSTR-2B Reconciliation · ${periodLabel(period)}`}
+        title={`${demoView ? "DEMO · " : ""}GSTR-2B Reconciliation · ${periodLabel(period)}`}
         actions={(
           <>
             {canManage && (
@@ -138,7 +183,8 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
             )}
             {imported && (
               <>
-                <Button size="small" variant="outline" onClick={() => doExport("xlsx")} loading={exporting === "xlsx"} disabled={Boolean(exporting)}>
+                <Button size="small" variant="outline" onClick={() => doExport("xlsx")}
+                  title={group ? "The export applies the status and search filters - not the match group" : undefined} loading={exporting === "xlsx"} disabled={Boolean(exporting)}>
                   <FileDown className="mr-1 h-3.5 w-3.5" aria-hidden /> Excel
                 </Button>
                 <Button size="small" variant="ghost" onClick={() => doExport("csv")} loading={exporting === "csv"} disabled={Boolean(exporting)}>CSV</Button>
@@ -153,24 +199,42 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
         ) : summary.isError ? (
           <div className="p-4"><ErrorBlock error={summary.error} fallback="Could not load the reconciliation." /></div>
         ) : !imported ? (
-          <div className="px-4 py-10 text-center text-sm text-slate-600">
-            <p className="font-medium text-slate-800">No GSTR-2B imported for {periodLabel(period)} yet.</p>
-            <p className="mt-1 text-xs text-slate-500">
-              This period&apos;s invoices are not checked against the suppliers&apos; filings until its GSTR-2B is imported.
-              {!canManage && " Ask a Finance user with GST input credit access to import it."}
-            </p>
-          </div>
+          demoView ? (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              <p className="font-medium text-slate-800">No demo import for {periodLabel(period)}.</p>
+            </div>
+          ) : (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              <p className="font-medium text-slate-800">No GSTR-2B imported for {periodLabel(period)} yet.</p>
+              <p className="mt-1 text-xs text-slate-500">
+                This period&apos;s invoices are not checked against the suppliers&apos; filings until its GSTR-2B is imported.
+                {!canManage && " Ask a Finance user with GST input credit access to import it."}
+                {hasDemo && " A demo import exists for this period - it is not an official GSTR-2B and does not count."}
+              </p>
+            </div>
+          )
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
-                {chips.map((c) => (
-                  <button key={c.label} type="button" onClick={() => onStatusChange(c.value)} aria-pressed={status === c.value}
-                    className={clsx("rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition",
-                      status === c.value ? "bg-[#0A0082] text-white ring-[#0A0082]" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50")}>
-                    {c.label}{c.count !== undefined && c.count !== null ? ` · ${c.count}` : ""}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by match group">
+                {chips.map((c) => {
+                  const active = c.value ? group === c.value : !group && !status;
+                  return (
+                    <button key={c.label} type="button" title={c.hint} aria-pressed={active}
+                      onClick={() => (c.value ? onGroupChange(c.value) : (onGroupChange(""), onStatusChange("")))}
+                      className={clsx("rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition",
+                        active ? "bg-[#0A0082] text-white ring-[#0A0082]" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50")}>
+                      {c.label}{c.count !== undefined && c.count !== null ? ` · ${c.count}` : ""}
+                    </button>
+                  );
+                })}
+                <select aria-label="Detailed status" value={status} onChange={(e) => onStatusChange(e.target.value)}
+                  className="h-7 rounded-full border border-slate-200 bg-white px-2 text-xs text-slate-600">
+                  <option value="">Any detailed status</option>
+                  {statusOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}{o.count !== undefined && o.count !== null ? ` · ${o.count}` : ""}</option>
+                  ))}
+                </select>
               </div>
               <label className="relative">
                 <span className="sr-only">Search vendor, GSTIN or invoice number</span>
@@ -185,14 +249,14 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
             ) : matches.isError ? (
               <div className="p-4"><ErrorBlock error={matches.error} fallback="Could not load the records." /></div>
             ) : rows.length === 0 ? (
-              <Empty text={search || status ? "No records match the filter." : "No records for this period."} />
+              <Empty text={filtered ? "No records match the filter." : "No records for this period."} />
             ) : (
               <>
                 <div className={clsx("overflow-x-auto", matches.isFetching && "opacity-70")}>
                   <table className="min-w-full text-sm">
                     <thead className="bg-slate-50 text-left text-xs font-medium text-slate-500">
                       <tr>
-                        <th scope="col" className="px-3 py-2">Status</th>
+                        <th scope="col" className="px-3 py-2">Match</th>
                         <SortHeader label="GSTR-2B document" sortKey="date" sort={sort} onSort={onSort} />
                         <SortHeader label="Supplier" sortKey="supplier" sort={sort} onSort={onSort} />
                         <th scope="col" className="px-3 py-2">AP invoice</th>
@@ -211,7 +275,14 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
                           <tr key={r.match_id ?? `missing-${inv?.invoice_id ?? i}`}>
                             <td className="px-3 py-2">
                               <div className="flex flex-col items-start gap-1">
-                                <StatusPill spec={reconSpec(r.reconciliation_status)} />
+                                {r.match_group ? (
+                                  <>
+                                    <StatusPill spec={matchGroupSpec(r.match_group)} />
+                                    <span className="text-[11px] text-slate-500" title={reconSpec(r.reconciliation_status).hint}>
+                                      {reconSpec(r.reconciliation_status).label}
+                                    </span>
+                                  </>
+                                ) : <StatusPill spec={reconSpec(r.reconciliation_status)} />}
                                 {r.review_status && <StatusPill spec={RECON_REVIEW[r.review_status] || { label: r.review_status }} />}
                               </div>
                             </td>
@@ -245,6 +316,7 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
                             <td className="max-w-xs px-3 py-2 text-xs text-slate-600">
                               {r.mismatch_reasons?.[0] || (r.reconciliation_status === "MATCHED" ? "Agrees with the books" : "—")}
                               {r.mismatch_reasons?.length > 1 && <span className="text-slate-400"> +{r.mismatch_reasons.length - 1} more</span>}
+                              {r.review_remarks && <div className="mt-0.5 text-slate-500">Review: {r.review_remarks}</div>}
                             </td>
                             <td className="whitespace-nowrap px-3 py-2 text-right">
                               {r.match_id ? (
@@ -272,14 +344,18 @@ export default function Gstr2bPanel({ period, periods, canManage, status, onStat
         )}
       </SectionCard>
 
-      <Gstr2bImportHistory financialYear={financialYearOf(period)} />
+      <Gstr2bImportHistory financialYear={financialYearOf(period)} importMode={IMPORT_MODE.ALL} />
 
       <p className="text-xs text-slate-400">
         Download GSTR-2B from the GST portal: Returns Dashboard → GSTR-2B → Download (Excel or JSON). Once a month is imported,
         only invoices the supplier filed can be approved for GSTR-3B (s.16(2)(aa)). Reconciliation never claims credit.
+        Demo imports (AP demo Excel template) are for demonstrations only and never count as the period&apos;s GSTR-2B.
       </p>
 
-      {importOpen && <Gstr2bImportModal isOpen onClose={() => setImportOpen(false)} defaultPeriod={period} periods={periods} />}
+      {importOpen && (
+        <Gstr2bImportModal isOpen onClose={() => setImportOpen(false)} defaultPeriod={period} periods={periods}
+          onImported={(r) => setView(r?.is_demo ? IMPORT_MODE.DEMO : IMPORT_MODE.OFFICIAL)} />
+      )}
       {detailId && (
         <MatchDetailDrawer matchId={detailId} period={period} canManage={canManage} onClose={() => setDetailId(null)}
           onOpenItc={(invoiceId) => { setDetailId(null); onOpenItc(invoiceId); }} />

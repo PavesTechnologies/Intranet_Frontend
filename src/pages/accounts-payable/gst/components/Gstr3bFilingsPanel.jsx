@@ -3,22 +3,19 @@ import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { ShieldCheck } from "lucide-react";
 import Button from "../../../../components/Button/Button";
-import { useAuth } from "../../../../contexts/AuthContext";
 import { AP_ROUTES } from "../../constants/routes";
 import { ALLOCATION_TYPE, TAX_COMPONENTS, TAX_COMPONENT_LABELS, filingSpec } from "../../constants/gstItc";
 import { Empty } from "../../dashboard/components/insights";
 import { formatDate, formatDateTime } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { useGstr3bFiling, useGstr3bFilings, useVerifyFiling } from "../hooks/useGstItc";
-import { currentUserId, financialYearOf, inr, periodLabel } from "../utils/gstFormat";
+import { useGstr3bFiling, useGstr3bFilings, useGstWorkflow, useVerifyFiling } from "../hooks/useGstItc";
+import { financialYearOf, inr, inrOrDash, periodLabel } from "../utils/gstFormat";
 import { ComponentTable, ConfirmDialog, Drawer, ErrorBlock, Field, LoadingBlock, SectionCard, StatusPill } from "./GstUi";
 
 function FilingDrawer({ filingId, canManage, onClose }) {
-  const { user } = useAuth();
   const { data: f, isLoading, isError, error } = useGstr3bFiling(filingId);
   const verify = useVerifyFiling();
   const [confirming, setConfirming] = useState(false);
-  const recordedByMe = f && currentUserId(user) && currentUserId(user) === String(f.recorded_by);
 
   const doVerify = async () => {
     if (verify.isPending) return;
@@ -40,8 +37,7 @@ function FilingDrawer({ filingId, canManage, onClose }) {
       subtitle={f ? `ARN ${f.arn} · FY ${f.financial_year}` : undefined}
       footer={f && canManage && f.filing_status === "FILED" && (
         <div className="flex flex-wrap items-center justify-end gap-3">
-          {recordedByMe && <span className="text-xs text-amber-700">You recorded this filing - a different Finance user must verify it.</span>}
-          <Button size="small" variant="primary" disabled={recordedByMe} onClick={() => setConfirming(true)}>
+          <Button size="small" variant="primary" onClick={() => setConfirming(true)}>
             <ShieldCheck className="mr-1 h-3.5 w-3.5" aria-hidden /> Verify filing
           </Button>
         </div>
@@ -66,7 +62,7 @@ function FilingDrawer({ filingId, canManage, onClose }) {
             <Field label="Evidence reference">{f.evidence_reference}</Field>
             <Field label="Recorded by">{f.recorded_by}<span className="block text-xs text-slate-400">{formatDateTime(f.recorded_at)}</span></Field>
             <Field label="Verified by">
-              {f.verified_by ? <>{f.verified_by}<span className="block text-xs text-slate-400">{formatDateTime(f.verified_at)}</span></> : "Not verified yet"}
+              {f.verified_by ? <>{f.verified_by}<span className="block text-xs text-slate-400">{formatDateTime(f.verified_at)}{f.self_verified && " · same user who recorded it"}</span></> : "Not verified yet"}
             </Field>
             {f.remarks && <Field label="Remarks" className="col-span-2 sm:col-span-3">{f.remarks}</Field>}
           </dl>
@@ -121,6 +117,81 @@ function FilingDrawer({ filingId, canManage, onClose }) {
   );
 }
 
+/**
+ * The period's GSTR-3B claim (GET /itc/workflow gstr3b_claim): filing status, the credit ready / awaiting
+ * verification / claimed, reversals, re-claims, and Table 4 as the backend built it. Credit shows as claimed only
+ * when the filing is VERIFIED; before a filing is recorded Table 4 is a projection of the approved credit.
+ */
+function PeriodClaim({ period, onOpenFiling }) {
+  const { data: w, isLoading, isError, error } = useGstWorkflow(period);
+  if (isLoading) return <LoadingBlock text="Loading the period's GSTR-3B..." />;
+  if (isError) return <ErrorBlock error={error} fallback="Could not load the period's GSTR-3B claim." />;
+  const c = w?.gstr3b_claim;
+  if (!c) return null;
+  const t4 = c.table_4 || {};
+  const recorded = c.filing_status !== "NOT_RECORDED";
+  const blocked = Number(t4.blocked_in_gstr2b?.total) > 0;
+  return (
+    <SectionCard
+      title={`GSTR-3B · ${periodLabel(c.return_period || period)}`}
+      actions={(
+        <>
+          <StatusPill spec={filingSpec(c.filing_status)} />
+          {c.due_date && <span className="text-xs text-slate-500">Due {formatDate(c.due_date)}</span>}
+          {c.filing?.filing_id && (
+            <Button size="small" variant={c.filing_status === "FILED" ? "primary" : "outline"} onClick={() => onOpenFiling(c.filing.filing_id)}>
+              {c.filing_status === "FILED" ? "Open filing to verify" : "View filing"}
+            </Button>
+          )}
+        </>
+      )}
+      bodyClassName="space-y-4 p-4"
+    >
+      {!c.return_open && !recorded && (
+        <p className="text-xs text-slate-500">The month is not over yet - its GSTR-3B cannot be filed.</p>
+      )}
+      {c.filing && (
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label="ARN"><span className="font-mono">{c.filing.arn}</span></Field>
+          <Field label="Filing date">{formatDate(c.filing.filing_date)}</Field>
+          <Field label="Recorded by">{c.filing.recorded_by}</Field>
+          <Field label="Verified by">
+            {c.filing.verified_by ? <>{c.filing.verified_by}<span className="block text-xs text-slate-400">{formatDateTime(c.filing.verified_at)}</span></> : "Not verified yet"}
+          </Field>
+        </dl>
+      )}
+      <ComponentTable caption="GSTR-3B credit of the period" showCount rows={[
+        { label: "Ready to claim", hint: "Approved for this return, not in its filing", count: c.ready_for_claim_count, values: c.ready_for_claim_itc },
+        { label: "In the filing - awaiting verification", hint: "Not claimed until the filing is verified", values: c.in_filing_awaiting_verification_itc },
+        { label: "Claimed", hint: "Verified filing", values: c.claimed_itc, emphasis: true },
+        { label: "Re-claimed", values: c.reclaimed_itc },
+        { label: "Reversed", values: c.reversed_itc },
+        { label: "Vendor credit notes", hint: "Reduce the return's credit (s.34)", values: c.credit_note_itc },
+      ]} />
+      <div>
+        <h3 className="mb-1 text-sm font-semibold text-slate-800">Table 4 - Eligible ITC</h3>
+        <p className="mb-2 text-xs text-slate-500">
+          {t4.basis === "RECORDED_FILING"
+            ? "From the recorded filing's allocations."
+            : "Projected from the credit approved for this return - nothing is claimed until a filing is recorded and verified."}
+        </p>
+        <ComponentTable caption="GSTR-3B Table 4" rows={(t4.rows || []).map((r) => ({
+          label: r.label || r.row, values: r, emphasis: r.row === "4C",
+        }))} />
+        {blocked && (
+          <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-800">
+            Blocked / ineligible credit in this GSTR-2B: {inrOrDash(t4.blocked_in_gstr2b.total)}. The portal auto-populates it into 4(A)(5) -
+            reverse it in 4(B)(1) when filing.
+          </p>
+        )}
+      </div>
+      <p className="text-xs text-slate-400">
+        Net GST payable: {c.net_tax_payable === null || c.net_tax_payable === undefined ? (c.net_tax_payable_note || "not computed by Accounts Payable") : inr(c.net_tax_payable)}
+      </p>
+    </SectionCard>
+  );
+}
+
 function FilingRow({ f, onOpen }) {
   return (
     <tr className="cursor-pointer hover:bg-slate-50" onClick={() => onOpen(f.filing_id)}>
@@ -160,18 +231,23 @@ function FilingTable({ filings, onOpen }) {
 }
 
 /**
- * GSTR-3B filings recorded for a financial year: the ones awaiting second-user verification
+ * GSTR-3B filings recorded for a financial year: the ones awaiting verification
  * first, then the history. Recording a filing never claims credit by itself.
  */
-export default function Gstr3bFilingsPanel({ period, canManage, onRecordFiling }) {
+export default function Gstr3bFilingsPanel({ period, canManage, onRecordFiling, openFilingId, onOpenFiling }) {
   const financialYear = financialYearOf(period);
   const { data, isLoading, isError, error } = useGstr3bFilings(financialYear);
-  const [openId, setOpenId] = useState(null);
+  const [localId, setLocalId] = useState(null);
+  // controlled through the URL by GstItcPage (so the workflow's "Verify GSTR-3B filing" opens the filing)
+  const openId = onOpenFiling ? openFilingId : localId;
+  const setOpenId = onOpenFiling || setLocalId;
   const items = data?.items || [];
   const pending = items.filter((f) => f.filing_status === "FILED");
 
   return (
     <div className="space-y-4">
+      <PeriodClaim period={period} onOpenFiling={setOpenId} />
+
       <SectionCard
         title={`Filing verification${pending.length ? ` · ${pending.length} pending` : ""}`}
         actions={canManage && <Button size="small" variant="primary" onClick={() => onRecordFiling()}>Record GSTR-3B filing</Button>}
@@ -184,7 +260,7 @@ export default function Gstr3bFilingsPanel({ period, canManage, onRecordFiling }
           <Empty text="No filing is waiting for verification." />
         )}
         <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
-          A filing&apos;s credit counts as claimed only after a Finance user other than the one who recorded it verifies it.
+          Recording a filing claims nothing - its credit counts as claimed only after the filing is verified (the Finance user who recorded it may verify it).
         </p>
       </SectionCard>
 
