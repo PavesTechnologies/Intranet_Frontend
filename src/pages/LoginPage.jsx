@@ -319,9 +319,11 @@ const customCSS = `
 @keyframes gradShift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
 @keyframes illusIn { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
 .login-page-container .lp-grad-bg{background:linear-gradient(125deg,#EEF0FB 0%,#E4E3F8 25%,#F4F6FC 45%,#FBE6EE 70%,#E8ECFA 100%);background-size:300% 300%;animation:gradShift 20s ease-in-out infinite}
-.login-page-container .lp-illus{flex:0 0 auto;width:clamp(300px,24vw,470px);animation:illusIn 900ms cubic-bezier(.16,1,.3,1) 300ms both}
-.login-page-container .lp-illus svg{width:100%;height:auto;display:block}
-@media (max-width:1280px){.login-page-container .lp-illus{display:none}}
+.login-page-container .lp-illus{flex:0 0 auto;width:clamp(220px,24vw,470px);animation:illusIn 900ms cubic-bezier(.16,1,.3,1) 300ms both}
+.login-page-container .lp-illus svg{width:100%;height:auto;max-height:62vh;display:block}
+.login-page-container .lp-ws{font-size:clamp(56px,5.2vw,84px)}
+@media (max-width:1100px){.login-page-container .lp-illus{display:none}}
+@media (max-height:760px){.login-page-container .lp-ws{margin-bottom:18px !important;font-size:clamp(44px,4.2vw,68px)}.login-page-container .lp-hero-p{margin-bottom:20px !important}.login-page-container .left-panel{padding-top:32px !important;padding-bottom:28px !important}.login-page-container .svc-cap{margin-top:12px}}
 @keyframes wiBar   { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(.68)} }
 @keyframes wiDonut { 0%{stroke-dashoffset:76} 35%,85%{stroke-dashoffset:0} 100%{stroke-dashoffset:76} }
 @keyframes wiSteam { 0%{opacity:0;transform:translateY(4px)} 30%{opacity:.8} 100%{opacity:0;transform:translateY(-14px)} }
@@ -386,7 +388,11 @@ const customCSS = `
 .login-page-container .ws-line:nth-child(1) > span{background-image:linear-gradient(100deg,var(--navy-2) 0%,var(--navy-2) 42%,#5B66B8 50%,var(--navy-2) 58%,var(--navy-2) 100%)}
 .login-page-container .ws-line:nth-child(2) > span{animation-delay:120ms,1.9s;background-image:linear-gradient(100deg,var(--pink) 0%,var(--pink) 42%,#FF8AAA 50%,var(--pink) 58%,var(--pink) 100%)}
 .login-page-container .svc-tile{width:38px;height:38px;border-radius:9px;background:#fff;border:1px solid var(--neutral-200);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(12,10,9,.05);color:var(--neutral-600);position:relative;overflow:hidden;transition:all 380ms cubic-bezier(.16,1,.3,1)}
-.login-page-container .svc-label{font-size:10px;font-weight:500;color:var(--neutral-500);letter-spacing:.06em;text-transform:uppercase;transition:color 380ms ease}
+.login-page-container .lp-text{container-type:inline-size}
+.login-page-container .svc-grid{display:grid;grid-template-columns:repeat(6,84px);gap:16px 4px;justify-content:start}
+.login-page-container .svc-grid .svc-item{align-items:flex-start !important}
+@container (max-width:520px){.login-page-container .svc-grid{grid-template-columns:repeat(3,96px)}}
+.login-page-container .svc-label{white-space:nowrap;text-align:center;font-size:10px;font-weight:500;color:var(--neutral-500);letter-spacing:.06em;text-transform:uppercase;transition:color 380ms ease}
 .login-page-container .svc-item .svc-tile,.login-page-container .svc-item .svc-label{opacity:.55;transition:opacity 380ms ease,all 380ms cubic-bezier(.16,1,.3,1)}
 .login-page-container .svc-item.active .svc-tile{opacity:1;transform:translateY(-3px);border-color:var(--accent-600);color:var(--accent-600);box-shadow:0 0 0 4px rgba(10,0,130,.08),0 8px 18px -8px rgba(10,0,130,.4)}
 .login-page-container .svc-item.active .svc-label{opacity:1;color:var(--neutral-800)}
@@ -769,19 +775,19 @@ export default function LoginPage() {
       <div className="left-panel lp-grad-bg panel-l" style={{ width: "55%", height: "100vh", borderRight: "1px solid #E3E6F2", display: "flex", flexDirection: "column", padding: "48px", position: "relative", overflow: "hidden" }}>
         <InteractiveGrid />
         <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "28px", flexShrink: 0 }}>
             <img src="/logo.png" alt="Logo" style={{ width: "48px", height: "48px", objectFit: "contain", borderRadius: "10px", flexShrink: 0 }} />
             <span className="head-font" style={{ fontSize: "20px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.01em" }}>Paves Enterprise App</span>
           </div>
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "32px" }}>
-          <div style={{ display: "flex", flexDirection: "column", flex: "1 1 0", minWidth: 0 }}>
-            <div className="head-font" style={{ fontSize: "84px", fontWeight: 700, lineHeight: 0.95, letterSpacing: "-0.04em", marginBottom: "40px", userSelect: "none", pointerEvents: "none" }}>
+          <div className="lp-text" style={{ display: "flex", flexDirection: "column", flex: "1 1 0", minWidth: 0 }}>
+            <div className="head-font lp-ws" style={{ fontWeight: 700, lineHeight: 0.95, letterSpacing: "-0.04em", marginBottom: "40px", userSelect: "none", pointerEvents: "none" }}>
               <span className="ws-line"><span>Work</span></span>
               <span className="ws-line"><span>Space</span></span>
             </div>
             <h1 className="head-font" style={{ fontSize: "24px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.3, marginBottom: "14px" }}>Your organization's<br />operational hub</h1>
-            <p style={{ fontSize: "14px", color: "#5B6479", lineHeight: 1.7, maxWidth: "440px", marginBottom: "40px" }}>Manage leave, track timesheets, handle projects, and access all your internal tools through a single gateway.</p>
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }} onMouseLeave={() => setSvcPaused(false)}>
+            <p className="lp-hero-p" style={{ fontSize: "14px", color: "#5B6479", lineHeight: 1.7, maxWidth: "440px", marginBottom: "40px" }}>Manage leave, track timesheets, handle projects, and access all your internal tools through a single gateway.</p>
+            <div className="svc-grid" onMouseLeave={() => setSvcPaused(false)}>
               {SERVICES.map(({ label, d }, i) => (
                 <div key={label} className={`svc-item${i === activeSvc ? " active" : ""}`}
                   onMouseEnter={() => { setSvcPaused(true); setActiveSvc(i); }}
