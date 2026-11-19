@@ -12,6 +12,7 @@ import SupplementaryApprovalsList from "../components/SupplementaryApprovalsList
 import MyDelegateCard from "../components/MyDelegateCard";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
+import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
@@ -25,6 +26,21 @@ const PENDING_SHOW_OPTIONS = [
   { label: "Ready to approve", value: "PENDING" },
   { label: "Policy warnings", value: "FLAGGED" },
   { label: "Awaiting employee", value: "AWAITING" },
+];
+
+// Which kinds of request the table shows, on every tab.
+const TYPE_OPTIONS = [
+  { label: "All types", value: "ALL" },
+  { label: "Expense reports", value: "EXPENSE" },
+  { label: "Cash advances", value: "CASH" },
+  { label: "Supplementary claims", value: "SUPP" },
+];
+
+// Cash advances only: approved as requested, or at a lower amount.
+const AMOUNT_OPTIONS = [
+  { label: "Any amount", value: "ALL" },
+  { label: "Approved in full", value: "FULL" },
+  { label: "Approved lower amount", value: "REDUCED" },
 ];
 
 const PENDING_SORT_OPTIONS = [
@@ -45,6 +61,9 @@ export default function ApprovalsPage({ embedded = false }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [pendingShow, setPendingShow] = useState("ALL");
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [amountFilter, setAmountFilter] = useState("ALL");
+  const showType = (t) => typeFilter === "ALL" || typeFilter === t;
   // Rows each list currently shows, keyed by tab, so the page can show one empty message for the whole table.
   const [rowCounts, setRowCounts] = useState({});
   const reportExpenseRows = useCallback(
@@ -67,10 +86,15 @@ export default function ApprovalsPage({ embedded = false }) {
   const [page, setPage] = useState(0);
   useEffect(() => {
     setPage(0);
-  }, [activeTab, searchTerm, pendingShow, pendingSort]);
-  const expenseCount = rowCounts[`${activeTab}-expense`] ?? 0;
-  const cashCount = rowCounts[`${activeTab}-cash`] ?? 0;
-  const suppCount = rowCounts[`${activeTab}-supp`] ?? 0;
+  }, [activeTab, searchTerm, pendingShow, pendingSort, typeFilter, amountFilter]);
+  // The amount filter only applies to cash advances; it is reset when it no longer applies.
+  useEffect(() => {
+    if (typeFilter !== "CASH" || activeTab === "pending") setAmountFilter("ALL");
+  }, [typeFilter, activeTab]);
+  // A list hidden by the type filter contributes no rows.
+  const expenseCount = showType("EXPENSE") ? rowCounts[`${activeTab}-expense`] ?? 0 : 0;
+  const cashCount = showType("CASH") ? rowCounts[`${activeTab}-cash`] ?? 0 : 0;
+  const suppCount = showType("SUPP") ? rowCounts[`${activeTab}-supp`] ?? 0 : 0;
   const combinedRows = expenseCount + cashCount + suppCount;
   const totalPages = Math.max(1, Math.ceil(combinedRows / APPROVALS_PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
@@ -107,7 +131,10 @@ export default function ApprovalsPage({ embedded = false }) {
     ? hasRole(["Finance", "FINANCE", "Finance_Executive", "FINANCE_EXECUTIVE"])
     : false;
 
-  const mountedLists = ["expense", ...(isManager || isFinance ? ["cash", "supp"] : [])];
+  const mountedLists = [
+    ...(showType("EXPENSE") ? ["expense"] : []),
+    ...(isManager || isFinance ? [...(showType("CASH") ? ["cash"] : []), ...(showType("SUPP") ? ["supp"] : [])] : []),
+  ];
   const allReported = mountedLists.every((key) => rowCounts[`${activeTab}-${key}`] !== undefined);
   const totalRows = mountedLists.reduce((sum, key) => sum + (rowCounts[`${activeTab}-${key}`] ?? 0), 0);
   const showEmptyTable = allReported && totalRows === 0;
@@ -245,7 +272,7 @@ export default function ApprovalsPage({ embedded = false }) {
   const active = tabs.find((t) => t.key === activeTab) || tabs[0];
   // Empty only when every list has reported zero rows (supplementary claims included) and, on Pending,
   // the Finance verification rows (not part of the paged lists) are empty too.
-  const showEmpty = showEmptyTable && !(activeTab === "pending" && financePendingCount > 0);
+  const showEmpty = showEmptyTable && !(activeTab === "pending" && showType("EXPENSE") && financePendingCount > 0);
   const EmptyIcon = active.empty.icon;
   const pct = (n) => (totalCount > 0 ? (n / totalCount) * 100 : 0);
 
@@ -416,7 +443,7 @@ export default function ApprovalsPage({ embedded = false }) {
             })}
           </div>
 
-          <div className="w-full lg:w-96">
+          <div className="w-full lg:w-80">
             <SearchInput
               value={searchTerm}
               onSearch={handleSearch}
@@ -424,6 +451,33 @@ export default function ApprovalsPage({ embedded = false }) {
               className="!px-3 !py-2 !text-sm"
             />
           </div>
+
+          <div className="w-full lg:w-48">
+            <FormSelect
+              label="Type"
+              name="typeFilter"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              options={TYPE_OPTIONS}
+              className="[&>label]:mb-1 [&>label]:text-xs"
+              buttonClassName="!px-3 !py-1.5 !text-xs"
+            />
+          </div>
+
+          {/* Approved tab, cash advances: approved as requested or at a lower amount */}
+          {activeTab === "approved" && typeFilter === "CASH" && (
+            <div className="w-full lg:w-52">
+              <FormSelect
+                label="Amount"
+                name="amountFilter"
+                value={amountFilter}
+                onChange={(e) => setAmountFilter(e.target.value)}
+                options={AMOUNT_OPTIONS}
+                className="[&>label]:mb-1 [&>label]:text-xs"
+                buttonClassName="!px-3 !py-1.5 !text-xs"
+              />
+            </div>
+          )}
 
           {/* Pending only: which rows to show, and their order */}
           {activeTab === "pending" && (
@@ -459,14 +513,16 @@ export default function ApprovalsPage({ embedded = false }) {
           <table className="w-full table-fixed text-left text-sm">
             {/* Fixed column widths: each header sits exactly above its cells, whatever the row content is. */}
             <colgroup>
-              <col className="w-[9%]" />
-              <col className="w-[13%]" />
-              <col className="w-[13%]" />
-              <col className="w-[20%]" />
-              <col className="w-[12%]" />
+              <col className="w-[8%]" />
               <col className="w-[12%]" />
               <col className="w-[10%]" />
+              <col className="w-[15%]" />
+              <col className="w-[8%]" />
               <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[9%]" />
+              <col className="w-[7%]" />
             </colgroup>
             <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               <tr>
@@ -476,11 +532,13 @@ export default function ApprovalsPage({ embedded = false }) {
                 <th className="px-2.5 py-2.5 text-left">Title / Merchant</th>
                 <th className="px-2.5 py-2.5 text-left">Cost Center</th>
                 <th className="px-2.5 py-2.5 text-left">Status</th>
-                <th className="px-2.5 py-2.5 text-right">Amount</th>
+                <th className="px-2.5 py-2.5 text-right">Requested</th>
+                <th className="px-2.5 py-2.5 text-right">Approved</th>
+                <th className="px-2.5 py-2.5 text-right">Paid</th>
                 <th className="px-2.5 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
-            {activeTab === "pending" && (
+            {activeTab === "pending" && showType("EXPENSE") && (
               <PendingApprovalsPage
                 key={`pending-${reloadKey}`}
                 searchTerm={searchTerm}
@@ -494,10 +552,10 @@ export default function ApprovalsPage({ embedded = false }) {
                 windowEnd={expenseWindow.end}
               />
             )}
-            {activeTab === "pending" && isFinance && (
+            {activeTab === "pending" && isFinance && showType("EXPENSE") && (
               <FinanceVerificationApprovalsList key={`finance-${reloadKey}`} searchTerm={searchTerm} excludeReportIds={myQueueReportIds} />
             )}
-            {activeTab === "approved" && (
+            {activeTab === "approved" && showType("EXPENSE") && (
               <ApprovalHistoryPage
                 key={`approved-${reloadKey}`}
                 outcome="APPROVED"
@@ -508,7 +566,7 @@ export default function ApprovalsPage({ embedded = false }) {
                 windowEnd={expenseWindow.end}
               />
             )}
-            {activeTab === "rejected" && (
+            {activeTab === "rejected" && showType("EXPENSE") && (
               <ApprovalHistoryPage
                 key={`rejected-${reloadKey}`}
                 outcome="REJECTED"
@@ -519,18 +577,19 @@ export default function ApprovalsPage({ embedded = false }) {
                 windowEnd={expenseWindow.end}
               />
             )}
-            {(isManager || isFinance) && (
+            {(isManager || isFinance) && showType("CASH") && (
               <CashAdvanceApprovalsList
                 key={`cash-${activeTab}-${reloadKey}`}
                 activeTab={activeTab}
                 searchTerm={searchTerm}
+                amountFilter={amountFilter}
                 embedded
                 onRowCount={reportCashRows}
                 windowStart={cashWindow.start}
                 windowEnd={cashWindow.end}
               />
             )}
-            {(isManager || isFinance) && (
+            {(isManager || isFinance) && showType("SUPP") && (
               <SupplementaryApprovalsList
                 key={`supp-${activeTab}-${reloadKey}`}
                 activeTab={activeTab}
@@ -545,7 +604,7 @@ export default function ApprovalsPage({ embedded = false }) {
             {showEmpty && (
               <tbody data-approvals-empty>
                 <tr>
-                  <td colSpan={8} className="px-4 py-14">
+                  <td colSpan={10} className="px-4 py-14">
                     <div className="mx-auto flex max-w-sm flex-col items-center text-center">
                       <span className={`flex h-14 w-14 items-center justify-center rounded-2xl ${active.tone.tile}`}>
                         <EmptyIcon size={26} aria-hidden="true" />
