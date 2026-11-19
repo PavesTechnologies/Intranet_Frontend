@@ -46,7 +46,7 @@ function useApprovedForPeriod(period) {
 /**
  * Records a GSTR-3B that was already filed on the GST portal (ARN, filing date, evidence) with
  * the ITC each approved invoice took in it. Nothing is filed from here, and the credit is not
- * claimed yet: a second Finance user must verify the filing first.
+ * claimed yet: the filing must be verified first (a separate step - the same Finance user may do it).
  */
 export default function RecordFilingModal({ defaultPeriod, onClose }) {
   const record = useRecordFiling();
@@ -102,7 +102,7 @@ export default function RecordFilingModal({ defaultPeriod, onClose }) {
           ? customRows.map((d) => ({ invoiceId: d.invoice_id, amounts: rowState(d) }))
           : null,
       });
-      toast.success(`GSTR-3B ${periodLabel(filing.return_period)} recorded (ARN ${filing.arn}). It counts as claimed once another Finance user verifies it.`);
+      toast.success(`GSTR-3B ${periodLabel(filing.return_period)} recorded (ARN ${filing.arn}). It counts as claimed once the filing is verified.`);
       onClose();
     } catch (err) {
       setConfirming(false);
@@ -237,7 +237,7 @@ export default function RecordFilingModal({ defaultPeriod, onClose }) {
               {nilReturn ? "Recorded as a nil-ITC filing." : mode === "custom"
                 ? `${customRows.length} invoice allocation(s) as entered.`
                 : `All approved credit for ${periodLabel(period)}.`}
-              {" "}The credit is not claimed yet - a different Finance user must verify the filing.
+              {" "}The credit is not claimed yet - verify the filing next to claim it.
             </p>
             {nothingToAllocate && <p className="mt-2 text-amber-700">No allocations - the backend will refuse it unless it is a nil-ITC filing.</p>}
           </>

@@ -4,6 +4,25 @@ import { formatMonth } from "../../utils/formatters";
 /** INR with the AP module's formatting; null / undefined show as ₹0. */
 export const inr = (value) => formatMoney(Number(value ?? 0), "INR");
 
+/** INR, but a missing amount (null / undefined / "") shows as "—" - never as a valid ₹0. */
+export const inrOrDash = (value) => (value === null || value === undefined || value === "" ? "—" : inr(value));
+
+/**
+ * The filed invoice value of a set of GSTR-2B documents (backend document_totals). The portal Excel / JSON carry
+ * it; the CSV and demo templates do not, so it may be missing for some or all documents. Returns
+ * { text, note } - the value is never filled in or estimated here.
+ */
+export function invoiceValueText(totals) {
+  if (!totals) return { text: "—", note: null };
+  const docs = Number(totals.documents ?? 0);
+  const missing = Number(totals.documents_without_invoice_value ?? 0);
+  if (docs > 0 && missing >= docs) return { text: "Not in file", note: "The file does not report invoice values" };
+  return {
+    text: inrOrDash(totals.invoice_value),
+    note: missing > 0 ? `Excludes ${missing} document(s) filed without an invoice value` : null,
+  };
+}
+
 /** "2026-11" or "2026-11-01" -> "Nov 2026". */
 export const periodLabel = (period) => formatMonth(period ? `${String(period).slice(0, 7)}-01` : "");
 

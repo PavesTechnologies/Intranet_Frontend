@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 import clsx from "clsx";
 import Button from "../../../../components/Button/Button";
 import { AP_ROUTES } from "../../constants/routes";
-import { GSTR2B_MATCH, ITC_STATUS, LEGACY_CLAIM_LABEL, approvalSpec, eligibilitySpec } from "../../constants/gstItc";
+import {
+  GSTR2B_MATCH, ITC_POSITION_ORDER, ITC_STATUS, LEGACY_CLAIM_LABEL, approvalSpec, eligibilitySpec, itcPositionSpec,
+} from "../../constants/gstItc";
 import { Empty } from "../../dashboard/components/insights";
 import { formatDate } from "../../utils/formatters";
-import { useGstRegister } from "../hooks/useGstItc";
-import { inr, monthDate, periodLabel } from "../utils/gstFormat";
-import { ErrorBlock, LoadingBlock, SectionCard, StatusPill } from "./GstUi";
+import { useGstRegister, useGstWorkflow } from "../hooks/useGstItc";
+import { inr, inrOrDash, monthDate, periodLabel } from "../utils/gstFormat";
+import { ComponentTable, ErrorBlock, SectionCard, LoadingBlock, StatusPill } from "./GstUi";
 
 const UNDER_REVIEW = ["PENDING_REVIEW", "REQUIRES_CLARIFICATION"];
 const CLAIMED = ["CLAIMED", "PARTIALLY_CLAIMED", "REVERSED"];
@@ -36,10 +38,60 @@ const VIEWS = [
   { value: "legacy", label: "Legacy claims", test: (r) => r.claim_source === "LEGACY" },
 ];
 
+/**
+ * The period's eligibility and approval position from GET /itc/workflow (shared with the workflow overview - no
+ * extra request): ITC per position and per component, why credit is held, and what is approved / awaiting approval.
+ */
+function EligibilitySummary({ period }) {
+  const { data: w, isError } = useGstWorkflow(period);
+  if (isError || !w) return null;
+  const e = w.itc_eligibility || {};
+  const a = w.approval || {};
+  const counts = e.invoice_counts || {};
+  const awaiting = Number(e.awaiting_finance_confirmation_itc?.total) > 0;
+  return (
+    <SectionCard title={`ITC eligibility & approval position · ${periodLabel(period)}`} bodyClassName="space-y-3 p-4">
+      <ComponentTable showCount caption="ITC by eligibility and approval" rows={[
+        ...ITC_POSITION_ORDER.map((p) => ({
+          label: itcPositionSpec(p).label, hint: itcPositionSpec(p).hint, count: counts[p.toLowerCase()],
+          values: e[{ ELIGIBLE: "eligible_itc", PENDING_REVIEW: "pending_itc", INELIGIBLE: "ineligible_itc", ALREADY_CLAIMED: "already_claimed_itc" }[p]],
+        })),
+        { label: "Approved for GSTR-3B", hint: "Internal approval - not claimed yet", count: a.counts?.approved, values: a.approved_itc, emphasis: true },
+        { label: "Pending approval", hint: "Eligible, not yet approved", count: a.counts ? a.counts.pending_approval : undefined, values: a.pending_approval_itc },
+        { label: "Rejected for claim", count: a.counts?.rejected, values: a.rejected_itc },
+      ]} />
+      {awaiting && (
+        <p className="text-xs text-amber-700">
+          Finance review pending: {inrOrDash(e.awaiting_finance_confirmation_itc.total)} is eligible by the system&apos;s suggestion only and
+          is held until Finance confirms it.
+        </p>
+      )}
+      {e.reasons?.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-slate-600">Why credit is held or ineligible</p>
+          <ul className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-100 text-xs" aria-label="Eligibility reasons">
+            {e.reasons.map((r) => (
+              <li key={`${r.position}-${r.code}`} className="flex flex-wrap items-center gap-2 px-3 py-1.5">
+                <StatusPill spec={itcPositionSpec(r.position)} />
+                <span className="text-slate-700">{r.label || r.code}</span>
+                <span className="ml-auto tabular-nums text-slate-500">{r.invoices} invoice(s) · {inrOrDash(r.itc)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[11px] text-slate-400">One amount can be held for several reasons, so these can add up to more than the pending credit.</p>
+        </div>
+      )}
+      <p className="text-[11px] text-slate-400">{a.note || "Only eligible credit can be approved, and only approved credit goes into a GSTR-3B filing."}</p>
+    </SectionCard>
+  );
+}
+
 /** The period's purchase invoices (GET /itc?month=) with their eligibility, approval and claim state. */
-export default function ItcReviewPanel({ period, onOpenItc }) {
+export default function ItcReviewPanel({ period, view: viewProp, onViewChange, onOpenItc }) {
   const { data, isLoading, isError, error } = useGstRegister(monthDate(period));
-  const [view, setView] = useState("all");
+  const [localView, setLocalView] = useState("all");
+  const view = VIEWS.some((v) => v.value === viewProp) ? viewProp : onViewChange ? "all" : localView;
+  const setView = onViewChange || setLocalView;
 
   if (isLoading) return <LoadingBlock text="Loading the period's invoices..." />;
   if (isError) return <ErrorBlock error={error} fallback="Could not load the ITC register." />;
@@ -49,6 +101,8 @@ export default function ItcReviewPanel({ period, onOpenItc }) {
   const shown = invoices.filter(VIEWS.find((v) => v.value === view).test);
 
   return (
+    <div className="space-y-4">
+    <EligibilitySummary period={period} />
     <SectionCard
       title={`ITC eligibility & approval · invoices dated ${periodLabel(period)}`}
       actions={(
@@ -116,5 +170,6 @@ export default function ItcReviewPanel({ period, onOpenItc }) {
         </div>
       )}
     </SectionCard>
+    </div>
   );
 }

@@ -120,7 +120,7 @@ export const PAGE_GUIDES = {
         { label: "Match with GSTR-2B", detail: "On the 14th, import the GSTR-2B Excel - resolve mismatches and map what didn't match.", terms: ["GSTR-2B"] },
         { label: "Review eligibility", detail: "Confirm each invoice's credit (or block it); record missing IRNs.", terms: ["IRN", "ITC"] },
         { label: "Approve for GSTR-3B", detail: "Approve eligible, matched credit for the return - approval is not a claim.", terms: ["GSTR-3B"] },
-        { label: "Record the filing by the 20th", detail: "File GSTR-3B on the portal, record its ARN here; a second Finance user verifies it.", terms: ["GSTR-3B", "ARN"] },
+        { label: "Record the filing by the 20th", detail: "File GSTR-3B on the portal, record its ARN here, then verify the filing to claim the credit.", terms: ["GSTR-3B", "ARN"] },
       ],
     }],
   },

@@ -5,7 +5,31 @@ import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { TAX_COMPONENTS, TAX_COMPONENT_LABELS } from "../../constants/gstItc";
-import { inr } from "../utils/gstFormat";
+import { inr, inrOrDash, invoiceValueText } from "../utils/gstFormat";
+
+/**
+ * GSTR-2B document totals (backend document_totals: invoice value, taxable value and GST reported separately,
+ * credit notes negative). Shown exactly as returned; a missing invoice value is labelled, not replaced by ₹0.
+ */
+export function DocumentTotals({ totals, className }) {
+  const value = invoiceValueText(totals);
+  const items = [
+    ["Invoice value", value.text, value.note],
+    ["Taxable value", inrOrDash(totals?.taxable_value)],
+    ["GST amount", inrOrDash(totals?.total_gst), totals ? TAX_COMPONENTS.map((c) => `${TAX_COMPONENT_LABELS[c]} ${inrOrDash(totals[c])}`).join(" · ") : null],
+  ];
+  return (
+    <dl className={clsx("grid gap-2 sm:grid-cols-3", className)} aria-label="GSTR-2B totals">
+      {items.map(([label, text, note]) => (
+        <div key={label} className="rounded-md bg-white px-3 py-2">
+          <dt className="text-[11px] text-slate-500">{label}</dt>
+          <dd className="text-base font-semibold tabular-nums text-slate-800">{text}</dd>
+          {note && <dd className="text-[11px] text-slate-400">{note}</dd>}
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 /** Status badge for a {label, tone} spec from constants/gstItc.js. */
 export function StatusPill({ spec, title, className }) {
@@ -74,9 +98,9 @@ export function ComponentTable({ rows, showCount = false, caption }) {
               </th>
               {showCount && <td className="px-3 py-2 text-right tabular-nums">{r.count ?? "—"}</td>}
               {TAX_COMPONENTS.map((c) => (
-                <td key={c} className="px-3 py-2 text-right tabular-nums">{r.values ? inr(r.values[c]) : "—"}</td>
+                <td key={c} className="px-3 py-2 text-right tabular-nums">{r.values ? inrOrDash(r.values[c]) : "—"}</td>
               ))}
-              <td className="px-3 py-2 text-right tabular-nums">{r.values && r.values.total !== undefined ? inr(r.values.total) : "—"}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{r.values ? inrOrDash(r.values.total) : "—"}</td>
             </tr>
           ))}
         </tbody>
