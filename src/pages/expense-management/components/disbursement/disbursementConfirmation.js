@@ -11,12 +11,14 @@ export const DISBURSEMENT_MODE = {
   CASH: "CASH",
   BANK_TRANSFER: "BANK_TRANSFER",
   UPI: "UPI",
+  COMPANY_CARD: "COMPANY_CARD",
 };
 
 export const DISBURSEMENT_MODE_OPTIONS = [
   { value: DISBURSEMENT_MODE.CASH, label: "Cash" },
   { value: DISBURSEMENT_MODE.BANK_TRANSFER, label: "Bank transfer" },
   { value: DISBURSEMENT_MODE.UPI, label: "UPI" },
+  { value: DISBURSEMENT_MODE.COMPANY_CARD, label: "Company card" },
 ];
 
 export const ACK_ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
@@ -74,6 +76,18 @@ export const validateDisbursementConfirmation = (values) => {
     }
   }
 
+  if (values.mode === DISBURSEMENT_MODE.COMPANY_CARD) {
+    if (!values.transactionReference.trim()) {
+      errors.transactionReference = "Enter the card transaction reference.";
+    }
+    if (!values.transferDate) {
+      errors.transferDate = "Enter the payment date.";
+    }
+    if (!values.transferDetails.trim()) {
+      errors.transferDetails = "Enter the company card used (card name or last four digits).";
+    }
+  }
+
   if (values.mode === DISBURSEMENT_MODE.UPI) {
     if (!values.upiTransactionId.trim()) {
       errors.upiTransactionId = "Enter the UPI transaction ID.";
@@ -104,7 +118,7 @@ export const buildDisbursementFormData = (values) => {
     formData.append("signedAcknowledgment", values.signedAcknowledgment);
   }
 
-  if (values.mode === DISBURSEMENT_MODE.BANK_TRANSFER) {
+  if (values.mode === DISBURSEMENT_MODE.BANK_TRANSFER || values.mode === DISBURSEMENT_MODE.COMPANY_CARD) {
     formData.append("transactionReference", values.transactionReference.trim());
     formData.append("transferDate", values.transferDate);
     formData.append("transferDetails", values.transferDetails.trim());

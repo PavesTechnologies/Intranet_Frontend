@@ -5,6 +5,7 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import Button from "@/components/Button/Button";
 import FormSelect from "@/components/forms/FormSelect";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
+import Modal from "@/components/Modal/modal";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 import {
   LATE_REASON_OPTIONS,
@@ -17,7 +18,7 @@ import {
   SORT_OPTIONS,
   STATUS_FILTER_OPTIONS,
   TONE_CLASSES,
-  claimRowActions,
+  listRowActionStates,
   filterAndSortClaims,
   paymentInfo,
   statusLabel,
@@ -66,6 +67,8 @@ export default function SupplementaryClaimsPage() {
 
   const [settledReports, setSettledReports] = useState([]);
   const [reportId, setReportId] = useState("");
+  const [raiseOpen, setRaiseOpen] = useState(false);
+  const closeRaise = () => setRaiseOpen(false);
   const [eligibility, setEligibility] = useState(null);
   const [checking, setChecking] = useState(false);
   const [form, setForm] = useState({ lateReasonCode: "", lateReasonText: "" });
@@ -150,6 +153,7 @@ export default function SupplementaryClaimsPage() {
   const presetReport = searchParams.get("reportId");
   useEffect(() => {
     if (presetReport && reportId !== presetReport && settledReports.some((r) => r.reportId === presetReport)) {
+      setRaiseOpen(true);
       chooseReport(presetReport);
     }
     // chooseReport is recreated each render; the effect should run only when the preset or the report list changes.
@@ -186,9 +190,7 @@ export default function SupplementaryClaimsPage() {
     else window.location.assign("/expense-management/dashboard");
   };
 
-  const raiseClaim = () => {
-    document.getElementById("raise-claim")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const raiseClaim = () => setRaiseOpen(true);
 
   const summaryCards = [
     { label: "Total claims", value: summary.total, hint: "All your supplementary claims", tone: "neutral" },
@@ -221,6 +223,58 @@ export default function SupplementaryClaimsPage() {
           <FilePlus2 size={14} aria-hidden="true" /> Raise a claim
         </Button>
       </header>
+
+      {/* Raise a new claim against a settled report, in a dialog opened from the page. */}
+      <Modal isOpen={raiseOpen} onClose={closeRaise} title="Raise a new claim" subtitle="Choose the settled report that is missing an expense." size="lg">
+        <div className="space-y-4">
+        {settledReports.length === 0 ? (
+          <p className="text-sm text-gray-600">You have no settled reports (reimbursed or closed) that can take a supplementary claim.</p>
+        ) : (
+          <>
+            <FormSelect
+              label="Settled report"
+              name="reportId"
+              value={reportId}
+              onChange={(e) => chooseReport(e.target.value)}
+              options={settledReports.map((r) => ({
+                value: r.reportId,
+                label: `${r.reportNumber || r.reportId} — ${r.title || "Expense report"}`,
+              }))}
+              placeholder="Select a report"
+            />
+            {checking && <p className="text-sm text-gray-500">Checking eligibility…</p>}
+            {eligibility && !checking && (
+              <p className={`text-sm ${eligibility.eligible ? "text-emerald-700" : "text-red-600"}`} role="status">
+                {eligibility.eligible
+                  ? "This report can take a supplementary claim."
+                  : eligibility.reason}
+              </p>
+            )}
+            {eligibility?.eligible && (
+              <form onSubmit={createDraft} className="space-y-3" noValidate>
+                <FormSelect
+                  label="Why is the expense missing from the report?"
+                  name="lateReasonCode"
+                  value={form.lateReasonCode}
+                  onChange={(e) => setForm({ ...form, lateReasonCode: e.target.value })}
+                  options={LATE_REASON_OPTIONS}
+                  placeholder="Select a reason"
+                />
+                <label className="block text-sm">
+                  <span className="mb-1 block text-gray-600">Explanation {form.lateReasonCode === "OTHER" ? "(required)" : "(optional)"}</span>
+                  <textarea rows={2} maxLength={2000} className="w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={form.lateReasonText} onChange={(e) => setForm({ ...form, lateReasonText: e.target.value })} />
+                </label>
+                {formError && <p className="text-sm text-red-600" role="alert">{formError}</p>}
+                <Button variant="primary" size="small" type="submit" disabled={creating}>
+                  Create draft claim
+                </Button>
+              </form>
+            )}
+          </>
+        )}
+        </div>
+      </Modal>
 
       {/* Summary cards, calculated from the claims the API returned. */}
       <section aria-label="Claim summary" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -335,57 +389,6 @@ export default function SupplementaryClaimsPage() {
         )}
       </section>
 
-      {/* Raise a new claim against a settled report. */}
-      <section id="raise-claim" className="scroll-mt-4 space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="text-base font-semibold text-[#0a174e]">Raise a new claim</h2>
-        {settledReports.length === 0 ? (
-          <p className="text-sm text-gray-600">You have no settled reports (reimbursed or closed) that can take a supplementary claim.</p>
-        ) : (
-          <>
-            <FormSelect
-              label="Settled report"
-              name="reportId"
-              value={reportId}
-              onChange={(e) => chooseReport(e.target.value)}
-              options={settledReports.map((r) => ({
-                value: r.reportId,
-                label: `${r.reportNumber || r.reportId} — ${r.title || "Expense report"}`,
-              }))}
-              placeholder="Select a report"
-            />
-            {checking && <p className="text-sm text-gray-500">Checking eligibility…</p>}
-            {eligibility && !checking && (
-              <p className={`text-sm ${eligibility.eligible ? "text-emerald-700" : "text-red-600"}`} role="status">
-                {eligibility.eligible
-                  ? "This report can take a supplementary claim."
-                  : eligibility.reason}
-              </p>
-            )}
-            {eligibility?.eligible && (
-              <form onSubmit={createDraft} className="space-y-3" noValidate>
-                <FormSelect
-                  label="Why is the expense missing from the report?"
-                  name="lateReasonCode"
-                  value={form.lateReasonCode}
-                  onChange={(e) => setForm({ ...form, lateReasonCode: e.target.value })}
-                  options={LATE_REASON_OPTIONS}
-                  placeholder="Select a reason"
-                />
-                <label className="block text-sm">
-                  <span className="mb-1 block text-gray-600">Explanation {form.lateReasonCode === "OTHER" ? "(required)" : "(optional)"}</span>
-                  <textarea rows={2} maxLength={2000} className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={form.lateReasonText} onChange={(e) => setForm({ ...form, lateReasonText: e.target.value })} />
-                </label>
-                {formError && <p className="text-sm text-red-600" role="alert">{formError}</p>}
-                <Button variant="primary" size="small" type="submit" disabled={creating}>
-                  Create draft claim
-                </Button>
-              </form>
-            )}
-          </>
-        )}
-      </section>
-
       <ConfirmationModal
         isOpen={!!cancelTarget}
         title="Cancel Claim"
@@ -418,11 +421,12 @@ function StatusBadge({ tone, label }) {
   );
 }
 
-/** One claim. Actions show only where the claim rules allow them; the backend checks each one again. */
+/** One claim. Every row action is always shown; the ones that are not allowed are disabled, with the reason as a tooltip. */
 function ClaimRow({ claim: c, onCancel }) {
-  const actions = claimRowActions(c);
+  const actions = listRowActionStates(c);
   const payment = paymentInfo(c);
   const itemCount = Array.isArray(c.items) ? c.items.length : 0;
+  const path = detailPath(c.claimId);
 
   return (
     <tr className="transition hover:bg-gray-50/80">
@@ -440,37 +444,56 @@ function ClaimRow({ claim: c, onCancel }) {
       </td>
       <td className="px-3 py-3">
         <div className="flex items-center justify-end gap-1">
-          <Link
-            to={detailPath(c.claimId)}
-            aria-label={`View ${c.claimNumber}`}
-            title="View claim"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-gray-600 transition hover:bg-gray-100 hover:text-blue-700"
-          >
+          <RowAction to={path} label={`View ${c.claimNumber}`} title="View claim" tone="text-gray-600 hover:bg-gray-100 hover:text-blue-700">
             <Eye size={16} aria-hidden="true" />
-          </Link>
-          {actions.canEdit && (
-            <Link
-              to={detailPath(c.claimId)}
-              aria-label={`Edit ${c.claimNumber}`}
-              title="Edit expenses on this claim"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-blue-600 transition hover:bg-blue-50 hover:text-blue-800"
-            >
-              <Pencil size={16} aria-hidden="true" />
-            </Link>
-          )}
-          {actions.canCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              aria-label={`Cancel ${c.claimNumber}`}
-              title="Cancel claim"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-rose-600 transition hover:bg-rose-50 hover:text-rose-800"
-            >
-              <XCircle size={16} aria-hidden="true" />
-            </button>
-          )}
+          </RowAction>
+          <RowAction
+            to={actions.edit.allowed ? path : null}
+            label={`Edit ${c.claimNumber}`}
+            title={actions.edit.allowed ? "Edit expenses on this claim" : actions.edit.reason}
+            tone="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+          >
+            <Pencil size={16} aria-hidden="true" />
+          </RowAction>
+          <RowAction
+            onClick={actions.cancel.allowed ? onCancel : null}
+            label={`Cancel ${c.claimNumber}`}
+            title={actions.cancel.allowed ? "Cancel claim" : actions.cancel.reason}
+            tone="text-rose-600 hover:bg-rose-50 hover:text-rose-800"
+          >
+            <XCircle size={16} aria-hidden="true" />
+          </RowAction>
         </div>
       </td>
     </tr>
+  );
+}
+
+/** A row action that is either a link or a button. When it is not allowed it renders disabled, and keeps its reason. */
+function RowAction({ to, onClick, label, title, tone, children }) {
+  const allowed = Boolean(to || onClick);
+  const className = `flex h-8 w-8 items-center justify-center rounded-md transition ${allowed ? tone : "cursor-not-allowed text-gray-300"}`;
+  if (to !== undefined && to !== null && allowed) {
+    return (
+      <Link to={to} aria-label={label} title={title} className={className}>
+        {children}
+      </Link>
+    );
+  }
+  if (to === undefined && onClick === undefined) {
+    return null;
+  }
+  return (
+    <button
+      type="button"
+      onClick={allowed && onClick ? onClick : undefined}
+      disabled={!allowed}
+      aria-label={label}
+      aria-disabled={!allowed}
+      title={title}
+      className={className}
+    >
+      {children}
+    </button>
   );
 }

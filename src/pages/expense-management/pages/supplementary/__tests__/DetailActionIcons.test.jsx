@@ -67,10 +67,11 @@ describe("expense row action icons", () => {
     expect(await screen.findByRole("button", { name: "Edit expense" })).toBeInTheDocument();
   });
 
-  it("hides them on a claim waiting for Finance", async () => {
+  it("shows them disabled on a claim waiting for Finance", async () => {
     supplementaryClaimService.get.mockResolvedValue({ data: { data: claim("PENDING_FINANCE") } });
     renderPage();
     expect(await screen.findByText("Metro Mart")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit expense" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit expense" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete expense" })).toBeDisabled();
   });
 });
