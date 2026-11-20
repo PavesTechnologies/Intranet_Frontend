@@ -664,8 +664,7 @@ export default function ReimbursementsPage() {
                             {getEmployeeName(adv, directory)}
                           </td>
                           <td className="py-3 px-4 max-w-xs">
-                            <p className="font-semibold text-gray-900 truncate">{adv.title || "Cash Advance"}</p>
-                            <p className="text-[11px] text-gray-500 truncate mt-0.5">{adv.purpose || "—"}</p>
+                            <p className="font-semibold text-gray-900 truncate" title={adv.purpose || undefined}>{adv.title || "Cash Advance"}</p>
                           </td>
                           <td className="py-3 px-4 text-right font-semibold text-gray-800 whitespace-nowrap">
                             {formatMoney(advAmt, adv.currencyCode || "INR")}
@@ -884,8 +883,7 @@ export default function ReimbursementsPage() {
                           {adv.employeeId || "—"}
                         </td>
                         <td className="py-3 px-4 max-w-xs">
-                          <p className="font-semibold text-gray-900 truncate">{adv.title || "Cash Advance"}</p>
-                          <p className="text-[11px] text-gray-500 truncate mt-0.5">{adv.purpose || "—"}</p>
+                          <p className="font-semibold text-gray-900 truncate" title={adv.purpose || undefined}>{adv.title || "Cash Advance"}</p>
                         </td>
                         <td className="py-3 px-4 text-right font-bold text-gray-900 whitespace-nowrap">
                           {formatMoney(adv.amount, adv.currencyCode || "INR")}

@@ -99,7 +99,7 @@ describe("SettleBalancePanel - two settlement options", () => {
     renderPanel();
     fireEvent.click(screen.getByRole("radio", { name: /Carry forward/ }));
 
-    expect(await screen.findByText(/is ready to carry forward/)).toBeInTheDocument();
+    expect(await screen.findByText(/is carried forward and held in the employee.s outstanding/)).toBeInTheDocument();
     expect(screen.getByText(/Carry-forward confirmation/)).toBeInTheDocument();
   });
 });

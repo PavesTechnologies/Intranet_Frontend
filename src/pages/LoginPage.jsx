@@ -259,6 +259,54 @@ function WorkIllustration() {
   );
 }
 
+// ─── Live clock / greeting ────────────────────────────────────────
+function useNow(ms = 15000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return now;
+}
+function greetingFor(d) {
+  const h = d.getHours();
+  if (h < 12) return { text: "Good morning", icon: "sun" };
+  if (h < 17) return { text: "Good afternoon", icon: "sun" };
+  return { text: "Good evening", icon: "moon" };
+}
+
+function GreetingPill() {
+  const g = greetingFor(useNow(60000));
+  return (
+    <span className="lp-greet">
+      {g.icon === "sun" ? (
+        <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" aria-hidden="true">
+          <circle cx="8" cy="8" r="3" /><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" />
+        </svg>
+      ) : (
+        <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M13 9.5A5.5 5.5 0 1 1 6.5 3a4.5 4.5 0 0 0 6.5 6.5z" />
+        </svg>
+      )}
+      {g.text}
+    </span>
+  );
+}
+
+function LeftFooter() {
+  const now = useNow(15000);
+  const date = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const time = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return (
+    <div className="lp-lfoot">
+      <span className="lp-chip">
+        <span className="lp-live" aria-hidden="true" />
+        {date}<span style={{ opacity: .4 }}>·</span><strong>{time}</strong>
+      </span>
+    </div>
+  );
+}
+
 // ─── Floating label input ─────────────────────────────────────────
 function FloatingInput({ id, label, type = "text", value, onChange, onKeyDown, error, autoComplete, hasSuffix, children }) {
   const [focused, setFocused] = useState(false);
@@ -336,6 +384,8 @@ const customCSS = `
   .login-page-container .lp-form-head{margin-bottom:22px !important}
   .login-page-container .lp-or{margin:14px 0 !important}
   .login-page-container .lp-foot{padding-top:14px !important}
+  .login-page-container .lp-lfoot{margin-top:16px}
+  .login-page-container .lp-greet{margin-bottom:10px}
 }
 @keyframes wiBar   { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(.68)} }
 @keyframes wiDonut { 0%{stroke-dashoffset:76} 35%,85%{stroke-dashoffset:0} 100%{stroke-dashoffset:76} }
@@ -383,6 +433,14 @@ const customCSS = `
 .login-page-container .wi-sitter{animation:wiSitIn 5.2s ease-out .7s both}
 .login-page-container .wi-blobshape{transform-box:fill-box;transform-origin:center;animation:wiBlob 14s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.login-page-container .lp-grad-bg{animation:none}}
+@keyframes livePulse { 0%{box-shadow:0 0 0 0 rgba(52,179,138,.55)} 70%{box-shadow:0 0 0 7px rgba(52,179,138,0)} 100%{box-shadow:0 0 0 0 rgba(52,179,138,0)} }
+.login-page-container .lp-lfoot{display:flex;align-items:center;margin-top:22px;animation:fadeIn 500ms ease 900ms both}
+.login-page-container .lp-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.7);border:1px solid #E3E6F2;backdrop-filter:blur(6px);font-size:12px;color:#5B6479;box-shadow:0 2px 8px -4px rgba(10,23,78,.15)}
+.login-page-container .lp-chip strong{color:var(--navy);font-weight:600;font-variant-numeric:tabular-nums}
+.login-page-container .lp-live{width:7px;height:7px;border-radius:50%;background:#34B38A;animation:livePulse 2s ease-out infinite}
+.login-page-container .lp-copy{font-size:11px;color:#8A90A6;letter-spacing:.02em}
+.login-page-container .lp-greet{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#FFF0F4;color:#D42A5C;font-size:12px;font-weight:600;margin-bottom:14px}
+.login-page-container .lp-caps{display:flex;align-items:center;gap:6px;margin:6px 0 0;font-size:12px;color:#B7791F;animation:slideUp 200ms cubic-bezier(0,0,0.2,1) both}
 .login-page-container .head-font{font-family:var(--ff-h)}
 @keyframes panelL  { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
 @keyframes panelR  { from{opacity:0;transform:translateX(20px)}  to{opacity:1;transform:translateX(0)} }
@@ -546,6 +604,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [shake, setShake] = useState(null);
@@ -816,6 +875,7 @@ export default function LoginPage() {
               ))}
             </div>
             <div key={activeSvc} className="svc-cap">{SERVICE_DESC[SERVICES[activeSvc].label]}</div>
+            <LeftFooter />
           </div>
           <div className="lp-illus">
             <WorkIllustration />
@@ -831,7 +891,7 @@ export default function LoginPage() {
           {currentView === "login" ? (
             <>
               <div className="a1 lp-form-head" style={{ marginBottom: "40px" }}>
-                <span style={{ display: "block", width: "32px", height: "4px", borderRadius: "4px", background: "linear-gradient(90deg,var(--accent-600),var(--pink))", marginBottom: "18px" }} />
+                <GreetingPill />
                 <h2 className="head-font" style={{ fontSize: "28px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.2, marginBottom: "8px" }}>Welcome back</h2>
                 <p style={{ fontSize: "14px", color: "var(--neutral-500)", lineHeight: 1.5, margin: 0 }}>Sign in to continue to your workspace</p>
               </div>
@@ -858,11 +918,20 @@ export default function LoginPage() {
               <div className={`a5${shake === "pw" ? " shake" : ""}`}>
                 <FloatingInput id="password" label="Password" type={showPw ? "text" : "password"} value={pw}
                   onChange={(e) => { setPw(e.target.value); clrErr("pw"); }}
-                  onKeyDown={onKey} error={errors.pw} autoComplete="current-password" hasSuffix>
+                  onKeyDown={(e) => { setCapsOn(e.getModifierState?.("CapsLock")); onKey(e); }}
+                  error={errors.pw} autoComplete="current-password" hasSuffix>
                   <button type="button" className="pw-btn" tabIndex={-1} onClick={() => setShowPw((v) => !v)}>
                     <EyeIcon show={showPw} />
                   </button>
                 </FloatingInput>
+                {capsOn && !errors.pw && (
+                  <p className="lp-caps" role="status">
+                    <svg width={12} height={12} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M8 2L2 8h3v4h6V8h3L8 2zM5 14h6" />
+                    </svg>
+                    Caps Lock is on
+                  </p>
+                )}
               </div>
 
               <div className="a6" style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>

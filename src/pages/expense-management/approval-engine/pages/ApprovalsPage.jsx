@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ClipboardCheck, Clock, Inbox, Layers, RefreshCw, XCircle } from "lucide-react";
 
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
@@ -51,32 +51,45 @@ const PENDING_SORT_OPTIONS = [
 
 // `embedded`: rendered inside another page (the Finance dashboard), so the page's own breadcrumb and banner are
 // dropped and a compact summary line with its own refresh takes their place. Queries, tabs and actions are unchanged.
+// Every source the table can show: each request type, for each status.
+const SOURCE_KEYS = ["expense", "cash", "supp"].flatMap((kind) => ["pending", "approved", "rejected"].map((o) => `${kind}-${o}`));
+
+/** A small red dot on the Pending card and tab when new requests arrived since the tab was last opened. */
+function NewDot() {
+  return (
+    <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5" role="status" aria-label="New requests waiting">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
+    </span>
+  );
+}
+
 export default function ApprovalsPage({ embedded = false }) {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
 
   // -----------------------------
   // State
   // -----------------------------
-  const [activeTab, setActiveTab] = useState("pending");
+  // "All" by default: a request stays in view after a decision, with its new status, instead of leaving the list.
+  const [activeTab, setActiveTab] = useState("all");
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [pendingShow, setPendingShow] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [amountFilter, setAmountFilter] = useState("ALL");
   const showType = (t) => typeFilter === "ALL" || typeFilter === t;
-  // Rows each list currently shows, keyed by tab, so the page can show one empty message for the whole table.
+  // Rows each list currently shows, keyed by source ("cash-approved", ...), so the page can page them as one table
+  // and show one empty message for the whole table. One stable reporter per source.
   const [rowCounts, setRowCounts] = useState({});
-  const reportExpenseRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-expense`] === count ? prev : { ...prev, [`${activeTab}-expense`]: count })),
-    [activeTab]
-  );
-  const reportCashRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-cash`] === count ? prev : { ...prev, [`${activeTab}-cash`]: count })),
-    [activeTab]
-  );
-  const reportSuppRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-supp`] === count ? prev : { ...prev, [`${activeTab}-supp`]: count })),
-    [activeTab]
+  const rowReporters = useMemo(
+    () =>
+      Object.fromEntries(
+        SOURCE_KEYS.map((key) => [
+          key,
+          (count) => setRowCounts((prev) => (prev[key] === count ? prev : { ...prev, [key]: count })),
+        ])
+      ),
+    []
   );
 
   const [pendingSort, setPendingSort] = useState("NEWEST");
@@ -91,24 +104,6 @@ export default function ApprovalsPage({ embedded = false }) {
   useEffect(() => {
     if (typeFilter !== "CASH" || activeTab === "pending") setAmountFilter("ALL");
   }, [typeFilter, activeTab]);
-  // A list hidden by the type filter contributes no rows.
-  const expenseCount = showType("EXPENSE") ? rowCounts[`${activeTab}-expense`] ?? 0 : 0;
-  const cashCount = showType("CASH") ? rowCounts[`${activeTab}-cash`] ?? 0 : 0;
-  const suppCount = showType("SUPP") ? rowCounts[`${activeTab}-supp`] ?? 0 : 0;
-  const combinedRows = expenseCount + cashCount + suppCount;
-  const totalPages = Math.max(1, Math.ceil(combinedRows / APPROVALS_PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const winStart = safePage * APPROVALS_PAGE_SIZE;
-  const winEnd = winStart + APPROVALS_PAGE_SIZE;
-  // Each source covers its own slice of the one sequence: expense reports, then cash advances, then supplementary claims.
-  const windowFor = (offset, count) => ({
-    start: Math.max(Math.min(winStart - offset, count), 0),
-    end: Math.max(Math.min(winEnd - offset, count), 0),
-  });
-  const expenseWindow = windowFor(0, expenseCount);
-  const cashWindow = windowFor(expenseCount, cashCount);
-  const suppWindow = windowFor(expenseCount + cashCount, suppCount);
-
   // -----------------------------
   // Role check
   // -----------------------------
@@ -131,13 +126,37 @@ export default function ApprovalsPage({ embedded = false }) {
     ? hasRole(["Finance", "FINANCE", "Finance_Executive", "FINANCE_EXECUTIVE"])
     : false;
 
-  const mountedLists = [
-    ...(showType("EXPENSE") ? ["expense"] : []),
-    ...(isManager || isFinance ? [...(showType("CASH") ? ["cash"] : []), ...(showType("SUPP") ? ["supp"] : [])] : []),
-  ];
-  const allReported = mountedLists.every((key) => rowCounts[`${activeTab}-${key}`] !== undefined);
-  const totalRows = mountedLists.reduce((sum, key) => sum + (rowCounts[`${activeTab}-${key}`] ?? 0), 0);
-  const showEmptyTable = allReported && totalRows === 0;
+  // The table is one sequence of sources: for each status on this tab (All shows pending, then approved, then rejected),
+  // expense reports, then cash advances, then supplementary claims. A source hidden by the type filter is left out.
+  const outcomes = activeTab === "all" ? ["pending", "approved", "rejected"] : [activeTab];
+  const sources = outcomes.flatMap((outcome) => [
+    ...(showType("EXPENSE") ? [{ kind: "expense", outcome, key: `expense-${outcome}` }] : []),
+    ...(isManager || isFinance
+      ? [
+          ...(showType("CASH") ? [{ kind: "cash", outcome, key: `cash-${outcome}` }] : []),
+          ...(showType("SUPP") ? [{ kind: "supp", outcome, key: `supp-${outcome}` }] : []),
+        ]
+      : []),
+  ]);
+  const combinedRows = sources.reduce((sum, src) => sum + (rowCounts[src.key] ?? 0), 0);
+  const totalPages = Math.max(1, Math.ceil(combinedRows / APPROVALS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const winStart = safePage * APPROVALS_PAGE_SIZE;
+  const winEnd = winStart + APPROVALS_PAGE_SIZE;
+  // Each source renders only its own slice of the current page.
+  let offset = 0;
+  const windows = {};
+  for (const src of sources) {
+    const count = rowCounts[src.key] ?? 0;
+    windows[src.key] = {
+      start: Math.max(Math.min(winStart - offset, count), 0),
+      end: Math.max(Math.min(winEnd - offset, count), 0),
+    };
+    offset += count;
+  }
+
+  const allReported = sources.every((src) => rowCounts[src.key] !== undefined);
+  const showEmptyTable = allReported && combinedRows === 0;
 
   // -----------------------------
   // Breadcrumbs
@@ -240,14 +259,43 @@ export default function ApprovalsPage({ embedded = false }) {
   // -----------------------------
   // Tabs: each is also a summary card, so the numbers and the list never disagree about what is selected.
   // -----------------------------
+  // A dot on Pending when requests arrived since the approver last opened that tab.
+  const seenKey = `approvals.pendingSeen.${user?.employeeId || "me"}`;
+  const [pendingSeen, setPendingSeen] = useState(() => {
+    try {
+      return Number(window.localStorage.getItem(seenKey)) || 0;
+    } catch {
+      return 0;
+    }
+  });
+  useEffect(() => {
+    if (activeTab !== "pending" || loadingCounts) return;
+    setPendingSeen(pendingCount);
+    try {
+      window.localStorage.setItem(seenKey, String(pendingCount));
+    } catch {
+      // Storage can be unavailable (private mode); the dot then simply shows until the tab is opened.
+    }
+  }, [activeTab, loadingCounts, pendingCount, seenKey]);
+  const hasNewPending = !loadingCounts && pendingCount > pendingSeen;
+
   const tabs = [
+    {
+      key: "all",
+      label: "All",
+      caption: "All requests sent to you",
+      icon: Layers,
+      count: totalCount,
+      tone: { tile: "bg-[#0A0082]/10 text-[#0A0082]", text: "text-[#0a174e]", ring: "ring-indigo-300", active: "border-indigo-300 bg-indigo-50/40", bar: "from-indigo-500 to-blue-400", chip: "bg-indigo-100 text-indigo-800" },
+      empty: { icon: Inbox, title: "Nothing here yet", text: "Requests your team sends you, and your decisions on them, will be listed here." },
+    },
     {
       key: "pending",
       label: "Pending",
       caption: "Waiting for your decision",
       icon: Clock,
       count: pendingCount,
-      tone: { tile: "bg-amber-50 text-amber-600", text: "text-amber-600", ring: "ring-amber-300", bar: "from-amber-400 to-orange-300", chip: "bg-amber-100 text-amber-800" },
+      tone: { tile: "bg-amber-50 text-amber-600", text: "text-amber-600", ring: "ring-amber-300", active: "border-amber-300 bg-amber-50/40", bar: "from-amber-400 to-orange-300", chip: "bg-amber-100 text-amber-800" },
       empty: { icon: Inbox, title: "You're all caught up", text: "Nothing is waiting for your approval right now. New requests from your team will show up here." },
     },
     {
@@ -256,7 +304,7 @@ export default function ApprovalsPage({ embedded = false }) {
       caption: "Requests you approved",
       icon: CheckCircle2,
       count: approvedCount,
-      tone: { tile: "bg-emerald-50 text-emerald-600", text: "text-emerald-600", ring: "ring-emerald-300", bar: "from-emerald-500 to-teal-400", chip: "bg-emerald-100 text-emerald-800" },
+      tone: { tile: "bg-emerald-50 text-emerald-600", text: "text-emerald-600", ring: "ring-emerald-300", active: "border-emerald-300 bg-emerald-50/40", bar: "from-emerald-500 to-teal-400", chip: "bg-emerald-100 text-emerald-800" },
       empty: { icon: CheckCircle2, title: "No approvals yet", text: "Requests you approve will be listed here." },
     },
     {
@@ -265,16 +313,16 @@ export default function ApprovalsPage({ embedded = false }) {
       caption: "Requests you rejected",
       icon: XCircle,
       count: rejectedCount,
-      tone: { tile: "bg-rose-50 text-rose-600", text: "text-rose-600", ring: "ring-rose-300", bar: "from-[#ff3d72] to-[#ff7aa0]", chip: "bg-rose-100 text-rose-800" },
+      tone: { tile: "bg-rose-50 text-rose-600", text: "text-rose-600", ring: "ring-rose-300", active: "border-rose-300 bg-rose-50/40", bar: "from-[#ff3d72] to-[#ff7aa0]", chip: "bg-rose-100 text-rose-800" },
       empty: { icon: XCircle, title: "Nothing rejected", text: "Requests you reject will be listed here." },
     },
   ];
   const active = tabs.find((t) => t.key === activeTab) || tabs[0];
   // Empty only when every list has reported zero rows (supplementary claims included) and, on Pending,
   // the Finance verification rows (not part of the paged lists) are empty too.
-  const showEmpty = showEmptyTable && !(activeTab === "pending" && showType("EXPENSE") && financePendingCount > 0);
+  const showEmpty =
+    showEmptyTable && !((activeTab === "pending" || activeTab === "all") && showType("EXPENSE") && financePendingCount > 0);
   const EmptyIcon = active.empty.icon;
-  const pct = (n) => (totalCount > 0 ? (n / totalCount) * 100 : 0);
 
   // -----------------------------
   // Render
@@ -360,7 +408,7 @@ export default function ApprovalsPage({ embedded = false }) {
 
       {/* Summary cards; the first three also switch the list below */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {tabs.map((tab) => {
+        {[...tabs.slice(1), tabs[0]].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
           return (
@@ -370,52 +418,29 @@ export default function ApprovalsPage({ embedded = false }) {
               aria-pressed={isActive}
               data-approvals-card={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`group relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40 ${
-                isActive ? `border-transparent ring-2 ${tab.tone.ring}` : "border-slate-100"
+              className={`flex items-center gap-3 rounded-xl border bg-white p-4 text-left shadow-sm transition hover:border-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40 ${
+                isActive ? tab.tone.active : "border-slate-200"
               }`}
             >
-              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tab.tone.tile}`}>
-                <Icon size={20} aria-hidden="true" />
+              <span className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tab.tone.tile}`}>
+                <Icon size={18} aria-hidden="true" />
+                {tab.key === "pending" && hasNewPending && <NewDot />}
               </span>
               <span className="min-w-0">
                 <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{tab.label}</span>
-                <span className={`block text-2xl font-bold tabular-nums ${tab.count > 0 ? tab.tone.text : "text-[#0a174e]"}`}>
-                  {loadingCounts ? "—" : tab.count}
+                <span className={`block text-xl font-bold tabular-nums ${tab.count > 0 ? tab.tone.text : "text-[#0a174e]"}`}>
+                  {loadingCounts ? <span className="text-slate-300">0</span> : tab.count}
                 </span>
                 <span className="block truncate text-[11px] text-slate-400">{tab.caption}</span>
               </span>
-              <span
-                aria-hidden="true"
-                className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r ${tab.tone.bar} transition-opacity ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              />
             </button>
           );
         })}
 
-        <div className="flex flex-col justify-center rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0A0082]/10 text-[#0A0082]">
-              <Layers size={20} aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total</span>
-              <span className="block text-2xl font-bold tabular-nums text-[#0a174e]">{loadingCounts ? "—" : totalCount}</span>
-            </span>
-          </div>
-          <div
-            className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100"
-            role="img"
-            aria-label={`${pendingCount} pending, ${approvedCount} approved, ${rejectedCount} rejected`}
-          >
-            {pendingCount > 0 && <span className="h-full bg-amber-400" style={{ width: `${pct(pendingCount)}%` }} />}
-            {approvedCount > 0 && <span className="h-full bg-emerald-500" style={{ width: `${pct(approvedCount)}%` }} />}
-            {rejectedCount > 0 && <span className="h-full bg-rose-500" style={{ width: `${pct(rejectedCount)}%` }} />}
-          </div>
-        </div>
       </div>
 
       {/* Delegate: only relevant while there is a queue to cover */}
-      {activeTab === "pending" && <MyDelegateCard />}
+      {(activeTab === "pending" || activeTab === "all") && <MyDelegateCard />}
 
       {/* The list: toolbar on top, then one table for expense reports and cash advances */}
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
@@ -435,7 +460,10 @@ export default function ApprovalsPage({ embedded = false }) {
                     isActive ? "bg-white text-[#0A0082] shadow-sm" : "text-slate-500 hover:text-[#0a174e]"
                   }`}
                 >
-                  <Icon size={16} aria-hidden="true" className={isActive ? tab.tone.text : ""} />
+                  <span className="relative">
+                    <Icon size={16} aria-hidden="true" className={isActive ? tab.tone.text : ""} />
+                    {tab.key === "pending" && hasNewPending && <NewDot />}
+                  </span>
                   {tab.label}
                   {/* The count is on the summary card above; not repeated on the tab. */}
                 </button>
@@ -465,7 +493,7 @@ export default function ApprovalsPage({ embedded = false }) {
           </div>
 
           {/* Approved tab, cash advances: approved as requested or at a lower amount */}
-          {activeTab === "approved" && typeFilter === "CASH" && (
+          {(activeTab === "approved" || activeTab === "all") && typeFilter === "CASH" && (
             <div className="w-full lg:w-52">
               <FormSelect
                 label="Amount"
@@ -479,8 +507,8 @@ export default function ApprovalsPage({ embedded = false }) {
             </div>
           )}
 
-          {/* Pending only: which rows to show, and their order */}
-          {activeTab === "pending" && (
+          {/* Pending rows (also on All): which to show, and their order */}
+          {(activeTab === "pending" || activeTab === "all") && (
             <>
               <div className="w-full lg:w-44">
                 <FormSelect
@@ -538,69 +566,68 @@ export default function ApprovalsPage({ embedded = false }) {
                 <th className="px-2.5 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
-            {activeTab === "pending" && showType("EXPENSE") && (
-              <PendingApprovalsPage
-                key={`pending-${reloadKey}`}
-                searchTerm={searchTerm}
-                statusFilter={pendingShow}
-                sortBy={pendingSort}
-                hideHeader
-                noPadding
-                embedded
-                onRowCount={reportExpenseRows}
-                windowStart={expenseWindow.start}
-                windowEnd={expenseWindow.end}
-              />
-            )}
-            {activeTab === "pending" && isFinance && showType("EXPENSE") && (
-              <FinanceVerificationApprovalsList key={`finance-${reloadKey}`} searchTerm={searchTerm} excludeReportIds={myQueueReportIds} />
-            )}
-            {activeTab === "approved" && showType("EXPENSE") && (
-              <ApprovalHistoryPage
-                key={`approved-${reloadKey}`}
-                outcome="APPROVED"
-                searchTerm={searchTerm}
-                embedded
-                onRowCount={reportExpenseRows}
-                windowStart={expenseWindow.start}
-                windowEnd={expenseWindow.end}
-              />
-            )}
-            {activeTab === "rejected" && showType("EXPENSE") && (
-              <ApprovalHistoryPage
-                key={`rejected-${reloadKey}`}
-                outcome="REJECTED"
-                searchTerm={searchTerm}
-                embedded
-                onRowCount={reportExpenseRows}
-                windowStart={expenseWindow.start}
-                windowEnd={expenseWindow.end}
-              />
-            )}
-            {(isManager || isFinance) && showType("CASH") && (
-              <CashAdvanceApprovalsList
-                key={`cash-${activeTab}-${reloadKey}`}
-                activeTab={activeTab}
-                searchTerm={searchTerm}
-                amountFilter={amountFilter}
-                embedded
-                onRowCount={reportCashRows}
-                windowStart={cashWindow.start}
-                windowEnd={cashWindow.end}
-              />
-            )}
-            {(isManager || isFinance) && showType("SUPP") && (
-              <SupplementaryApprovalsList
-                key={`supp-${activeTab}-${reloadKey}`}
-                activeTab={activeTab}
-                searchTerm={searchTerm}
-                isManager={isManager}
-                isFinance={isFinance}
-                onRowCount={reportSuppRows}
-                windowStart={suppWindow.start}
-                windowEnd={suppWindow.end}
-              />
-            )}
+            {sources.map((src) => {
+              const win = windows[src.key];
+              const onRowCount = rowReporters[src.key];
+              if (src.kind === "expense" && src.outcome === "pending") {
+                return (
+                  <React.Fragment key={`${src.key}-${reloadKey}`}>
+                    <PendingApprovalsPage
+                      searchTerm={searchTerm}
+                      statusFilter={pendingShow}
+                      sortBy={pendingSort}
+                      hideHeader
+                      noPadding
+                      embedded
+                      onRowCount={onRowCount}
+                      windowStart={win.start}
+                      windowEnd={win.end}
+                    />
+                    {isFinance && <FinanceVerificationApprovalsList searchTerm={searchTerm} excludeReportIds={myQueueReportIds} />}
+                  </React.Fragment>
+                );
+              }
+              if (src.kind === "expense") {
+                return (
+                  <ApprovalHistoryPage
+                    key={`${src.key}-${reloadKey}`}
+                    outcome={src.outcome.toUpperCase()}
+                    searchTerm={searchTerm}
+                    embedded
+                    onRowCount={onRowCount}
+                    windowStart={win.start}
+                    windowEnd={win.end}
+                  />
+                );
+              }
+              if (src.kind === "cash") {
+                return (
+                  <CashAdvanceApprovalsList
+                    key={`${src.key}-${reloadKey}`}
+                    activeTab={src.outcome}
+                    searchTerm={searchTerm}
+                    amountFilter={src.outcome === "approved" ? amountFilter : "ALL"}
+                    embedded
+                    onRowCount={onRowCount}
+                    onDecided={handleReload}
+                    windowStart={win.start}
+                    windowEnd={win.end}
+                  />
+                );
+              }
+              return (
+                <SupplementaryApprovalsList
+                  key={`${src.key}-${reloadKey}`}
+                  activeTab={src.outcome}
+                  searchTerm={searchTerm}
+                  isManager={isManager}
+                  isFinance={isFinance}
+                  onRowCount={onRowCount}
+                  windowStart={win.start}
+                  windowEnd={win.end}
+                />
+              );
+            })}
             {showEmpty && (
               <tbody data-approvals-empty>
                 <tr>
