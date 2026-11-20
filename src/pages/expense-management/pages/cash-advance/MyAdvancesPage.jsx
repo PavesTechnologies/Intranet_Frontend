@@ -523,7 +523,7 @@ export default function MyAdvancesPage() {
                   <th className="py-3 px-4">Cost Center</th>
                   <th className="py-3 px-4">Currency</th>
                   <th className="py-3 px-4">Needed By</th>
-                  <th className="py-3 px-4 text-right">Outstanding</th>
+                  <th className="py-3 px-4 text-right">Balance</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="sticky right-0 bg-gray-50 py-3 px-4 text-right">Actions</th>
                 </tr>
