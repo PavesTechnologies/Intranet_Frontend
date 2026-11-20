@@ -220,6 +220,14 @@ export default function RequestAdvancePage() {
   const prefill = location.state?.prefill ?? {};
   // The draft created by a submit attempt. A retry updates this draft instead of creating a second one.
   const draftIdRef = useRef(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  // True once the draft must survive leaving the page: the employee pressed Save Draft, or the request was submitted.
+  // Otherwise a draft that this page created by itself (to hold an uploaded document, or by a submit attempt that
+  // failed) is removed when the employee cancels or leaves, so no request appears that they never chose to save.
+  const keepDraftRef = useRef(false);
+  // What the form started with, to tell whether Cancel would throw anything away.
+  const initialFormRef = useRef(null);
   const [formData, setFormData] = useState({
     title: prefill.title ?? "",
     costCenterId: prefill.costCenterId ?? "",
@@ -232,6 +240,8 @@ export default function RequestAdvancePage() {
     settlementDueDate: "",
     notes: prefill.notes ?? "",
   });
+
+  if (initialFormRef.current === null) initialFormRef.current = formData;
 
   const [errors, setErrors] = useState({});
   // Request type and the justification for a separate advance. The total and the cash are calculated by the server.
@@ -422,15 +432,41 @@ export default function RequestAdvancePage() {
   );
 
   /*
+   * Balances Finance carried forward. That money has already left its advance and sits in the employee's outstanding,
+   * waiting for the next request, so the form opens as "Cash Advance + Outstanding" and says where it comes from. It
+   * can be taken in whatever the status of the advance it came from.
+   */
+  const waitingCarryForwards = useMemo(
+    () => advances.filter((a) => Number(a.carryForwardReadyAmount) > 0),
+    [advances]
+  );
+  // What was asked to carry forward. The server caps it at each advance's real balance when Finance approves.
+  const waitingCarryForwardTotal = waitingCarryForwards.reduce(
+    (sum, a) => sum + (Number(a.carryForwardReadyAmount) || 0),
+    0
+  );
+  const typeChosenRef = useRef(false);
+  useEffect(() => {
+    if (!typeChosenRef.current && waitingCarryForwards.length > 0) {
+      setRequestType(ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING);
+    }
+  }, [waitingCarryForwards.length]);
+  const chooseRequestType = (type) => {
+    typeChosenRef.current = true;
+    setRequestType(type);
+  };
+
+  /*
    * Calculate outstanding balance
    */
+  // What is owed on open advances, plus every balance Finance carried forward (held in the employee's outstanding).
   const outstandingBalance = useMemo(() => {
     return activeAdvances.reduce(
       (total, advance) =>
         total + getOutstandingBalance(advance),
       0
-    );
-  }, [activeAdvances]);
+    ) + waitingCarryForwardTotal;
+  }, [activeAdvances, waitingCarryForwardTotal]);
 
   /*
    * Find overdue advances
@@ -545,6 +581,51 @@ export default function RequestAdvancePage() {
     });
   };
 
+  // Bring the first problem into view. Fields such as "Reason for Separate Advance" sit far above the buttons, so
+  // without this a failed check looked like a Submit button that did nothing.
+  const FIELD_ORDER = ["title", "costCenterId", "amount", "employeeJustification", "currencyId", "purpose",
+    "neededByDate", "expectedTripStartDate", "expectedTripEndDate", "settlementDueDate"];
+  const focusFirstError = (errs) => {
+    const key = FIELD_ORDER.find((k) => errs[k]) || Object.keys(errs)[0];
+    if (!key) return;
+    const el = key === "employeeJustification"
+      ? document.getElementById("employee-justification")
+      : document.querySelector(`[name="${key}"]`);
+    if (el) {
+      el.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      el.focus?.({ preventScroll: true });
+    }
+    showStatusToast(errs[key], "error", 6000);
+  };
+
+  // A reason is needed only for a Complete New request while money is still owed. The server decides this from the
+  // advance ledger, and the balance stored on the list can be stale (it can read 0 while money is owed, or the other way
+  // round). So once the server has answered, through a preview or by refusing a save, its answer is used; until then
+  // the list balance is only a guess.
+  const [serverNeedsReason, setServerNeedsReason] = useState(false);
+  useEffect(() => {
+    setServerNeedsReason(false);
+  }, [requestType]);
+  const justificationRequired = preview
+    ? !!preview.justificationRequired
+    : requestType === ADVANCE_TYPE.COMPLETE_NEW && (serverNeedsReason || outstandingBalance > 0);
+
+  const REASON_MIN_LENGTH = 20;
+  const reasonProblem = () => {
+    const reason = employeeJustification.trim();
+    if (!reason) return "Explain why a separate new advance is needed while your outstanding balance remains.";
+    if (reason.length < REASON_MIN_LENGTH) return `The reason must be at least ${REASON_MIN_LENGTH} characters.`;
+    return "";
+  };
+  // Shows the reason box with its message and brings it into view. Deferred so the box is on the page before scrolling.
+  const askForReason = (message) => {
+    setErrors((previous) => ({ ...previous, employeeJustification: message }));
+    setTimeout(() => focusFirstError({ employeeJustification: message }), 0);
+  };
+  // The server refuses a save without a reason when it finds money owed. Show the box instead of a bare error.
+  const isMissingReasonError = (error) =>
+    /separate (new )?advance/i.test(error?.response?.data?.message || error?.message || "");
+
   /*
    * Validate form
    */
@@ -635,20 +716,19 @@ export default function RequestAdvancePage() {
      */
     // An overdue advance does not stop the request. It is routed to Finance, who must authorise it before approval.
 
-    // A separate advance needs a reason when an outstanding balance exists (complete new only).
-    if (requestType === ADVANCE_TYPE.COMPLETE_NEW && outstandingBalance > 0) {
-      const reason = employeeJustification.trim();
-      if (!reason) {
-        newErrors.employeeJustification =
-          "Explain why a separate new advance is needed while your outstanding balance remains.";
-      } else if (reason.length < 20) {
-        newErrors.employeeJustification = "The reason must be at least 20 characters.";
-      }
+    // A separate advance needs a reason only when the server has said money is owed. With nothing owed, none is asked.
+    // Before the first preview this is not checked here; Submit checks it once the server has answered.
+    if (preview && justificationRequired && reasonProblem()) {
+      newErrors.employeeJustification = reasonProblem();
     }
 
     setErrors(newErrors);
 
-    return Object.keys(newErrors).length === 0;
+    if (Object.keys(newErrors).length > 0) {
+      focusFirstError(newErrors);
+      return false;
+    }
+    return true;
   };
 
   /*
@@ -660,8 +740,9 @@ export default function RequestAdvancePage() {
     requestType,
     // For Cash Advance + Outstanding the amount is the additional amount; the server checks they match.
     additionalAmount: null,
+    // Sent only when asked for: the server also checks the length of a reason it did not need.
     employeeJustification:
-      requestType === ADVANCE_TYPE.COMPLETE_NEW && employeeJustification.trim() ? employeeJustification.trim() : null,
+      justificationRequired && employeeJustification.trim() ? employeeJustification.trim() : null,
   });
 
   /*
@@ -679,6 +760,38 @@ export default function RequestAdvancePage() {
     setDraftId(id);
   };
 
+  // Removes the draft this page created by itself, with its documents (the server deletes only the request row).
+  // Returns false when it could not be removed, so the employee can be told where to find it.
+  const discardAutoDraft = async () => {
+    const id = draftIdRef.current;
+    if (!id || keepDraftRef.current) return true;
+    try {
+      const docs = await cashAdvanceApi.listDocuments(id).catch(() => []);
+      for (const doc of Array.isArray(docs) ? docs : []) {
+        await cashAdvanceApi.deleteDocument(id, doc.documentId);
+      }
+      await cashAdvanceApi.delete(id);
+      draftIdRef.current = null;
+      setDraftId(null);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Leaving by the browser's Back button or the menu also removes that draft. Fire and forget: the page is gone.
+  useEffect(() => () => {
+    const id = draftIdRef.current;
+    if (!id || keepDraftRef.current) return;
+    draftIdRef.current = null;
+    Promise.resolve()
+      .then(() => cashAdvanceApi.listDocuments(id))
+      .catch(() => [])
+      .then((docs) => Promise.all((Array.isArray(docs) ? docs : []).map((d) => cashAdvanceApi.deleteDocument(id, d.documentId))))
+      .then(() => cashAdvanceApi.delete(id))
+      .catch(() => {});
+  }, []);
+
   const idOfCreated = (created) =>
     created?.data?.data?.advanceId || created?.data?.advanceId || created?.data?.data?.id;
 
@@ -694,7 +807,24 @@ export default function RequestAdvancePage() {
     if (problem) {
       throw new Error(problem);
     }
-    const created = await cashAdvanceApi.create(buildPayload());
+    // The server refuses to save the request without this reason, which made the upload fail with no pointer to
+    // the field. Check it here and show the field instead.
+    const reasonMessage = "Fill in \"Reason for Separate Advance\" above (at least 20 characters) before adding documents.";
+    if (justificationRequired && reasonProblem()) {
+      askForReason(reasonMessage);
+      throw new Error(reasonMessage);
+    }
+    let created;
+    try {
+      created = await cashAdvanceApi.create(buildPayload());
+    } catch (error) {
+      if (isMissingReasonError(error)) {
+        setServerNeedsReason(true);
+        askForReason(reasonMessage);
+        throw new Error(reasonMessage);
+      }
+      throw error;
+    }
     const id = idOfCreated(created);
     if (!id) {
       throw new Error("The request was saved, but its ID was not returned.");
@@ -703,15 +833,16 @@ export default function RequestAdvancePage() {
     return id;
   };
 
+  // Returns the preview, or null when the form is invalid or the server could not calculate it.
   const handlePreview = async () => {
     // Preview checks the whole form first, so the calculation is only ever made of valid input.
     if (!validateForm()) {
-      return;
+      return null;
     }
     const amountNumber = Number(formData.amount);
     if (!(amountNumber > 0)) {
       setErrors((previous) => ({ ...previous, amount: "Enter a valid advance amount." }));
-      return;
+      return null;
     }
     setPreviewing(true);
     try {
@@ -721,12 +852,14 @@ export default function RequestAdvancePage() {
         currencyId: formData.currencyId || null,
       });
       setPreview(data ?? null);
+      return data ?? null;
     } catch (error) {
       showStatusToast(
         error?.response?.data?.message || error?.message || "Could not calculate the preview",
         "error",
         6000
       );
+      return null;
     } finally {
       setPreviewing(false);
     }
@@ -735,16 +868,23 @@ export default function RequestAdvancePage() {
   /*
    * Submit cash advance request
    */
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
-    // The employee must see the calculation before the request can be sent.
-    if (!preview) {
-      showStatusToast("Preview the calculation before you submit.", "error");
+    // The employee must see the calculation before the request is sent. If it has not been run yet, Submit runs it
+    // now; the confirmation dialog then shows its figures. (Submit used to stay disabled until Preview was pressed.)
+    const calculated = preview ?? (await handlePreview());
+    if (!calculated) {
+      return;
+    }
+
+    // The server's answer decides whether a reason is needed: none when nothing is owed.
+    if (calculated.justificationRequired && reasonProblem()) {
+      askForReason(reasonProblem());
       return;
     }
 
@@ -779,6 +919,7 @@ export default function RequestAdvancePage() {
       }
 
       await cashAdvanceApi.submit(advanceId);
+      keepDraftRef.current = true;
       draftIdRef.current = null;
 
       showStatusToast(
@@ -801,13 +942,39 @@ export default function RequestAdvancePage() {
         "Failed to submit cash advance request.";
       showStatusToast(
         draftIdRef.current
-          ? `${message} Your request is saved as a draft. Press Submit again to send it.`
+          ? `${message} Fix it and press Submit again. Nothing has been sent.`
           : message,
         "error",
         8000
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  /*
+   * Cancel: leave without submitting. Ask first only when something would be lost.
+   */
+  const leavePage = async () => {
+    setDiscarding(true);
+    const removed = await discardAutoDraft();
+    setDiscarding(false);
+    setCancelOpen(false);
+    if (!removed) {
+      showStatusToast("The request was cancelled, but its unsaved draft could not be removed. Delete it from My Advances.", "error", 8000);
+    }
+    keepDraftRef.current = true; // handled here; the unmount cleanup must not try again
+    navigate("/expense-management/cash-advance/my");
+  };
+  const handleCancel = () => {
+    const changed =
+      JSON.stringify(formData) !== JSON.stringify(initialFormRef.current) ||
+      employeeJustification.trim() !== "" ||
+      !!draftIdRef.current;
+    if (changed) {
+      setCancelOpen(true);
+    } else {
+      leavePage();
     }
   };
 
@@ -836,6 +1003,7 @@ export default function RequestAdvancePage() {
 
     if (Object.keys(draftErrors).length > 0) {
       setErrors(draftErrors);
+      focusFirstError(draftErrors);
       return;
     }
 
@@ -844,11 +1012,6 @@ export default function RequestAdvancePage() {
     try {
       const payload = buildPayload();
 
-      console.log(
-        "Cash Advance Draft Payload:",
-        payload
-      );
-
       if (draftIdRef.current) {
         await cashAdvanceApi.update(draftIdRef.current, payload);
       } else {
@@ -856,6 +1019,8 @@ export default function RequestAdvancePage() {
         rememberDraft(idOfCreated(created));
       }
 
+      // The employee chose to keep it: leaving the page must not remove this draft.
+      keepDraftRef.current = true;
       showStatusToast(
         "Cash advance draft saved successfully.",
         "success"
@@ -867,6 +1032,12 @@ export default function RequestAdvancePage() {
         "Failed to save cash advance draft:",
         error
       );
+
+      if (isMissingReasonError(error)) {
+        setServerNeedsReason(true);
+        askForReason(reasonProblem() || "Explain why a separate new advance is needed while your outstanding balance remains.");
+        return;
+      }
 
       showStatusToast(
         error?.response?.data?.message ||
@@ -912,7 +1083,39 @@ export default function RequestAdvancePage() {
         onSubmit={handleSubmit}
         className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
       >
-        <AdvanceTypeSelector value={requestType} onChange={setRequestType} />
+        <AdvanceTypeSelector value={requestType} onChange={chooseRequestType} />
+
+        {waitingCarryForwards.length > 0 && (
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs text-violet-900"
+          >
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="space-y-1">
+              <p className="font-semibold">
+                {formatMoney(waitingCarryForwardTotal, "INR")} is carried forward into this request
+              </p>
+              <ul className="space-y-0.5">
+                {waitingCarryForwards.map((a) => (
+                  <li key={a.advanceId}>
+                    {formatMoney(a.carryForwardReadyAmount, a.currencyCode || "INR")} from{" "}
+                    <span className="font-medium">{a.title || "an earlier advance"}</span>{" "}
+                    <span className="font-mono text-[10px] text-violet-700">{a.advanceNumber || ""}</span>
+                  </li>
+                ))}
+              </ul>
+              {requestType === ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING ? (
+                <p className="text-violet-800">
+                  Enter only the new cash you need. Finance moves the carried-forward balance into this advance when it approves.
+                </p>
+              ) : (
+                <p className="text-amber-800">
+                  "Complete New" keeps that balance on its own advance. Choose "Cash Advance + Outstanding" to carry it into this one.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div>
           <h2 className="text-sm font-bold text-gray-900">
@@ -994,7 +1197,7 @@ export default function RequestAdvancePage() {
             error={errors.amount}
           />
 
-          {requestType === ADVANCE_TYPE.COMPLETE_NEW && outstandingBalance > 0 && (
+          {justificationRequired && (
             <div>
               <label htmlFor="employee-justification" className="block text-sm font-medium leading-5 text-gray-700">
                 Reason for Separate Advance <span className="text-red-500">*</span>
@@ -1200,13 +1403,23 @@ export default function RequestAdvancePage() {
           <AdvanceCalculationPreview preview={preview} />
           {!preview && (
             <p className="text-right text-[11px] text-gray-500">
-              Preview the calculation before you submit.
+              Submit calculates the amounts first and asks you to confirm them.
             </p>
           )}
         </div>
 
         {/* Buttons */}
         <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancel}
+            disabled={savingDraft || submitting || discarding}
+            className="text-xs"
+          >
+            Cancel
+          </Button>
+
           <Button
             type="button"
             variant="outline"
@@ -1234,18 +1447,18 @@ export default function RequestAdvancePage() {
               savingDraft ||
               balanceLoading ||
               loadingCurrencies ||
-              !preview
+              previewing
             }
             className="bg-blue-600 text-xs text-white hover:bg-blue-700"
           >
-            {submitting ? (
+            {submitting || previewing ? (
               <LoadingSpinner
                 size="sm"
                 className="mr-1.5"
               />
             ) : null}
 
-            Submit Request
+            {previewing ? "Calculating..." : "Submit Request"}
           </Button>
         </div>
       </form>
@@ -1259,6 +1472,21 @@ export default function RequestAdvancePage() {
         onConfirm={confirmSubmit}
         onCancel={() => setConfirmSubmitOpen(false)}
         isLoading={submitting}
+      />
+
+      <ConfirmationModal
+        isOpen={cancelOpen}
+        title="Discard this request?"
+        message={
+          draftId
+            ? "Everything you entered, including the documents you added, will be discarded. Nothing is sent or kept."
+            : "Nothing you entered has been saved. Leave without submitting?"
+        }
+        confirmText="Discard and leave"
+        cancelText="Keep editing"
+        onConfirm={leavePage}
+        onCancel={() => setCancelOpen(false)}
+        isLoading={discarding}
       />
     </div>
   );

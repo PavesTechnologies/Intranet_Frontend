@@ -10,6 +10,18 @@ export const formatMoney = (amount, currencyCode = "INR") => {
 };
 
 
+/**
+ * The expected trip (event) dates as one range, e.g. "17 Oct 2026 → 21 Oct 2026". Either date may be missing, since
+ * both are optional on the request; "—" when neither was given.
+ */
+export const formatTripDates = (advance) => {
+  const start = advance?.expectedTripStartDate;
+  const end = advance?.expectedTripEndDate;
+  if (!start && !end) return "—";
+  if (start && end) return `${formatDate(start)} → ${formatDate(end)}`;
+  return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
+};
+
 export const formatDate = (dateValue) => {
   if (!dateValue) return "—";
 
