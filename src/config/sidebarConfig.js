@@ -250,8 +250,13 @@ export const XMS_SUBMENU = [
     // Not XMS_MANAGER-only (§1.5): any employee can be a resolved approver (NAMED_USER/
     // DEPARTMENT_OWNER/COST_CENTER_OWNER), so a General-role approver still needs a way in.
     // "My Approvals" is presence-based - visible to everyone, empty for anyone with nothing pending.
-    // Finance users do not get this menu item: Finance approvals are on the Finance tab. The page itself stays reachable by URL.
-    allowedRoles: XMS_EVERYONE.filter((role) => !XMS_FINANCE_ROLES.includes(role)),
+    allowedRoles: XMS_EVERYONE,
+    // Approvals are the reporting manager's queue. Finance users act on the Finance page instead,
+    // so the entry is hidden for them unless they are also a reporting manager / manager.
+    hiddenForRoles: {
+      roles: [ROLES.FINANCE, ROLES.FINANCE_EXECUTIVE, ROLES.FINANCE_MANAGER],
+      unless: [ROLES.REPORTING_MANAGER, ROLES.MANAGER, ...ADMIN_ROLES],
+    },
   },
   {
     // One page: verify, queried, and verified reports with their AP payment status.

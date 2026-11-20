@@ -18,7 +18,7 @@ import {
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
-import { formatMoney, formatDate, getCostCenterValue, getStatusBadge, hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
+import { formatMoney, formatDate, formatTripDates, getCostCenterValue, getStatusBadge, hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
@@ -30,6 +30,7 @@ import Pagination from "@/components/Pagination/pagination";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
+import { useAdvanceFigures } from "@/pages/expense-management/pages/cash-advance/useAdvanceFigures";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 
 // Statuses in which an expense report can be linked to the advance (same list as the detail page).
@@ -239,6 +240,8 @@ export default function MyAdvancesPage() {
     () => sortedAdvances.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE),
     [sortedAdvances, safeCurrentPage]
   );
+  // Money figures for the rows on this page, from the server (expenses added, salary deducted). See settlementFigures.js.
+  const { figuresOf, isLoaded } = useAdvanceFigures(pagedAdvances);
 
   // Go back to page 1 whenever the search or status filter changes
   useEffect(() => {
@@ -372,18 +375,19 @@ export default function MyAdvancesPage() {
     <div className="space-y-4 p-4 sm:p-6">
       <Breadcrumb items={breadcrumbs} />
 
-      {/* Page Header Card */}
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      {/* Page Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0a174e]">My Advances</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Track the status of your cash advance requests and manage drafts.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#0a174e]">My Advances</h1>
+          <p className="mt-1 text-sm text-gray-500">Track your cash advance requests and manage drafts.</p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={fetchMyAdvances}
             title="Refresh list"
-            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-md transition"
+            aria-label="Refresh list"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-[#0a0082]/30 hover:text-[#0a0082]"
           >
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
@@ -391,104 +395,75 @@ export default function MyAdvancesPage() {
           <Button
             variant="primary"
             onClick={() => navigate("/expense-management/cash-advance/request")}
-            className="text-xs bg-blue-600 hover:bg-blue-700 text-white"
+            className="h-10 text-sm"
           >
             <Plus className="mr-1.5 h-4 w-4" /> Request Advance
           </Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
-            <FileText size={18} />
+      {/* Summary strip: all five figures in one row */}
+      <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm sm:grid-cols-3 lg:grid-cols-5 [&>*]:border-gray-100 lg:divide-x lg:divide-gray-100">
+        {[
+          { label: "Total Requests", value: stats.totalCount, icon: FileText, tone: "text-[#263383] bg-[#263383]/10", valueTone: "text-gray-900" },
+          { label: "Pending Approval", value: stats.pendingCount, icon: Clock, tone: "text-amber-600 bg-amber-50", valueTone: "text-amber-600" },
+          { label: "Disbursed", value: formatMoney(stats.totalDisbursed), icon: DollarSign, tone: "text-indigo-600 bg-indigo-50", valueTone: "text-indigo-700" },
+          { label: "Settled", value: formatMoney(stats.totalSettled), icon: CheckCircle2, tone: "text-emerald-600 bg-emerald-50", valueTone: "text-emerald-700" },
+          {
+            label: "Outstanding",
+            value: formatMoney(stats.outstandingBalance),
+            icon: AlertCircle,
+            tone: stats.overdueCount > 0 ? "text-rose-600 bg-rose-50" : "text-orange-600 bg-orange-50",
+            valueTone: stats.overdueCount > 0 ? "text-rose-600" : "text-orange-600",
+            note: stats.overdueCount > 0 ? `${stats.overdueCount} overdue` : null,
+          },
+        ].map(({ label, value, icon: Icon, tone, valueTone, note }) => (
+          <div key={label} className="flex items-center gap-3 border-b p-4 lg:border-b-0">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tone}`}>
+              <Icon size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
+              <p className={`mt-0.5 truncate text-lg font-bold ${valueTone}`}>{value}</p>
+              {note && <p className="text-[11px] font-medium text-rose-600">{note}</p>}
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Requests</p>
-            <p className="text-xl font-bold text-gray-900 mt-0.5">{stats.totalCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-            <Clock size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Pending Approval</p>
-            <p className="text-xl font-bold text-amber-600 mt-0.5">{stats.pendingCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
-            <DollarSign size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Disbursed Total</p>
-            <p className="text-xl font-bold text-indigo-600 mt-0.5">{formatMoney(stats.totalDisbursed)}</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-            <CheckCircle2 size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Settled Total</p>
-            <p className="text-xl font-bold text-emerald-600 mt-0.5">{formatMoney(stats.totalSettled)}</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-            <AlertCircle size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Outstanding Balance</p>
-            <p className="text-xl font-bold text-amber-600 mt-0.5">{formatMoney(stats.outstandingBalance)}</p>
-            {stats.overdueCount > 0 && <p className="text-[10px] text-rose-600 mt-0.5">{stats.overdueCount} overdue</p>}
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+      {/* Table card with the filter toolbar on top */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <SearchInput
               value={searchTerm}
               onSearch={(val) => setSearchTerm(val || "")}
               placeholder="Search by title, purpose, or advance ID..."
-              className="!py-1.5 !px-3 !text-xs"
+              className="!pl-9"
             />
           </div>
-
-          <FormSelect
-            label="Status"
-            name="statusFilter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            options={statusOptions}
-            className="[&>label]:text-xs [&>label]:mb-1"
-            buttonClassName="!py-1.5 !px-3 !text-xs"
-          />
+          <div className="w-full sm:w-56">
+            <FormSelect
+              name="statusFilter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={statusOptions}
+              buttonClassName="!h-10"
+            />
+          </div>
           {statusFilter === "ALL" && (
-            <label className="flex items-center gap-2 text-xs text-gray-600 whitespace-nowrap">
+            <label className="flex h-10 cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 px-3 text-sm text-gray-600 transition hover:bg-gray-50">
               <input
                 type="checkbox"
                 checked={showClosed}
                 onChange={(e) => setShowClosed(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 accent-[#0a0082]"
               />
-              Show closed and cancelled
+              Show closed
             </label>
           )}
         </div>
-      </div>
-
-      {/* Data Table Container */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-12 flex flex-col items-center justify-center text-gray-500">
             <LoadingSpinner size="lg" className="mb-2" />
@@ -516,16 +491,15 @@ export default function MyAdvancesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-gray-700">
-              <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+              <thead className="bg-[#F4F6FC] text-[11px] font-semibold text-[#263383]/70 uppercase tracking-wider border-b border-gray-200">
                 <tr>
                   <th className="py-3 px-4">S.No</th>
                   <th className="py-3 px-4">Title</th>
-                  <th className="py-3 px-4">Cost Center</th>
-                  <th className="py-3 px-4">Currency</th>
-                  <th className="py-3 px-4">Needed By</th>
-                  <th className="py-3 px-4 text-right">Outstanding</th>
+                  <th className="py-3 px-4">Trip Dates</th>
+                  <th className="py-3 px-4 text-right" title="Approved amount, or the requested amount until it is approved">Amount</th>
+                  <th className="py-3 px-4 text-right" title="Expenses you added against this advance">Consumed</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="sticky right-0 bg-gray-50 py-3 px-4 text-right">Actions</th>
+                  <th className="sticky right-0 bg-[#F4F6FC] py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -534,6 +508,14 @@ export default function MyAdvancesPage() {
                   const statusUpper = (adv.status || "").toUpperCase();
                   const isDraft = statusUpper === "DRAFT";
                   const isSubmitted = ["SUBMITTED", "PENDING", "PENDING_APPROVAL"].includes(statusUpper);
+                  const f = figuresOf(adv);
+                  const cur = adv.currencyCode || "INR";
+                  const loading = !isLoaded(adv);
+                  // Figures that exist only once cash is paid out show "—" before that, and "…" while loading.
+                  const paidCell = (value) =>
+                    loading ? <span className="text-gray-300">…</span> : !f.paidOut ? <span className="text-gray-300">—</span> : formatMoney(value, cur);
+
+                  const amountLabel = f.approvedKnown ? "Approved" : "Requested";
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
@@ -541,22 +523,24 @@ export default function MyAdvancesPage() {
                         {(safeCurrentPage - 1) * PAGE_SIZE + idx + 1}
                       </td>
                       <td className="py-3 px-4 max-w-xs">
-                        <p className="font-semibold text-gray-900 truncate">{adv.title || "Cash Advance"}</p>
-                        {adv.purpose && <p className="text-[11px] text-gray-500 truncate mt-0.5">{adv.purpose}</p>}
+                        <p className="font-semibold text-gray-900 truncate" title={adv.title || undefined}>{adv.title || "Cash Advance"}</p>
                       </td>
-                      <td className="py-3 px-4 font-medium text-gray-700">
-                        {getCostCenterValue(adv)}
+                      <td className="py-3 px-4 whitespace-nowrap text-gray-600">
+                        {formatTripDates(adv)}
                       </td>
-                      <td className="py-3 px-4 font-bold text-gray-900">
-                        {formatMoney(adv.amount, adv.currencyCode || "INR")}
+                      <td className="py-3 px-4 text-right whitespace-nowrap tabular-nums">
+                        <p className="font-semibold text-gray-900">{formatMoney(f.approvedKnown ? f.approved : f.requested, cur)}</p>
+                        <p className="mt-0.5 text-[10px] text-gray-400">
+                          {f.paidOut && !loading ? `${formatMoney(f.disbursed, cur)} disbursed` : amountLabel}
+                        </p>
                       </td>
-                      <td className="py-3 px-4 text-gray-600">
-                        {formatDate(getNeededByDateValue(adv))}
-                      </td>
-                      <td className="py-3 px-4 text-right font-semibold">
-                        <span className={isOverdue(adv) ? "text-rose-600" : "text-amber-600"}>
-                          {formatMoney(adv.outstandingBalance, adv.currencyCode || "INR")}
-                        </span>
+                      <td className="py-3 px-4 text-right whitespace-nowrap tabular-nums">
+                        <p className="font-semibold text-sky-700">{paidCell(f.consumed)}</p>
+                        {f.paidOut && !loading && (
+                          <p className={`mt-0.5 text-[10px] ${isOverdue(adv) ? "text-rose-600" : f.outstanding > 0 ? "text-amber-600" : "text-gray-400"}`}>
+                            {f.outstanding > 0 ? `${formatMoney(f.outstanding, cur)} outstanding` : "Nothing outstanding"}
+                          </p>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         {isOverdue(adv) ? getStatusBadge("OVERDUE") : getStatusBadge(adv.status)}

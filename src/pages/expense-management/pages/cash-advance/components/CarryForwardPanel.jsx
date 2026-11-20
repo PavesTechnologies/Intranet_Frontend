@@ -13,9 +13,9 @@ const formatMoney = (amount, currencyCode) =>
   `${currencyCode || "INR"} ${Number(amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
- * Carry-forward of the unused balance to the employee's next approved INR advance. Clicking Carry forward makes the
- * amount ready. It is added to the next advance automatically when that advance is approved, and Finance then pays
- * only the difference at disbursement. Nothing is paid now.
+ * Carry-forward of the unused balance. Clicking Carry forward moves it off this advance at once and holds it in the
+ * employee's outstanding. The employee's next request (Cash Advance + Outstanding) takes it in, and Finance then pays
+ * only the new cash. Nothing is paid now.
  */
 export default function CarryForwardPanel({ advanceId, currencyCode, outstanding, onChanged }) {
   const [reason, setReason] = useState("");
@@ -54,10 +54,10 @@ export default function CarryForwardPanel({ advanceId, currencyCode, outstanding
     try {
       const updated = await carryForwardApi.markReady({ advanceId, amount: amountNumber, reason: STANDARD_REASON });
       setReadyAmount(updated?.readyAmount ?? null);
-      showStatusToast("Carry-forward is ready. It is added when the next INR advance is approved.", "success", 6000);
+      showStatusToast("Balance carried forward. It is now in the employee's outstanding for the next advance.", "success", 6000);
       onChanged?.();
     } catch (err) {
-      showStatusToast(err.response?.data?.message || "Could not mark the carry-forward ready", "error", 8000);
+      showStatusToast(err.response?.data?.message || "Could not carry the balance forward", "error", 8000);
     } finally {
       setBusy(false);
     }
@@ -73,7 +73,7 @@ export default function CarryForwardPanel({ advanceId, currencyCode, outstanding
       const updated = await carryForwardApi.cancelReady(advanceId, reason.trim());
       setReadyAmount(updated?.readyAmount ?? null);
       setReason("");
-      showStatusToast("Ready carry-forward cancelled.", "success");
+      showStatusToast("Carry-forward returned to this advance.", "success");
       onChanged?.();
     } catch (err) {
       showStatusToast(err.response?.data?.message || "Could not cancel the carry-forward", "error", 8000);
@@ -91,11 +91,11 @@ export default function CarryForwardPanel({ advanceId, currencyCode, outstanding
       <div className="space-y-3 rounded-lg border border-emerald-300 bg-white p-4 text-xs">
         <p className="text-sm font-semibold text-gray-900">Carry-forward confirmation</p>
         <p className="text-gray-800">
-          <span className="font-semibold">{formatMoney(readyAmount, currencyCode)}</span> is ready to carry forward.
+          <span className="font-semibold">{formatMoney(readyAmount, currencyCode)}</span> is carried forward and held in the employee's outstanding.
         </p>
         <p className="text-gray-600">
-          It is added automatically to this employee's next INR advance when that advance is approved. At disbursement,
-          Finance then pays only the difference. Nothing is paid now.
+          The employee's next INR request takes it in as outstanding, and Finance then pays only the new cash. Cancelling
+          returns it to this advance.
         </p>
         <label className="block text-xs font-semibold text-gray-700" htmlFor="carry-forward-cancel-reason">
           Reason to cancel (at least {MIN_REASON_LENGTH} characters)
@@ -120,8 +120,8 @@ export default function CarryForwardPanel({ advanceId, currencyCode, outstanding
   return (
     <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
       <p className="text-xs text-gray-600">
-        Carry the {formatMoney(outstanding, currencyCode)} unused balance to the employee's next INR advance. It is added
-        automatically when that advance is approved, and Finance pays only the difference. Nothing is paid now.
+        Move the {formatMoney(outstanding, currencyCode)} unused balance off this advance now and into the employee's
+        outstanding. Their next INR request takes it in, and Finance pays only the new cash. Nothing is paid now.
       </p>
       <div className="flex justify-end">
         <Button type="button" variant="success" disabled={busy} loading={busy} onClick={markReady}>
