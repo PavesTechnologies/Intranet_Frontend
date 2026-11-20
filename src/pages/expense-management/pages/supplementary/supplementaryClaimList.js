@@ -107,3 +107,58 @@ export function claimRowActions(claim) {
   const actions = claimActions(claim, "employee");
   return { canView: true, canEdit: actions.canEditItems, canCancel: actions.canCancel };
 }
+
+const ALLOWED = Object.freeze({ allowed: true, reason: "" });
+const blocked = (reason) => ({ allowed: false, reason });
+
+/**
+ * Every action the employee can take on a claim, each with whether it is allowed now and, when it is not, why.
+ * The screens show all of them and disable the ones that are not allowed, so the reason is always visible.
+ */
+export function employeeActionStates(claim) {
+  const actions = claimActions(claim, "employee");
+  const status = claim?.status;
+  const items = Array.isArray(claim?.items) ? claim.items : [];
+  const withoutReceipt = items.some((i) => !Array.isArray(i.receipts) || i.receipts.length === 0);
+
+  const acknowledge = actions.canAcknowledge
+    ? ALLOWED
+    : blocked(status === "DRAFT" ? "Nothing to acknowledge on this claim." : "Only a Draft that Finance created needs acknowledging.");
+
+  let submit = ALLOWED;
+  if (!actions.canSubmit) {
+    if (status !== SUPP_STATUS.DRAFT) submit = blocked("Only a Draft can be submitted.");
+    else if (items.length === 0) submit = blocked("Add at least one expense first.");
+    else if (withoutReceipt) submit = blocked("Every expense needs a receipt before you submit.");
+    else submit = blocked("Acknowledge this claim before you submit it.");
+  }
+
+  let resubmit = ALLOWED;
+  if (!actions.canResubmit) {
+    resubmit = status === SUPP_STATUS.CLARIFICATION_REQUIRED
+      ? blocked("Every expense needs a receipt before you resubmit.")
+      : blocked("Only a claim that needs clarification can be resubmitted.");
+  }
+
+  const cancel = actions.canCancel
+    ? ALLOWED
+    : blocked("Cancel is available only while the claim is a Draft, waiting for your manager, or needs clarification.");
+
+  const editExpenses = actions.canEditItems
+    ? ALLOWED
+    : blocked("Expenses can be changed only while the claim is a Draft or needs clarification.");
+
+  return { acknowledge, submit, resubmit, cancel, editExpenses };
+}
+
+/** Row actions on the My Claims list: View is always allowed; Edit and Cancel follow the same rules as the claim page. */
+export function listRowActionStates(claim) {
+  const states = employeeActionStates(claim);
+  return {
+    view: ALLOWED,
+    edit: states.editExpenses.allowed
+      ? ALLOWED
+      : blocked("Edit is available only for a Draft or a claim that needs clarification."),
+    cancel: states.cancel,
+  };
+}

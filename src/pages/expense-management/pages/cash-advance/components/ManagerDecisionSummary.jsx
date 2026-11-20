@@ -5,7 +5,6 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { carryForwardApi } from "@/pages/expense-management/api/carryForwardApi";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
-import AllocationApprovalForm from "@/pages/expense-management/pages/cash-advance/components/AllocationApprovalForm";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 
 const TREATMENT_LABEL = {
@@ -255,10 +254,6 @@ export default function ManagerDecisionSummary({ advance, canAct, onChanged }) {
             Approving this request then takes it in here, so Finance disburses only the difference.
           </p>
         </section>
-      )}
-      {/* Finance approves a Cash Advance + Outstanding request by allocation: the rollover and the cash are set together */}
-      {canAct && advance.requestType === "ADVANCE_PLUS_OUTSTANDING" && ["PENDING_FINANCE_APPROVAL", "PENDING_FINANCE"].includes(String(advance.status || "").toUpperCase()) && (
-        <AllocationApprovalForm advance={advance} balance={balance} onApproved={onChanged} />
       )}
     </div>
   );

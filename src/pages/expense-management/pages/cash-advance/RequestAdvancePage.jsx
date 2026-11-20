@@ -739,7 +739,7 @@ export default function RequestAdvancePage() {
     amount: Number(formData.amount),
     requestType,
     // For Cash Advance + Outstanding the amount is the additional amount; the server checks they match.
-    additionalAmount: requestType === ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING ? Number(formData.amount) : null,
+    additionalAmount: null,
     // Sent only when asked for: the server also checks the length of a reason it did not need.
     employeeJustification:
       justificationRequired && employeeJustification.trim() ? employeeJustification.trim() : null,
@@ -1179,7 +1179,7 @@ export default function RequestAdvancePage() {
             inputClassName="h-10"
             label={
               <RequiredLabel>
-                {requestType === ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING ? "Additional Amount Required" : "Amount Required"}
+                Amount Required
               </RequiredLabel>
             }
             name="amount"

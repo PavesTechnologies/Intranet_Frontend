@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import AppCard from "./AppCard";
 import LoadingSpinner from "../LoadingSpinner";
 import { User } from "lucide-react";
-import Working from "../icons/working.svg";
+import { FullHouseIllustration } from "../illustrations/DashboardIllustrations";
 import { todayOnLeave } from "../../services/dashboard";
 
 const AVATAR_COLORS = [
@@ -69,8 +69,8 @@ export default function TodayOnLeavePanel() {
       renderHeader={() => (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-4 rounded-full bg-amber-400" />
-            <span className="text-sm font-semibold text-gray-800">Today on Leave</span>
+            <span className="h-1 w-6 rounded bg-gradient-to-r from-[#0A0082] to-[#FF3D72]" />
+            <span className="font-heading text-sm font-semibold text-[#0A174E]">Today on Leave</span>
           </div>
           {!loading && employees.length > 0 && (
             <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
@@ -85,10 +85,12 @@ export default function TodayOnLeavePanel() {
           <LoadingSpinner text="Loading..." />
         </div>
       ) : employees.length === 0 ? (
-        <div className="flex items-center gap-2 py-1 justify-center">
-          {/* <User size={15} className="text-gray-400" strokeWidth={2.5} /> */}
-          <p className="text-xs text-gray-400 italic font-semibold">No one is on leave today</p>
-          <img src={Working} alt="working" width={100} height={10} />
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-5 py-2 text-center sm:text-left">
+          <FullHouseIllustration className="w-28 h-20" />
+          <div>
+            <p className="font-heading text-sm font-semibold text-[#0A174E]">Full house today!</p>
+            <p className="text-xs text-[#78716C] mt-0.5">No one is on leave, the whole team is in.</p>
+          </div>
         </div>
       ) : (
         <div className="flex flex-wrap gap-4">

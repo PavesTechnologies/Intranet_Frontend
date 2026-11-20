@@ -717,7 +717,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     >
                       <NavLink
                         to={item.to}
-                        onClick={(e) => { if (item.children) e.preventDefault(); }}
+                        onClick={(e) => { if (item.children && !item.to) e.preventDefault(); }}
                         className={({ isActive }) =>
                           `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                             ? "bg-blue-100 text-[#0a174e] font-semibold"

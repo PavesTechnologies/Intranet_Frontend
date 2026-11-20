@@ -51,22 +51,6 @@ const openAdvance = (overrides = {}) => ({
   amount: 10000, outstandingBalance: 4000, ...overrides,
 });
 
-describe('AdvanceTypeSelector', () => {
-  it('shows both options and reports the chosen one', () => {
-    const onChange = vi.fn();
-    render(<AdvanceTypeSelector value={ADVANCE_TYPE.COMPLETE_NEW} onChange={onChange} />);
-
-    expect(screen.getByRole('radio', { name: /Complete New Cash Advance/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('radio', { name: /Cash Advance \+ Outstanding/ }));
-    expect(onChange).toHaveBeenCalledWith(ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING);
-  });
-
-  it('cannot be changed when disabled', () => {
-    render(<AdvanceTypeSelector value={ADVANCE_TYPE.COMPLETE_NEW} onChange={vi.fn()} disabled />);
-    expect(screen.getByRole('radio', { name: /Cash Advance \+ Outstanding/ })).toBeDisabled();
-  });
-});
-
 describe('EmployeeProfileCard', () => {
   it('shows the details it has, and leaves out the ones it does not', () => {
     render(<EmployeeProfileCard profile={{ employeeId: 'EMP001', fullName: 'Ravi Menon', managerName: 'Anita Rao', departmentName: null, designationName: null }} />);
@@ -102,16 +86,6 @@ describe('OutstandingBalanceSummary', () => {
 });
 
 describe('AdvanceCalculationPreview', () => {
-  it('shows the eligible balance and total for Cash Advance + Outstanding', () => {
-    render(<AdvanceCalculationPreview preview={{
-      requestType: ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING, currencyCode: 'INR', eligibleOutstanding: 4000,
-      cashRequested: 4000, totalAdvanceAllocation: 8000, justificationRequired: false, exceedsLimit: false,
-    }} />);
-    expect(screen.getByText('Eligible outstanding balance')).toBeInTheDocument();
-    expect(screen.getByText('INR 8,000.00')).toBeInTheDocument();
-    expect(screen.getAllByText('INR 4,000.00')).toHaveLength(2); // eligible balance and cash now
-  });
-
   it('warns when the total exposure is above the company limit', () => {
     render(<AdvanceCalculationPreview preview={{
       requestType: ADVANCE_TYPE.COMPLETE_NEW, currencyCode: 'INR', cashRequested: 8000, totalAdvanceAllocation: 8000,
@@ -146,33 +120,6 @@ describe('RequestAdvancePage: request types and justification', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
     expect(screen.queryByLabelText(/Reason for Separate Advance/)).not.toBeInTheDocument();
-  });
-
-  it('switches to the additional amount, and hides the reason, for Cash Advance + Outstanding', async () => {
-    renderPage();
-    await screen.findByLabelText(/Reason for Separate Advance/);
-    fireEvent.click(screen.getByRole('radio', { name: /Cash Advance \+ Outstanding/ }));
-
-    expect(screen.getByLabelText(/Additional Amount Required/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Reason for Separate Advance/)).not.toBeInTheDocument();
-  });
-
-  it('previews through the server and shows its figures', async () => {
-    cashAdvanceApi.preview.mockResolvedValue({
-      requestType: ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING, currencyCode: 'INR', eligibleOutstanding: 4000,
-      cashRequested: 4000, totalAdvanceAllocation: 8000, justificationRequired: false, exceedsLimit: false,
-    });
-    renderPage();
-    await screen.findByLabelText(/Reason for Separate Advance/);
-    fireEvent.click(screen.getByRole('radio', { name: /Cash Advance \+ Outstanding/ }));
-    fireEvent.change(screen.getByLabelText(/Additional Amount Required/), { target: { value: '4000' } });
-    await fillRequiredFields();
-    fireEvent.click(screen.getByRole('button', { name: /Preview calculation/ }));
-
-    await waitFor(() => expect(cashAdvanceApi.preview).toHaveBeenCalledWith(expect.objectContaining({
-      requestType: ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING, amount: 4000,
-    })));
-    expect(await screen.findByText('INR 8,000.00')).toBeInTheDocument();
   });
 
   it('shows the employee their own details, read-only', async () => {

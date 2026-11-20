@@ -41,7 +41,7 @@ export default function DisbursementConfirmationFields({
   values,
   errors = {},
   onFieldChange,
-  modes = [DISBURSEMENT_MODE.CASH, DISBURSEMENT_MODE.BANK_TRANSFER, DISBURSEMENT_MODE.UPI],
+  modes = [DISBURSEMENT_MODE.CASH, DISBURSEMENT_MODE.BANK_TRANSFER, DISBURSEMENT_MODE.UPI, DISBURSEMENT_MODE.COMPANY_CARD],
   // Called with the fields read from a payment screenshot (for example, to fill the amount).
   onScreenshotRead,
 }) {
@@ -80,7 +80,8 @@ export default function DisbursementConfirmationFields({
     }
   };
   const isCash = values.mode === DISBURSEMENT_MODE.CASH;
-  const isBank = values.mode === DISBURSEMENT_MODE.BANK_TRANSFER;
+  const isCard = values.mode === DISBURSEMENT_MODE.COMPANY_CARD;
+  const isBank = values.mode === DISBURSEMENT_MODE.BANK_TRANSFER || isCard;
   const isUpi = values.mode === DISBURSEMENT_MODE.UPI;
 
   return (
@@ -139,13 +140,17 @@ export default function DisbursementConfirmationFields({
               onChange={set("transferDate")}
             />
           </Field>
-          <Field id="disb-transfer-details" label="Transfer details" error={errors.transferDetails}>
+          <Field
+            id="disb-transfer-details"
+            label={isCard ? "Company card used" : "Transfer details"}
+            error={errors.transferDetails}
+          >
             <textarea
               id="disb-transfer-details"
               rows={2}
               maxLength={500}
               className={inputClass}
-              placeholder="Bank, beneficiary account, UTR"
+              placeholder={isCard ? "Card name or last four digits" : "Bank, beneficiary account, UTR"}
               value={values.transferDetails}
               onChange={set("transferDetails")}
             />
