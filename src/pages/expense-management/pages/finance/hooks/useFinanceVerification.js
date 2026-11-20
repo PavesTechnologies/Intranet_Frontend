@@ -12,10 +12,11 @@ const unwrap = (res) => (res?.data?.data !== undefined ? res.data.data : res?.da
 // ── Queries ─────────────────────────────────────────────────────────────────
 
 /** PageResponse<FinanceQueueItemResponse> */
-export const useFinanceQueue = (page = 0, size = 20) =>
+export const useFinanceQueue = (page = 0, size = 20, { enabled = true } = {}) =>
   useQuery({
     queryKey: FINANCE_QUEUE_KEY(page, size),
     queryFn: () => financeVerificationApi.getMyQueue(page, size).then(unwrap),
+    enabled,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: 2,

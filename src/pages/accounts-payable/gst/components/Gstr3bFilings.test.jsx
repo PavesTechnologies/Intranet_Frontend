@@ -7,7 +7,7 @@ import Gstr3bFilingsPanel from "./Gstr3bFilingsPanel";
 import RecordFilingModal from "./RecordFilingModal";
 import * as hooks from "../hooks/useGstItc";
 import { useAuth } from "../../../../contexts/AuthContext";
-import { REGISTER, itcDetail, query, registerRow, setupGstHooks } from "../__fixtures__/gstFixtures";
+import { FILINGS, REGISTER, itcDetail, query, registerRow, setupGstHooks } from "../__fixtures__/gstFixtures";
 
 vi.mock("../hooks/useGstItc", async () => {
   const { HOOK_NAMES } = await import("../__fixtures__/gstFixtures");
@@ -46,7 +46,7 @@ describe("GSTR-3B filing verification", () => {
     expect(hooks.useGstr3bFilings).toHaveBeenCalledWith("2026-27");
   });
 
-  it("lets a second Finance user verify after confirmation", async () => {
+  it("lets a Finance user verify after confirmation", async () => {
     await openPending();
     expect(screen.getByText(/not counted as claimed until it is verified/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Verify filing/ }));
@@ -54,20 +54,35 @@ describe("GSTR-3B filing verification", () => {
     expect(m.useVerifyFiling.mutateAsync).toHaveBeenCalledWith(4);
   });
 
-  it("does not let the user who recorded the filing verify it", async () => {
-    useAuth.mockReturnValue({ user: { sub: "fin-maker" } });
+  it("lets the Finance Executive who recorded the filing verify it", async () => {
+    useAuth.mockReturnValue({ user: { sub: "fin-maker" } }); // recorded_by of the pending filing
     await openPending();
-    expect(screen.getByText(/a different Finance user must verify it/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Verify filing/ })).toBeDisabled();
+    expect(screen.queryByText(/different Finance user/)).toBeNull();
+    const verify = screen.getByRole("button", { name: /Verify filing/ });
+    expect(verify).toBeEnabled();
+    await userEvent.click(verify);
+    await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Verify filing" }));
+    expect(m.useVerifyFiling.mutateAsync).toHaveBeenCalledWith(4);
   });
 
-  it("shows the backend's refusal (e.g. maker-checker) instead of a claimed status", async () => {
+  it("shows a filing verified by its recorder as such", async () => {
+    hooks.useGstr3bFiling.mockReturnValue(query({ ...FILINGS.items[1], verified_by: "fin-maker", self_verified: true,
+      verification_mode: "SELF_VERIFICATION", allocations: [] }));
+    renderPanel();
+    const history = screen.getByRole("heading", { name: /filing history/ }).closest("section");
+    await userEvent.click(within(history).getByRole("button", { name: "Sep 2026" }));
+    expect(screen.getByText(/same user who recorded it/)).toBeInTheDocument();
+    expect(screen.getByText(/Its credit counts as claimed/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Verify filing/ })).toBeNull();
+  });
+
+  it("shows the backend's refusal instead of a claimed status", async () => {
     const { toast } = await import("react-toastify");
-    m.useVerifyFiling.mutateAsync.mockRejectedValue({ response: { status: 403, data: { detail: "A different Finance user must verify the filing (maker-checker)" } } });
+    m.useVerifyFiling.mutateAsync.mockRejectedValue({ response: { status: 422, data: { detail: "This filing is already verified" } } });
     await openPending();
     await userEvent.click(screen.getByRole("button", { name: /Verify filing/ }));
     await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Verify filing" }));
-    expect(toast.error).toHaveBeenCalledWith("A different Finance user must verify the filing (maker-checker)");
+    expect(toast.error).toHaveBeenCalledWith("This filing is already verified");
   });
 
   it("offers no verify or record actions without the manage permission", () => {
@@ -116,7 +131,7 @@ describe("RecordFilingModal", () => {
     await userEvent.type(screen.getByLabelText("Filing date"), "2026-11-12");
     await userEvent.click(screen.getByRole("button", { name: "Record filing" }));
     const dialog = screen.getByRole("alertdialog");
-    expect(dialog).toHaveTextContent(/a different Finance user must verify the filing/);
+    expect(dialog).toHaveTextContent(/not claimed yet - verify the filing next to claim it/);
     await userEvent.click(within(dialog).getByRole("button", { name: "Record filing" }));
     expect(m.useRecordFiling.mutateAsync).toHaveBeenCalledWith({
       period: "2026-10-01", filingDate: "2026-11-12", arn: "AA2910260012345", evidenceReference: "", remarks: "", nilReturn: false, allocations: null,

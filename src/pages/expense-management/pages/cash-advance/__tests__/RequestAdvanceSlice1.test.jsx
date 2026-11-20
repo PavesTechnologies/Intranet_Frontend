@@ -51,22 +51,6 @@ const openAdvance = (overrides = {}) => ({
   amount: 10000, outstandingBalance: 4000, ...overrides,
 });
 
-describe('AdvanceTypeSelector', () => {
-  it('shows both options and reports the chosen one', () => {
-    const onChange = vi.fn();
-    render(<AdvanceTypeSelector value={ADVANCE_TYPE.COMPLETE_NEW} onChange={onChange} />);
-
-    expect(screen.getByRole('radio', { name: /Complete New Cash Advance/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('radio', { name: /Cash Advance \+ Outstanding/ }));
-    expect(onChange).toHaveBeenCalledWith(ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING);
-  });
-
-  it('cannot be changed when disabled', () => {
-    render(<AdvanceTypeSelector value={ADVANCE_TYPE.COMPLETE_NEW} onChange={vi.fn()} disabled />);
-    expect(screen.getByRole('radio', { name: /Cash Advance \+ Outstanding/ })).toBeDisabled();
-  });
-});
-
 describe('EmployeeProfileCard', () => {
   it('shows the details it has, and leaves out the ones it does not', () => {
     render(<EmployeeProfileCard profile={{ employeeId: 'EMP001', fullName: 'Ravi Menon', managerName: 'Anita Rao', departmentName: null, designationName: null }} />);
@@ -102,16 +86,6 @@ describe('OutstandingBalanceSummary', () => {
 });
 
 describe('AdvanceCalculationPreview', () => {
-  it('shows the eligible balance and total for Cash Advance + Outstanding', () => {
-    render(<AdvanceCalculationPreview preview={{
-      requestType: ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING, currencyCode: 'INR', eligibleOutstanding: 4000,
-      cashRequested: 4000, totalAdvanceAllocation: 8000, justificationRequired: false, exceedsLimit: false,
-    }} />);
-    expect(screen.getByText('Eligible outstanding balance')).toBeInTheDocument();
-    expect(screen.getByText('INR 8,000.00')).toBeInTheDocument();
-    expect(screen.getAllByText('INR 4,000.00')).toHaveLength(2); // eligible balance and cash now
-  });
-
   it('warns when the total exposure is above the company limit', () => {
     render(<AdvanceCalculationPreview preview={{
       requestType: ADVANCE_TYPE.COMPLETE_NEW, currencyCode: 'INR', cashRequested: 8000, totalAdvanceAllocation: 8000,
@@ -148,33 +122,6 @@ describe('RequestAdvancePage: request types and justification', () => {
     expect(screen.queryByLabelText(/Reason for Separate Advance/)).not.toBeInTheDocument();
   });
 
-  it('switches to the additional amount, and hides the reason, for Cash Advance + Outstanding', async () => {
-    renderPage();
-    await screen.findByLabelText(/Reason for Separate Advance/);
-    fireEvent.click(screen.getByRole('radio', { name: /Cash Advance \+ Outstanding/ }));
-
-    expect(screen.getByLabelText(/Additional Amount Required/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Reason for Separate Advance/)).not.toBeInTheDocument();
-  });
-
-  it('previews through the server and shows its figures', async () => {
-    cashAdvanceApi.preview.mockResolvedValue({
-      requestType: ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING, currencyCode: 'INR', eligibleOutstanding: 4000,
-      cashRequested: 4000, totalAdvanceAllocation: 8000, justificationRequired: false, exceedsLimit: false,
-    });
-    renderPage();
-    await screen.findByLabelText(/Reason for Separate Advance/);
-    fireEvent.click(screen.getByRole('radio', { name: /Cash Advance \+ Outstanding/ }));
-    fireEvent.change(screen.getByLabelText(/Additional Amount Required/), { target: { value: '4000' } });
-    await fillRequiredFields();
-    fireEvent.click(screen.getByRole('button', { name: /Preview calculation/ }));
-
-    await waitFor(() => expect(cashAdvanceApi.preview).toHaveBeenCalledWith(expect.objectContaining({
-      requestType: ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING, amount: 4000,
-    })));
-    expect(await screen.findByText('INR 8,000.00')).toBeInTheDocument();
-  });
-
   it('shows the employee their own details, read-only', async () => {
     renderPage();
     expect(await screen.findByText('Ravi Menon')).toBeInTheDocument();
@@ -201,16 +148,7 @@ describe('RequestAdvancePage: mandatory preview before submit', () => {
     });
   });
 
-  it('keeps Submit disabled until a preview has been calculated', async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeDisabled();
-    expect(screen.getByText(/Preview the calculation before you submit/)).toBeInTheDocument();
-  });
-
-  it('drops the preview when the amount changes, so Submit is disabled again until a fresh preview', async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+  const fillValidForm = async () => {
     fireEvent.change(screen.getByLabelText(/^Amount Required/), { target: { value: '5000' } });
     fireEvent.change(screen.getByLabelText(/title/i), { target: { value: 'Pune trip' } });
     fireEvent.change(screen.getByLabelText(/purpose/i), { target: { value: 'Client visit' } });
@@ -218,13 +156,46 @@ describe('RequestAdvancePage: mandatory preview before submit', () => {
     fireEvent.change(screen.getByLabelText(/settlement expected date/i), { target: { value: daysFromToday(20) } });
     fireEvent.click(screen.getByRole('button', { name: /select currency/i }));
     fireEvent.click(await screen.findByRole('option', { name: /INR/ }));
+  };
+
+  it('keeps Submit clickable before a preview, and says Submit will calculate first', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeEnabled();
+    expect(screen.getByText(/Submit calculates the amounts first/)).toBeInTheDocument();
+  });
+
+  it('Submit without a preview runs the preview first, then asks to confirm; nothing is created before that', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+    await fillValidForm();
+
+    fireEvent.click(screen.getByRole('button', { name: /Submit Request/i }));
+    expect(await screen.findByText('Calculation preview')).toBeInTheDocument();
+    expect(cashAdvanceApi.preview).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/Cash requested now/)).toBeInTheDocument();
+    expect(cashAdvanceApi.create).not.toHaveBeenCalled();
+  });
+
+  it('Submit with an invalid form runs no preview and does not open the confirmation', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Submit Request/i }));
+    expect(await screen.findByText('Title is required.')).toBeInTheDocument();
+    expect(cashAdvanceApi.preview).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Cash requested now/)).not.toBeInTheDocument();
+  });
+
+  it('drops the preview when the amount changes, so the next Submit calculates it again', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+    await fillValidForm();
 
     fireEvent.click(screen.getByRole('button', { name: /Preview calculation/ }));
     expect(await screen.findByText('Calculation preview')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeEnabled();
 
     fireEvent.change(screen.getByLabelText(/^Amount Required/), { target: { value: '6000' } });
     await waitFor(() => expect(screen.queryByText('Calculation preview')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeDisabled();
   });
 });

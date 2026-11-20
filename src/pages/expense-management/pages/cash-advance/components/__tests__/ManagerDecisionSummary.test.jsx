@@ -9,6 +9,9 @@ vi.mock("@/pages/expense-management/api/carryForwardApi", () => ({
   carryForwardApi: { getReady: vi.fn(), markReady: vi.fn() },
 }));
 vi.mock("@/components/toastfy/toast", () => ({ showStatusToast: vi.fn() }));
+vi.mock("@/pages/expense-management/approval-engine/components/EmployeeLabel", () => ({
+  default: ({ employeeId }) => <span>{employeeId === "5100023" ? "Rama Durgam" : employeeId}</span>,
+}));
 
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { carryForwardApi } from "@/pages/expense-management/api/carryForwardApi";
@@ -107,6 +110,41 @@ describe("manager decision summary for Finance", () => {
 
     expect(await screen.findByText(/Above the limit by INR 1,000.00/)).toBeInTheDocument();
     expect(screen.getByText(/Approving authorises this exception/)).toBeInTheDocument();
+  });
+
+  it("reduced by the manager: shows the requested amount, the cut, and the cash to send", async () => {
+    cashAdvanceApi.approvalBalance.mockResolvedValue(balanceWith({
+      requestedAmount: 1000,
+      managerDecision: {
+        treatment: "REDUCED", justification: "the trip donot need that much",
+        decidedBy: "5100023", decidedAt: "2026-11-19T10:50:00", exposureExceptionAuthorized: false,
+      },
+    }));
+    render(
+      <ManagerDecisionSummary
+        advance={{ ...advance, amount: 1000, requestedAmount: 2000, managerTreatment: "REDUCED" }}
+        canAct
+      />,
+    );
+
+    const box = await screen.findByRole("region", { name: "Amount on approval" });
+    expect(box).toHaveTextContent(/Employee requested\s*INR 2,000.00/);
+    expect(box).toHaveTextContent(/Reduced by the manager\s*− INR 1,000.00/);
+    expect(screen.getByTestId("cash-on-approval")).toHaveTextContent("INR 1,000.00");
+    expect(screen.getByText(/Cash to send to the employee/)).toBeInTheDocument();
+    expect(screen.getByText(/^From/)).toHaveTextContent("From INR 2,000.00 to INR 1,000.00.");
+    expect(screen.getByText("Rama Durgam")).toBeInTheDocument();
+  });
+
+  it("carried-in balance: the cash sent is the approved amount less what was carried in", async () => {
+    cashAdvanceApi.approvalBalance.mockResolvedValue(balanceWith());
+    render(<ManagerDecisionSummary advance={{ ...advance, amount: 8000, requestedAmount: 8000, carriedInAmount: 3000 }} canAct />);
+
+    const box = await screen.findByRole("region", { name: "Amount on approval" });
+    expect(box).toHaveTextContent(/Approved advance amount\s*INR 8,000.00/);
+    expect(box).toHaveTextContent(/carried in from an earlier advance\s*− INR 3,000.00/);
+    expect(screen.queryByText(/Reduced by the manager/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("cash-on-approval")).toHaveTextContent("INR 5,000.00");
   });
 
   it("says so clearly when the balance cannot be loaded, rather than showing nothing", async () => {

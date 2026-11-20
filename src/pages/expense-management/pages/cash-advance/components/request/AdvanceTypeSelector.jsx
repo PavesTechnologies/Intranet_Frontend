@@ -1,9 +1,8 @@
 import React from "react";
 
-// The two ways to ask for an advance. The backend stores the choice; the calculation is done there.
+// The only way to ask for an advance now. The Cash Advance + Outstanding (rollover) flow has been removed.
 export const ADVANCE_TYPE = {
   COMPLETE_NEW: "COMPLETE_NEW",
-  ADVANCE_PLUS_OUTSTANDING: "ADVANCE_PLUS_OUTSTANDING",
 };
 
 const OPTIONS = [
@@ -11,11 +10,6 @@ const OPTIONS = [
     value: ADVANCE_TYPE.COMPLETE_NEW,
     title: "Complete New Cash Advance",
     help: "The whole sum for a new trip. Any balance you already owe stays separately tracked.",
-  },
-  {
-    value: ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING,
-    title: "Cash Advance + Outstanding",
-    help: "Only the extra cash you need. Your eligible outstanding balance is added automatically.",
   },
 ];
 

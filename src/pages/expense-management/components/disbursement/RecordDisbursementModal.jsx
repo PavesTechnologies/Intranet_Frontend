@@ -74,18 +74,6 @@ export default function RecordDisbursementModal({
           </p>
         )}
 
-        {paymentRequired && (
-          <Field id="disb-note" label="Confirmation note" required={false}>
-            <textarea
-              id="disb-note"
-              rows={2}
-              maxLength={500}
-              className={confirmationInputClass}
-              value={values.confirmationNote}
-              onChange={(e) => handleFieldChange("confirmationNote", e.target.value)}
-            />
-          </Field>
-        )}
       </form>
     </Modal>
   );

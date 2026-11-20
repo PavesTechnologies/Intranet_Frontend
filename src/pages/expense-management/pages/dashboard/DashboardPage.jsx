@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,8 +8,13 @@ import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { dashboardService } from "@/pages/expense-management/api/expenseReportsApi";
+import SupplementaryWaitingCard from "@/pages/expense-management/pages/dashboard/SupplementaryWaitingCard";
 import EmployeeMoneyFlow from "@/pages/expense-management/components/dashboard/EmployeeMoneyFlow";
 import RoleDashboard from "@/pages/expense-management/components/dashboard/RoleDashboard";
+import ApprovalsPanel from "@/pages/expense-management/components/dashboard/ApprovalsPanel";
+import FinanceDashboard from "@/pages/expense-management/components/dashboard/FinanceDashboard";
+import ApDashboard from "@/pages/expense-management/components/dashboard/ApDashboard";
+import AdminDashboard from "@/pages/expense-management/components/dashboard/AdminDashboard";
 
 // Each role sees one simple money flow: four steps, left to right, showing where the money is now.
 // Each step names the figure, says what it means in one line, and points to the records behind it.
@@ -61,8 +66,8 @@ const VIEWS = [
       { key: "submit", label: "Submit expense", hint: "Create an expense report", icon: "ReceiptText", to: "/expense-management/expenses/create", roles: ["GENERAL", "MANAGER"], primary: true },
       { key: "advance", label: "Request advance", hint: "Request travel or business funds", icon: "Banknote", to: "/expense-management/cash-advance/request", roles: ["GENERAL"] },
       { key: "reports", label: "My expense reports", hint: "Track submitted reports", icon: "FileText", to: "/expense-management/expenses/my", roles: ["GENERAL", "MANAGER"] },
+      { key: "supplementary", label: "Supplementary claims", hint: "Claim expenses missed on a settled report", icon: "FileText", to: "/expense-management/expenses/supplementary", roles: ["GENERAL", "MANAGER"] },
       { key: "advances", label: "My advances", hint: "Balances and settlements", icon: "Wallet", to: "/expense-management/cash-advance/my", roles: ["GENERAL"] },
-      { key: "outdated", label: "Outdated expense", hint: "Attach a receipt to a settled report", icon: "ScanLine", to: "/expense-management/expenses/outdated", roles: ["GENERAL"] },
     ],
     attentionTitle: "Needs your action",
     attentionEmpty: "Nothing needs you right now.",
@@ -75,6 +80,8 @@ const VIEWS = [
     view: "manager",
     label: "Approvals",
     roles: ["MANAGER", "REPORTING_MANAGER"],
+    // Not a tab: shown as a collapsible panel inside "My money", so a manager's own money stays the main dashboard.
+    embedded: true,
     subtitle: "What your team has sent you, and what you have decided.",
     steps: [
       { key: "pending", label: "Waiting for you", help: "Requests and reports for your decision.", tone: "amber" },
@@ -100,11 +107,12 @@ const VIEWS = [
     view: "finance",
     label: "Finance",
     roles: ["FINANCE_EXECUTIVE", "FINANCE"],
-    subtitle: "What is waiting to be verified, and what has been verified.",
+    subtitle: "Your verification queue, your approvals, and how reports are moving to payment.",
+    // Rendered by FinanceDashboard; the approvals routed to a Finance user are embedded there as a tab.
     steps: [
-      { key: "toVerify", label: "To verify", help: "Reports waiting for Finance verification.", tone: "amber" },
-      { key: "queueValue", label: "Value to verify", help: "Total claimed in the verification queue.", tone: "blue" },
+      // "To verify" and its value are the banner's headline, so they are not repeated as figures here.
       { key: "queries", label: "Open queries", help: "Reports sent back to employees for answers.", tone: "rose" },
+      { key: "exceptions", label: "Policy exceptions", help: "Policy issues on reports in the queue.", tone: "orange" },
       { key: "verified", label: "Verified this month", help: "Reports Finance has verified this month.", tone: "emerald" },
     ],
     attentionTitle: "Longest in the queue",
@@ -116,7 +124,6 @@ const VIEWS = [
     activitySubtitle: "Reports you verified most recently",
     quickActions: [
       { key: "finance", label: "Finance verification", hint: "Reports waiting to be verified", icon: "ClipboardCheck", to: "/expense-management/finance", roles: ["FINANCE_EXECUTIVE"], primary: true },
-      { key: "lateReceipts", label: "Late receipts", hint: "Receipts found after settlement, to review", icon: "ScanLine", to: "/expense-management/finance/late-receipts", roles: ["FINANCE_EXECUTIVE", "FINANCE"] },
       { key: "settlement", label: "Cash advance settlement", hint: "Settle advances and review balances", icon: "Banknote", to: "/expense-management/cash-advance/settlement", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
       { key: "reports", label: "Expense reports", hint: "All reports, with their status", icon: "FileText", to: "/expense-management/reports", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
     ],
@@ -128,10 +135,10 @@ const VIEWS = [
     roles: ["AP_EXECUTIVE"],
     subtitle: "What is still to be paid to employees, and what has been paid.",
     steps: [
-      { key: "toPay", label: "Waiting to pay", help: "Reports approved and waiting for payment.", tone: "indigo" },
-      { key: "toPayValue", label: "Amount to pay", help: "Still unpaid. Paid amounts are not counted.", tone: "blue" },
+      // What is waiting to be paid (count and amount) is the banner's headline, so it is not repeated as a figure.
       { key: "paidMonth", label: "Paid this month", help: "Payments confirmed this month.", tone: "emerald" },
-      { key: "failed", label: "Failed payments", help: "Payments that need follow-up.", tone: "rose" },
+      { key: "avgDays", label: "Avg time to pay", help: "From approval to payment, last 90 days.", tone: "violet" },
+      { key: "failed", label: "Failed payments", help: "Payment handoffs that need follow-up.", tone: "rose" },
     ],
     attentionTitle: "Waiting longest for payment",
     attentionEmpty: "Nothing waiting to be paid.",
@@ -142,8 +149,8 @@ const VIEWS = [
     activitySubtitle: "Payments confirmed recently",
     quickActions: [
       { key: "queue", label: "Payment queue", hint: "Reports approved and waiting for payment", icon: "Wallet", to: "/expense-management/ap-payments/queue", roles: ["AP_EXECUTIVE"], primary: true },
+      { key: "supplementaryPayments", label: "Supplementary payments", hint: "Record payments for approved supplementary claims", icon: "Wallet", to: "/expense-management/ap/supplementary-payments", roles: ["AP_EXECUTIVE"] },
       { key: "notifications", label: "Notifications", hint: "Updates on payments and returns", icon: "Bell", to: "/expense-management/activity/notifications", roles: ["AP_EXECUTIVE"] },
-      { key: "lateReceipts", label: "Late receipts", hint: "Receipts found after settlement, to review", icon: "ScanLine", to: "/expense-management/finance/late-receipts", roles: ["AP_EXECUTIVE"] },
     ],
     actions: [],
   },
@@ -153,9 +160,8 @@ const VIEWS = [
     roles: ["ADMIN", "SUPER_ADMIN"],
     subtitle: "Spend and activity across the organization.",
     steps: [
-      { key: "spendMonth", label: "Spend this month", help: "Expenses submitted this month.", tone: "indigo" },
-      { key: "submitted", label: "Reports submitted", help: "Reports submitted this month.", tone: "blue" },
-      { key: "claimants", label: "Active claimants", help: "Employees who claimed this month.", tone: "gray" },
+      // Spend, reports submitted and claimants this month are the banner's headline.
+      { key: "cycle", label: "Avg approval time", help: "From submission to approval, last 90 days.", tone: "indigo" },
       { key: "violations", label: "Open policy issues", help: "Policy issues on open reports.", tone: "amber" },
     ],
     activityTitle: "Latest submissions",
@@ -178,21 +184,24 @@ const VIEWS = [
 const viewStorageKey = (user) =>
   `xms.dashboard.view.${user?.employeeId || user?.email || user?.id || "anonymous"}`;
 
-const useDashboard = (view) =>
+const useDashboard = (view, enabled = true) =>
   useQuery({
     queryKey: ["xmsDashboard", view],
     queryFn: () => dashboardService.get(view).then((res) => res.data?.data),
-    enabled: !!view,
+    enabled: !!view && enabled,
     staleTime: 60_000,
   });
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, hasRole } = useAuth();
+  const queryClient = useQueryClient();
 
-  const available = useMemo(() => VIEWS.filter((v) => hasRole(v.roles)), [hasRole]);
+  const available = useMemo(() => VIEWS.filter((v) => !v.embedded && hasRole(v.roles)), [hasRole]);
+  const approvalsConfig = VIEWS.find((v) => v.view === "manager");
+  const canApprove = hasRole(approvalsConfig.roles);
   const defaultView = useMemo(() => {
-    const priority = ["ap", "finance", "manager", "admin", "employee"];
+    const priority = ["ap", "finance", "admin", "employee"];
     return priority.find((p) => available.some((v) => v.view === p)) || "employee";
   }, [available]);
   const [view, setView] = useState(() => {
@@ -211,7 +220,11 @@ export default function DashboardPage() {
     }
   }, [active.view]);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useDashboard(active.view);
+  const { data, isLoading, isError, error, refetch } = useDashboard(active.view);
+  const showApprovals = canApprove && active.view === "employee";
+  const approvals = useDashboard("manager", showApprovals);
+  const isFetching = useIsFetching({ queryKey: ["xmsDashboard"] }) > 0;
+  const refreshAll = () => queryClient.invalidateQueries({ queryKey: ["xmsDashboard"] });
   const currency = data?.baseCurrencyCode || "INR";
 
   return (
@@ -220,10 +233,10 @@ export default function DashboardPage() {
 
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold text-[#0a174e]">Dashboard</h1>
+          <h1 className="text-xl font-semibold text-[#0a174e]">Expense Management</h1>
           <p className="truncate text-sm text-slate-500">{active.subtitle}</p>
         </div>
-        <Button variant="outline" size="small" onClick={() => refetch()} disabled={isFetching}>
+        <Button variant="outline" size="small" onClick={refreshAll} disabled={isFetching}>
           <RefreshCw size={14} className={`mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
         </Button>
       </div>
@@ -254,15 +267,35 @@ export default function DashboardPage() {
           </Button>
         </div>
       ) : data ? (
-        <DashboardBody data={data} config={active} currency={currency} />
+        <>
+          {active.view === "finance" && <SupplementaryWaitingCard />}
+          <DashboardBody
+            data={data}
+            config={active}
+            currency={currency}
+            approvals={showApprovals ? <ApprovalsPanel config={approvalsConfig} query={approvals} currency={currency} /> : null}
+          />
+        </>
       ) : null}
     </div>
   );
 }
 
-function DashboardBody({ data, config, currency }) {
+function DashboardBody({ data, config, currency, approvals }) {
   if (config.ledgers) {
-    return <EmployeeMoneyFlow data={data} config={config} currency={currency} />;
+    return <EmployeeMoneyFlow data={data} config={config} currency={currency} approvals={approvals} />;
+  }
+  if (config.view === "finance") {
+    return <FinanceDashboard data={data} config={config} currency={currency} />;
+  }
+  if (config.view === "ap") {
+    return <ApDashboard data={data} config={config} currency={currency} />;
+  }
+  if (config.view === "admin") {
+    return <AdminDashboard data={data} config={config} currency={currency} />;
+  }
+  if (config.view === "ap") {
+    return <ApDashboard data={data} config={config} currency={currency} />;
   }
   return <RoleDashboard data={data} config={config} currency={currency} />;
 }

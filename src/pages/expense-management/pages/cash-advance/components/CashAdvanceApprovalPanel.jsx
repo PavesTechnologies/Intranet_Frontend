@@ -4,7 +4,8 @@ import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
-import ManagerDecisionSummary from "@/pages/expense-management/pages/cash-advance/components/ManagerDecisionSummary";
+import ManagerDecisionSummary, { payoutOf } from "@/pages/expense-management/pages/cash-advance/components/ManagerDecisionSummary";
+import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 
 const MANAGER_STAGE = ["SUBMITTED", "PENDING", "PENDING_APPROVAL", "PENDING_MANAGER_APPROVAL"];
 const COST_CENTER_STAGE = ["PENDING_COST_CENTER_APPROVAL", "PENDING_COST_CENTER"];
@@ -120,6 +121,12 @@ export default function CashAdvanceApprovalPanel({ advance, canAct, onChanged })
   };
 
   const finalNode = approved || rejected;
+  // At Finance's step the Approve button names the cash it releases. A Cash Advance + Outstanding request is approved
+  // through its allocation form instead, so it keeps the plain label.
+  const financeCash =
+    current === 3 && advance.requestType !== "ADVANCE_PLUS_OUTSTANDING" && advance.amount != null
+      ? payoutOf(advance, null).cash
+      : null;
 
   return (
     <div className="space-y-3">
@@ -158,7 +165,7 @@ export default function CashAdvanceApprovalPanel({ advance, canAct, onChanged })
       {canAct && !rejecting && (
         <div className="flex flex-wrap gap-2">
           <Button variant="success" disabled={busy} onClick={approve} className="text-xs">
-            Approve
+            {financeCash !== null ? `Approve & pay ${formatMoney(financeCash, advance.currencyCode || "INR")}` : "Approve"}
           </Button>
           <Button variant="danger" disabled={busy} onClick={() => setRejecting(true)} className="text-xs">
             Reject

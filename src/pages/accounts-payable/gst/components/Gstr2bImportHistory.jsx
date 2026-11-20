@@ -1,13 +1,16 @@
-import { importSpec } from "../../constants/gstItc";
+import { GSTR2B_SOURCE_TYPES, importModeSpec, importSpec } from "../../constants/gstItc";
 import { formatDate, formatDateTime } from "../../utils/formatters";
 import { Empty } from "../../dashboard/components/insights";
 import { useGstr2bImports } from "../hooks/useGstItc";
 import { periodLabel } from "../utils/gstFormat";
 import { ErrorBlock, LoadingBlock, SectionCard, StatusPill } from "./GstUi";
 
-/** Every GSTR-2B import of a financial year (current, replaced and failed) - GET /gstr2b/imports. */
-export default function Gstr2bImportHistory({ financialYear }) {
-  const { data, isLoading, isError, error } = useGstr2bImports({ financialYear });
+/**
+ * Every GSTR-2B import of a financial year (current, replaced and failed) - GET /gstr2b/imports.
+ * importMode ALL lists official and demo imports together; demo rows carry a DEMO badge.
+ */
+export default function Gstr2bImportHistory({ financialYear, importMode }) {
+  const { data, isLoading, isError, error } = useGstr2bImports({ financialYear, importMode });
 
   return (
     <SectionCard title={`Import history${financialYear ? ` · FY ${financialYear}` : ""}`}>
@@ -35,8 +38,13 @@ export default function Gstr2bImportHistory({ financialYear }) {
                     <div className="text-xs text-slate-400">FY {i.financial_year}</div>
                   </td>
                   <td className="max-w-[14rem] px-3 py-2">
-                    <span className="block truncate" title={i.file_name}>{i.file_name || "—"}</span>
-                    <span className="text-xs text-slate-400">{i.source_format}{i.generated_on ? ` · generated ${formatDate(i.generated_on)}` : ""}</span>
+                    <span className="flex items-center gap-1.5">
+                      {i.is_demo && <StatusPill spec={importModeSpec("DEMO")} />}
+                      <span className="block truncate" title={i.file_name}>{i.file_name || "—"}</span>
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {GSTR2B_SOURCE_TYPES[i.source_type] || i.source_format}{i.generated_on ? ` · generated ${formatDate(i.generated_on)}` : ""}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">
                     {formatDateTime(i.imported_at)}

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import ReportSupplementarySection from "@/pages/expense-management/pages/supplementary/ReportSupplementarySection";
 import { createPortal } from "react-dom";
 import {
   Plus,
@@ -68,6 +69,7 @@ import {
   validateTripDates,
 } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
+import ReportHeroCard from "@/pages/expense-management/components/expense-reports/ReportHeroCard";
 import {
   LineItemAllocationDetails,
   LineItemTaxDetails,
@@ -94,7 +96,6 @@ import FormTextArea from "@/components/forms/FormTextArea";
 import FormDatePicker from "@/components/forms/FormDatePicker";
 import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
 import ReceiptDropzone from "@/pages/expense-management/components/expense-reports/ReceiptDropzone";
-import LateReceiptPanel from "@/pages/expense-management/components/expense-reports/LateReceiptPanel";
 import PolicyStatusBadge, {
   PolicyResultBanner,
   derivePolicyStatus,
@@ -745,45 +746,48 @@ export default function ExpenseReportDetailPage() {
 
   // The Actions column always renders (it holds "View", which every role that can reach
   // this page is allowed to use) — only the Edit/Delete buttons inside it are role/status-gated.
-  const headers = ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Cost Center", "Billable", "Actions"];
-  const columns = ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "costCenter", "billable", "actions"];
+  const lineBaseCurrency = lineItems.find((li) => li.baseCurrencyCode)?.baseCurrencyCode || report?.baseCurrencyCode || "";
+  const headers = ["Expense", "Date", "Cost Center", "Policy", "Amount & GST", `Total${lineBaseCurrency ? ` (${lineBaseCurrency})` : ""}`, "Actions"];
+  const columns = ["expense", "date", "costCenter", "policy", "amount", "base", "actions"];
 
   const { pageItems: pagedLineItems, paginationProps: lineItemPager } = useClientPagination(filteredLineItems);
   const tableRows = pagedLineItems.map((li) => {
     const showCurrency = li.currencyCode && (li.currencyCode === "EUR" || li.currencyCode !== li.baseCurrencyCode);
     const rowObj = {
-      category: <span className="font-medium text-gray-800">{li.categoryName || "—"}</span>,
-      merchant: (
-        <div className="text-left">
-          <p className="font-medium text-gray-900">{li.merchantName || "—"}</p>
-          {li.description && <p className="text-xs text-gray-400 truncate max-w-[180px]">{li.description}</p>}
+      expense: (
+        <div className="min-w-[200px] text-left">
+          <p className="font-semibold text-[#0a174e]">{li.merchantName || "—"}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">{li.categoryName || "Uncategorised"}</span>
+            {li.clientBillable && (
+              <span className="rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">Client billable</span>
+            )}
+          </div>
+          {li.description && <p className="mt-1 max-w-[220px] truncate text-xs text-gray-400">{li.description}</p>}
         </div>
       ),
       date: formatDate(li.expenseDate),
       amount: (
-        <span className="font-mono font-semibold text-gray-900">
-          {formatAmount(li.amount)} <span className="text-xs text-gray-400">{li.currencyCode}</span>
-        </span>
+        <div className="whitespace-nowrap text-left">
+          <p className="font-semibold tabular-nums text-gray-900">
+            {formatAmount(li.amount)} <span className="text-xs font-normal text-gray-400">{li.currencyCode}</span>
+          </p>
+          <p className="mt-0.5 text-[11px] tabular-nums text-amber-600">
+            GST {formatAmount(li.taxAmount)}
+            {li.tax?.taxCode && <span className="ml-1 text-gray-400">· {li.tax.taxCode}</span>}
+          </p>
+          <TaxStatusBadge tax={li.tax} />
+        </div>
       ),
       policy: <PolicyStatusBadge lineStatus={li.lineStatus} policyWarnings={li.policyWarnings} />,
-      gst: (
-        <span className="inline-flex flex-col items-start gap-0.5">
-          <span className="font-mono text-amber-600">
-            {formatAmount(li.taxAmount)} {showCurrency && <span className="text-xs text-gray-400">{li.currencyCode}</span>}
-          </span>
-          {li.tax?.taxCode && <span className="text-[11px] text-gray-400">{li.tax.taxCode}</span>}
-          <TaxStatusBadge tax={li.tax} />
-        </span>
-      ),
-      net: (
-        <span className="font-mono font-semibold text-emerald-700">
-          {formatAmount(li.netAmount)} {showCurrency && <span className="text-xs text-gray-400">{li.currencyCode}</span>}
-        </span>
-      ),
       base: (
-        <span className="font-mono text-[#0A0082] font-semibold">
-          {formatAmount(li.baseAmount)} <span className="text-xs text-gray-400">{li.baseCurrencyCode}</span>
-        </span>
+        <div className="whitespace-nowrap text-left">
+          <p className="text-base font-bold tabular-nums text-[#0A0082]">{formatAmount(li.baseAmount)}</p>
+          <p className="text-[11px] tabular-nums text-emerald-700">
+            Net {formatAmount(li.netAmount)}
+            {showCurrency && <span className="ml-1 text-gray-400">{li.currencyCode}</span>}
+          </p>
+        </div>
       ),
       costCenter: (() => {
         const splits = lineItemSplitsMap[li.lineItemId] || [];
@@ -806,11 +810,6 @@ export default function ExpenseReportDetailPage() {
           </span>
         );
       })(),
-      billable: li.clientBillable ? (
-        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">Yes</span>
-      ) : (
-        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200">No</span>
-      ),
     };
 
     rowObj.actions = (
@@ -899,33 +898,11 @@ export default function ExpenseReportDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         {/* Left column */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Report Information */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            {linkedAdvance && (
-              <div className="mb-3 flex justify-end">
-                <div className="text-right">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                    Cash advance · {linkedAdvance.title || "Cash advance"}
-                  </p>
-                  <p className="text-2xl font-bold text-[#0a174e]">
-                    {linkedAdvance.currencyCode || ""} {formatAmount(linkedAdvance.amount)}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Balance {linkedAdvance.currencyCode || ""} {formatAmount(linkedAdvance.outstandingBalance)} ·{" "}
-                    {report.reportStatus !== "APPROVED"
-                      ? "reconciles automatically on approval"
-                      : Number(report.reimbursableAmount) > 0
-                        ? `payable to employee after the advance: ${report.currencyCode || ""} ${formatAmount(report.reimbursableAmount)}`
-                        : "fully covered by the advance"}
-                  </p>
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-xl font-bold text-[#0a174e]">{report.title}</h1>
-                  <ApprovalStatusPill
+          {/* Report header: status in plain words, total, actions, key facts and progress */}
+          <ReportHeroCard
+            report={{ ...report, totalAmount: lineItems.length ? lineItems.reduce((sum, li) => sum + (Number(li.baseAmount) || 0), 0) : report.totalAmount, lineItemCount: lineItems.length }}
+            statusPill={
+              <ApprovalStatusPill
                     status={report.reportStatus || "DRAFT"}
                     label={
                       report.reportStatus === "PENDING_APPROVAL" && approvalStatus?.currentLevelDisplayName
@@ -934,19 +911,16 @@ export default function ExpenseReportDetailPage() {
                     }
                     correctionRequestedBy={approvalStatus?.correctionRequestedBy}
                   />
-                </div>
-                <p className="text-xs text-gray-400 font-mono mt-1">{report.reportNumber}</p>
-                {deadlineInfo && (
+            }
+            deadline={deadlineInfo && (
                   <p className={`mt-1.5 text-xs font-medium ${deadlineInfo.isOverdue ? "text-red-700" : "text-gray-600"}`}>
                     {deadlineInfo.isOverdue
                       ? `Overdue: submission was due ${formatDeadlineDate(deadlineInfo.deadline)}`
                       : `Submit by ${formatDeadlineDate(deadlineInfo.deadline)} (${deadlineInfo.daysRemaining} day${deadlineInfo.daysRemaining === 1 ? "" : "s"} left)`}
                   </p>
                 )}
-              </div>
-
-              {canManage && (
-                <div className="flex gap-2 shrink-0 flex-wrap">
+            actions={canManage && (
+                <div className="flex flex-wrap gap-2 lg:justify-end">
                   {report.reportStatus === "DRAFT" && (
                     <Button
                       variant="primary"
@@ -1008,7 +982,37 @@ export default function ExpenseReportDetailPage() {
                   )}
                 </div>
               )}
-            </div>
+          >
+            {linkedAdvance && (
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5 sm:flex-row sm:items-center sm:justify-between" data-linked-advance>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0A0082]/10 text-[#0A0082]">
+                    <Landmark size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">Settles cash advance</p>
+                    <p className="truncate text-sm font-semibold text-[#0a174e]">{linkedAdvance.title || "Cash advance"}</p>
+                    <p className="text-xs text-slate-600">
+                      {report.reportStatus !== "APPROVED"
+                        ? "Reconciles automatically on approval"
+                        : Number(report.reimbursableAmount) > 0
+                          ? `Payable to you after the advance: ${report.currencyCode || ""} ${formatAmount(report.reimbursableAmount)}`
+                          : "Fully covered by the advance"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-4 sm:text-right">
+                  <div>
+                    <p className="text-[11px] text-slate-500">Advance</p>
+                    <p className="text-sm font-bold tabular-nums text-[#0a174e]">{linkedAdvance.currencyCode || ""} {formatAmount(linkedAdvance.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500">Balance</p>
+                    <p className="text-sm font-bold tabular-nums text-[#0A0082]">{linkedAdvance.currencyCode || ""} {formatAmount(linkedAdvance.outstandingBalance)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {["AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) && correctionRequests.length > 0 && (
               <div className="mt-4 rounded-lg bg-orange-50 border border-orange-200 px-4 py-3">
@@ -1052,26 +1056,24 @@ export default function ExpenseReportDetailPage() {
                 </Button>
               </div>
             )}
+          </ReportHeroCard>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <DetailField icon={<FileText size={16} />} label="Business Purpose" value={report.businessPurpose || "—"} />
-              <DetailField icon={<Briefcase size={16} />} label="Cost Center" value={report.costCenterName || "—"} />
-              <DetailField icon={<Landmark size={16} />} label="Report Currency" value={report.currencyCode || "—"} />
-              <DetailField icon={<Calendar size={16} />} label="Created" value={formatDate(report.createdAt)} />
-            </div>
-          </div>
-
-          {/* Late receipts: attached after approval without reopening the claim */}
-          <LateReceiptPanel reportId={report.reportId} reportStatus={report.reportStatus} lineItems={lineItems} />
+          {/* Supplementary claims: missed expenses claimed separately; this report itself is not changed */}
+          <ReportSupplementarySection reportId={report.reportId} />
 
           {/* Line Items */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 text-[#0A0082]">
-                  <Receipt size={16} />
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_1px_2px_rgba(10,0,130,0.04),0_10px_30px_-18px_rgba(10,0,130,0.18)] sm:p-5" data-line-items>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0A0082]/10 text-[#0A0082]">
+                  <Receipt size={18} />
                 </div>
-                <h2 className="text-base font-bold text-gray-900">Line Items</h2>
+                <div>
+                  <h2 className="text-base font-bold text-[#0a174e]">
+                    Expenses <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{lineItems.length}</span>
+                  </h2>
+                  <p className="text-xs text-slate-500">Each expense on this report, with its GST and amount in {lineBaseCurrency || "the base currency"}.</p>
+                </div>
               </div>
               {canManage && isReportEditable && (
                 <Button variant="primary" size="small" onClick={openAddLineItem} className="shadow-sm">
@@ -1112,7 +1114,7 @@ export default function ExpenseReportDetailPage() {
         </div>
 
         {/* Right column */}
-        <div className="lg:col-span-1">
+        <div className="space-y-4 lg:col-span-1">
           <SummaryPanel report={{ ...report, status: report?.reportStatus }} lineItems={lineItems} />
           <ReportHistoryTimeline reportId={reportId} />
         </div>
@@ -1124,6 +1126,8 @@ export default function ExpenseReportDetailPage() {
         reportId={reportId}
         lineItem={selectedLineItem}
         defaultCostCenterId={report.costCenterId}
+        defaultClientId={report.clientId}
+        defaultProjectId={report.projectId}
         categoryOptions={categoryOptions}
         costCenterOptions={costCenterOptions}
         currencyOptions={currencyOptions}
@@ -1593,7 +1597,8 @@ const compactSelectStyles = {
   menu: (base) => ({ ...base, zIndex: 9999 }),
 };
 
-const emptyForm = (defaultCostCenterId) => ({
+// A new line starts with the report's client and project, so a billable report needs no re-entry for each expense.
+const emptyForm = (defaultCostCenterId, defaultClientId, defaultProjectId) => ({
   categoryId: "",
   expenseDate: "",
   merchantName: "",
@@ -1602,11 +1607,11 @@ const emptyForm = (defaultCostCenterId) => ({
   currencyId: "",
   tax: emptyTaxValue,
   costCenterId: defaultCostCenterId || "",
-  clientBillable: false,
-  clientId: "",
+  clientBillable: !!defaultClientId,
+  clientId: defaultClientId || "",
   employeePaymentMethod: "",
   allocationReason: "",
-  projectId: "",
+  projectId: defaultProjectId || "",
 });
 
 export function LineItemDrawer({
@@ -1615,12 +1620,14 @@ export function LineItemDrawer({
   reportId,
   lineItem,
   defaultCostCenterId,
+  defaultClientId,
+  defaultProjectId,
   categoryOptions = [],
   costCenterOptions = [],
   currencyOptions = [],
   onSaved,
 }) {
-  const [formData, setFormData] = useState(emptyForm(defaultCostCenterId));
+  const [formData, setFormData] = useState(emptyForm(defaultCostCenterId, defaultClientId, defaultProjectId));
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [savedLineItem, setSavedLineItem] = useState(null);
@@ -1628,6 +1635,8 @@ export function LineItemDrawer({
   const [ocrReceiptId, setOcrReceiptId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  // A failed load is shown as an error, not as "no projects", so the two cases are never confused.
+  const [projectsError, setProjectsError] = useState("");
   const { clients, loading: loadingClients, error: clientsError, reload: loadClients } = useActiveClients();
   // The caller's home department, to tell when a chosen cost center needs a cross-department reason.
   const [homeDepartmentUuid, setHomeDepartmentUuid] = useState(null);
@@ -1689,10 +1698,12 @@ export function LineItemDrawer({
     const loadProjects = async () => {
       try {
         setLoadingProjects(true);
+        setProjectsError("");
         const list = await lookupService.getAssignedProjects();
         setProjects(Array.isArray(list) ? list : []);
       } catch (err) {
         console.error("Failed to load assigned projects:", err);
+        setProjectsError("Your assigned projects could not be loaded. You can save without a project.");
         showStatusToast("Could not load your assigned projects. Project is optional for billable expenses.", "error");
       } finally {
         setLoadingProjects(false);
@@ -1741,7 +1752,7 @@ export function LineItemDrawer({
         }
       }
     } else {
-      setFormData(emptyForm(defaultCostCenterId));
+      setFormData(emptyForm(defaultCostCenterId, defaultClientId, defaultProjectId));
       setTaxPreview(null);
       setSavedLineItem(null);
       setOcrReceiptId(null);
@@ -2396,6 +2407,7 @@ export function LineItemDrawer({
           clientsError={clientsError}
           onRetryClients={loadClients}
           projectsLoading={loadingProjects}
+          projectsError={projectsError}
           errors={formErrors}
           selectStyles={compactSelectStyles}
           disabled={submitting}

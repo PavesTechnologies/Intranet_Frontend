@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import { Check, X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import { AP_ROUTES } from "../../constants/routes";
-import { ITC_STATUS, RECON_REVIEW, eligibilitySpec, reconSpec } from "../../constants/gstItc";
+import { ITC_STATUS, RECON_REVIEW, eligibilitySpec, importModeSpec, reconSpec } from "../../constants/gstItc";
 import { formatDate, formatDateTime } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { useGstr2bMatchDetail, useMapGstr2bMatch, useReviewGstr2bMatch } from "../hooks/useGstItc";
@@ -109,7 +109,7 @@ export default function MatchDetailDrawer({ matchId, period, canManage, onClose,
       <Drawer
         open
         onClose={onClose}
-        title={data ? `GSTR-2B ${doc.document_number || ""}` : "GSTR-2B record"}
+        title={data ? `${data.is_demo ? "DEMO · " : ""}GSTR-2B ${doc.document_number || ""}` : "GSTR-2B record"}
         subtitle={data ? `${doc.supplier_name || ""} · ${doc.supplier_gstin || ""}` : undefined}
         footer={data && editable && (
           <div className="flex flex-wrap justify-end gap-2">
@@ -131,6 +131,12 @@ export default function MatchDetailDrawer({ matchId, period, canManage, onClose,
           <ErrorBlock error={error} fallback="Could not load the GSTR-2B record." />
         ) : data && (
           <>
+            {data.is_demo && (
+              <p role="note" className="rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                <StatusPill spec={importModeSpec("DEMO")} className="mr-1.5" />
+                {data.demo_notice || "Demo record - not a supplier filing. Reviews and mappings here never affect ITC."}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill spec={reconSpec(data.reconciliation_status)} />
               {data.review_status && <StatusPill spec={RECON_REVIEW[data.review_status] || { label: data.review_status, tone: "" }} />}

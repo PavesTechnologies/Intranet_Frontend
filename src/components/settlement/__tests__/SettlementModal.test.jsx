@@ -68,7 +68,7 @@ describe("SettlementModal", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Carry forward/ }));
 
     expect(carryForwardApi.markReady).toHaveBeenCalledWith(expect.objectContaining({ amount: 3000 }));
-    expect(await screen.findByText(/is ready to carry forward/)).toBeInTheDocument();
+    expect(await screen.findByText(/is carried forward and held in the employee.s outstanding/)).toBeInTheDocument();
   });
 
   it("creates a salary deduction request and reports it", async () => {

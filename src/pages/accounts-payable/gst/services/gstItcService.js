@@ -17,7 +17,7 @@ export function componentPayload(amounts) {
 /**
  * GST input tax credit API (/apm/gst/itc - Backend API_Layer/routes/gst_itc_route.py).
  * Eligibility, approval and claim status are decided and calculated by the backend; credit only
- * counts as claimed once a recorded GSTR-3B filing is verified by a second Finance user.
+ * counts as claimed once a recorded GSTR-3B filing is verified (the recorder may verify it).
  */
 export const gstItcService = {
   /** The month's purchase invoices with their GST split, ITC status and what needs attention. */
@@ -26,7 +26,16 @@ export const gstItcService = {
     return data;
   },
 
-  /** One invoice's credit: system suggestion vs Finance decision, approval, allocations, claim status. */
+  /**
+   * One return period's whole flow in one read (GET /itc/workflow): GSTR-2B import, matching, ITC eligibility,
+   * approval, ITC register, GSTR-3B claim (incl. Table 4) and the backend's `next_step`. OFFICIAL GSTR-2B only.
+   */
+  async workflow(returnPeriod) {
+    const { data } = await api.get(`${BASE}/workflow`, { params: { return_period: returnPeriod } });
+    return data;
+  },
+
+  /** One invoice's credit: system suggestion vs Finance decision, approval, allocations, claim status, itc_position. */
   async detail(invoiceId) {
     const { data } = await api.get(`${BASE}/${id(invoiceId)}`);
     return data;
@@ -99,7 +108,7 @@ export const gstItcService = {
     return data;
   },
 
-  /** A second Finance user verifies the filing; only then does its credit count as claimed. */
+  /** Verifies a recorded filing (any GST ITC manager, including its recorder); only then does its credit count as claimed. */
   async verifyFiling(filingId) {
     const { data } = await api.post(`${BASE}/gstr3b/filings/${id(filingId)}/verify`);
     return data;

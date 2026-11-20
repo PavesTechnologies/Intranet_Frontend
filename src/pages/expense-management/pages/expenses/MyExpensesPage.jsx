@@ -60,7 +60,7 @@ export default function MyExpensesPage() {
   const { hasRole } = useAuth();
   // Manager is read-only on the backend for report writes (ExpenseReportController
   // allows only ADMIN/GENERAL to create/update/delete/submit) — don't show write actions.
-  const canManage = hasRole(["General"]);
+  const canManage = hasRole(["General", "Manager"]);
  
   const [reports, setReports] = useState([]);
   const [isServerPaginated, setIsServerPaginated] = useState(false);
@@ -348,6 +348,18 @@ export default function MyExpensesPage() {
   const headers = ["S.No", "Title", "Cost Center", "Currency", "Total Amount", "Status", "Created", "Actions"];
   const columns = ["serial_no", "title", "costCenter", "currency", "totalAmount", "status", "created", "actions"];
  
+  // Every row action stays visible. An action that does not apply to this report is disabled, and its tooltip says why.
+  const reportEditState = (r) => {
+    if (!canManage) return { allowed: false, reason: "Only the report owner can edit this report." };
+    if (!REPORT_EDITABLE_STATUSES.includes(r.reportStatus)) return { allowed: false, reason: "A report can be edited only while it is a draft or needs correction." };
+    return { allowed: true, reason: "Edit Report" };
+  };
+  const reportDeleteState = (r) => {
+    if (!canManage) return { allowed: false, reason: "Only the report owner can delete this report." };
+    if (!REPORT_DELETABLE_STATUSES.includes(r.reportStatus)) return { allowed: false, reason: "A report can be deleted only while it is a draft or cancelled." };
+    return { allowed: true, reason: "Delete Report" };
+  };
+
   const tableRows = displayedReports.map((r, index) => ({
     serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
     reportNumber: <span className="font-mono text-[11px] font-semibold text-gray-700">{r.reportNumber || "—"}</span>,
@@ -440,13 +452,12 @@ export default function MyExpensesPage() {
         {canManage && (
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Button
-              onClick={() => navigate("/expense-management/expenses/outdated")}
-              variant="secondary"
+              onClick={() => navigate("/expense-management/expenses/supplementary")}
+              variant="outline"
               size="small"
               className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
             >
-              <Paperclip size={14} />
-              Outdated expense
+              Supplementary claim
             </Button>
             <Button
               onClick={handleCreateClick}

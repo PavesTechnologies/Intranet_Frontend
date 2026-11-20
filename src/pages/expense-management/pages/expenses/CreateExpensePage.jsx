@@ -253,6 +253,24 @@ export default function CreateExpensePage() {
       ),
     [lineItems]
   );
+  // Event dates follow the bills (expense line items): the event must cover the earliest and latest bill date. When a bill
+  // falls outside the current dates the range widens to include it; dates are never narrowed automatically.
+  useEffect(() => {
+    const dates = lineItems
+      .map((li) => (li.expenseDate ? String(li.expenseDate).slice(0, 10) : ""))
+      .filter(Boolean)
+      .sort();
+    if (dates.length === 0) return;
+    const earliest = dates[0];
+    const latest = dates[dates.length - 1];
+    setFormData((prev) => {
+      const tripStartDate = !prev.tripStartDate || earliest < prev.tripStartDate ? earliest : prev.tripStartDate;
+      const tripEndDate = !prev.tripEndDate || latest > prev.tripEndDate ? latest : prev.tripEndDate;
+      if (tripStartDate === prev.tripStartDate && tripEndDate === prev.tripEndDate) return prev;
+      return { ...prev, tripStartDate, tripEndDate };
+    });
+  }, [lineItems]);
+
   const [justifyDialog, setJustifyDialog] = useState(null); // { mode: "submit" | "save", items } | null
   const [justifySaving, setJustifySaving] = useState(false);
   const [justifyError, setJustifyError] = useState("");
@@ -1999,7 +2017,6 @@ export default function CreateExpensePage() {
   // Active RMS clients for the report's client field (a report needs a project or a client before it is submitted).
   const [clients, setClients] = useState([]);
   // Yes/No: whether this report is for a client. No hides the client field and clears it.
-  const [forClient, setForClient] = useState(false);
   useEffect(() => {
     Promise.resolve()
       .then(() => lookupService.getActiveClients())
@@ -2059,15 +2076,6 @@ export default function CreateExpensePage() {
             <p className="text-sm text-gray-500 mt-0.5">
               Start a new expense report, then add individual line items with receipts.
             </p>
-            {hasRole(["General", "Admin"]) && (
-              <button
-                type="button"
-                onClick={() => navigate("/expense-management/expenses/outdated")}
-                className="mt-2 inline-flex items-center rounded-md border border-blue-600 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
-              >
-                Outdated expense
-              </button>
-            )}
           </div>
 
         </div>
@@ -2148,53 +2156,6 @@ export default function CreateExpensePage() {
 
               {/* COST CENTER */}
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Project</label>
-                  <Select
-                    options={projectOptions}
-                    value={projectOptions.find((o) => o.value === formData.projectId) || null}
-                    onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
-                    placeholder="Search and select project..."
-                    noOptionsMessage={() => "No projects assigned to you"}
-                    isClearable
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Is this client billable?</label>
-                  <div className="flex gap-2">
-                    <Button type="button" size="small" variant={forClient ? "primary" : "outline"} onClick={() => setForClient(true)}>
-                      Yes
-                    </Button>
-                    <Button
-                      type="button"
-                      size="small"
-                      variant={forClient ? "outline" : "primary"}
-                      onClick={() => {
-                        setForClient(false);
-                        handleSelectChange("clientId", "");
-                      }}
-                    >
-                      No
-                    </Button>
-                  </div>
-                </div>
-                {forClient && (
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">Client</label>
-                    <Select
-                      options={clientOptions}
-                      value={clientOptions.find((o) => o.value === formData.clientId) || null}
-                      onChange={(opt) => handleSelectChange("clientId", opt ? opt.value : "")}
-                      placeholder="Search and select client..."
-                      isClearable
-                    />
-                  </div>
-                )}
-                <p className="text-xs text-gray-500 sm:col-span-2">
-                  Choose a project or a client for this event. One of them is required before you submit.
-                </p>
-              </div>
 
               <div className="space-y-1">
 
