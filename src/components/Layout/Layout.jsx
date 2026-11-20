@@ -6,6 +6,7 @@ import ErrorBoundary from "../ErrorBoundary";
 import { TourProvider } from "../Tour/TourContext";
 import TourOverlay from "../Tour/TourOverlay";
 import TourNudge from "../Tour/TourNudge";
+import ChatbotWidget from "../Chatbot/ChatbotWidget";
 import { getApplicationFromPath, isCanonicalPageShellRoute } from "../../utils/applicationRoutes";
 
 const Layout = () => {
@@ -69,6 +70,8 @@ const Layout = () => {
       </div>
       <TourOverlay />
       <TourNudge />
+      {/* Intranet assistant — module-aware chat, see components/Chatbot. */}
+      <ChatbotWidget />
     </div>
     </TourProvider>
   );
