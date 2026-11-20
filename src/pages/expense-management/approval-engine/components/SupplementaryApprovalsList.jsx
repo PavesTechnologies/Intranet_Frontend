@@ -153,7 +153,7 @@ export default function SupplementaryApprovalsList({
       <tbody className="divide-y divide-gray-100">
         {loadError && (
           <tr>
-            <td colSpan={8} role="alert" className="bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <td colSpan={10} role="alert" className="bg-amber-50 px-4 py-3 text-sm text-amber-900">
               {loadError}
             </td>
           </tr>
@@ -182,6 +182,8 @@ export default function SupplementaryApprovalsList({
             <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap text-xs">
               {formatMoney(c.totalAmount, c.currencyCode)}
             </td>
+            <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
+            <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
             <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
               <div className="flex items-center justify-end gap-1">
                 <button type="button" onClick={() => openClaim(c)} title="View claim" aria-label={`View ${c.claimNumber}`}

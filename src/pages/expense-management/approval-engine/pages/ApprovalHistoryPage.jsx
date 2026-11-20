@@ -70,7 +70,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
     return (
       <>
         {isPending && (
-          <tbody><tr><td colSpan={8} className="py-10 text-center text-xs text-gray-500">Loading…</td></tr></tbody>
+          <tbody><tr><td colSpan={10} className="py-10 text-center text-xs text-gray-500">Loading…</td></tr></tbody>
         )}
         {!isPending && !isError && filteredItems.length > 0 && (
           <tbody className="divide-y divide-gray-100">
@@ -86,6 +86,8 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                 <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate">{report.costCenterName || "—"}</td>
                 <td className="px-2.5 py-1.5 text-left whitespace-nowrap"><ApprovalStatusPill status={report.reportStatus} /></td>
                 <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
+                <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
+                <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
                 <td className="px-2.5 py-1.5 text-right">
                   <button
                     type="button"

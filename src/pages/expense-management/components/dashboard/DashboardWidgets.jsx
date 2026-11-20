@@ -100,6 +100,29 @@ export function TrendChart({ points, currency, mode = "money", countLabel = "Ite
   }
 
   const data = points.map((p) => ({ ...p, primary: Number(p.primary) || 0 }));
+
+  // "moneyBars": the same money series as columns, one per month.
+  if (mode === "moneyBars") {
+    return (
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart data={data} margin={{ top: 8, right: 8, left: 4, bottom: 0 }} barCategoryGap="32%">
+          <CartesianGrid vertical={false} stroke={CHROME.grid} />
+          <XAxis dataKey="label" {...axisProps} />
+          <YAxis {...axisProps} axisLine={false} width={64} tickFormatter={(v) => formatMoney(v, currency, { compact: true })} />
+          <Tooltip
+            cursor={{ fill: "rgba(42,120,214,0.06)" }}
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const p = payload[0].payload;
+              return <TooltipBox title={`${label} ${String(p.period || "").slice(0, 4)}`} rows={[[primaryLabel, formatMoney(p.primary, currency), ACCENT], [countLabel, p.count]]} />;
+            }}
+          />
+          <Bar dataKey="primary" name={primaryLabel} fill={ACCENT} radius={[4, 4, 0, 0]} maxBarSize={56} />
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={240}>
       <AreaChart data={data} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>

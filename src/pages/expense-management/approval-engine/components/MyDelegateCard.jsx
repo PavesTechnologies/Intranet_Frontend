@@ -72,13 +72,13 @@ export default function MyDelegateCard() {
   if (!myEmployeeId) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[#0A0082]/20 bg-[#0A0082]/[0.025] px-4 py-3">
       <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-indigo-50 text-[#0A0082]">
-          <UserRoundCog className="h-4 w-4" />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0A0082] shadow-sm ring-1 ring-[#0A0082]/10">
+          <UserRoundCog className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-900">My Delegate</p>
+          <p className="text-sm font-semibold text-[#0a174e]">My Delegate</p>
           {myDelegation ? (
             <p className="text-xs text-gray-500">
               <EmployeeLabel employeeId={myDelegation.delegateId} className="font-medium text-gray-700" /> covers your approvals from{" "}

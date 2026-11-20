@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import SegmentedControl from "@/components/ui/SegmentedControl";
+import EmptyPanel, { GhostRows } from "@/components/ui/EmptyPanel";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 import {
   ACTIVITY_FILTERS,
@@ -78,10 +79,33 @@ const VIEW_ALL = {
   all: { to: "/expense-management/expenses/my", label: "View all reports" },
 };
 
+const CREATE_LINKS = {
+  report: "/expense-management/expenses/create",
+  advance: "/expense-management/cash-advance/request",
+};
+
 const EMPTY_TEXT = {
   all: "No activity yet. Advances you request and reports you submit will appear here.",
   advance: "No cash advance activity yet.",
   report: "No expense report activity yet.",
+};
+
+// What the empty tab explains, and the path that fills it.
+const EMPTY_DETAIL = {
+  all: {
+    title: "No activity yet",
+    steps: ["Request an advance or create a report", "Submit it for approval", "Track it here to payment"],
+  },
+  advance: {
+    title: "No cash advance activity yet",
+    text: "Advances you request show here with their amount, status and when they changed, from request through approval, disbursement and settlement.",
+    steps: ["Request an advance", "Manager and Finance approve", "Settle it with your expenses"],
+  },
+  report: {
+    title: "No expense report activity yet",
+    text: "Reports you create show here with their number, amount, status and last update, from draft through approval to payment.",
+    steps: ["Create a report", "Add expenses and receipts", "Submit for approval"],
+  },
 };
 
 const KIND_LABEL = { advance: "Cash advance", report: "Expense report" };
@@ -149,7 +173,6 @@ export default function RecentActivity({
   const [status, setStatus] = useState("all");
   const [period, setPeriod] = useState("all");
   const [search, setSearch] = useState("");
-  const [limit, setLimit] = useState(ACTIVITY_LIMIT);
 
   const rows = useMemo(
     () => buildActivityRows(advances || [], reports || []),
@@ -157,18 +180,14 @@ export default function RecentActivity({
   );
   const byKind = filterActivityRows(rows, filter);
   const matching = refineActivityRows(byKind, { status, period, search });
-  const visible = matching.slice(0, limit);
+  // Only the latest few rows are shown here; "More" opens the full list for the chosen tab.
+  const visible = matching.slice(0, ACTIVITY_LIMIT);
   const refined = status !== "all" || period !== "all" || search.trim() !== "";
-  // Any filter change starts the list again from the first page.
-  const change = (setter) => (value) => {
-    setter(value);
-    setLimit(ACTIVITY_LIMIT);
-  };
+  const change = (setter) => (value) => setter(value);
   const clearFilters = () => {
     setStatus("all");
     setPeriod("all");
     setSearch("");
-    setLimit(ACTIVITY_LIMIT);
   };
 
   // Status counts reflect the type, period and search chosen, so each option says how many rows it would show.
@@ -294,7 +313,7 @@ export default function RecentActivity({
         <p className="rounded-lg bg-rose-50 px-4 py-6 text-center text-sm text-rose-700">
           Recent activity couldn't be loaded.
         </p>
-      ) : visible.length === 0 ? (
+      ) : visible.length === 0 && refined && byKind.length ? (
         <div
           className="flex flex-col items-center gap-2 rounded-2xl bg-gradient-to-b from-slate-50 to-white px-4 py-10 text-center"
           data-testid="activity-empty"
@@ -302,12 +321,21 @@ export default function RecentActivity({
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0A0082]/10 text-[#0A0082]">
             <Inbox size={20} aria-hidden="true" />
           </span>
-          <p className="max-w-sm text-sm text-slate-600">
-            {refined && byKind.length
-              ? "Nothing matches these filters."
-              : EMPTY_TEXT[filter]}
-          </p>
+          <p className="max-w-sm text-sm text-slate-600">Nothing matches these filters.</p>
         </div>
+      ) : visible.length === 0 ? (
+        <EmptyPanel
+          icon={filter === "advance" ? Banknote : filter === "report" ? ReceiptText : Inbox}
+          title={EMPTY_DETAIL[filter].title}
+          text={EMPTY_DETAIL[filter].text || EMPTY_TEXT[filter]}
+          preview={<GhostRows />}
+          steps={EMPTY_DETAIL[filter].steps}
+          actions={[
+            filter !== "advance" && canOpenReports && { label: "Create expense report", to: CREATE_LINKS.report, icon: ReceiptText, primary: true },
+            filter !== "report" && canOpenAdvances && { label: "Request cash advance", to: CREATE_LINKS.advance, icon: Banknote, primary: filter === "advance" },
+          ].filter(Boolean)}
+          data-testid="activity-empty"
+        />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
           {/* text-left on purpose: a global stylesheet centres table text */}
@@ -427,13 +455,15 @@ export default function RecentActivity({
                 {formatMoney(total, currency)}
               </span>
             </p>
-            {matching.length > visible.length && (
+            {matching.length > visible.length && viewAll && (
               <button
                 type="button"
-                onClick={() => setLimit((l) => l + ACTIVITY_LIMIT)}
+                data-activity-more
+                onClick={() => navigate(viewAll.to)}
+                title={viewAll.label}
                 className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold text-[#0A0082] transition hover:bg-[#0A0082]/[0.06]"
               >
-                Show more <ChevronDown size={13} aria-hidden="true" />
+                More <ArrowRight size={13} aria-hidden="true" />
               </button>
             )}
           </div>

@@ -8,7 +8,7 @@ export const ACTIVITY_FILTERS = [
   { key: "report", label: "Expense reports" },
 ];
 
-export const ACTIVITY_LIMIT = 8;
+export const ACTIVITY_LIMIT = 5;
 const REMINDER_WINDOW_DAYS = 7;
 
 // Advances that no longer owe anything, or never went anywhere, are not settlement reminders.

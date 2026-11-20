@@ -258,6 +258,8 @@ export const XMS_SUBMENU = [
     label: "Finance",
     to: "/expense-management/finance",
     allowedRoles: XMS_FINANCE_VERIFICATION,
+    // Exact match, so "Finance" is not highlighted as well on its sub-pages (e.g. /finance/supplementary-claims).
+    end: true,
   },
   {
     // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")
