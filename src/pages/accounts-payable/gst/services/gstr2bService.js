@@ -6,8 +6,11 @@ const BASE = `${window.__APP_CONFIG__.AP_BASE_URL}/gst/gstr2b`;
 /** Drops empty params so the backend applies its own defaults. */
 const params = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== ""));
 
-/** Import modes (backend import_mode). OFFICIAL is the backend default, so it is only sent on uploads. */
-export const IMPORT_MODE = { OFFICIAL: "OFFICIAL", DEMO: "DEMO", ALL: "ALL" };
+/**
+ * Import modes (backend import_mode). OFFICIAL is the backend default, so it is only sent on uploads. AUTO (uploads
+ * only) lets the backend identify OFFICIAL / DEMO from the file's sheets and headers.
+ */
+export const IMPORT_MODE = { OFFICIAL: "OFFICIAL", DEMO: "DEMO", ALL: "ALL", AUTO: "AUTO" };
 const modeParam = (importMode) => (importMode && importMode !== IMPORT_MODE.OFFICIAL ? importMode : undefined);
 
 /**

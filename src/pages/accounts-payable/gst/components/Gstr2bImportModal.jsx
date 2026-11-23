@@ -18,41 +18,51 @@ import { ConfirmDialog, DocumentTotals, StatusPill } from "./GstUi";
 const MAX_BYTES = 10 * 1024 * 1024;
 const PREVIEW_ROWS = 10;
 
-/** What each mode accepts - shown before upload, and enforced again by the backend. */
-const MODES = {
-  [IMPORT_MODE.OFFICIAL]: {
-    title: "Official GST Portal Excel",
+const ACCEPTED = [".xlsx", ".json", ".csv"];
+
+/**
+ * The formats one upload accepts. The backend identifies which one a file is from its worksheets and header rows
+ * (import_mode=AUTO) - never from the file name - and refuses anything else.
+ */
+const FORMATS = [
+  {
+    title: "GST portal GSTR-2B",
     icon: Landmark,
-    summary: "Production GSTR-2B reconciliation",
-    accepted: [".xlsx", ".json", ".csv"],
-    fileError: "Upload the GSTR-2B as .xlsx or .json from the GST portal, or the .csv template.",
-    requirements: [
-      "The GSTR-2B downloaded from the GST portal (Returns Dashboard → GSTR-2B → Download) as Excel or JSON; the CSV template is accepted too.",
-      "Excel sheets reconciled: B2B, B2BA, B2B-CDNR and B2B-CDNRA, each with the portal header row “GSTIN of supplier”. Other sheets (ISD, IMPG, …) are reported, not imported.",
+    lines: [
+      "Excel or JSON downloaded from the GST portal (Returns Dashboard → GSTR-2B → Download); the CSV template is accepted too.",
+      "Excel sheets reconciled: B2B, B2BA, B2B-CDNR and B2B-CDNRA, with the portal header “GSTIN of supplier”. Other sheets (ISD, IMPG, …) are reported, not imported.",
       "A month's GSTR-2B is generated on the 14th of the following month - it cannot be imported earlier.",
     ],
   },
-  [IMPORT_MODE.DEMO]: {
-    title: "Demo Excel Template",
+  {
+    title: "AP demo Excel template",
     icon: FlaskConical,
-    summary: "Demonstrations and testing only",
-    accepted: [".xlsx"],
-    fileError: "The demo template is an Excel workbook (.xlsx).",
-    requirements: [
-      "The AP demo Excel template (.xlsx) with one worksheet named B2B and the header on its first row.",
-      `Columns: ${GSTR2B_DEMO_COLUMNS.map((c) => c.header).join(", ")}. Required: ${GSTR2B_DEMO_COLUMNS.filter((c) => c.required).map((c) => c.header).join(", ")}.`,
-      "Every record is marked DEMO, kept apart from the official GSTR-2B, and never used for ITC eligibility, GSTR-3B approval or claims.",
+    lines: [
+      `One worksheet named B2B with ${GSTR2B_DEMO_COLUMNS.map((c) => c.header).join(", ")} (required: ${GSTR2B_DEMO_COLUMNS.filter((c) => c.required).map((c) => c.header).join(", ")}).`,
+      "Imported as DEMO data - kept apart from the official GSTR-2B and never used for ITC eligibility, GSTR-3B approval or claims.",
     ],
   },
-};
+];
 
-function validateFile(file, mode) {
+function validateFile(file) {
   if (!file) return "Choose the GSTR-2B file.";
   const name = file.name.toLowerCase();
-  if (!MODES[mode].accepted.some((ext) => name.endsWith(ext))) return MODES[mode].fileError;
+  if (!ACCEPTED.some((ext) => name.endsWith(ext))) return "Upload the GSTR-2B Excel (.xlsx) - or the portal JSON / CSV template.";
   if (file.size === 0) return "The file is empty.";
   if (file.size > MAX_BYTES) return "The file is larger than 10 MB.";
   return "";
+}
+
+/** "Detected format" line of a preview / result: what the backend identified the file as. */
+function DetectedFormat({ data }) {
+  if (!data?.import_mode) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-2 text-xs text-slate-600" aria-label="Detected format">
+      <span className="font-medium text-slate-700">{data.mode_detected === false ? "Format:" : "Detected format:"}</span>
+      {GSTR2B_SOURCE_TYPES[data.source_type] || data.source_type || data.source_format}
+      <StatusPill spec={importModeSpec(data.import_mode)} />
+    </p>
+  );
 }
 
 /** The backend answers 409 for both a replace that was not confirmed and the identical file again. */
@@ -109,10 +119,9 @@ function ImportPreview({ preview }) {
     <section aria-label="Import preview" className={clsx("space-y-3 rounded-lg border p-4 text-sm",
       preview.is_demo ? "border-amber-300 bg-amber-50/40" : "border-slate-200 bg-slate-50/60")}>
       <p className="flex flex-wrap items-center gap-2 font-medium text-slate-800">
-        Preview · {GSTR2B_SOURCE_TYPES[preview.source_type] || preview.source_type}
-        {preview.return_period && <span className="font-normal text-slate-500">· {periodLabel(preview.return_period)}</span>}
-        <StatusPill spec={importModeSpec(preview.import_mode)} />
+        Preview{preview.return_period && <span className="font-normal text-slate-500">· {periodLabel(preview.return_period)}</span>}
       </p>
+      <DetectedFormat data={preview} />
       {preview.is_demo && <DemoNotice text={preview.demo_notice} />}
       <Counts items={[["Records in file", preview.total_records], ["Will be imported", preview.accepted_records],
         ["Skipped (blank / total rows)", preview.skipped_records], ["Rejected", preview.rejected_records, true]]} />
@@ -180,6 +189,7 @@ function ImportResult({ result }) {
         <StatusPill spec={importSpec(result.import_status)} />
         {result.import_mode && <StatusPill spec={importModeSpec(result.import_mode)} />}
       </p>
+      <DetectedFormat data={result} />
       {demo && <DemoNotice text={result.demo_notice} />}
       <Counts items={[["Records in file", result.total_records], ["Imported", result.accepted_records ?? result.success_records],
         ["Skipped", result.skipped_records], ["Rejected", result.rejected_records ?? result.failed_records, true]]} />
@@ -209,17 +219,18 @@ function ImportResult({ result }) {
 }
 
 /**
- * Imports a GSTR-2B for a return period in one of two modes - the official GST portal Excel (B2B,
- * B2BA, B2B-CDNR, B2B-CDNRA sheets) / JSON / CSV template, or the AP demo Excel template - after a
- * preview of what the backend would import. When the period already has an import of the same mode
- * the user must confirm replacing it; only then is replace=true sent. The backend keeps the previous
- * import as history, and a demo import never replaces or mixes with the official one.
+ * Imports a GSTR-2B for a return period: the user picks only the period and the file. The preview is
+ * requested with import_mode=AUTO - the backend identifies the official GST portal Excel (B2B, B2BA,
+ * B2B-CDNR, B2B-CDNRA sheets) / JSON / CSV template or the AP demo Excel template from the file's
+ * structure, and refuses anything else. The import then sends the mode the preview reported, so what is
+ * imported is exactly what was previewed. When the period already has an import of that mode the user
+ * must confirm replacing it; only then is replace=true sent. A demo import never replaces or mixes with
+ * the official one.
  */
 export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, periods = [], onImported }) {
   const inputRef = useRef(null);
   const importFile = useImportGstr2b();
   const previewFile = usePreviewGstr2b();
-  const [mode, setMode] = useState(IMPORT_MODE.OFFICIAL);
   const [returnPeriod, setReturnPeriod] = useState(defaultPeriod || "");
   const [file, setFile] = useState(null);
   const [fileError, setFileError] = useState("");
@@ -230,7 +241,7 @@ export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, peri
   const [confirmReplace, setConfirmReplace] = useState(null); // null | backend message | ""
   const [result, setResult] = useState(null);
   const busy = importFile.isPending || previewFile.isPending;
-  const spec = MODES[mode];
+  const demo = Boolean(preview?.is_demo);
 
   const reset = () => {
     setFile(null);
@@ -245,33 +256,26 @@ export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, peri
   const close = () => {
     if (busy) return;
     reset();
-    setMode(IMPORT_MODE.OFFICIAL);
     setReturnPeriod(defaultPeriod || "");
     onClose();
-  };
-
-  const chooseMode = (next) => {
-    if (busy || next === mode) return;
-    reset();
-    setMode(next);
   };
 
   const pick = (picked) => {
     setResult(null);
     setPreview(null);
     setError("");
-    const message = validateFile(picked, mode);
+    const message = validateFile(picked);
     setFileError(message);
     setFile(message ? null : picked);
   };
 
   const runPreview = async () => {
-    const message = validateFile(file, mode);
+    const message = validateFile(file);
     if (message) return setFileError(message);
     if (!/^\d{4}-\d{2}$/.test(returnPeriod)) return setError("Choose the return period (YYYY-MM).");
     setError("");
     try {
-      setPreview(await previewFile.mutateAsync({ file, returnPeriod, importMode: mode }));
+      setPreview(await previewFile.mutateAsync({ file, returnPeriod, importMode: IMPORT_MODE.AUTO }));
     } catch (err) {
       setPreview(null);
       setError(getApiErrorMessage(err, "Could not read the file."));
@@ -284,7 +288,8 @@ export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, peri
     setError("");
     setProgress(0);
     try {
-      const r = await importFile.mutateAsync({ file, returnPeriod, replace, importMode: mode, onUploadProgress: setProgress });
+      // the mode the backend identified in the preview - the import is validated against it again
+      const r = await importFile.mutateAsync({ file, returnPeriod, replace, importMode: preview.import_mode, onUploadProgress: setProgress });
       setConfirmReplace(null);
       setResult(r);
       setPreview(null);
@@ -302,9 +307,9 @@ export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, peri
 
   const start = () => {
     if (!preview) return undefined;
-    // The period already has an import of this mode: ask before anything is sent.
+    // The period already has an import of the detected mode: ask before anything is sent.
     const existing = preview.replace_required || periods.some((p) => p.period === returnPeriod
-      && (mode === IMPORT_MODE.DEMO ? p.demo_imported : p.gstr2b_imported));
+      && (demo ? p.demo_imported : p.gstr2b_imported));
     if (existing) return setConfirmReplace("");
     return upload(false);
   };
@@ -323,7 +328,7 @@ export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, peri
         isOpen={isOpen}
         onClose={close}
         title="Import GSTR-2B"
-        subtitle="Choose the import mode, the return period and the file - then check the preview before importing"
+        subtitle="Choose the return period and the GSTR-2B file - its format is identified automatically. Check the preview before importing."
         size="2xl"
         closeOnBackdrop={!busy}
         footer={(
@@ -344,37 +349,19 @@ export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, peri
         )}
       >
         <div className="space-y-4">
-          <fieldset disabled={busy || Boolean(result)}>
-            <legend className="text-xs font-medium text-slate-600">Import mode <span className="text-rose-600">*</span></legend>
-            <div role="radiogroup" aria-label="Import mode" className="mt-1 grid gap-2 sm:grid-cols-2">
-              {Object.entries(MODES).map(([key, m]) => {
-                const Icon = m.icon;
-                const selected = mode === key;
-                return (
-                  <label key={key} className={clsx("flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm transition",
-                    selected ? (key === IMPORT_MODE.DEMO ? "border-amber-400 bg-amber-50/60 ring-1 ring-amber-300" : "border-[#0A0082] bg-indigo-50/60 ring-1 ring-[#0A0082]/30")
-                      : "border-slate-200 hover:bg-slate-50")}>
-                    <input type="radio" name="gstr2b-import-mode" value={key} checked={selected} onChange={() => chooseMode(key)}
-                      className="mt-1" aria-label={m.title} />
-                    <Icon className={clsx("mt-0.5 h-4 w-4 shrink-0", key === IMPORT_MODE.DEMO ? "text-amber-600" : "text-indigo-600")} aria-hidden />
-                    <span>
-                      <span className="block font-medium text-slate-800">{m.title}</span>
-                      <span className="block text-xs text-slate-500">{m.summary}</span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-
           <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600" aria-label="Supported file format">
-            <p className="font-medium text-slate-700">{spec.title} - supported format</p>
-            <ul className="mt-1 list-disc space-y-0.5 pl-4">{spec.requirements.map((r) => <li key={r}>{r}</li>)}</ul>
-            {mode === IMPORT_MODE.DEMO && (
-              <button type="button" onClick={downloadDemoTemplate} className="mt-2 inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline">
-                <Download className="h-3.5 w-3.5" aria-hidden /> Download the demo template
-              </button>
-            )}
+            <p className="font-medium text-slate-700">Supported formats - identified automatically from the file&apos;s sheets and headers</p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              {FORMATS.map(({ title, icon: Icon, lines }) => (
+                <div key={title}>
+                  <p className="flex items-center gap-1.5 font-medium text-slate-700"><Icon className="h-3.5 w-3.5" aria-hidden /> {title}</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">{lines.map((l) => <li key={l}>{l}</li>)}</ul>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={downloadDemoTemplate} className="mt-2 inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline">
+              <Download className="h-3.5 w-3.5" aria-hidden /> Download the demo template
+            </button>
           </div>
 
           <label className="block text-xs font-medium text-slate-600">
@@ -418,10 +405,10 @@ export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, peri
                     Drag the file here, or{" "}
                     <button type="button" className="font-medium text-indigo-600 hover:underline" onClick={() => inputRef.current?.click()}>browse</button>
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">{spec.accepted.join(", ")} · up to 10 MB</p>
+                  <p className="mt-1 text-xs text-slate-400">GSTR-2B Excel (.xlsx) · portal JSON or CSV template also accepted · up to 10 MB</p>
                 </>
               )}
-              <input ref={inputRef} type="file" className="hidden" aria-label="GSTR-2B file" accept={spec.accepted.join(",")}
+              <input ref={inputRef} type="file" className="hidden" aria-label="GSTR-2B file" accept={ACCEPTED.join(",")}
                 onChange={(e) => pick(e.target.files?.[0])} />
             </div>
           )}
@@ -443,13 +430,13 @@ export default function Gstr2bImportModal({ isOpen, onClose, defaultPeriod, peri
 
       <ConfirmDialog
         open={confirmReplace !== null}
-        title={mode === IMPORT_MODE.DEMO ? "Replace Existing Demo Import?" : "Replace Existing GSTR-2B Import?"}
+        title={demo ? "Replace Existing Demo Import?" : "Replace Existing GSTR-2B Import?"}
         message={(
           <>
             <p>
-              {mode === IMPORT_MODE.DEMO ? "A demo import" : "An import"} already exists for {periodLabel(returnPeriod)}. Replacing it will create a new import version.
+              {demo ? "A demo import" : "An import"} already exists for {periodLabel(returnPeriod)}. Replacing it will create a new import version.
               Previous import history will be retained. Existing manual mappings will carry over where supported.
-              {mode === IMPORT_MODE.DEMO && " The official GSTR-2B import of the period is not affected."}
+              {demo && " The official GSTR-2B import of the period is not affected."}
             </p>
             {confirmReplace && <p className="mt-2 text-xs text-slate-500">{confirmReplace}</p>}
           </>
