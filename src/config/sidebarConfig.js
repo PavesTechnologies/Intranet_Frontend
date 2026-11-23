@@ -251,9 +251,15 @@ export const XMS_SUBMENU = [
   {
     label: "Approvals",
     to: "/expense-management/approvals",
-    // Approvers only. Employees (General) do not get this menu item, and Finance approvals are on the Finance tab.
-    // The route (XMS_APPROVALS_PAGE_ROLES) also lets Finance in, for the supplementary-claims link on their dashboard.
+    // Approvers only: employees (General) do not get this menu item. The route (XMS_APPROVALS_PAGE_ROLES) also lets
+    // Finance in, for the supplementary-claims link on their dashboard.
     allowedRoles: XMS_APPROVER_ROLES,
+    // Approvals are the reporting manager's queue. Finance users act on the Finance page instead,
+    // so the entry is hidden for them unless they are also a reporting manager / manager.
+    hiddenForRoles: {
+      roles: [ROLES.FINANCE, ROLES.FINANCE_EXECUTIVE, ROLES.FINANCE_MANAGER],
+      unless: [ROLES.REPORTING_MANAGER, ROLES.MANAGER, ...ADMIN_ROLES],
+    },
   },
   {
     // One page: verify, queried, and verified reports with their AP payment status.

@@ -148,16 +148,7 @@ describe('RequestAdvancePage: mandatory preview before submit', () => {
     });
   });
 
-  it('keeps Submit disabled until a preview has been calculated', async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeDisabled();
-    expect(screen.getByText(/Preview the calculation before you submit/)).toBeInTheDocument();
-  });
-
-  it('drops the preview when the amount changes, so Submit is disabled again until a fresh preview', async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+  const fillValidForm = async () => {
     fireEvent.change(screen.getByLabelText(/^Amount Required/), { target: { value: '5000' } });
     fireEvent.change(screen.getByLabelText(/title/i), { target: { value: 'Pune trip' } });
     fireEvent.change(screen.getByLabelText(/purpose/i), { target: { value: 'Client visit' } });
@@ -165,13 +156,46 @@ describe('RequestAdvancePage: mandatory preview before submit', () => {
     fireEvent.change(screen.getByLabelText(/settlement expected date/i), { target: { value: daysFromToday(20) } });
     fireEvent.click(screen.getByRole('button', { name: /select currency/i }));
     fireEvent.click(await screen.findByRole('option', { name: /INR/ }));
+  };
+
+  it('keeps Submit clickable before a preview, and says Submit will calculate first', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeEnabled();
+    expect(screen.getByText(/Submit calculates the amounts first/)).toBeInTheDocument();
+  });
+
+  it('Submit without a preview runs the preview first, then asks to confirm; nothing is created before that', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+    await fillValidForm();
+
+    fireEvent.click(screen.getByRole('button', { name: /Submit Request/i }));
+    expect(await screen.findByText('Calculation preview')).toBeInTheDocument();
+    expect(cashAdvanceApi.preview).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/Cash requested now/)).toBeInTheDocument();
+    expect(cashAdvanceApi.create).not.toHaveBeenCalled();
+  });
+
+  it('Submit with an invalid form runs no preview and does not open the confirmation', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Submit Request/i }));
+    expect(await screen.findByText('Title is required.')).toBeInTheDocument();
+    expect(cashAdvanceApi.preview).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Cash requested now/)).not.toBeInTheDocument();
+  });
+
+  it('drops the preview when the amount changes, so the next Submit calculates it again', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/no outstanding cash advance/)).toBeInTheDocument());
+    await fillValidForm();
 
     fireEvent.click(screen.getByRole('button', { name: /Preview calculation/ }));
     expect(await screen.findByText('Calculation preview')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeEnabled();
 
     fireEvent.change(screen.getByLabelText(/^Amount Required/), { target: { value: '6000' } });
     await waitFor(() => expect(screen.queryByText('Calculation preview')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /Submit Request/i })).toBeDisabled();
   });
 });

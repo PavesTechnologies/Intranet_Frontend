@@ -16,10 +16,13 @@ import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-ad
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import CashAdvanceApprovalPanel from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceApprovalPanel";
 import DecisionNotice from "@/pages/expense-management/pages/cash-advance/components/DecisionNotice";
+import AdvanceMoneySummary from "@/pages/expense-management/pages/cash-advance/components/AdvanceMoneySummary";
+import { figuresForAdvance } from "@/pages/expense-management/pages/cash-advance/useAdvanceFigures";
 import { canApproveAdvance } from "@/pages/expense-management/approval-engine/components/CashAdvanceApprovalsList";
 import {
   formatDate,
   formatMoney,
+  formatTripDates,
   getCostCenterValue,
   getStatusBadge,
   hasSubmittedLinkedReport,
@@ -177,9 +180,6 @@ export default function CashAdvanceDetailPage() {
   const verifiedExpenses = settlement?.totalAdjustedAmount ?? advance.verifiedExpenseAmount ?? 0;
   const outstanding = settlement?.outstandingBalance ?? advance.outstandingBalance ?? 0;
   const closedWithBalance = status === "CLOSED" && Number(outstanding) > 0;
-  // Shown figures: a carry-forward the employee chose counts as carried forward at once, not as outstanding.
-  const carriedForwardShown = (Number(advance.carriedOutAmount) || 0) + carryForwardReady;
-  const outstandingShown = Math.max((Number(outstanding) || 0) - carryForwardReady, 0);
 
   // Statuses in which the backend accepts a repayment (matches CashAdvanceServiceImpl.repay)
   const repayableStatuses = [
@@ -195,270 +195,236 @@ export default function CashAdvanceDetailPage() {
 
   // Checked before the request is sent. The backend checks again and is the authority.
 
+  const Fact = ({ label, children, wide = false }) => (
+    <div className={`min-w-0 ${wide ? "sm:col-span-2" : ""}`}>
+      <dt className="text-[11px] font-medium text-gray-400">{label}</dt>
+      <dd className="mt-0.5 text-sm text-gray-800">{children}</dd>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <Breadcrumb items={breadcrumbs} />
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5 text-blue-600" />
-
-          <h1 className="text-lg font-bold text-gray-900">
-            {isSettlementView ? "Settlement & Lifecycle" : "Cash Advance Lifecycle"} {formatAdvanceNumber(advance)}
-          </h1>
+      {/* Header: what this advance is and where it stands */}
+      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0A0082]/10 text-[#0A0082]">
+            <DollarSign size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+              {isSettlementView ? "Settlement & Lifecycle" : "Cash Advance"}
+            </p>
+            <h1 className="truncate text-lg font-bold text-[#0a174e]">{advance.title || "Cash Advance"}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {getStatusBadge(advance.status)}
+              <span className="font-mono text-[11px] text-gray-400">{formatAdvanceNumber(advance)}</span>
+            </div>
+          </div>
         </div>
 
-        <Button variant="outline" onClick={() => navigate(backPath)} className="text-xs">
+        <Button variant="outline" onClick={() => navigate(backPath)} className="shrink-0 text-xs">
           <ArrowLeft size={13} className="mr-1.5" /> {backLabel}
         </Button>
       </div>
 
-      <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 text-xs shadow-sm">
-        {closedWithBalance && (
-          <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <p>
-              This advance is marked Closed, but {formatMoney(outstanding, advance.currencyCode || "INR")} is still
-              outstanding. A closed advance should have a zero balance. Check the audit trail before relying on this status.
-            </p>
-          </div>
-        )}
-
-        {/* 7-Stage Workflow Lifecycle Stepper */}
-        <CashAdvanceWorkflowStepper
-          currentStatus={advance.status}
-          linkedExpenseReport={advance.linkedExpenseReport}
-        />
-
-        <div className="flex items-center justify-between bg-blue-50/50 p-3 rounded-lg border border-blue-100">
-          <div>
-            <p className="text-[10px] font-semibold uppercase text-blue-600">
-              {isApprovalView ? "Requested Amount" : "Advance Disbursed Amount"}
-            </p>
-            <p className="text-lg font-bold text-blue-900 mt-0.5">
-              {formatMoney(advance.amount, advance.currencyCode || "INR")}
-            </p>
-          </div>
-          <div>{getStatusBadge(advance.status)}</div>
-        </div>
-
-        {!isSettlementView && (
-          <DecisionNotice
-            advance={advance}
-            isOwner={!!user?.employeeId && user.employeeId === advance.employeeId}
-            onChanged={fetchAdvance}
-          />
-        )}
-
-
-        {/* Settlement breakdown (settlement view only) */}
-        {isSettlementView && (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            {[
-              ["Disbursed", formatMoney(advance.amount, advance.currencyCode || "INR"), "text-gray-900"],
-              ["Verified Expenses", formatMoney(verifiedExpenses, advance.currencyCode || "INR"), "text-blue-700"],
-              ["Carried forward", formatMoney(carriedForwardShown, advance.currencyCode || "INR"), "text-indigo-700"],
-              ["Salary deduction", formatMoney(salaryDeducted, advance.currencyCode || "INR"), "text-rose-700"],
-              ["Outstanding Balance", formatMoney(outstandingShown, advance.currencyCode || "INR"), outstandingShown > 0 ? "text-amber-700" : "text-gray-900"],
-            ].map(([label, value, tone]) => (
-              <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
-                <p className={`mt-1 text-sm font-bold ${tone}`}>{value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Server-calculated utilization from the linked expense reports (settlement view only; figures are not recalculated here) */}
-        {isSettlementView && utilization && (
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[#0a174e]">Utilization from expense reports</h4>
-              <span className="text-[11px] font-semibold text-gray-600">Closure: {utilization.closureStatus?.replace(/_/g, " ")}</span>
-            </div>
-
-            {Number(utilization.reimbursementOwedAmount) > 0 && (
-              <p className="text-xs font-semibold text-amber-700">
-                Awaiting employee reimbursement:{" "}
-                {formatMoney(utilization.reimbursementOwedAmount, utilization.currencyCode || advance.currencyCode || "INR")}.
-                This advance closes once it is paid.
-              </p>
-            )}
-
-            {!utilization.balanceConsistent && (
-              <p className="text-xs font-semibold text-rose-700">
-                Stored outstanding balance does not match the ledger. Check the adjustments and repayments before closing.
-              </p>
-            )}
-
-            {utilization.linkedReports?.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-gray-500">
-                      <th className="py-1.5 pr-4 font-semibold">Report</th>
-                      <th className="py-1.5 pr-4 font-semibold">Status</th>
-                      <th className="py-1.5 pr-4 font-semibold text-right">Claimed</th>
-                      <th className="py-1.5 font-semibold text-right">Reserved</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {utilization.linkedReports.map((r) => (
-                      <tr key={r.reportId} className="border-t border-gray-100">
-                        <td className="py-1.5 pr-4 font-mono">{r.reportNumber}</td>
-                        <td className="py-1.5 pr-4">{r.reportStatus?.replace(/_/g, " ")}</td>
-                        <td className="py-1.5 pr-4 text-right">{formatMoney(r.claimedAmount ?? 0, utilization.currencyCode || "INR")}</td>
-                        <td className="py-1.5 text-right">{formatMoney(r.reservedAmount ?? 0, utilization.currencyCode || "INR")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {utilization.categories?.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-gray-500">
-                      <th className="py-1.5 pr-4 font-semibold">Category</th>
-                      <th className="py-1.5 pr-4 font-semibold text-right">Lines</th>
-                      <th className="py-1.5 pr-4 font-semibold text-right">Claimed</th>
-                      <th className="py-1.5 pr-4 font-semibold text-right">Approved</th>
-                      <th className="py-1.5 pr-4 font-semibold text-right">Returned</th>
-                      <th className="py-1.5 font-semibold text-right">Missing receipts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {utilization.categories.map((c) => (
-                      <tr key={c.categoryId ?? c.categoryName} className="border-t border-gray-100">
-                        <td className="py-1.5 pr-4">{c.categoryName}</td>
-                        <td className="py-1.5 pr-4 text-right">{c.lineCount}</td>
-                        <td className="py-1.5 pr-4 text-right">{formatMoney(c.claimedAmount ?? 0, utilization.currencyCode || "INR")}</td>
-                        <td className="py-1.5 pr-4 text-right">{formatMoney(c.approvedAmount ?? 0, utilization.currencyCode || "INR")}</td>
-                        <td className="py-1.5 pr-4 text-right">{formatMoney(c.returnedAmount ?? 0, utilization.currencyCode || "INR")}</td>
-                        <td className={`py-1.5 text-right ${c.missingReceiptCount > 0 ? "font-semibold text-rose-700" : ""}`}>{c.missingReceiptCount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Stage 6 Adjustment Card */}
-        {["DISBURSED", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "PARTIALLY_ADJUSTED", "ADJUSTED", "SETTLED", "SETTLEMENT_PENDING", "CLOSED"].includes(status) && (
-          <CashAdvanceAdjustmentCard
-            advanceAmount={advance.amount}
-            verifiedExpenseAmount={verifiedExpenses}
-            currencyCode={advance.currencyCode || "INR"}
-            status={advance.status}
-            outstandingBalance={outstanding}
-            carriedOutAmount={advance.carriedOutAmount ?? 0}
-            carryForwardReady={carryForwardReady}
-            salaryDeductedAmount={salaryDeducted}
-            expenseReport={advance.linkedExpenseReport}
-          />
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase">Employee</p>
-            <p className="font-semibold text-gray-800 mt-0.5">
-              <EmployeeLabel employeeId={advance.employeeId || advance.employee_id} showIdSubtext />
-            </p>
-          </div>
-          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase">Report #</p>
-            <p className="font-mono font-medium text-blue-700 mt-0.5">{formatAdvanceNumber(advance)}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase">Title</p>
-            <p className="font-semibold text-gray-800 mt-0.5">{advance.title || "Cash Advance"}</p>
-          </div>
-          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase">Cost Center</p>
-            <p className="font-semibold text-gray-800 mt-0.5">{getCostCenterValue(advance)}</p>
-          </div>
-        </div>
-
-        <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase">Purpose / Business Justification</p>
-          <p className="text-gray-800 mt-1 leading-relaxed whitespace-pre-line">
-            {advance.purpose || "No justification provided."}
+      {closedWithBalance && (
+        <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <p>
+            This advance is marked Closed, but {formatMoney(outstanding, currencyCode)} is still
+            outstanding. A closed advance should have a zero balance. Check the audit trail before relying on this status.
           </p>
         </div>
+      )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase">Needed By Date</p>
-            <p className="font-medium text-gray-800 mt-0.5">{formatDate(advance.neededByDate)}</p>
-          </div>
-          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase">Settlement Due Date</p>
-            <p className="font-medium text-gray-800 mt-0.5">{formatDate(advance.settlementDueDate)}</p>
-          </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Left: details, progress and the actions for this stage */}
+        <div className="min-w-0 space-y-4 text-xs lg:col-span-2">
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="mb-3 text-sm font-bold text-[#0a174e]">Details</h3>
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+              <Fact label="Employee">
+                <span className="font-semibold"><EmployeeLabel employeeId={advance.employeeId || advance.employee_id} showIdSubtext /></span>
+              </Fact>
+              <Fact label="Cost center"><span className="font-semibold">{getCostCenterValue(advance)}</span></Fact>
+              <Fact label="Trip dates">{formatTripDates(advance)}</Fact>
+              <Fact label="Needed by">{formatDate(advance.neededByDate)}</Fact>
+              <Fact label="Settlement due">{formatDate(advance.settlementDueDate)}</Fact>
+              <Fact label="Report #"><span className="font-mono text-xs text-[#0A0082] break-all">{formatAdvanceNumber(advance)}</span></Fact>
+              <Fact label="Purpose / business justification" wide>
+                <span className="whitespace-pre-line leading-relaxed">{advance.purpose || "No justification provided."}</span>
+              </Fact>
+              {advance.notes && (
+                <Fact label="Notes & remarks" wide>
+                  <span className="text-gray-700">{advance.notes}</span>
+                </Fact>
+              )}
+            </dl>
+          </section>
+
+          {/* 7-Stage Workflow Lifecycle Stepper */}
+          <CashAdvanceWorkflowStepper
+            currentStatus={advance.status}
+            linkedExpenseReport={advance.linkedExpenseReport}
+          />
+
+          {!isSettlementView && (
+            <DecisionNotice
+              advance={advance}
+              isOwner={!!user?.employeeId && user.employeeId === advance.employeeId}
+              onChanged={fetchAdvance}
+            />
+          )}
+
+          {/* Server-calculated utilization from the linked expense reports (settlement view only; figures are not recalculated here) */}
+          {isSettlementView && utilization && (
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#0a174e]">Utilization from expense reports</h4>
+                <span className="text-[11px] font-semibold text-gray-600">Closure: {utilization.closureStatus?.replace(/_/g, " ")}</span>
+              </div>
+
+              {Number(utilization.reimbursementOwedAmount) > 0 && (
+                <p className="text-xs font-semibold text-amber-700">
+                  Awaiting employee reimbursement:{" "}
+                  {formatMoney(utilization.reimbursementOwedAmount, utilization.currencyCode || currencyCode)}.
+                  This advance closes once it is paid.
+                </p>
+              )}
+
+              {!utilization.balanceConsistent && (
+                <p className="text-xs font-semibold text-rose-700">
+                  Stored outstanding balance does not match the ledger. Check the adjustments and repayments before closing.
+                </p>
+              )}
+
+              {utilization.linkedReports?.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-gray-500">
+                        <th className="py-1.5 pr-4 font-semibold">Report</th>
+                        <th className="py-1.5 pr-4 font-semibold">Status</th>
+                        <th className="py-1.5 pr-4 font-semibold text-right">Claimed</th>
+                        <th className="py-1.5 font-semibold text-right">Reserved</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {utilization.linkedReports.map((r) => (
+                        <tr key={r.reportId} className="border-t border-gray-100">
+                          <td className="py-1.5 pr-4 font-mono">{r.reportNumber}</td>
+                          <td className="py-1.5 pr-4">{r.reportStatus?.replace(/_/g, " ")}</td>
+                          <td className="py-1.5 pr-4 text-right">{formatMoney(r.claimedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                          <td className="py-1.5 text-right">{formatMoney(r.reservedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {utilization.categories?.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-gray-500">
+                        <th className="py-1.5 pr-4 font-semibold">Category</th>
+                        <th className="py-1.5 pr-4 font-semibold text-right">Lines</th>
+                        <th className="py-1.5 pr-4 font-semibold text-right">Claimed</th>
+                        <th className="py-1.5 pr-4 font-semibold text-right">Approved</th>
+                        <th className="py-1.5 pr-4 font-semibold text-right">Returned</th>
+                        <th className="py-1.5 font-semibold text-right">Missing receipts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {utilization.categories.map((c) => (
+                        <tr key={c.categoryId ?? c.categoryName} className="border-t border-gray-100">
+                          <td className="py-1.5 pr-4">{c.categoryName}</td>
+                          <td className="py-1.5 pr-4 text-right">{c.lineCount}</td>
+                          <td className="py-1.5 pr-4 text-right">{formatMoney(c.claimedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                          <td className="py-1.5 pr-4 text-right">{formatMoney(c.approvedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                          <td className="py-1.5 pr-4 text-right">{formatMoney(c.returnedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                          <td className={`py-1.5 text-right ${c.missingReceiptCount > 0 ? "font-semibold text-rose-700" : ""}`}>{c.missingReceiptCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Stage 6 Adjustment Card */}
+          {["DISBURSED", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "PARTIALLY_ADJUSTED", "ADJUSTED", "SETTLED", "SETTLEMENT_PENDING", "CLOSED"].includes(status) && (
+            <CashAdvanceAdjustmentCard
+              advanceAmount={advance.amount}
+              verifiedExpenseAmount={verifiedExpenses}
+              currencyCode={currencyCode}
+              status={advance.status}
+              outstandingBalance={outstanding}
+              carriedOutAmount={advance.carriedOutAmount ?? 0}
+              carryForwardReady={carryForwardReady}
+              salaryDeductedAmount={salaryDeducted}
+              expenseReport={advance.linkedExpenseReport}
+            />
+          )}
+
+          {isSettlementView && settlement && (
+            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#0a174e]">Money movement</h4>
+              <MoneyMovements
+                settlement={settlement}
+                currencyCode={currencyCode}
+                advanceId={advance.advanceId || advance.id || advanceId}
+                carriedOut={advance.carriedOutAmount ?? 0}
+                carryForwardReady={carryForwardReady}
+                salaryDeducted={salaryDeducted}
+              />
+            </section>
+          )}
+
+          {canRepay && (
+            <SettleBalancePanel
+              advanceId={advance.advanceId || advance.id || advanceId}
+              advanceNumber={formatAdvanceNumber(advance)}
+              outstanding={outstanding}
+              currencyCode={currencyCode}
+              onSettled={() => {
+                fetchAdvance();
+                carryLock.reload();
+              }}
+            />
+          )}
+
+          {isApprovalView && (
+            <CashAdvanceApprovalPanel
+              advance={advance}
+              canAct={canApproveAdvance(advance, user, hasRole)}
+              onChanged={fetchAdvance}
+            />
+          )}
+
+          {!isApprovalView && !isSettlementView && ["DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "SETTLEMENT_PENDING", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED"].includes(status) && Number(outstanding) > 0 && (
+            <div>
+              <Button
+                variant="primary"
+                onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${advance.advanceId || advance.id}`)}
+                disabled={hasSubmittedLinkedReport(advance)}
+                title={hasSubmittedLinkedReport(advance) ? "An expense report is already submitted for this advance" : undefined}
+                className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <Send size={13} className="mr-1.5" /> Stage 4: Submit Linked Expenses
+              </Button>
+            </div>
+          )}
         </div>
 
-        {isSettlementView && settlement && (
-          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#0a174e]">Money movement</h4>
-            <MoneyMovements
-              settlement={settlement}
-              currencyCode={currencyCode}
-              advanceId={advance.advanceId || advance.id || advanceId}
-              carriedOut={advance.carriedOutAmount ?? 0}
-              carryForwardReady={carryForwardReady}
-              salaryDeducted={salaryDeducted}
-            />
-          </section>
-        )}
-
-        {canRepay && (
-          <SettleBalancePanel
-            advanceId={advance.advanceId || advance.id || advanceId}
-            advanceNumber={formatAdvanceNumber(advance)}
-            outstanding={outstanding}
-            currencyCode={currencyCode}
-            onSettled={() => {
-              fetchAdvance();
-              carryLock.reload();
-            }}
-          />
-        )}
-
-        {advance.notes && (
-          <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase">Notes & Remarks</p>
-            <p className="text-gray-700 mt-1">{advance.notes}</p>
-          </div>
-        )}
-
-        {isApprovalView && (
-          <CashAdvanceApprovalPanel
-            advance={advance}
-            canAct={canApproveAdvance(advance, user, hasRole)}
-            onChanged={fetchAdvance}
-          />
-        )}
-
-        {!isApprovalView && !isSettlementView && ["DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "SETTLEMENT_PENDING", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED"].includes(status) && Number(outstanding) > 0 && (
-          <div className="pt-2">
-            <Button
-              variant="primary"
-              onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${advance.advanceId || advance.id}`)}
-              disabled={hasSubmittedLinkedReport(advance)}
-              title={hasSubmittedLinkedReport(advance) ? "An expense report is already submitted for this advance" : undefined}
-              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              <Send size={13} className="mr-1.5" /> Stage 4: Submit Linked Expenses
-            </Button>
-          </div>
-        )}
+        {/* Right: the money, as a short statement */}
+        <div className="lg:sticky lg:top-4 lg:self-start">
+          <AdvanceMoneySummary advance={advance} figures={figuresForAdvance(advance, utilization, salaryDeducted)} />
+        </div>
       </div>
     </div>
   );

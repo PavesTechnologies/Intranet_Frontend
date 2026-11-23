@@ -5,17 +5,19 @@ import {
   AlertTriangle,
   Eye,
   Inbox,
-  Layers,
   ShieldAlert,
   Lock,
   ClipboardCheck,
   MessageSquareWarning,
   Hourglass,
   BadgeCheck,
+  Check,
+  X,
+  RefreshCw,
+  Wallet,
 } from "lucide-react";
+import { getStatusBadge } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
-import PageHeader from "@/components/ui/PageHeader";
-import FilterCard from "@/components/ui/FilterCard";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import GenericTable from "@/components/Table/table";
@@ -28,7 +30,6 @@ import Modal from "@/components/Modal/modal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import PolicyEmptyState from "../../components/policy/common/PolicyEmptyState";
-import SelectableStatCard from "../../components/common/SelectableStatCard";
 import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
 import InvoiceHandoffBadge from "../../components/expense-reports/InvoiceHandoffBadge";
 import { formatMoney, formatDate } from "../../approval-engine/constants/approvalLabels";
@@ -38,6 +39,7 @@ import RequestTypeBadge, { reportTypeOf } from "@/pages/expense-management/compo
 const TABS = [
   { value: "ALL", label: "All" },
   { value: "PENDING", label: "To verify" },
+  { value: "ADVANCES", label: "Advances to approve" },
   { value: "QUERIED", label: "Queried" },
   { value: "VERIFIED", label: "Verified & payments" },
 ];
@@ -52,6 +54,7 @@ const PAYMENT_FILTERS = [
 const EMPTY_TEXT = {
   ALL: ["Nothing to show yet.", "Reports and cash advances at every stage appear here, newest first."],
   PENDING: ["Nothing to verify right now.", "Expense reports reach Finance after the manager approves them."],
+  ADVANCES: ["No cash advances waiting.", "Cash advances reach Finance after the manager approves them."],
   QUERIED: ["No open queries.", "Reports you send back to an employee for correction appear here until they resubmit."],
   VERIFIED: ["Nothing verified yet.", "Reports you verify appear here, with whether AP has paid the employee."],
 };
@@ -182,8 +185,11 @@ export default function FinancePage() {
 
   const queriesByTab = { PENDING: pendingQuery, QUERIED: queriedQuery, VERIFIED: verifiedQuery };
   const isAll = activeTab === "ALL";
+  const isAdvancesTab = activeTab === "ADVANCES";
+  // "All" and "Advances to approve" are paged on screen; the other statuses are paged by the server.
+  const clientPaged = isAll || isAdvancesTab;
   const sourceQueries = [pendingQuery, queriedQuery, verifiedQuery];
-  // "All" reads the first page of each expense status and merges them; the pager is hidden for it.
+  // "All" reads the first page of each expense status and merges them.
   const activeQuery = isAll
     ? {
         data: undefined,
@@ -191,6 +197,14 @@ export default function FinancePage() {
         isError: sourceQueries.some((q) => q.isError),
         error: sourceQueries.find((q) => q.error)?.error,
         refetch: () => sourceQueries.forEach((q) => q.refetch()),
+      }
+    : isAdvancesTab
+    ? {
+        data: undefined,
+        isLoading: advancesQuery.isLoading,
+        isError: advancesQuery.isError,
+        error: advancesQuery.error,
+        refetch: advancesQuery.refetch,
       }
     : queriesByTab[activeTab];
   const { data, isLoading, isError, error, refetch } = activeQuery;
@@ -234,10 +248,29 @@ export default function FinancePage() {
 
   const navigate = useNavigate();
 
-  const reviewButton = (item, label, variant = "outline") => (
-    <Button size="small" variant={variant} onClick={() => setReviewingReport(item)}>
-      {label}
-    </Button>
+  // Row actions are icons; the title/aria-label carry the name.
+  const ICON_BTN = "inline-flex h-8 w-8 items-center justify-center rounded-lg transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40";
+  const reviewButton = (item, label) => {
+    const toReview = label === "Review";
+    return (
+      <button
+        type="button"
+        title={toReview ? "Review and verify" : "View"}
+        aria-label={`${toReview ? "Review" : "View"} ${item.reportNumber || "report"}`}
+        onClick={() => setReviewingReport(item)}
+        className={`${ICON_BTN} ${toReview ? "bg-[#0A0082]/10 text-[#0A0082] hover:bg-[#0A0082] hover:text-white" : "text-gray-500 hover:bg-blue-50 hover:text-blue-600"}`}
+      >
+        {toReview ? <ClipboardCheck size={16} /> : <Eye size={16} />}
+      </button>
+    );
+  };
+
+  // A pulsing dot marks rows that are waiting for this user.
+  const WaitingDot = () => (
+    <span className="relative mr-1.5 inline-flex h-2 w-2 shrink-0 align-middle" title="Waiting for you" aria-label="Waiting for you">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+    </span>
   );
 
 
@@ -265,12 +298,32 @@ export default function FinancePage() {
   const query = searchTerm.toLowerCase();
   const advanceList = isAll
     ? allAdvances.filter((adv) => advanceIsPending(adv) || advanceIsDone(adv))
-    : activeTab === "PENDING"
+    : isAdvancesTab
     ? allAdvances.filter(advanceIsPending)
     : activeTab === "VERIFIED"
     ? allAdvances.filter(advanceIsDone)
     : [];
-  const advanceTabOf = (adv) => (isAll ? (advanceIsPending(adv) ? "PENDING" : "VERIFIED") : activeTab);
+  const advanceTabOf = (adv) => (advanceIsPending(adv) ? "PENDING" : "VERIFIED");
+  const pendingAdvanceCount = allAdvances.filter(advanceIsPending).length;
+  const doneAdvanceCount = allAdvances.filter(advanceIsDone).length;
+  const pendingReportCount = pendingQuery.data?.totalElements ?? 0;
+  const waitingCount = pendingReportCount + pendingAdvanceCount;
+  const countFor = (tab) => {
+    switch (tab) {
+      case "ALL":
+        return sourceQueries.reduce((sum, q) => sum + (q.data?.totalElements ?? 0), 0) + pendingAdvanceCount + doneAdvanceCount;
+      case "PENDING":
+        return pendingReportCount;
+      case "ADVANCES":
+        return pendingAdvanceCount;
+      case "VERIFIED":
+        return (verifiedQuery.data?.totalElements ?? 0) + doneAdvanceCount;
+      default:
+        return queriesByTab[tab]?.data?.totalElements ?? 0;
+    }
+  };
+  // Tabs with something waiting for this user get a dot.
+  const tabNeedsYou = (tab) => (tab === "PENDING" ? pendingReportCount > 0 : tab === "ADVANCES" ? pendingAdvanceCount > 0 : tab === "ALL" && waitingCount > 0);
   const visibleAdvances = advanceList.filter(
     (adv) =>
       !query ||
@@ -282,35 +335,61 @@ export default function FinancePage() {
   const allRows = [
     ...filteredItems.map((item) => ({
       type: <RequestTypeBadge type={reportTypeOf(item)} />,
-      reference: <span className="font-mono text-xs font-semibold text-gray-700">{item.reportNumber}</span>,
+      reference: (
+        <span className="inline-flex items-center font-mono text-xs font-semibold text-gray-700">
+          {tabOf(item) === "PENDING" && <WaitingDot />}
+          {item.reportNumber}
+        </span>
+      ),
       employee: <EmployeeLabel employeeId={item.employeeId} />,
       amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</span>,
       status: expenseStatusCell(item),
       date: formatDate(item.submittedAt || item.actionedAt),
-      action: reviewButton(item, tabOf(item) === "PENDING" ? "Review" : "View", tabOf(item) === "PENDING" ? "primary" : "outline"),
+      action: reviewButton(item, tabOf(item) === "PENDING" ? "Review" : "View"),
     })),
     ...visibleAdvances.map((adv) => ({
       type: <RequestTypeBadge type="ADVANCE" />,
-      reference: <span className="font-mono text-xs font-semibold text-gray-700">{advanceRef(adv)}</span>,
+      reference: (
+        <span className="inline-flex items-center font-mono text-xs font-semibold text-gray-700">
+          {advanceTabOf(adv) === "PENDING" && <WaitingDot />}
+          {advanceRef(adv)}
+        </span>
+      ),
       employee: <EmployeeLabel employeeId={adv.employeeId || adv.employee_id} />,
       amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(adv.amount, adv.currencyCode)}</span>,
-      status: <span className="text-xs text-gray-700">{(adv.status || "").replace(/_/g, " ")}</span>,
+      status: getStatusBadge(adv.status),
       date: formatDate(adv.neededByDate),
       action: (
-        <div className="flex gap-1">
+        <div className="flex items-center justify-center gap-1">
           <button
             type="button"
             title="View"
-            aria-label="View cash advance"
+            aria-label={`View cash advance ${advanceRef(adv)}`}
             onClick={() => navigate(`/expense-management/approvals/cash-advance/${adv.advanceId || adv.id}`)}
-            className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+            className={`${ICON_BTN} text-gray-500 hover:bg-blue-50 hover:text-blue-600`}
           >
-            <Eye size={15} />
+            <Eye size={16} />
           </button>
           {advanceTabOf(adv) === "PENDING" && (
             <>
-              <Button size="small" variant="primary" onClick={() => setApprovingAdvance(adv)}>Approve</Button>
-              <Button size="small" variant="outline" onClick={() => setRejectingAdvance(adv)}>Reject</Button>
+              <button
+                type="button"
+                title="Approve"
+                aria-label={`Approve cash advance ${advanceRef(adv)}`}
+                onClick={() => setApprovingAdvance(adv)}
+                className={`${ICON_BTN} bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white`}
+              >
+                <Check size={16} />
+              </button>
+              <button
+                type="button"
+                title="Reject"
+                aria-label={`Reject cash advance ${advanceRef(adv)}`}
+                onClick={() => setRejectingAdvance(adv)}
+                className={`${ICON_BTN} bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white`}
+              >
+                <X size={16} />
+              </button>
             </>
           )}
         </div>
@@ -318,10 +397,10 @@ export default function FinancePage() {
     })),
   ];
 
-  const pagerTab = isAll ? "ALL" : activeTab;
+  const pagerTab = activeTab;
   const listPage = pageFor(pagerTab);
-  const rows = isAll ? allRows.slice(listPage * pageSize, (listPage + 1) * pageSize) : allRows;
-  const listTotalPages = isAll ? Math.ceil(allRows.length / pageSize) : data?.totalPages ?? 0;
+  const rows = clientPaged ? allRows.slice(listPage * pageSize, (listPage + 1) * pageSize) : allRows;
+  const listTotalPages = clientPaged ? Math.ceil(allRows.length / pageSize) : data?.totalPages ?? 0;
 
   const errorStatus = error?.response?.status;
   const isAuthError = errorStatus === 401 || errorStatus === 403;
@@ -331,78 +410,117 @@ export default function FinancePage() {
     <div className="p-4 sm:p-6 space-y-4">
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Finance" }]} />
 
-      <PageHeader
-        icon={ClipboardCheck}
-        title="Finance"
-        subtitle="Verify approved expense reports, follow up on queries, and track whether AP has reimbursed the employee."
-      />
+      {/* Banner: what is waiting for Finance right now */}
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0A0082] via-[#18208f] to-[#2f3f9e] px-5 py-6 text-white shadow-[0_18px_40px_-24px_rgba(10,0,130,0.7)] sm:px-6">
+        <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/[0.06]" />
+        <span aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-48 h-56 w-56 rounded-full bg-[#ff3d72]/[0.12] blur-2xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
+              <ClipboardCheck size={22} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Finance</h1>
+              <p className="mt-0.5 text-sm text-white/70">Verify expense reports, approve cash advances and track AP payments.</p>
+              <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium ring-1 ring-white/15">
+                {waitingCount > 0 ? (
+                  <>
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-amber-300" aria-hidden="true" />
+                    {pendingReportCount} report{pendingReportCount === 1 ? "" : "s"} to verify · {pendingAdvanceCount} advance{pendingAdvanceCount === 1 ? "" : "s"} to approve
+                  </>
+                ) : (
+                  <>
+                    <BadgeCheck size={14} className="text-emerald-300" aria-hidden="true" />
+                    You&apos;re all caught up
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { sourceQueries.forEach((q) => q.refetch()); advancesQuery.refetch(); }}
+            className="inline-flex items-center gap-2 self-start rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-[#0A0082] shadow-sm transition hover:bg-white/90 lg:self-center"
+          >
+            <RefreshCw size={15} className={advancesQuery.isFetching || sourceQueries.some((q) => q.isFetching) ? "animate-spin" : ""} aria-hidden="true" />
+            Refresh
+          </button>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SelectableStatCard
-          title="To verify"
-          value={pendingQuery.data?.totalElements ?? "—"}
-          subtitle="Reports waiting on you"
-          icon={ClipboardCheck}
-          textColor="text-amber-700"
-          active={activeTab === "PENDING"}
-          onClick={() => switchTab("PENDING")}
-        />
-        <SelectableStatCard
-          title="Queried"
-          value={queriedQuery.data?.totalElements ?? "—"}
-          subtitle="Back with the employee"
-          icon={MessageSquareWarning}
-          textColor="text-rose-700"
-          active={activeTab === "QUERIED"}
-          onClick={() => switchTab("QUERIED")}
-        />
-        <SelectableStatCard
-          title="With AP"
-          value={paymentSummary?.awaitingPaymentCount ?? "—"}
-          subtitle="Verified, not yet paid"
-          icon={Hourglass}
-          textColor="text-indigo-700"
-          active={activeTab === "VERIFIED" && paymentFilter === "APPROVED_FOR_PAYMENT"}
-          onClick={() => switchTab("VERIFIED", "APPROVED_FOR_PAYMENT")}
-        />
-        <SelectableStatCard
-          title="Paid"
-          value={paymentSummary?.paidCount ?? "—"}
-          subtitle="Employee reimbursed"
-          icon={BadgeCheck}
-          textColor="text-emerald-700"
-          active={activeTab === "VERIFIED" && paymentFilter === "PAYMENT_COMPLETED"}
-          onClick={() => switchTab("VERIFIED", "PAYMENT_COMPLETED")}
-        />
+      {/* Summary cards; each also filters the list below */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {[
+          { key: "PENDING", label: "To verify", caption: "Reports waiting on you", icon: ClipboardCheck, value: pendingReportCount, tone: "bg-amber-50 text-amber-600", text: "text-amber-600", active: "border-amber-300 bg-amber-50/40", isActive: activeTab === "PENDING", onClick: () => switchTab("PENDING"), dot: pendingReportCount > 0 },
+          { key: "ADVANCES", label: "Advances", caption: "Cash advances to approve", icon: Wallet, value: pendingAdvanceCount, tone: "bg-[#ff3d72]/10 text-[#e0245e]", text: "text-[#e0245e]", active: "border-[#ff3d72]/40 bg-[#ff3d72]/[0.04]", isActive: isAdvancesTab, onClick: () => switchTab("ADVANCES"), dot: pendingAdvanceCount > 0 },
+          { key: "QUERIED", label: "Queried", caption: "Back with the employee", icon: MessageSquareWarning, value: queriedQuery.data?.totalElements ?? 0, tone: "bg-rose-50 text-rose-600", text: "text-rose-600", active: "border-rose-300 bg-rose-50/40", isActive: activeTab === "QUERIED", onClick: () => switchTab("QUERIED") },
+          { key: "WITH_AP", label: "With AP", caption: "Verified, not yet paid", icon: Hourglass, value: paymentSummary?.awaitingPaymentCount ?? 0, tone: "bg-indigo-50 text-indigo-600", text: "text-indigo-600", active: "border-indigo-300 bg-indigo-50/40", isActive: activeTab === "VERIFIED" && paymentFilter === "APPROVED_FOR_PAYMENT", onClick: () => switchTab("VERIFIED", "APPROVED_FOR_PAYMENT") },
+          { key: "PAID", label: "Paid", caption: "Employee reimbursed", icon: BadgeCheck, value: paymentSummary?.paidCount ?? 0, tone: "bg-emerald-50 text-emerald-600", text: "text-emerald-600", active: "border-emerald-300 bg-emerald-50/40", isActive: activeTab === "VERIFIED" && paymentFilter === "PAYMENT_COMPLETED", onClick: () => switchTab("VERIFIED", "PAYMENT_COMPLETED") },
+        ].map((card) => {
+          const Icon = card.icon;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              aria-pressed={card.isActive}
+              onClick={card.onClick}
+              className={`relative flex items-center gap-3 rounded-xl border bg-white p-4 text-left shadow-sm transition hover:border-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40 ${card.isActive ? card.active : "border-slate-200"}`}
+            >
+              {card.dot && (
+                <span className="absolute right-3 top-3 flex h-2.5 w-2.5" aria-label="Needs your action">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+                </span>
+              )}
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${card.tone}`}>
+                <Icon size={18} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{card.label}</span>
+                <span className={`block text-xl font-bold tabular-nums ${card.value > 0 ? card.text : "text-[#0a174e]"}`}>{card.value}</span>
+                <span className="block truncate text-[11px] text-slate-400">{card.caption}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <FilterCard title="Search" description="Filters the reports on the current page.">
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex shrink-0 items-center gap-2">
-            <label htmlFor="finance-status" className="text-xs font-medium text-slate-600">Status</label>
-            <select
-              id="finance-status"
-              value={activeTab}
-              onChange={(e) => switchTab(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-            >
-              {TABS.map((tab) => (
-                <option key={tab.value} value={tab.value}>
-                  {tab.label} (
-                  {tab.value === "ALL"
-                    ? sourceQueries.reduce((sum, q) => sum + (q.data?.totalElements ?? 0), 0)
-                    : queriesByTab[tab.value].data?.totalElements ?? 0}
-                  )
-                </option>
-              ))}
-            </select>
+      {/* The list: status tabs and search on top, then the table */}
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex w-full gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 lg:w-fit" role="tablist" aria-label="Status">
+            {TABS.map((tab) => {
+              const isActive = activeTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => switchTab(tab.value)}
+                  className={`relative flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
+                    isActive ? "bg-white text-[#0A0082] shadow-sm" : "text-slate-500 hover:text-[#0a174e]"
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`rounded-full px-1.5 py-0.5 text-[11px] tabular-nums ${isActive ? "bg-[#0A0082]/10 text-[#0A0082]" : "bg-white text-slate-500"}`}>
+                    {countFor(tab.value)}
+                  </span>
+                  {tabNeedsYou(tab.value) && tab.value !== "ALL" && (
+                    <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white" aria-label="Needs your action" />
+                  )}
+                </button>
+              );
+            })}
           </div>
-        <div className="w-full sm:max-w-md">
-          <SearchInput value={searchTerm} onSearch={(val) => setSearchTerm(val || "")} placeholder="Employee, merchant or report #..." />
+
+          <div className="w-full lg:w-80">
+            <SearchInput value={searchTerm} onSearch={(val) => setSearchTerm(val || "")} placeholder="Employee, merchant or report #..." />
+          </div>
         </div>
-        </div>
+
         {activeTab === "VERIFIED" && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 border-b border-slate-100 px-4 py-2.5">
             <span className="mr-1 text-xs font-medium text-slate-600">Payment:</span>
             {PAYMENT_FILTERS.map((f) => (
               <button
@@ -418,10 +536,9 @@ export default function FinancePage() {
             ))}
           </div>
         )}
-      </FilterCard>
 
       {isError ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center px-4 shadow-sm">
+        <div className="m-3 flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center px-4">
           {isAuthError ? <Lock className="h-6 w-6 text-rose-500" /> : <AlertTriangle className="h-6 w-6 text-rose-500" />}
           <p className="text-sm font-semibold text-rose-700">
             {errorStatus === 401
@@ -440,11 +557,11 @@ export default function FinancePage() {
           )}
         </div>
       ) : isLoading ? (
-        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16 shadow-sm">
+        <div className="flex items-center justify-center py-16">
           <LoadingSpinner text="Loading…" />
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div className="p-3">
           {rows.length === 0 ? (
             <PolicyEmptyState icon={<Inbox className="h-10 w-10" />} title={emptyTitle} description={emptyDescription} />
           ) : (
@@ -462,6 +579,7 @@ export default function FinancePage() {
           </div>
         </div>
       )}
+      </section>
 
       <Modal
         isOpen={!!approvingAdvance}

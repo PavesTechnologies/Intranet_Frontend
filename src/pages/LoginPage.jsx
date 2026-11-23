@@ -259,6 +259,54 @@ function WorkIllustration() {
   );
 }
 
+// ─── Live clock / greeting ────────────────────────────────────────
+function useNow(ms = 15000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return now;
+}
+function greetingFor(d) {
+  const h = d.getHours();
+  if (h < 12) return { text: "Good morning", icon: "sun" };
+  if (h < 17) return { text: "Good afternoon", icon: "sun" };
+  return { text: "Good evening", icon: "moon" };
+}
+
+function GreetingPill() {
+  const g = greetingFor(useNow(60000));
+  return (
+    <span className="lp-greet">
+      {g.icon === "sun" ? (
+        <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" aria-hidden="true">
+          <circle cx="8" cy="8" r="3" /><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" />
+        </svg>
+      ) : (
+        <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M13 9.5A5.5 5.5 0 1 1 6.5 3a4.5 4.5 0 0 0 6.5 6.5z" />
+        </svg>
+      )}
+      {g.text}
+    </span>
+  );
+}
+
+function LeftFooter() {
+  const now = useNow(15000);
+  const date = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const time = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return (
+    <div className="lp-lfoot">
+      <span className="lp-chip">
+        <span className="lp-live" aria-hidden="true" />
+        {date}<span style={{ opacity: .4 }}>·</span><strong>{time}</strong>
+      </span>
+    </div>
+  );
+}
+
 // ─── Floating label input ─────────────────────────────────────────
 function FloatingInput({ id, label, type = "text", value, onChange, onKeyDown, error, autoComplete, hasSuffix, children }) {
   const [focused, setFocused] = useState(false);
@@ -319,9 +367,26 @@ const customCSS = `
 @keyframes gradShift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
 @keyframes illusIn { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
 .login-page-container .lp-grad-bg{background:linear-gradient(125deg,#EEF0FB 0%,#E4E3F8 25%,#F4F6FC 45%,#FBE6EE 70%,#E8ECFA 100%);background-size:300% 300%;animation:gradShift 20s ease-in-out infinite}
-.login-page-container .lp-illus{flex:0 0 auto;width:clamp(300px,24vw,470px);animation:illusIn 900ms cubic-bezier(.16,1,.3,1) 300ms both}
-.login-page-container .lp-illus svg{width:100%;height:auto;display:block}
-@media (max-width:1280px){.login-page-container .lp-illus{display:none}}
+.login-page-container .lp-illus{flex:0 0 auto;width:clamp(220px,24vw,470px);animation:illusIn 900ms cubic-bezier(.16,1,.3,1) 300ms both}
+.login-page-container .lp-illus svg{width:100%;height:auto;max-height:62vh;display:block}
+.login-page-container .lp-ws{font-size:clamp(56px,5.2vw,84px)}
+@media (max-width:1100px){.login-page-container .lp-illus{display:none}}
+@media (max-height:760px){
+  .login-page-container .left-panel{padding:28px 40px !important}
+  .login-page-container .lp-brand{margin-bottom:14px !important}
+  .login-page-container .lp-brand img{width:38px !important;height:38px !important}
+  .login-page-container .lp-ws{margin-bottom:14px !important;font-size:clamp(40px,8vh,64px)}
+  .login-page-container .lp-h1{font-size:20px !important;margin-bottom:8px !important}
+  .login-page-container .lp-hero-p{font-size:13px !important;line-height:1.6 !important;margin-bottom:18px !important}
+  .login-page-container .svc-grid{row-gap:10px}
+  .login-page-container .svc-cap{display:none}
+  .login-page-container .right-panel{padding:24px 40px !important}
+  .login-page-container .lp-form-head{margin-bottom:22px !important}
+  .login-page-container .lp-or{margin:14px 0 !important}
+  .login-page-container .lp-foot{padding-top:14px !important}
+  .login-page-container .lp-lfoot{margin-top:16px}
+  .login-page-container .lp-greet{margin-bottom:10px}
+}
 @keyframes wiBar   { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(.68)} }
 @keyframes wiDonut { 0%{stroke-dashoffset:76} 35%,85%{stroke-dashoffset:0} 100%{stroke-dashoffset:76} }
 @keyframes wiSteam { 0%{opacity:0;transform:translateY(4px)} 30%{opacity:.8} 100%{opacity:0;transform:translateY(-14px)} }
@@ -368,6 +433,14 @@ const customCSS = `
 .login-page-container .wi-sitter{animation:wiSitIn 5.2s ease-out .7s both}
 .login-page-container .wi-blobshape{transform-box:fill-box;transform-origin:center;animation:wiBlob 14s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.login-page-container .lp-grad-bg{animation:none}}
+@keyframes livePulse { 0%{box-shadow:0 0 0 0 rgba(52,179,138,.55)} 70%{box-shadow:0 0 0 7px rgba(52,179,138,0)} 100%{box-shadow:0 0 0 0 rgba(52,179,138,0)} }
+.login-page-container .lp-lfoot{display:flex;align-items:center;margin-top:22px;animation:fadeIn 500ms ease 900ms both}
+.login-page-container .lp-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.7);border:1px solid #E3E6F2;backdrop-filter:blur(6px);font-size:12px;color:#5B6479;box-shadow:0 2px 8px -4px rgba(10,23,78,.15)}
+.login-page-container .lp-chip strong{color:var(--navy);font-weight:600;font-variant-numeric:tabular-nums}
+.login-page-container .lp-live{width:7px;height:7px;border-radius:50%;background:#34B38A;animation:livePulse 2s ease-out infinite}
+.login-page-container .lp-copy{font-size:11px;color:#8A90A6;letter-spacing:.02em}
+.login-page-container .lp-greet{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#FFF0F4;color:#D42A5C;font-size:12px;font-weight:600;margin-bottom:14px}
+.login-page-container .lp-caps{display:flex;align-items:center;gap:6px;margin:6px 0 0;font-size:12px;color:#B7791F;animation:slideUp 200ms cubic-bezier(0,0,0.2,1) both}
 .login-page-container .head-font{font-family:var(--ff-h)}
 @keyframes panelL  { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
 @keyframes panelR  { from{opacity:0;transform:translateX(20px)}  to{opacity:1;transform:translateX(0)} }
@@ -386,7 +459,11 @@ const customCSS = `
 .login-page-container .ws-line:nth-child(1) > span{background-image:linear-gradient(100deg,var(--navy-2) 0%,var(--navy-2) 42%,#5B66B8 50%,var(--navy-2) 58%,var(--navy-2) 100%)}
 .login-page-container .ws-line:nth-child(2) > span{animation-delay:120ms,1.9s;background-image:linear-gradient(100deg,var(--pink) 0%,var(--pink) 42%,#FF8AAA 50%,var(--pink) 58%,var(--pink) 100%)}
 .login-page-container .svc-tile{width:38px;height:38px;border-radius:9px;background:#fff;border:1px solid var(--neutral-200);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(12,10,9,.05);color:var(--neutral-600);position:relative;overflow:hidden;transition:all 380ms cubic-bezier(.16,1,.3,1)}
-.login-page-container .svc-label{font-size:10px;font-weight:500;color:var(--neutral-500);letter-spacing:.06em;text-transform:uppercase;transition:color 380ms ease}
+.login-page-container .lp-text{container-type:inline-size}
+.login-page-container .svc-grid{display:grid;grid-template-columns:repeat(6,84px);gap:16px 4px;justify-content:start}
+.login-page-container .svc-grid .svc-item{align-items:flex-start !important}
+@container (max-width:520px){.login-page-container .svc-grid{grid-template-columns:repeat(3,96px)}}
+.login-page-container .svc-label{white-space:nowrap;text-align:center;font-size:10px;font-weight:500;color:var(--neutral-500);letter-spacing:.06em;text-transform:uppercase;transition:color 380ms ease}
 .login-page-container .svc-item .svc-tile,.login-page-container .svc-item .svc-label{opacity:.55;transition:opacity 380ms ease,all 380ms cubic-bezier(.16,1,.3,1)}
 .login-page-container .svc-item.active .svc-tile{opacity:1;transform:translateY(-3px);border-color:var(--accent-600);color:var(--accent-600);box-shadow:0 0 0 4px rgba(10,0,130,.08),0 8px 18px -8px rgba(10,0,130,.4)}
 .login-page-container .svc-item.active .svc-label{opacity:1;color:var(--neutral-800)}
@@ -527,6 +604,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [shake, setShake] = useState(null);
@@ -769,19 +847,19 @@ export default function LoginPage() {
       <div className="left-panel lp-grad-bg panel-l" style={{ width: "55%", height: "100vh", borderRight: "1px solid #E3E6F2", display: "flex", flexDirection: "column", padding: "48px", position: "relative", overflow: "hidden" }}>
         <InteractiveGrid />
         <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div className="lp-brand" style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "28px", flexShrink: 0 }}>
             <img src="/logo.png" alt="Logo" style={{ width: "48px", height: "48px", objectFit: "contain", borderRadius: "10px", flexShrink: 0 }} />
             <span className="head-font" style={{ fontSize: "20px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.01em" }}>Paves Enterprise App</span>
           </div>
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "32px" }}>
-          <div style={{ display: "flex", flexDirection: "column", flex: "1 1 0", minWidth: 0 }}>
-            <div className="head-font" style={{ fontSize: "84px", fontWeight: 700, lineHeight: 0.95, letterSpacing: "-0.04em", marginBottom: "40px", userSelect: "none", pointerEvents: "none" }}>
+          <div className="lp-text" style={{ display: "flex", flexDirection: "column", flex: "1 1 0", minWidth: 0 }}>
+            <div className="head-font lp-ws" style={{ fontWeight: 700, lineHeight: 0.95, letterSpacing: "-0.04em", marginBottom: "40px", userSelect: "none", pointerEvents: "none" }}>
               <span className="ws-line"><span>Work</span></span>
               <span className="ws-line"><span>Space</span></span>
             </div>
-            <h1 className="head-font" style={{ fontSize: "24px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.3, marginBottom: "14px" }}>Your organization's<br />operational hub</h1>
-            <p style={{ fontSize: "14px", color: "#5B6479", lineHeight: 1.7, maxWidth: "440px", marginBottom: "40px" }}>Manage leave, track timesheets, handle projects, and access all your internal tools through a single gateway.</p>
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }} onMouseLeave={() => setSvcPaused(false)}>
+            <h1 className="head-font lp-h1" style={{ fontSize: "24px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.3, marginBottom: "14px" }}>Your organization's<br />operational hub</h1>
+            <p className="lp-hero-p" style={{ fontSize: "14px", color: "#5B6479", lineHeight: 1.7, maxWidth: "420px", marginBottom: "32px" }}>Leave, timesheets, projects and all your internal tools in one secure place.</p>
+            <div className="svc-grid" onMouseLeave={() => setSvcPaused(false)}>
               {SERVICES.map(({ label, d }, i) => (
                 <div key={label} className={`svc-item${i === activeSvc ? " active" : ""}`}
                   onMouseEnter={() => { setSvcPaused(true); setActiveSvc(i); }}
@@ -797,6 +875,7 @@ export default function LoginPage() {
               ))}
             </div>
             <div key={activeSvc} className="svc-cap">{SERVICE_DESC[SERVICES[activeSvc].label]}</div>
+            <LeftFooter />
           </div>
           <div className="lp-illus">
             <WorkIllustration />
@@ -806,13 +885,13 @@ export default function LoginPage() {
       </div>
 
       {/* RIGHT PANEL */}
-      <div className="right-panel panel-r" style={{ flex: 1, height: "100vh", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px", position: "relative" }}>
-        <div style={{ width: "100%", maxWidth: "360px" }}>
+      <div className="right-panel panel-r" style={{ flex: 1, height: "100vh", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", padding: "48px", position: "relative", overflowY: "auto" }}>
+        <div className="lp-form" style={{ width: "100%", maxWidth: "360px", margin: "auto 0" }}>
 
           {currentView === "login" ? (
             <>
-              <div className="a1" style={{ marginBottom: "40px" }}>
-                <span style={{ display: "block", width: "32px", height: "4px", borderRadius: "4px", background: "linear-gradient(90deg,var(--accent-600),var(--pink))", marginBottom: "18px" }} />
+              <div className="a1 lp-form-head" style={{ marginBottom: "40px" }}>
+                <GreetingPill />
                 <h2 className="head-font" style={{ fontSize: "28px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.2, marginBottom: "8px" }}>Welcome back</h2>
                 <p style={{ fontSize: "14px", color: "var(--neutral-500)", lineHeight: 1.5, margin: 0 }}>Sign in to continue to your workspace</p>
               </div>
@@ -824,7 +903,7 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <div className="a3" style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
+              <div className="a3 lp-or" style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
                 <div style={{ flex: 1, height: "1px", background: "var(--neutral-150)" }} />
                 <span style={{ fontSize: "11px", fontWeight: 500, color: "var(--neutral-300)", letterSpacing: ".1em", textTransform: "uppercase" }}>or</span>
                 <div style={{ flex: 1, height: "1px", background: "var(--neutral-150)" }} />
@@ -839,11 +918,20 @@ export default function LoginPage() {
               <div className={`a5${shake === "pw" ? " shake" : ""}`}>
                 <FloatingInput id="password" label="Password" type={showPw ? "text" : "password"} value={pw}
                   onChange={(e) => { setPw(e.target.value); clrErr("pw"); }}
-                  onKeyDown={onKey} error={errors.pw} autoComplete="current-password" hasSuffix>
+                  onKeyDown={(e) => { setCapsOn(e.getModifierState?.("CapsLock")); onKey(e); }}
+                  error={errors.pw} autoComplete="current-password" hasSuffix>
                   <button type="button" className="pw-btn" tabIndex={-1} onClick={() => setShowPw((v) => !v)}>
                     <EyeIcon show={showPw} />
                   </button>
                 </FloatingInput>
+                {capsOn && !errors.pw && (
+                  <p className="lp-caps" role="status">
+                    <svg width={12} height={12} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M8 2L2 8h3v4h6V8h3L8 2zM5 14h6" />
+                    </svg>
+                    Caps Lock is on
+                  </p>
+                )}
               </div>
 
               <div className="a6" style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
@@ -867,7 +955,7 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              <div className="a1" style={{ marginBottom: "40px" }}>
+              <div className="a1 lp-form-head" style={{ marginBottom: "40px" }}>
                 <span style={{ display: "block", width: "32px", height: "4px", borderRadius: "4px", background: "linear-gradient(90deg,var(--accent-600),var(--pink))", marginBottom: "18px" }} />
                 <h2 className="head-font" style={{ fontSize: "28px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.2, marginBottom: "8px" }}>Reset password</h2>
                 <p style={{ fontSize: "14px", color: "var(--neutral-500)", lineHeight: 1.5, margin: 0 }}>Enter your email to receive an OTP and set a new password</p>
@@ -919,7 +1007,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div style={{ position: "absolute", bottom: "28px", display: "flex", alignItems: "center", gap: "14px" }}>
+        <div className="lp-foot" style={{ display: "flex", alignItems: "center", gap: "14px", paddingTop: "24px", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
             <svg width={10} height={10} viewBox="0 0 16 16" fill="none" stroke="var(--neutral-300)" strokeWidth={1.5}>
               <path d="M8 2L4 4v5c0 3 4 5 4 5s4-2 4-5V4L8 2z" />

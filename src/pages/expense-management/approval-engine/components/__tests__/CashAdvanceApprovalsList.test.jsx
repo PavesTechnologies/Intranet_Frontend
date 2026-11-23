@@ -69,7 +69,8 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/decide on cash advance request/i)).toBeInTheDocument();
-        expect(screen.getByText(/business trip/i)).toBeInTheDocument();
+        // The title and the purpose both mention it now that the summary shows both.
+        expect(screen.getAllByText(/business trip/i).length).toBeGreaterThan(0);
       });
     });
 
@@ -81,9 +82,14 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         fireEvent.click(approveButton);
       });
 
+      // A new request shows one figure, and the outcome line says what Finance pays for the chosen decision.
       await waitFor(() => {
-        expect(screen.getByText(/USD 5,000.00/, { selector: 'strong' })).toBeInTheDocument();
+        expect(screen.getByText('New cash advance')).toBeInTheDocument();
       });
+      expect(screen.getByText('Finance will pay the employee')).toBeInTheDocument();
+      expect(screen.getAllByText(/USD 5,000.00/).length).toBeGreaterThanOrEqual(2);
+      // Nothing to set off for this employee, so that option is not offered.
+      expect(screen.queryByText('Set off earlier balance')).not.toBeInTheDocument();
     });
 
     it('should allow adding optional remarks before approval', async () => {
@@ -219,7 +225,8 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
       renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
-        expect(screen.getByText(/business trip/i)).toBeInTheDocument();
+        // The title and the purpose both mention it now that the summary shows both.
+        expect(screen.getAllByText(/business trip/i).length).toBeGreaterThan(0);
       });
 
       expect(cashAdvanceApi.getMyApprovals).toHaveBeenCalled();
@@ -236,7 +243,8 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
       renderWithProviders(<CashAdvanceApprovalsList activeTab="approved" />);
 
       await waitFor(() => {
-        expect(screen.getByText(/business trip/i)).toBeInTheDocument();
+        // The title and the purpose both mention it now that the summary shows both.
+        expect(screen.getAllByText(/business trip/i).length).toBeGreaterThan(0);
       });
     });
   });

@@ -23,11 +23,34 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
-// Date-only strings ("2026-12-15") are kept as-is; a datetime is cut to its
-// date part so it can feed <input type="date"> and the billingDate field.
+// Normalises every date shape the milestone API uses into "yyyy-mm-dd", so the
+// value can feed <input type="date"> and be compared as a plain string.
+// Jackson serialises java.time.LocalDate as a [year, month, day] array (the
+// month is already 1-indexed), which is what this endpoint sends; a date-only
+// string is kept as-is and a datetime is cut to its date part.
 const toDateOnly = (value) => {
   if (!value) return "";
-  return String(value).slice(0, 10);
+
+  const pad = (part) => String(part).padStart(2, "0");
+
+  if (Array.isArray(value)) {
+    const [year, month, day] = value;
+    if (!year || !month || !day) return "";
+    return `${year}-${pad(month)}-${pad(day)}`;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return "";
+
+  // The same array after it has been stringified somewhere up the line.
+  if (raw.includes(",")) {
+    const parts = raw.split(",").map((part) => parseInt(part.trim(), 10));
+    const [year, month, day] = parts;
+    if (parts.slice(0, 3).some(Number.isNaN) || !year || !month || !day) return "";
+    return `${year}-${pad(month)}-${pad(day)}`;
+  }
+
+  return raw.slice(0, 10);
 };
 
 // ---------------------------------------------------------------------------------------------------------------
