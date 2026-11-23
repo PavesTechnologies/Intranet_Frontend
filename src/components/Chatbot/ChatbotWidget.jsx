@@ -17,6 +17,9 @@ import { aiEnabled, askAI } from "./chatApi";
  *
  * Answer order: module FAQ → general intents (live data) → AI endpoint
  * (if CHATBOT_AI_URL is configured) → friendly fallback with suggestions.
+ * In modules marked `aiFirst` (Expense Management) the AI is asked before the
+ * module FAQ, because it can look up the user's own records. If the AI fails,
+ * the FAQ answer (or the friendly fallback) is used instead of an error.
  */
 
 const STORAGE_KEY = "paves-assistant-chat";
@@ -91,9 +94,12 @@ export default function ChatbotWidget() {
 
   const respond = useCallback(
     async (text, history) => {
-      // 1) Module-specific answer
       const hit = matchModuleFaq(module, text);
-      if (hit) return { text: hit.text, actions: hit.links };
+      const faqReply = hit ? { text: hit.text, actions: hit.links } : null;
+      const aiFirst = useAI && module?.aiFirst;
+
+      // 1) Module-specific answer (deferred to the AI in aiFirst modules)
+      if (faqReply && !aiFirst) return faqReply;
 
       // 2) General intents (with live data)
       const intent = matchIntent(text);
@@ -112,14 +118,24 @@ export default function ChatbotWidget() {
           actions: [{ label: "Start the tour", tour: tourId }],
         };
       }
-      if (intent) {
+      // Small talk keeps its instant answers; everything else in an aiFirst module goes to the AI.
+      if (intent && (!aiFirst || ["greet", "thanks"].includes(intent))) {
         const reply = await runIntent(intent, { userId: user?.user_id, firstName });
         if (reply) return reply;
       }
 
-      // 3) AI fallback
+      // 3) AI
       if (useAI) {
-        return askAI(history, { userName: user?.name, currentPage: location.pathname, module: module?.name || null });
+        try {
+          return await askAI(history, { userName: user?.name, currentPage: location.pathname, module: module?.name || null });
+        } catch (err) {
+          console.warn("Assistant AI unavailable, using built-in answers", err);
+          if (faqReply) return faqReply;
+          if (intent) {
+            const reply = await runIntent(intent, { userId: user?.user_id, firstName });
+            if (reply) return reply;
+          }
+        }
       }
 
       // 4) Fallback
