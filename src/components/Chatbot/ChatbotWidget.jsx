@@ -118,8 +118,7 @@ export default function ChatbotWidget() {
           actions: [{ label: "Start the tour", tour: tourId }],
         };
       }
-      // Small talk keeps its instant answers; everything else in an aiFirst module goes to the AI.
-      if (intent && (!aiFirst || ["greet", "thanks"].includes(intent))) {
+      if (intent) {
         const reply = await runIntent(intent, { userId: user?.user_id, firstName });
         if (reply) return reply;
       }
@@ -131,10 +130,6 @@ export default function ChatbotWidget() {
         } catch (err) {
           console.warn("Assistant AI unavailable, using built-in answers", err);
           if (faqReply) return faqReply;
-          if (intent) {
-            const reply = await runIntent(intent, { userId: user?.user_id, firstName });
-            if (reply) return reply;
-          }
         }
       }
 
