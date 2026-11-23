@@ -66,6 +66,24 @@ export function settlementFiguresFor(advance, utilization, salaryDeducted = 0) {
   };
 }
 
+/**
+ * Report statuses whose expenses are not final yet: the advance's balance can still change, so it cannot be settled.
+ * Matches CashAdvanceSettlementReadiness.OPEN_REPORT_STATUSES on the server.
+ */
+export const OPEN_REPORT_STATUSES = [
+  "DRAFT", "SUBMITTED", "PENDING_APPROVAL", "PENDING_FINANCE_VERIFICATION", "AWAITING_CORRECTION", "POLICY_REJECTED", "QUERY_RAISED",
+];
+
+/** Linked reports still open, each with a readable status: { reportNumber, reportStatus, statusLabel, claimedAmount }. */
+export function openLinkedReports(reports) {
+  return (Array.isArray(reports) ? reports : [])
+    .filter((r) => OPEN_REPORT_STATUSES.includes(String(r?.reportStatus || "").toUpperCase()))
+    .map((r) => {
+      const words = String(r.reportStatus).replace(/_/g, " ").toLowerCase();
+      return { ...r, statusLabel: words.charAt(0).toUpperCase() + words.slice(1) };
+    });
+}
+
 /** Totals across the advances on the list. Total outstanding adds the held carry-forwards to what each advance owes. */
 export function settlementTotals(figuresList) {
   const sum = (key) => round2(figuresList.reduce((total, f) => total + num(f[key]), 0));

@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import SalaryDeductionPanel from "@/pages/expense-management/pages/cash-advance/components/SalaryDeductionPanel";
 import CarryForwardPanel from "@/pages/expense-management/pages/cash-advance/components/CarryForwardPanel";
 import { SETTLEMENT_LOCK, useSettlementLock } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
+import { openLinkedReports } from "@/pages/expense-management/pages/cash-advance/settlementFigures";
 
 /**
  * The two ways to clear an outstanding balance after the employee has been asked to pay:
@@ -21,9 +22,26 @@ const OPTIONS = [
   { value: SETTLE_OPTION.DEFER, label: "Carry forward to next expense", hint: "The balance moves to another approved advance for this employee, once Finance approves it." },
 ];
 
-export default function SettleBalancePanel({ advanceId, outstanding, currencyCode, advanceNumber, onSettled }) {
+/**
+ * {@code settleable} is the part of the balance that can be settled now: the outstanding balance less what is held for
+ * expenses still in approval (server: utilization.settleableAmount). Those expenses are set against the advance when
+ * approved, so only the rest is deducted from salary or carried forward. Defaults to {@code outstanding}.
+ */
+export default function SettleBalancePanel({
+  advanceId,
+  outstanding,
+  settleable,
+  currencyCode,
+  advanceNumber,
+  onSettled,
+  linkedReports = [],
+}) {
+  const openReports = openLinkedReports(linkedReports);
+  const heldForExpenses = openReports.reduce((t, r) => t + Number(r.claimedAmount || 0), 0);
   const [option, setOption] = useState(SETTLE_OPTION.SALARY);
-  const balance = Number(outstanding) || 0;
+  const total = Number(outstanding) || 0;
+  const balance = settleable === undefined || settleable === null ? total : Math.max(0, Number(settleable) || 0);
+  const nothingToSettleYet = balance <= 0 && heldForExpenses > 0;
   // Once carry-forward or a salary request is set, the options stay locked until it is cancelled.
   const lock = useSettlementLock(advanceId);
   const handleChanged = () => {
@@ -46,9 +64,31 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Settle remaining balance</p>
           <p className="text-xs text-gray-600">
-            Outstanding: {formatMoney(balance)} {advanceNumber ? `· ${advanceNumber}` : ""}
+            To settle now: <span className="font-semibold text-gray-900">{formatMoney(balance)}</span>{" "}
+            {advanceNumber ? `· ${advanceNumber}` : ""}
           </p>
         </div>
+
+        {heldForExpenses > 0 && (
+          <div role="note" className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            <p>
+              Outstanding on the advance is {formatMoney(total)}. Of that, {formatMoney(heldForExpenses)} is held for
+              expenses still in approval, and is set against the advance when they are approved:
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+              {openReports.map((r) => (
+                <li key={r.reportId || r.reportNumber}>
+                  <span className="font-mono">{r.reportNumber}</span>: {r.statusLabel}, {formatMoney(r.claimedAmount)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1">
+              {nothingToSettleYet
+                ? "The expenses cover the whole balance, so there is nothing to settle now."
+                : `Only the remaining ${formatMoney(balance)} is deducted from salary or carried forward.`}
+            </p>
+          </div>
+        )}
 
         {/* Repayment by the employee is not part of the current flows. Only salary deduction and carry-forward remain.
         <div className="space-y-2">
@@ -62,7 +102,7 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
         </div>
         */}
 
-        {!lock.kind && (
+        {!lock.kind && !nothingToSettleYet && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-gray-800">Choose how it is cleared</p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2" role="radiogroup" aria-label="Settlement option">
@@ -98,7 +138,7 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
           </div>
         )}
 
-        {effectiveOption === SETTLE_OPTION.SALARY && (
+        {(lock.kind || !nothingToSettleYet) && effectiveOption === SETTLE_OPTION.SALARY && (
           <SalaryDeductionPanel
             advanceId={advanceId}
             outstanding={balance}
@@ -107,7 +147,7 @@ export default function SettleBalancePanel({ advanceId, outstanding, currencyCod
           />
         )}
 
-        {effectiveOption === SETTLE_OPTION.DEFER && (
+        {(lock.kind || !nothingToSettleYet) && effectiveOption === SETTLE_OPTION.DEFER && (
           <CarryForwardPanel
             advanceId={advanceId}
             currencyCode={currencyCode}

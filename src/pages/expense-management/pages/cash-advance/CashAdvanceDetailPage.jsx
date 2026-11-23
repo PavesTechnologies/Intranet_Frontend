@@ -16,6 +16,7 @@ import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-ad
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import CashAdvanceApprovalPanel from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceApprovalPanel";
 import DecisionNotice from "@/pages/expense-management/pages/cash-advance/components/DecisionNotice";
+import { openLinkedReports } from "@/pages/expense-management/pages/cash-advance/settlementFigures";
 import AdvanceMoneySummary from "@/pages/expense-management/pages/cash-advance/components/AdvanceMoneySummary";
 import { figuresForAdvance } from "@/pages/expense-management/pages/cash-advance/useAdvanceFigures";
 import { canApproveAdvance } from "@/pages/expense-management/approval-engine/components/CashAdvanceApprovalsList";
@@ -381,6 +382,9 @@ export default function CashAdvanceDetailPage() {
                 carriedOut={advance.carriedOutAmount ?? 0}
                 carryForwardReady={carryForwardReady}
                 salaryDeducted={salaryDeducted}
+                expensesApproved={verifiedExpenses}
+                expensesInApproval={openLinkedReports(utilization?.linkedReports).reduce((t, r) => t + Number(r.claimedAmount || 0), 0)}
+                stillOutstanding={utilization?.settleableAmount}
               />
             </section>
           )}
@@ -390,11 +394,13 @@ export default function CashAdvanceDetailPage() {
               advanceId={advance.advanceId || advance.id || advanceId}
               advanceNumber={formatAdvanceNumber(advance)}
               outstanding={outstanding}
+              settleable={utilization?.settleableAmount}
               currencyCode={currencyCode}
               onSettled={() => {
                 fetchAdvance();
                 carryLock.reload();
               }}
+              linkedReports={utilization?.linkedReports}
             />
           )}
 

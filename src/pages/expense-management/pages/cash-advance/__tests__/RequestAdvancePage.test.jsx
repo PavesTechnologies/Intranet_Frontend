@@ -60,7 +60,8 @@ async function previewBeforeSubmit() {
   await screen.findByText(/Calculation preview/);
 }
 
-describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
+// Cases fill the whole form and submit; under a full parallel run that takes longer than the 5 s default.
+describe('RequestAdvancePage - EP04-S1: Cash Advance Request', { timeout: 20000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lookupService.getActiveCostCenters.mockResolvedValue([
