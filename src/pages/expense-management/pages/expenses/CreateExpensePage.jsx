@@ -253,6 +253,24 @@ export default function CreateExpensePage() {
       ),
     [lineItems]
   );
+  // Event dates follow the bills (expense line items): the event must cover the earliest and latest bill date. When a bill
+  // falls outside the current dates the range widens to include it; dates are never narrowed automatically.
+  useEffect(() => {
+    const dates = lineItems
+      .map((li) => (li.expenseDate ? String(li.expenseDate).slice(0, 10) : ""))
+      .filter(Boolean)
+      .sort();
+    if (dates.length === 0) return;
+    const earliest = dates[0];
+    const latest = dates[dates.length - 1];
+    setFormData((prev) => {
+      const tripStartDate = !prev.tripStartDate || earliest < prev.tripStartDate ? earliest : prev.tripStartDate;
+      const tripEndDate = !prev.tripEndDate || latest > prev.tripEndDate ? latest : prev.tripEndDate;
+      if (tripStartDate === prev.tripStartDate && tripEndDate === prev.tripEndDate) return prev;
+      return { ...prev, tripStartDate, tripEndDate };
+    });
+  }, [lineItems]);
+
   const [justifyDialog, setJustifyDialog] = useState(null); // { mode: "submit" | "save", items } | null
   const [justifySaving, setJustifySaving] = useState(false);
   const [justifyError, setJustifyError] = useState("");

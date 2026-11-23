@@ -31,9 +31,16 @@ export function filterMenuByRole(items, hasRole, hasAnyPermission = () => true) 
       || hasRole(item.roleOrPermissions.roles || [])
       || hasAnyPermission(item.roleOrPermissions.permissions || []);
     const passesRole = !item.allowedRoles || hasRole(item.allowedRoles);
+    // `hiddenForRoles`: hidden from users holding any of these roles, even when they also hold an allowed role.
+    // Either an array of roles, or `{ roles, unless }` to keep the item for users who also hold an `unless` role
+    // (e.g. Approvals is hidden for Finance unless they are also a manager).
+    const hidden = item.hiddenForRoles;
+    const passesHidden = !hidden || (Array.isArray(hidden)
+      ? !hasRole(hidden)
+      : !hasRole(hidden.roles || []) || hasRole(hidden.unless || []));
     const passesPermission = !item.requiredPermissions || hasAnyPermission(item.requiredPermissions);
     if (!passesEither) return acc;
-    if (!passesRole || !passesPermission) return acc;
+    if (!passesRole || !passesPermission || !passesHidden) return acc;
 
     if (item.children?.length) {
       const visibleChildren = filterMenuByRole(item.children, hasRole, hasAnyPermission);

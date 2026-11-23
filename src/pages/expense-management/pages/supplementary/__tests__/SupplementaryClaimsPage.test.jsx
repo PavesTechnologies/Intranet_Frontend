@@ -92,12 +92,12 @@ describe("My Supplementary Claims page", () => {
 
     expect(screen.getByRole("link", { name: "Edit SUP-DRAFT1" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Edit SUP-CLAR" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Edit SUP-PEND" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Edit SUP-SET" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit SUP-PEND" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Edit SUP-SET" })).toBeDisabled();
 
     expect(screen.getByRole("button", { name: "Cancel SUP-DRAFT1" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cancel SUP-PEND" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cancel SUP-SET" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel SUP-PEND" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel SUP-SET" })).toBeDisabled();
   });
 
   it("shows the payment reference once a claim is paid", async () => {
@@ -184,10 +184,13 @@ describe("My Supplementary Claims page", () => {
     expect(await screen.findByRole("table")).toBeInTheDocument();
   });
 
-  it("keeps the raise-a-claim section on the page", async () => {
+  it("opens the raise-a-claim dialog from the Raise a claim button, not on the page", async () => {
     supplementaryClaimService.listMine.mockResolvedValue(listResponse([]));
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: "Raise a new claim" })).toBeInTheDocument();
+    expect(screen.queryByText("Raise a new claim")).not.toBeInTheDocument();
+    fireEvent.click((await screen.findAllByRole("button", { name: "Raise a claim" }))[0]);
+    expect(await screen.findByText("Raise a new claim")).toBeInTheDocument();
+    expect(screen.getByText(/no settled reports/)).toBeInTheDocument();
   });
 });

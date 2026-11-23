@@ -22,6 +22,7 @@ import { FINANCE_ALL_ROLES } from "../../config/sidebarConfig";
 import { APPLICATIONS, isFinanceEnabled } from "../../utils/applicationRoutes";
 
 import Modal from "../Modal/modal";
+import TourCenter from "../Tour/TourCenter";
 
 import ExpenseNotificationBell from "../../pages/expense-management/components/notifications/NotificationBell";
 
@@ -232,6 +233,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
           {/* ── Left: sidebar toggle + welcome ── */}
           <div className="flex items-center gap-4">
             <button
+              data-tour="header-toggle"
               onClick={onToggleSidebar}
               className="flex items-center justify-center p-2 rounded-md hover:bg-gray-100 transition-colors"
               title="Toggle Sidebar"
@@ -249,7 +251,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
               </AnimatePresence>
             </button>
 
-            <div>
+            <div data-tour="header-welcome">
               <h2 className="text-1.5xl font-bold text-gray-900">Welcome back, {firstName}</h2>
               <p className="text-sm text-gray-600">
                 Here's what's happening with your organization today.
@@ -260,14 +262,21 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
           {/* ── Right: application switcher + notifications + profile ── */}
           <div className="flex items-center space-x-4">
             {/* Expense Management notifications - unread badge, dropdown, live updates */}
-            {isExpenseManagement && <ExpenseNotificationBell />}
+            {isExpenseManagement && (
+              <span data-tour="header-notifications" className="inline-flex">
+                <ExpenseNotificationBell />
+              </span>
+            )}
             {/* Notification bell. Renders itself only inside Accounts Payable, where the
                 notifications come from — see NotificationBell. */}
             <AccountsPayableNotificationBell />
 
             {/* Application Switcher — fully hidden when FINANCE_TOGGLE is off (public/config.js) */}
+            {/* Guided tours — Tour Center (components/Tour) */}
+            <TourCenter />
+
             {financeEnabled && (
-            <div className="relative" ref={appSwitcherRef}>
+            <div className="relative" ref={appSwitcherRef} data-tour="header-app-switcher">
               <button
                 onClick={() => setAppSwitcherOpen((prev) => !prev)}
                 className="flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-gray-100 transition-colors"
@@ -328,7 +337,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
             )}
 
             {/* Profile dropdown */}
-            <div className="relative pl-4 border-l border-gray-200" ref={dropdownRef}>
+            <div className="relative pl-4 border-l border-gray-200" ref={dropdownRef} data-tour="header-profile">
               <button
                 onClick={() => setDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-gray-100 transition-colors"

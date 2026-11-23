@@ -3,6 +3,10 @@ import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import ErrorBoundary from "../ErrorBoundary";
+import { TourProvider } from "../Tour/TourContext";
+import TourOverlay from "../Tour/TourOverlay";
+import TourNudge from "../Tour/TourNudge";
+import ChatbotWidget from "../Chatbot/ChatbotWidget";
 import { getApplicationFromPath, isCanonicalPageShellRoute } from "../../utils/applicationRoutes";
 
 const Layout = () => {
@@ -39,6 +43,8 @@ const Layout = () => {
   };
 
   return (
+    // Guided tours (Guide button in the header) — see components/Tour/tours.js.
+    <TourProvider>
     <div className={`min-h-screen bg-gray-50 ${isXms ? "xms-density" : ""}`}>
       {/* Sidebar */}
       <Sidebar isCollapsed={isCollapsed} activeApplication={activeApplication} />
@@ -56,13 +62,18 @@ const Layout = () => {
           isSidebarOpen={isSidebarOpen}
           activeApplication={activeApplication}
         />
-        <main className={`flex-1 overflow-y-auto bg-gray-50 rounded-tl-xl shadow-inner ${isCanonicalShell ? "" : isXms ? "p-3" : "p-4"}`}>
+        <main data-tour="main-content" className={`flex-1 overflow-y-auto bg-gray-50 rounded-tl-xl shadow-inner ${isCanonicalShell ? "" : isXms ? "p-3" : "p-4"}`}>
           <ErrorBoundary locationKey={location.pathname}>
             <Outlet />
           </ErrorBoundary>
         </main>
       </div>
+      <TourOverlay />
+      <TourNudge />
+      {/* Intranet assistant — module-aware chat, see components/Chatbot. */}
+      <ChatbotWidget />
     </div>
+    </TourProvider>
   );
 };
 

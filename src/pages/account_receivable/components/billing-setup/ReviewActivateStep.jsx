@@ -15,6 +15,7 @@ import {
   getBillingRecurringScheduleByBillingConfigurationId,
 } from "../../services/billingConfigurationService";
 import { isMilestoneEntryFrozen } from "../../services/projectMilestoneService";
+import { useProjectMilestones } from "./useProjectMilestones";
 
 // Display-time safety net: a Project Code must never be the project's own
 // internal id — see the matching guard in ProjectStep.jsx / billingConfigurationService.js.
@@ -566,7 +567,10 @@ const isSameAmount = (a, b) => a !== null && b !== null && Math.abs(a - b) < 0.0
 
 // Milestone Plan figures, computed once for both Billing & Pricing (summary)
 // and Payment Schedule (detail) so the two sections can never disagree.
-function buildMilestonePlanReview(wizardData, projectInfo) {
+// `milestones` are the PMS milestones of this project (GET /api/projects/{pmsProjectId}/milestones).
+// The saved plan's entries only carry pmsMilestoneId, so the milestone's own
+// planned due date and actual completion date are joined on in here.
+function buildMilestonePlanReview(wizardData, projectInfo, milestones = []) {
   const { billingConfig = {} } = wizardData;
   const milestonePlan =
     billingConfig.milestonePlan ||
@@ -595,19 +599,34 @@ function buildMilestonePlanReview(wizardData, projectInfo) {
     isFullPayment && rawEntries.length === 0
       ? [{ sequence: 1, percentage: 100, billingDate: "", remarks: "" }]
       : rawEntries;
+  const milestoneById = new Map(
+    milestones.filter((m) => m.pmsMilestoneId !== null && m.pmsMilestoneId !== undefined).map((m) => [m.pmsMilestoneId, m]),
+  );
   const payments = [...sourceEntries]
     .map((entry, index) => ({ ...entry, sequence: entry.sequence ?? index + 1 }))
     .sort((a, b) => a.sequence - b.sequence)
-    .map((entry) => ({
-      ...entry,
-      percentage: parseNumericValue(entry.percentage) || 0,
-      amount: resolvePaymentEntryAmount(entry, totalValue),
-    }));
+    .map((entry) => {
+      const milestone = milestoneById.get(entry.pmsMilestoneId);
+      return {
+        ...entry,
+        percentage: parseNumericValue(entry.percentage) || 0,
+        amount: resolvePaymentEntryAmount(entry, totalValue),
+        // "" whenever PMS has no such date: a milestone that is not finished yet has no
+        // actualCompletionDate, and it is shown as "—" rather than guessed at.
+        milestoneDueDate: milestone?.plannedCompletionDate || "",
+        milestoneCompletionDate: milestone?.actualCompletionDate || "",
+      };
+    });
 
   const allocationPercentage = Math.round(payments.reduce((sum, p) => sum + p.percentage, 0) * 100) / 100;
   const scheduledTotal = payments.reduce((sum, p) => sum + p.amount, 0);
   const remainingAmount = Math.max(0, totalValue - scheduledTotal);
   const billingDates = payments.map((p) => p.billingDate).filter(Boolean).sort();
+  // The plan's own due / completion dates: the last milestone's, i.e. when the whole
+  // plan is due and when the last of its milestones was actually completed. Both are
+  // "yyyy-mm-dd" (see toDateOnly in projectMilestoneService), so they sort as strings.
+  const milestoneDueDates = payments.map((p) => p.milestoneDueDate).filter(Boolean).sort();
+  const milestoneCompletionDates = payments.map((p) => p.milestoneCompletionDate).filter(Boolean).sort();
 
   return {
     milestonePlan,
@@ -628,6 +647,10 @@ function buildMilestonePlanReview(wizardData, projectInfo) {
     isFullyAllocated: Math.abs(allocationPercentage - 100) < 0.01,
     firstPaymentDate: billingDates[0] || null,
     lastPaymentDate: billingDates[billingDates.length - 1] || null,
+    milestoneDueDate: milestoneDueDates[milestoneDueDates.length - 1] || null,
+    milestoneCompletionDate: milestoneCompletionDates[milestoneCompletionDates.length - 1] || null,
+    // Every milestone in the plan has been completed in PMS (so the date above covers all of them).
+    allMilestonesCompleted: payments.length > 0 && milestoneCompletionDates.length === payments.length,
   };
 }
 
@@ -734,8 +757,22 @@ function PaymentSchedule({ review, currency }) {
     : [
       { label: "Schedule Type", value: review.isMilestones ? "PMS Milestones" : "Custom Payment Dates" },
       { label: "Number of Payments", value: String(review.payments.length) },
-      { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
-      { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
+      // A Milestone Plan is described by its milestones' own dates; Installments have no
+      // milestones behind them, so they keep the first/last billing date of the schedule.
+      ...(review.isMilestones
+        ? [
+          { label: "Milestone Due Date", value: formatDisplayDate(review.milestoneDueDate) },
+          {
+            label: "Milestone Completion Date",
+            value: review.milestoneCompletionDate
+              ? `${formatDisplayDate(review.milestoneCompletionDate)}${review.allMilestonesCompleted ? "" : " (partial)"}`
+              : "",
+          },
+        ]
+        : [
+          { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
+          { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
+        ]),
     ];
   return (
     <div className="space-y-3 py-1">
@@ -1163,7 +1200,12 @@ export default function ReviewActivateStep({ wizardData, data, onEditStep, leadi
   // Duration, shown in the primary summary).
   const hasSchedule = Boolean(commercialEffectiveDates.from || commercialEffectiveDates.to);
 
-  const milestoneReview = isMilestonePlan ? buildMilestonePlanReview(resolvedWizardData, projectInfo) : null;
+  // The milestone plan's entries carry only pmsMilestoneId, so the PMS milestones are
+  // loaded here too (the same source Step 3 uses) to show each plan's due and completion date.
+  const { milestones: pmsMilestones } = useProjectMilestones(projectInfo.pmsProjectId, { enabled: isMilestonePlan });
+  const milestoneReview = isMilestonePlan
+    ? buildMilestonePlanReview(resolvedWizardData, projectInfo, pmsMilestones)
+    : null;
   // Labels of fields the backend reports as changed — drives the subtle
   // "Changed" chips on matching review rows. Empty outside the view page.
   const changedFieldLabels = useMemo(() => getChangedFieldLabels(pendingChanges), [pendingChanges]);

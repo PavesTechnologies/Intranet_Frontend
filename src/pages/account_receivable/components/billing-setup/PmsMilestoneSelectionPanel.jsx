@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { AlertCircle, Loader2, Lock, Trash2 } from "lucide-react";
 import { formatCurrency, formatDisplayDate } from "../../utils/format";
 import {
@@ -15,6 +15,56 @@ const READINESS_LABELS = {
 };
 
 const roundPercent = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+// PMS sends the allocation as a decimal (15.00). It IS the AR billing % — the
+// panel shows it read-only, so it is normalised to a plain string ("15",
+// "12.5"). Only a usable percentage (> 0, <= 100) is taken; anything else
+// yields "" so the row shows no amount instead of a wrong one.
+const toPrefillPercentage = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 100) return "";
+  return String(roundPercent(numeric));
+};
+
+// Local calendar day as yyyy-mm-dd — the default billing date and the earliest
+// one <input type="date"> will accept. Local, not UTC, so it matches the day
+// the user sees.
+const todayDateOnly = () => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+};
+
+// A milestone already saved with a past billing date must stay selectable, so
+// the floor is relaxed to that date rather than rejecting what is stored.
+const earliestSelectableDate = (currentValue, today) =>
+  currentValue && currentValue < today ? currentValue : today;
+
+const addDays = (dateOnly, days) => {
+  const date = new Date(`${dateOnly}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
+// A Milestone Plan must give every milestone its own billing date (the backend
+// opens one occurrence per date, and the form blocks saving on a duplicate).
+// Defaults therefore start at today and step to the next free day, so a plan
+// with several milestones is saveable as it stands instead of starting out in
+// error. The user can still move any date, as long as it is not in the past.
+const nextFreeDate = (today, taken) => {
+  let candidate = today;
+  while (taken.has(candidate)) candidate = addDays(candidate, 1);
+  return candidate;
+};
+
+const isMilestoneEligible = (milestone) =>
+  milestone.eligibleForBilling !== undefined
+    ? Boolean(milestone.eligibleForBilling)
+    : !getMilestoneIneligibilityReason(milestone);
 
 const fieldInput =
   "h-9 w-full rounded-lg border px-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20";
@@ -35,12 +85,15 @@ function ReadinessBadge({ readiness }) {
 
 const hasValue = (value) => value !== "" && value !== null && value !== undefined;
 
-// Picks which PMS milestones a Milestone Plan bills and how much of the
-// contract each one bills. The milestone list comes from the backend
+// Shows what a Milestone Plan bills. The milestone list comes from the backend
 // (GET /api/projects/{pmsProjectId}/milestones) and is passed in with its
 // loading state; the plan's entries ({ pmsMilestoneId, percentage, billingDate,
-// remarks, ... }) are owned by the parent form. The PMS allocation percentage
-// is shown for reference only — the AR percentage is always entered here.
+// remarks, ... }) are owned by the parent form.
+//
+// There is no per-row selection: every milestone PMS reports as eligible is
+// billed, and its AR billing % IS the PMS allocationPercentage, shown read-only
+// rather than typed. The billing date is the only editable field — it defaults
+// to today and cannot be moved into the past.
 export default function PmsMilestoneSelectionPanel({
   pmsProjectId,
   milestonesState,
@@ -65,30 +118,43 @@ export default function PmsMilestoneSelectionPanel({
   // or not part of this project). Only meaningful once a list has really loaded.
   const unlistedEntries = status === "success" ? entries.filter((e) => !listedIds.has(e.pmsMilestoneId)) : [];
 
-  const toggle = (milestone) => {
-    if (entryByMilestone.has(milestone.pmsMilestoneId)) {
-      const existingEntry = entryByMilestone.get(milestone.pmsMilestoneId);
-      if (isMilestoneEntryLocked(existingEntry)) {
-        return;
-      }
-      onEntriesChange(entries.filter((e) => e.pmsMilestoneId !== milestone.pmsMilestoneId));
-      return;
-    }
-    const ineligibilityReason = getMilestoneIneligibilityReason(milestone);
-    const isEligible = milestone.eligibleForBilling !== undefined ? Boolean(milestone.eligibleForBilling) : !ineligibilityReason;
-    if (!isEligible) return;
+  const today = todayDateOnly();
 
+  // The parent rebuilds the whole plan object on every change, so the auto-fill below must never
+  // send an array it captured earlier: a saved plan arriving from the server (a hydrate, or the
+  // re-read after a save) would be overwritten by that stale copy. The ref always holds the
+  // entries of the latest commit, which is what the new rows are appended to.
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+
+  // Every eligible milestone is billed, so an entry is materialised for each one
+  // the parent does not already hold. Entries already in the plan are left
+  // untouched (a saved entry keeps its stored percentage and date, and a locked
+  // one must never be rewritten), and nothing is removed here — an entry whose
+  // milestone turned ineligible is surfaced rather than silently dropped.
+  useEffect(() => {
+    if (status !== "success") return;
+    const missing = milestones.filter(
+      (milestone) => isMilestoneEligible(milestone) && !entryByMilestone.has(milestone.pmsMilestoneId),
+    );
+    if (missing.length === 0) return;
+    const currentEntries = entriesRef.current;
+    const takenDates = new Set(currentEntries.map((entry) => entry.billingDate).filter(Boolean));
     onEntriesChange([
-      ...entries,
-      {
-        clientKey: `pms-milestone-${milestone.pmsMilestoneId}`,
-        pmsMilestoneId: milestone.pmsMilestoneId,
-        percentage: "",
-        billingDate: milestone.plannedCompletionDate || "",
-        remarks: milestone.name,
-      },
+      ...currentEntries,
+      ...missing.map((milestone) => {
+        const billingDate = nextFreeDate(today, takenDates);
+        takenDates.add(billingDate);
+        return {
+          clientKey: `pms-milestone-${milestone.pmsMilestoneId}`,
+          pmsMilestoneId: milestone.pmsMilestoneId,
+          percentage: toPrefillPercentage(milestone.pmsAllocationPercentage),
+          billingDate,
+          remarks: milestone.name,
+        };
+      }),
     ]);
-  };
+  }, [status, milestones, entries, entryByMilestone, onEntriesChange, today]);
 
   const patchEntry = (pmsMilestoneId, patch) => {
     if (isMilestoneEntryLocked(entryByMilestone.get(pmsMilestoneId))) {
@@ -104,7 +170,7 @@ export default function PmsMilestoneSelectionPanel({
     onEntriesChange(entries.filter((e) => e.pmsMilestoneId !== pmsMilestoneId));
   };
 
-  const selectedCount = entries.length;
+  const billedCount = entries.length;
   const currentCycleTotalPercentage = entries.reduce((sum, e) => sum + (Number(e.percentage) || 0), 0);
   const currentCycleScheduledAmount = entries.reduce((sum, e) => sum + ((Number(e.percentage) || 0) / 100) * totalValue, 0);
 
@@ -143,7 +209,7 @@ export default function PmsMilestoneSelectionPanel({
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-              PMS Milestones ({milestones.length}) · {selectedCount} selected
+              PMS Milestones ({milestones.length}) · {billedCount} billed
             </span>
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <span className="font-medium text-slate-500">
@@ -163,11 +229,9 @@ export default function PmsMilestoneSelectionPanel({
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <th className="px-3.5 py-2.5">Bill</th>
                   <th className="px-3.5 py-2.5">Milestone</th>
                   <th className="px-3.5 py-2.5">Planned Due</th>
                   <th className="px-3.5 py-2.5">PMS Status</th>
-                  <th className="px-3.5 py-2.5">PMS Allocation (reference)</th>
                   <th className="px-3.5 py-2.5">Readiness</th>
                   <th className="px-3.5 py-2.5">Billing State</th>
                   <th className="px-3.5 py-2.5">AR Billing %</th>
@@ -179,12 +243,15 @@ export default function PmsMilestoneSelectionPanel({
                 {milestones.map((milestone) => {
                   const entry = entryByMilestone.get(milestone.pmsMilestoneId);
                   const selected = Boolean(entry);
-                  const percentNum = Number(entry?.percentage);
+                  const rowKey = milestone.code || milestone.pmsMilestoneId;
+                  // The entry's percentage once it exists, otherwise what PMS allocated:
+                  // an ineligible milestone has no entry but its share is still shown.
+                  const displayPercentage = selected ? entry.percentage : toPrefillPercentage(milestone.pmsAllocationPercentage);
+                  const percentNum = Number(displayPercentage);
                   const percentInvalid =
-                    selected && hasValue(entry.percentage) && (Number.isNaN(percentNum) || percentNum <= 0 || percentNum > 100);
+                    hasValue(displayPercentage) && (Number.isNaN(percentNum) || percentNum <= 0 || percentNum > 100);
 
                   const ineligibilityReason = getMilestoneIneligibilityReason(milestone);
-                  const isEligible = milestone.eligibleForBilling !== undefined ? Boolean(milestone.eligibleForBilling) : !ineligibilityReason;
                   // the ENTRY's own backend state decides; the milestone-level billing state below is display only
                   const entryState = selected ? getMilestoneEntryFrozenState(entry) : null;
                   const isFrozen = entryState === MILESTONE_ENTRY_STATE.FROZEN;
@@ -198,24 +265,14 @@ export default function PmsMilestoneSelectionPanel({
                   const isReserved = Boolean(
                     milestone.reserved || milestone.isReserved || milestone.reservedBy || billingStateUpper === "RESERVED",
                   );
-                  const isCheckboxDisabled = (!selected && !isEligible) || isLocked;
 
                   return (
                     <tr
                       key={milestone.pmsMilestoneId}
+                      data-testid={`milestone-row-${rowKey}`}
+                      data-billed={selected ? "yes" : "no"}
                       className={selected ? "bg-[#0A0082]/[0.03]" : ineligibilityReason ? "bg-slate-50/40 opacity-80" : "hover:bg-slate-50/80"}
                     >
-                      <td className="px-3.5 py-3">
-                        <input
-                          type="checkbox"
-                          aria-label={`Bill milestone ${milestone.code || milestone.pmsMilestoneId}`}
-                          checked={selected}
-                          disabled={isCheckboxDisabled}
-                          title={isLocked ? "This milestone is locked and cannot be removed." : ineligibilityReason || "Select milestone"}
-                          onChange={() => toggle(milestone)}
-                          className="h-4 w-4 rounded border-slate-300 text-[#0A0082] focus:ring-[#0A0082]/30 disabled:cursor-not-allowed disabled:opacity-40"
-                        />
-                      </td>
                       <td className="px-3.5 py-3">
                         {milestone.code && <div className="font-mono text-xs font-semibold text-slate-900">{milestone.code}</div>}
                         <div className="text-xs font-medium text-slate-800">{milestone.name || `Milestone ${milestone.pmsMilestoneId}`}</div>
@@ -262,9 +319,6 @@ export default function PmsMilestoneSelectionPanel({
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3.5 py-3">{milestone.executionStatus || "—"}</td>
-                      <td className="whitespace-nowrap px-3.5 py-3 tabular-nums text-slate-500">
-                        {milestone.pmsAllocationPercentage !== null ? `${milestone.pmsAllocationPercentage}%` : "—"}
-                      </td>
                       <td className="whitespace-nowrap px-3.5 py-3">
                         <ReadinessBadge readiness={milestone.billingReadiness} />
                       </td>
@@ -311,26 +365,26 @@ export default function PmsMilestoneSelectionPanel({
                           </span>
                         )}
                       </td>
-                      <td className="px-3.5 py-3">
-                        {selected ? (
-                          <div className="relative w-28">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              inputMode="decimal"
-                              aria-label={`AR billing percentage for ${milestone.code || milestone.pmsMilestoneId}`}
-                              value={entry.percentage ?? ""}
-                              placeholder="Enter %"
-                              disabled={isLocked}
-                              onChange={(event) => patchEntry(milestone.pmsMilestoneId, { percentage: event.target.value })}
-                              className={`${fieldInput} pr-6 tabular-nums ${percentInvalid ? "border-red-400" : "border-slate-300"} disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed`}
-                            />
-                            <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-slate-400">%</span>
-                          </div>
+                      <td className="whitespace-nowrap px-3.5 py-3">
+                        {hasValue(displayPercentage) && !percentInvalid ? (
+                          <span
+                            className="font-semibold tabular-nums text-slate-900"
+                            data-testid={`ar-percentage-${rowKey}`}
+                          >
+                            {roundPercent(displayPercentage)}%
+                          </span>
                         ) : (
-                          <span className="text-slate-300">—</span>
+                          <span
+                            className="text-[11px] font-medium text-amber-700"
+                            data-testid={`ar-percentage-unavailable-${rowKey}`}
+                            title={
+                              hasValue(displayPercentage)
+                                ? `PMS reported an unusable allocation (${displayPercentage}%).`
+                                : "PMS did not report an allocation percentage for this milestone."
+                            }
+                          >
+                            No allocation
+                          </span>
                         )}
                       </td>
                       <td className="px-3.5 py-3">
@@ -338,9 +392,15 @@ export default function PmsMilestoneSelectionPanel({
                           <input
                             type="date"
                             aria-label={`Billing date for ${milestone.code || milestone.pmsMilestoneId}`}
-                            value={entry.billingDate || ""}
+                            value={entry.billingDate || today}
+                            min={earliestSelectableDate(entry.billingDate, today)}
                             disabled={isLocked}
-                            onChange={(event) => patchEntry(milestone.pmsMilestoneId, { billingDate: event.target.value })}
+                            onChange={(event) => {
+                              const nextDate = event.target.value;
+                              // The picker's min is advisory, so a typed-in past date is rejected here too.
+                              if (nextDate && nextDate < earliestSelectableDate(entry.billingDate, today)) return;
+                              patchEntry(milestone.pmsMilestoneId, { billingDate: nextDate });
+                            }}
                             className={`${fieldInput} w-40 border-slate-300 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed`}
                           />
                         ) : (
@@ -348,7 +408,7 @@ export default function PmsMilestoneSelectionPanel({
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3.5 py-3 text-right font-semibold tabular-nums text-slate-900">
-                        {selected && hasValue(entry.percentage) && !percentInvalid
+                        {hasValue(displayPercentage) && !percentInvalid
                           ? formatCurrency((percentNum / 100) * totalValue, currency)
                           : "—"}
                       </td>

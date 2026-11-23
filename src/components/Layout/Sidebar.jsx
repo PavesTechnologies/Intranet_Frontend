@@ -32,11 +32,12 @@ const navigation = [
   {
     name: "Projects",
     href: "/projects",
+    tourId: "nav-projects",
     icon: FolderKanban,
     allowedRoles: ["Project_Manager", "General", "Tester"],
   },
-  { name: "Leave Management", href: "/leave-management", icon: PlaneTakeoff },
-  { name: "Timesheets", href: "/timesheets", icon: Clock },
+  { name: "Leave Management", href: "/leave-management", icon: PlaneTakeoff, tourId: "nav-leave" },
+  { name: "Timesheets", href: "/timesheets", icon: Clock, tourId: "nav-timesheets" },
   // { name: "Calendar", href: "/calendar", icon: Calendar },
   // { name: "Employee Exit", href: "/employee-exit", icon: AlertCircle },
 ];
@@ -539,6 +540,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
 
   return (
     <aside
+      data-tour="sidebar"
       className={`fixed top-0 left-0 h-screen bg-[#081534] text-white flex flex-col z-50 transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"
         } border-r border-[#0f1a3a]`}
     >
@@ -567,9 +569,10 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           }
         `}</style>
 
-        <ul className="space-y-1">
+        {/* data-tour="..." attributes are anchors for the guided tours (components/Tour/tours.js). */}
+        <ul className="space-y-1" data-tour="sidebar-nav">
           {isIntranet && (
-            <li>
+            <li data-tour="nav-dashboard">
               <Link
                 to="/dashboard"
                 onMouseEnter={closeAllSubmenus}
@@ -586,7 +589,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           )}
 
           {isFinance && (
-            <li>
+            <li data-tour="nav-dashboard">
               <Link
                 to="/finance/dashboard"
                 onMouseEnter={closeAllSubmenus}
@@ -605,6 +608,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {/* AI Screening (AIRS) Menu */}
           {airsRBACAccess && (
             <li
+              data-tour="nav-airs"
               ref={airsRef}
               className="relative"
               onMouseEnter={handleAirsMouseEnter}
@@ -661,6 +665,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {/* Employee Onboarding (Non-General, Non-DM) */}
           {isIntranet && (
             <li
+              data-tour="nav-eo"
               ref={eoRef}
               className="relative"
               onMouseEnter={handleEoMouseEnter}
@@ -712,7 +717,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     >
                       <NavLink
                         to={item.to}
-                        onClick={(e) => { if (item.children) e.preventDefault(); }}
+                        onClick={(e) => { if (item.children && !item.to) e.preventDefault(); }}
                         className={({ isActive }) =>
                           `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                             ? "bg-blue-100 text-[#0a174e] font-semibold"
@@ -736,6 +741,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {/* User Management (Admin Only) */}
           {isIntranet && isAdmin && (
             <li
+              data-tour="nav-um"
               ref={userManagementRef}
               className="relative"
               onMouseEnter={handleUserMouseEnter}
@@ -795,6 +801,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {/* Resource Management (With Pop Label/Submenu) */}
           {isIntranet && (isAdmin || isRM || isDM) && (
             <li
+              data-tour="nav-rm"
               ref={rmRef}
               className="relative"
               onMouseEnter={isAdminOnly ? undefined : handleRmMouseEnter}
@@ -876,7 +883,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {isIntranet && filteredNavigation.slice(1).map((item) => {
             const isActive = location.pathname === item.href;
             return (
-              <li key={item.name}>
+              <li key={item.name} data-tour={item.tourId}>
                 <Link
                   to={item.href}
                   onMouseEnter={closeAllSubmenus}
@@ -897,6 +904,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
             <>
               {/* Expense Management (XMS) */}
               <li
+                data-tour="nav-xms"
                 ref={xmsRef}
                 className="relative"
                 onMouseEnter={handleXmsMouseEnter}
@@ -968,6 +976,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
               {/* Accounts Payable (Admin, Vendor Intake, AP Executive, Finance Executive only) */}
               {isApUser && (
                 <li
+                  data-tour="nav-ap"
                   ref={apRef}
                   className="relative"
                   onMouseEnter={handleApMouseEnter}
@@ -1036,6 +1045,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                   (Maker items only), Finance Manager (Billing Approvals only) */}
               {canSeeAr && (
                 <li
+                  data-tour="nav-ar"
                   ref={arRef}
                   className="relative"
                   onMouseEnter={handleArMouseEnter}

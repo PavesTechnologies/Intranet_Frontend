@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  employeeActionStates,
+  listRowActionStates,
   claimRowActions,
   filterAndSortClaims,
   paymentInfo,
@@ -123,5 +125,34 @@ describe("claimRowActions", () => {
     for (const status of ["DRAFT", "PENDING_MANAGER", "PENDING_FINANCE", "CLARIFICATION_REQUIRED", "APPROVED", "SETTLED", "CANCELLED"]) {
       expect(claimRowActions(claim("1", status)).canCancel).toBe(cancellable.includes(status));
     }
+  });
+});
+
+describe("row and workflow action states", () => {
+  it("keeps View allowed and gives Edit and Cancel a reason when they do not apply", () => {
+    const settled = listRowActionStates(claim("1", "SETTLED"));
+    expect(settled.view.allowed).toBe(true);
+    expect(settled.edit.allowed).toBe(false);
+    expect(settled.edit.reason).toMatch(/Draft or a claim that needs clarification/);
+    expect(settled.cancel.allowed).toBe(false);
+    expect(settled.cancel.reason).toMatch(/Cancel is available only/);
+  });
+
+  it("allows Edit and Cancel on a Draft", () => {
+    const draft = listRowActionStates(claim("1", "DRAFT"));
+    expect(draft.edit.allowed).toBe(true);
+    expect(draft.cancel.allowed).toBe(true);
+  });
+
+  it("explains why submit is blocked when an expense has no receipt", () => {
+    const draft = { ...claim("1", "DRAFT"), items: [{ claimItemId: "a", receipts: [] }] };
+    expect(employeeActionStates(draft).submit).toEqual({
+      allowed: false,
+      reason: "Every expense needs a receipt before you submit.",
+    });
+  });
+
+  it("explains that a submitted claim cannot be submitted again", () => {
+    expect(employeeActionStates(claim("1", "PENDING_MANAGER")).submit.reason).toBe("Only a Draft can be submitted.");
   });
 });

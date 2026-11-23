@@ -142,14 +142,30 @@ export default function SupportingDocumentsUpload({ advanceId, ensureDraft, disa
     }
   };
 
+  // Retry also works when the first attempt failed before the draft existed (e.g. a required field was empty):
+  // it creates the draft now, once the employee has fixed the form.
   const retry = async (item) => {
-    if (!advanceId) return;
     setBusy(true);
-    await uploadOne(item, advanceId);
-    setBusy(false);
+    try {
+      const targetId = advanceId || (await ensureDraft());
+      setProblems([]);
+      await uploadOne(item, targetId);
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || "The upload failed.";
+      setProblems([message]);
+      setPending((list) => list.map((p) => (p.localId === item.localId ? { ...p, status: "failed", error: message } : p)));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const dismissPending = (localId) => setPending((list) => list.filter((p) => p.localId !== localId));
+  // Dismissing the last failed file also clears its error message above the list.
+  const dismissPending = (localId) =>
+    setPending((list) => {
+      const next = list.filter((p) => p.localId !== localId);
+      if (!next.some((p) => p.status === "failed")) setProblems([]);
+      return next;
+    });
 
   const remove = async (documentId) => {
     if (!advanceId) return;
@@ -276,7 +292,7 @@ export default function SupportingDocumentsUpload({ advanceId, ensureDraft, disa
               {item.status === "failed" ? (
                 <>
                   <span className="text-rose-700" title={item.error}>Failed: {item.error}</span>
-                  <Button variant="outline" size="small" disabled={busy || !advanceId} onClick={() => retry(item)} className="text-xs">
+                  <Button variant="outline" size="small" disabled={busy || disabled} onClick={() => retry(item)} className="text-xs">
                     <RotateCcw size={12} className="mr-1" aria-hidden="true" /> Retry
                   </Button>
                   <Button variant="outline" size="small" onClick={() => dismissPending(item.localId)} className="text-xs">

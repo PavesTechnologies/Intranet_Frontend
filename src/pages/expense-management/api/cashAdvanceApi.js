@@ -137,13 +137,6 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }).then((res) => res.data?.data ?? res.data),
 
-  // Finance's approval of a Cash Advance + Outstanding request: rollover, approved cash and any overdue exception.
-  approveAllocation: (advanceId, body) =>
-    api.post(`/xms/employee/cash-advances/${advanceId}/approve-allocation`, body, {
-      baseURL: EXPENSE_API_BASE,
-      headers: authHeaders(),
-    }),
-
   approve: (advanceId) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/approve`, null, {
       baseURL: EXPENSE_API_BASE,

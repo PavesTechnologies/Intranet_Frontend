@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, XCircle, Eye, DollarSign, Calendar, RefreshCw, Send, AlertCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Eye, DollarSign, Calendar, RefreshCw, Send, AlertCircle, ChevronRight } from "lucide-react";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
@@ -9,6 +9,7 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { lookupService } from "@/pages/expense-management/api/expenseReportsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
+import { formatTripDates } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import { useApprovalWebSocket } from "@/pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
 
 const formatMoney = (amount, currencyCode = "INR") => {
@@ -28,22 +29,89 @@ const formatAdvanceNumber = (adv) => {
   return str.startsWith("ADV-") ? str : `ADV-${str}`;
 };
 
-const getNeededByDateValue = (adv) => {
-  if (!adv) return null;
-  return (
-    adv.neededByDate ||
-    adv.neededBy ||
-    adv.needed_by_date ||
-    adv.needed_by ||
-    adv.requiredDate ||
-    adv.targetDate ||
-    adv.expectedDate ||
-    adv.settlementDueDate ||
-    adv.createdDate ||
-    adv.createdAt ||
-    adv.created_at
-  );
+// Only a real needed-by date (the server already falls back to the settlement due date). The creation date used to be
+// shown here as "Needed by", which was wrong; it is now shown as "Requested on" instead.
+const getNeededByDateValue = (adv) => (adv ? adv.neededByDate || adv.needed_by_date || adv.settlementDueDate || null : null);
+
+const PENDING_STATUSES = [
+  "SUBMITTED",
+  "PENDING",
+  "PENDING_APPROVAL",
+  "PENDING_MANAGER_APPROVAL",
+  "PENDING_COST_CENTER_APPROVAL",
+  "PENDING_COST_CENTER",
+  "PENDING_FINANCE_APPROVAL",
+  "PENDING_FINANCE",
+];
+
+/**
+ * Requested vs approved for one advance. Requested is what the employee asked for. Approved is the frozen
+ * approvedAmount after Finance's final approval, or the manager's approved amount while later stages are pending.
+ */
+export const advanceAmounts = (adv) => {
+  const amount = Number(adv?.amount) || 0;
+  const requested = adv?.requestedAmount != null ? Number(adv.requestedAmount) : amount;
+  const status = String(adv?.status || "").toUpperCase();
+  const treatment = String(adv?.managerTreatment || "").toUpperCase();
+  let approved = null;
+  let approvedLabel = null;
+  if (adv?.approvedAmount != null) {
+    approved = Number(adv.approvedAmount);
+    approvedLabel = "Approved";
+  } else if (status === "REJECTED") {
+    approvedLabel = "Rejected";
+  } else if (treatment && treatment !== "DEFERRED") {
+    approved = amount;
+    approvedLabel = "Approved by manager";
+  }
+  const paid = adv?.disbursedAmount != null ? Number(adv.disbursedAmount) : null;
+  return { requested, approved, approvedLabel, cut: approved != null ? Math.max(requested - approved, 0) : 0, paid };
 };
+
+// Three table cells: Requested, Approved, Paid. Each holds one figure, so the columns can be read down the table.
+function AmountCells({ adv }) {
+  const cur = adv.currencyCode || "INR";
+  const { requested, approved, approvedLabel, cut, paid } = advanceAmounts(adv);
+  const cell = "px-2.5 py-1.5 text-right align-middle whitespace-nowrap text-xs";
+  return (
+    <>
+      <td className={cell}>
+        <span className="font-mono font-semibold tabular-nums text-gray-900">{formatMoney(requested, cur)}</span>
+      </td>
+      <td
+        className={cell}
+        // Who approved it is shown on hover, so the cell keeps to the amount and the cut.
+        title={
+          approved == null
+            ? undefined
+            : approvedLabel === "Approved by manager"
+              ? `Approved by the manager. Waiting for Finance's final approval.${cut > 0 ? ` Requested ${formatMoney(requested, cur)}, cut by ${formatMoney(cut, cur)}.` : ""}`
+              : `Final amount approved by Finance.${cut > 0 ? ` Requested ${formatMoney(requested, cur)}, cut by ${formatMoney(cut, cur)}.` : ""}`
+        }
+      >
+        {approved != null ? (
+          <span className="cursor-help">
+            <span className={`block font-mono font-semibold tabular-nums ${cut > 0 ? "text-amber-700" : "text-emerald-700"}`}>{formatMoney(approved, cur)}</span>
+            <span className="block text-[10px] text-gray-500">
+              {cut > 0 ? `Cut by ${formatMoney(cut, cur)}` : "In full"}
+            </span>
+          </span>
+        ) : (
+          <span className={`text-[11px] ${approvedLabel === "Rejected" ? "text-rose-600" : "text-gray-400"}`}>
+            {approvedLabel === "Rejected" ? "Rejected" : "Not yet"}
+          </span>
+        )}
+      </td>
+      <td className={cell}>
+        {paid != null ? (
+          <span className="font-mono tabular-nums text-gray-800">{formatMoney(paid, cur)}</span>
+        ) : (
+          <span className="text-[11px] text-gray-400">Not paid</span>
+        )}
+      </td>
+    </>
+  );
+}
 
 const formatDate = (dateValue) => {
   if (!dateValue) return "—";
@@ -187,7 +255,7 @@ const getStatusBadge = (status) => {
     default:
       return (
         <span className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-gray-100 text-gray-600 border border-gray-200">
-          {upper || "PENDING"}
+          {(upper || "PENDING").replace(/_/g, " ")}
         </span>
       );
   }
@@ -302,7 +370,7 @@ export const canApproveAdvance = (adv, user, hasRole) => {
  * "MANAGER" (the Approvals tab) shows advances waiting for the manager, "FINANCE" (the Finance tab)
  * shows advances waiting for Finance. Approved and rejected history is not split by stage.
  */
-export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", embedded = false, onRowCount, windowStart = 0, windowEnd }) {
+export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", amountFilter = "ALL", embedded = false, onRowCount, onDecided, windowStart = 0, windowEnd }) {
   const { user, hasRole } = useAuth();
   const ws = useApprovalWebSocket();
   const [advances, setAdvances] = useState([]);
@@ -393,22 +461,15 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
     return advances.filter((adv) => {
       const statusUpper = (adv.status || "").toUpperCase();
 
-      let matchTab = false;
-      if (activeTab === "pending") {
-        matchTab = [
-          "SUBMITTED",
-          "PENDING",
-          "PENDING_APPROVAL",
-          "PENDING_MANAGER_APPROVAL",
-          "PENDING_COST_CENTER_APPROVAL",
-          "PENDING_COST_CENTER",
-          "PENDING_FINANCE_APPROVAL",
-          "PENDING_FINANCE"
-        ].includes(statusUpper);
-      } else if (activeTab === "approved") {
-        matchTab = ["APPROVED", "DISBURSED", "SETTLED"].includes(statusUpper);
-      } else if (activeTab === "rejected") {
-        matchTab = statusUpper === "REJECTED";
+      // Pending: only rows still awaiting a decision. Approved / Rejected: the server returns exactly what this user
+      // decided, whatever stage the advance has reached since (e.g. still waiting for Finance), so nothing is dropped
+      // here and the list matches the count on the card.
+      const matchTab = activeTab === "pending" ? PENDING_STATUSES.includes(statusUpper) : true;
+
+      let matchAmount = true;
+      if (amountFilter !== "ALL") {
+        const { cut, approved } = advanceAmounts(adv);
+        matchAmount = amountFilter === "REDUCED" ? cut > 0 : amountFilter === "FULL" ? approved != null && cut === 0 : true;
       }
 
       const matchSearch =
@@ -421,9 +482,9 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
 
       // The backend already scopes /my-approvals to what this user is part of. Rows the user cannot act on yet
       // stay visible with disabled actions, as the card counts above do.
-      return matchTab && matchSearch;
+      return matchTab && matchAmount && matchSearch;
     });
-  }, [advances, activeTab, searchTerm]);
+  }, [advances, activeTab, searchTerm, amountFilter]);
 
   // Balance the approver sees before deciding: the employee's other open advances, loaded when the modal opens.
   const [approvalBalance, setApprovalBalance] = useState(null);
@@ -499,6 +560,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
       setApprovingAdvance(null);
       setApprovalRemarks("");
       fetchAdvances();
+      onDecided?.();
     } catch (err) {
       showStatusToast(err.response?.data?.message || "Could not record the decision", "error");
     } finally {
@@ -540,6 +602,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
       setRejectingAdvance(null);
       setRejectionReason("");
       fetchAdvances();
+      onDecided?.();
     } catch (err) {
       showStatusToast(err.response?.data?.message || "Failed to reject cash advance", "error");
     } finally {
@@ -553,18 +616,10 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                   const advId = adv.advanceId || adv.id;
                   const isActionable = canApproveAdvance(adv, user, hasRole);
                   // Show the buttons on every awaiting-approval row; disable them when this user can't act yet
+                  // Approve/Reject only on the Pending tab: on Approved, a row still waiting for Finance is already decided by this user.
                   const showActions =
-                    isActionable ||
-                    [
-                      "SUBMITTED",
-                      "PENDING",
-                      "PENDING_APPROVAL",
-                      "PENDING_MANAGER_APPROVAL",
-                      "PENDING_COST_CENTER_APPROVAL",
-                      "PENDING_COST_CENTER",
-                      "PENDING_FINANCE_APPROVAL",
-                      "PENDING_FINANCE",
-                    ].includes((adv.status || "").toUpperCase());
+                    activeTab === "pending" && (isActionable || PENDING_STATUSES.includes((adv.status || "").toUpperCase()));
+                  const neededBy = getNeededByDateValue(adv);
                   const empId = adv.employeeId || adv.employee_id || adv.userId || adv.createdById || adv.createdBy;
 
                   return (
@@ -579,16 +634,14 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                       <td className="px-2.5 py-1.5 text-left max-w-[220px]">
                         <p className="font-semibold text-gray-900 truncate text-xs">{adv.title || "Cash Advance"}</p>
                         <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                          Needed by {formatDate(getNeededByDateValue(adv))}
+                          {neededBy ? `Needed by ${formatDate(neededBy)}` : `Requested on ${formatDate(adv.createdAt)}`}
                         </p>
                       </td>
                       <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate">{getCostCenterValue(adv, costCentersMap)}</td>
                       <td className="px-2.5 py-1.5 text-left whitespace-nowrap">
                         {getStatusBadge(adv.status)}
                       </td>
-                      <td className="px-2.5 py-1.5 font-semibold text-gray-900 whitespace-nowrap text-right text-xs">
-                        {formatMoney(adv.amount, adv.currencyCode || "INR")}
-                      </td>
+                      <AmountCells adv={adv} />
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
@@ -634,111 +687,149 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
       {/* Approve / decision modal */}
       {approvingAdvance && (() => {
         const cur = approvalBalance?.currencyCode || approvingAdvance.currencyCode || "INR";
-        const Row = ({ label, value, strong, tone }) => (
-          <p className={`flex justify-between gap-3 ${strong ? "font-semibold border-t border-gray-200 pt-1.5" : ""} ${tone || ""}`}>
-            <span>{label}</span>
-            <span className="font-mono whitespace-nowrap">{formatMoney(value ?? 0, cur)}</span>
-          </p>
+        const money = (v) => formatMoney(Number(v) || 0, cur);
+        // One line of the ledger: sign (+, −, =) in its own column so every figure lines up and the sum reads top to bottom.
+        const Row = ({ sign, label, help, value, strong, tone, valueTone }) => (
+          <div className={`flex items-start gap-2 py-1.5 ${strong ? "border-t-2 border-gray-300 mt-1 pt-2.5" : ""} ${tone || ""}`}>
+            <span className="w-4 shrink-0 text-center font-mono font-semibold text-gray-400">{sign}</span>
+            <span className="min-w-0 flex-1">
+              <span className={`block ${strong ? "font-semibold text-gray-900 text-[13px]" : "text-gray-800"}`}>{label}</span>
+              {help && <span className="block text-[11px] leading-snug text-gray-500">{help}</span>}
+            </span>
+            <span className={`shrink-0 whitespace-nowrap font-mono tabular-nums text-right ${strong ? "font-bold text-gray-900 text-[13px]" : "text-gray-800"} ${valueTone || ""}`}>
+              {money(value)}
+            </span>
+          </div>
         );
         const sources = approvalBalance?.otherOpenAdvances || [];
         const pickedSource = sources.find((o) => o.advanceId === setOffSourceId) || null;
         const setOffCap = pickedSource
           ? Math.min(Number(pickedSource.outstandingBalance) || 0, Number(approvingAdvance.amount) || 0)
           : null;
+
+        // Live figures for the "if you confirm" breakdown. Display only: the server re-checks and decides.
+        const requested = Number(approvingAdvance.amount) || 0;
+        const totalExposure = Number(approvalBalance?.potentialExposure) || 0;
+        const limit = approvalBalance?.exposureLimit != null ? Number(approvalBalance.exposureLimit) : null;
+        const reducedNum = Number(reducedAmount);
+        const reducedValid = reducedAmount !== "" && reducedNum > 0 && reducedNum < requested && reducedNum % ROUND_BLOCK === 0;
+        const reducedProblem = reducedAmount === "" ? null
+          : !(reducedNum > 0) ? "Enter an amount above zero."
+          : reducedNum >= requested ? `Must be less than the requested ${money(requested)}.`
+          : reducedNum % ROUND_BLOCK !== 0 ? `Must be a multiple of ${ROUND_BLOCK} (for example ${money(Math.floor(reducedNum / ROUND_BLOCK) * ROUND_BLOCK)}).`
+          : null;
+        // A Cash Advance + Outstanding request carries the employee's balance into this one; a new request is just its cash.
+        const includesOutstanding = approvingAdvance.requestType === "ADVANCE_PLUS_OUTSTANDING";
+        const newCash = Number(approvingAdvance.additionalAmountRequested ?? approvingAdvance.amount) || 0;
+        const broughtIn = Math.max(0, (Number(approvingAdvance.totalAdvanceAllocation) || 0) - newCash);
+        // Money the employee already holds or is due on other advances; shown only when there is some.
+        const alreadyHeld = approvalBalance && !approvalBalance.error
+          ? (Number(approvalBalance.pendingBalanceTotal) || 0) + (Number(approvalBalance.committedAmount) || 0)
+          : 0;
+        const setOffNum = Number(setOffAmount);
+        const sourceOwed = Number(pickedSource?.outstandingBalance) || 0;
+        const setOffValid = !!pickedSource && setOffAmount !== "" && setOffNum > 0 && setOffNum <= sourceOwed && setOffNum <= requested;
+        const setOffProblem = !pickedSource || setOffAmount === "" ? null
+          : !(setOffNum > 0) ? "Enter an amount above zero."
+          : setOffNum > sourceOwed ? `More than the ${money(sourceOwed)} still owed on that advance.`
+          : setOffNum > requested ? `More than this request of ${money(requested)}.`
+          : null;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white sticky top-0 z-10">
                 <h3 className="font-bold text-gray-900 text-base">Decide on Cash Advance Request</h3>
                 <button onClick={() => setApprovingAdvance(null)} className="text-gray-400 hover:text-gray-600 p-1">
                   <XCircle size={18} />
                 </button>
               </div>
-              <form onSubmit={handleConfirmApprove} className="p-6 space-y-5">
-                <div className="rounded-xl border border-gray-200 bg-white p-5 text-xs text-gray-700">
-                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-3">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Request</p>
-                      <p className="font-mono text-sm font-semibold text-gray-900 break-all">{formatAdvanceNumber(approvingAdvance)}</p>
+              <form onSubmit={handleConfirmApprove} className="p-5 space-y-4">
+                {/* 1. What is being asked: one glance. */}
+                <div className="rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-700">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900" title={approvingAdvance.title || undefined}>
+                        {approvingAdvance.title || "Cash advance"}
+                      </p>
+                      <p className="mt-0.5 font-mono text-[11px] text-gray-400">{formatAdvanceNumber(approvingAdvance)}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Requested</p>
-                      <strong className="block text-base font-bold text-gray-900">{formatMoney(approvingAdvance.amount, cur)}</strong>
-                    </div>
+                    <p className="text-right text-[11px] text-gray-500">
+                      Trip {formatTripDates(approvingAdvance)}
+                    </p>
                   </div>
-                  <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <dt className="text-[11px] uppercase tracking-wide text-gray-500">Purpose</dt>
-                      <dd className="mt-0.5 leading-relaxed">{approvingAdvance.purpose || "Not given"}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[11px] uppercase tracking-wide text-gray-500">Trip dates</dt>
-                      <dd className="mt-0.5">
-                        {approvingAdvance.expectedTripStartDate
-                          ? `${new Date(approvingAdvance.expectedTripStartDate).toLocaleDateString("en-IN")} to ${approvingAdvance.expectedTripEndDate ? new Date(approvingAdvance.expectedTripEndDate).toLocaleDateString("en-IN") : "—"}`
-                          : "Not given"}
-                      </dd>
-                    </div>
-                    {approvingAdvance.notes && (
-                      <div className="sm:col-span-2">
-                        <dt className="text-[11px] uppercase tracking-wide text-gray-500">Employee's justification</dt>
-                        <dd className="mt-0.5 leading-relaxed">{approvingAdvance.notes}</dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
-
-                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-5 text-xs text-gray-700 space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Employee exposure</p>
-                  {!approvalBalance && <p className="text-gray-500">Loading balance...</p>}
-                  {approvalBalance?.error && <p className="text-rose-700">Could not load the balance. Check it before deciding.</p>}
-                  {approvalBalance && !approvalBalance.error && (
-                    <>
-                      <Row label="Outstanding in other advances" value={approvalBalance.pendingBalanceTotal} />
-                      <Row label="Approved or pending, not yet paid" value={approvalBalance.committedAmount} />
-                      <Row label="This request" value={approvingAdvance.amount} />
-                      <Row label="Total exposure" value={approvalBalance.potentialExposure} strong />
-                      {approvalBalance.exposureLimit != null ? (
-                        <Row label="Company limit" value={approvalBalance.exposureLimit} />
-                      ) : (
-                        <p className="text-gray-500">No exposure limit is configured.</p>
-                      )}
-                      {approvalBalance.exceedsLimit && (
-                        <p className="rounded bg-rose-50 p-2 font-semibold text-rose-700">
-                          Above the limit by {formatMoney(approvalBalance.excessOverLimit, cur)}. You can still approve with a justification, which Finance will authorize, or choose another option.
-                        </p>
-                      )}
-                      {sources.length > 0 && (
-                        <ul className="space-y-1 border-t border-gray-200 pt-2">
-                          {sources.map((o) => (
-                            <li key={o.advanceId} className="flex justify-between gap-3">
-                              <span className="truncate">{o.advanceId} · {o.title || "Cash advance"}</span>
-                              <span className="font-mono whitespace-nowrap">{formatMoney(o.outstandingBalance, cur)} owed</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </>
+                  {approvingAdvance.purpose && (
+                    <p className="mt-2 line-clamp-2 leading-relaxed text-gray-600" title={approvingAdvance.purpose}>
+                      {approvingAdvance.purpose}
+                    </p>
+                  )}
+                  {approvingAdvance.employeeJustification && (
+                    <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-amber-900">
+                      <span className="font-semibold">Why a separate advance: </span>
+                      {approvingAdvance.employeeJustification}
+                    </p>
                   )}
                 </div>
 
+                {/* 2. The money. A new request is one figure; a request with outstanding shows how the total is made. */}
+                <div className="rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 text-xs">
+                  {includesOutstanding ? (
+                    <>
+                      <Row sign="" label="New cash requested" value={newCash} />
+                      <Row sign="+" label="Outstanding brought in" help="Balance the employee still holds, rolled into this advance" value={broughtIn} />
+                      <Row sign="=" label="Total advance" value={newCash + broughtIn} strong />
+                    </>
+                  ) : (
+                    <Row sign="" label="Requested" help="New cash advance" value={requested} strong />
+                  )}
+
+                  {!approvalBalance && <p className="pb-1.5 text-[11px] text-gray-500">Checking the employee's other advances…</p>}
+                  {approvalBalance?.error && (
+                    <p className="pb-1.5 text-[11px] text-rose-700">Could not load the employee's other advances. Check them before deciding.</p>
+                  )}
+                  {alreadyHeld > 0 && (
+                    <details className="border-t border-gray-200 py-1.5 text-[11px] text-gray-600">
+                      <summary className="cursor-pointer">
+                        Employee already holds <span className="font-semibold text-gray-900">{money(alreadyHeld)}</span> on other advances
+                        <span className="ml-1 text-blue-700 underline">show</span>
+                      </summary>
+                      <ul className="mt-1 space-y-0.5 pl-3">
+                        {sources.map((o) => (
+                          <li key={o.advanceId} className="flex justify-between gap-3">
+                            <span className="truncate">{o.title || "Cash advance"}</span>
+                            <span className="shrink-0 font-mono">{money(o.outstandingBalance)} owed</span>
+                          </li>
+                        ))}
+                        {Number(approvalBalance?.committedAmount) > 0 && (
+                          <li className="flex justify-between gap-3">
+                            <span>Approved or pending, not paid yet</span>
+                            <span className="shrink-0 font-mono">{money(approvalBalance.committedAmount)}</span>
+                          </li>
+                        )}
+                      </ul>
+                    </details>
+                  )}
+                  {approvalBalance?.exceedsLimit && (
+                    <p className="mb-1.5 rounded bg-rose-50 px-2 py-1.5 text-[11px] font-semibold text-rose-700">
+                      Approving in full is {money(approvalBalance.excessOverLimit)} over the company limit of {money(limit)}. A justification is required.
+                    </p>
+                  )}
+                </div>
+
+                {/* 3. The decision. Set-off is offered only when there is an earlier balance to set off. */}
                 <fieldset>
-                  <legend className="text-xs font-semibold text-gray-800 mb-2">Your decision</legend>
-                  <div className="grid gap-3 md:grid-cols-3">
+                  <legend className="mb-2 text-xs font-semibold text-gray-800">Your decision</legend>
+                  <div className={`grid gap-2 ${sources.length > 0 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                     {[
-                      ["FULL", "Approve the full amount", "Option A. Both advances stay separate. Finance pays exactly this amount."],
-                      ["REDUCED", "Approve a lower amount", "Finance pays the reduced amount. The requested amount is kept on record."],
-                      ["SET_OFF", "Set off an earlier outstanding balance", "Option B. Recommended only. Finance proposes and approves the carry-forward, and disbursement waits for it."],
-                    ].map(([code, label, help]) => (
+                      ["FULL", "Approve full amount"],
+                      ["REDUCED", "Approve a lower amount"],
+                      ...(sources.length > 0 ? [["SET_OFF", "Set off earlier balance"]] : []),
+                    ].map(([code, label]) => (
                       <label
                         key={code}
-                        className={`flex items-start gap-3 rounded-xl border p-4 text-xs cursor-pointer transition-colors ${decision === code ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500" : "border-gray-200 hover:border-gray-300"}`}
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-colors ${decision === code ? "border-blue-500 bg-blue-50 text-blue-900 ring-1 ring-blue-500" : "border-gray-200 text-gray-800 hover:border-gray-300"}`}
                       >
-                        <input type="radio" name="decision" checked={decision === code} onChange={() => setDecision(code)} className="mt-0.5 shrink-0" />
-                        <span className="space-y-1">
-                          <span className="font-semibold text-gray-900 block">{label}</span>
-                          <span className="text-gray-500 block leading-relaxed">{help}</span>
-                        </span>
+                        <input type="radio" name="decision" checked={decision === code} onChange={() => setDecision(code)} className="shrink-0" />
+                        {label}
                       </label>
                     ))}
                   </div>
@@ -746,23 +837,28 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
 
                 {decision === "REDUCED" && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Amount to approve ({cur})</label>
+                    <label className="mb-1 block text-xs font-medium text-gray-700" htmlFor="reduced-amount">Amount to approve ({cur})</label>
                     <input
+                      id="reduced-amount"
                       type="number"
                       min="0"
                       step="500"
                       value={reducedAmount}
                       onChange={(e) => setReducedAmount(e.target.value)}
-                      className="w-full rounded-md border border-gray-300 p-2 text-xs"
+                      className={`w-full rounded-md border p-2 text-xs ${reducedProblem ? "border-rose-400" : "border-gray-300"}`}
                     />
+                    <p className={`mt-1 text-[11px] ${reducedProblem ? "text-rose-600" : "text-gray-500"}`}>
+                      {reducedProblem || `Less than ${money(requested)}, in multiples of ${ROUND_BLOCK}.`}
+                    </p>
                   </div>
                 )}
 
                 {decision === "SET_OFF" && (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Earlier advance</label>
+                      <label className="mb-1 block text-xs font-medium text-gray-700" htmlFor="set-off-source">Earlier advance</label>
                       <select
+                        id="set-off-source"
                         value={setOffSourceId}
                         onChange={(e) => {
                           const picked = sources.find((o) => o.advanceId === e.target.value);
@@ -776,30 +872,41 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                         <option value="">Choose an earlier advance…</option>
                         {sources.map((o) => (
                           <option key={o.advanceId} value={o.advanceId}>
-                            {`${o.title || "Cash advance"} · ${String(o.advanceId).slice(0, 8)} · ${formatMoney(o.outstandingBalance, cur)} owed`}
+                            {`${o.title || "Cash advance"} · ${formatMoney(o.outstandingBalance, cur)} owed`}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Amount to set off ({cur})</label>
+                      <label className="mb-1 block text-xs font-medium text-gray-700" htmlFor="set-off-amount">Amount to set off ({cur})</label>
                       <input
+                        id="set-off-amount"
                         type="number"
                         min="0"
                         max={setOffCap ?? undefined}
                         step="0.01"
                         value={setOffAmount}
                         onChange={(e) => setSetOffAmount(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 p-2 text-xs"
+                        className={`w-full rounded-md border p-2 text-xs ${setOffProblem ? "border-rose-400" : "border-gray-300"}`}
                       />
-                      {setOffCap != null && (
-                        <p className="mt-1 text-[11px] text-gray-500">
-                          At most {formatMoney(setOffCap, cur)}: the earlier balance or this request, whichever is lower.
-                        </p>
-                      )}
+                      {setOffProblem && <p className="mt-1 text-[11px] text-rose-600">{setOffProblem}</p>}
                     </div>
                   </div>
                 )}
+
+                {/* 4. The outcome, in one line, recalculated as the approver types. */}
+                <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs">
+                  <span className="text-gray-700">
+                    {decision === "FULL" && "Finance will pay the employee"}
+                    {decision === "REDUCED" && (reducedValid ? `Finance will pay the employee (cut by ${money(requested - reducedNum)})` : "Enter a valid amount to see what Finance pays")}
+                    {decision === "SET_OFF" && (setOffValid ? `Finance will pay in cash (${money(setOffNum)} set off from the earlier advance)` : "Choose the earlier advance and amount to see the cash paid")}
+                  </span>
+                  <span className="font-mono text-base font-bold tabular-nums text-emerald-800">
+                    {decision === "FULL" && money(requested)}
+                    {decision === "REDUCED" && reducedValid && money(reducedNum)}
+                    {decision === "SET_OFF" && setOffValid && money(requested - setOffNum)}
+                  </span>
+                </div>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -812,7 +919,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                     value={approvalRemarks}
                     onChange={(e) => setApprovalRemarks(e.target.value)}
                     placeholder="Explain the decision, for Finance and the employee"
-                    rows={3}
+                    rows={2}
                     className="w-full rounded-md border border-gray-300 p-2.5 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -900,7 +1007,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
         {loading && (
           <tbody>
             <tr>
-              <td colSpan={8} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
+              <td colSpan={10} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
             </tr>
           </tbody>
         )}
@@ -936,7 +1043,9 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                   <th className="px-2.5 py-2 text-left">Employee</th>
                   <th className="px-2.5 py-2 text-left">Title / Merchant</th>
                   <th className="px-2.5 py-2 text-left">Level / Status</th>
-                  <th className="px-2.5 py-2 text-left">Amount</th>
+                  <th className="px-2.5 py-2 text-right">Requested</th>
+                  <th className="px-2.5 py-2 text-right">Approved</th>
+                  <th className="px-2.5 py-2 text-right">Paid</th>
                   <th className="px-2.5 py-2 text-right">Actions</th>
                 </tr>
               </thead>

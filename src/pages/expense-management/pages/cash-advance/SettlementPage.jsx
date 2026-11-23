@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { loadSettlementLock, SETTLEMENT_LOCK } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
-import { DollarSign, CheckCircle2, RefreshCw, Eye, Receipt, CheckCircle, Clock, FileText, AlertCircle, Layers, ArrowUpRight, ArrowDownLeft, CreditCard, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, RefreshCw, Eye, Receipt, XCircle, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
@@ -13,7 +13,8 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import SettlementModal, { toSettlementAdvance } from "@/components/settlement/SettlementModal";
 import { getSettlementBlockReason } from "@/pages/expense-management/api/adjustmentRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
-import { hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
+import { formatTripDates, hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
+import AdvanceMoneyOverview from "@/pages/expense-management/pages/cash-advance/components/AdvanceMoneyOverview";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
@@ -36,6 +37,9 @@ import { getNextReviewDate, REVIEW_CYCLE_OPTIONS } from "@/pages/expense-managem
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEmployeeDirectory } from "@/pages/expense-management/approval-engine/hooks/useEmployeeDirectory";
+import { settlementTotals, usageShares } from "@/pages/expense-management/pages/cash-advance/settlementFigures";
+import { useAdvanceFigures } from "@/pages/expense-management/pages/cash-advance/useAdvanceFigures";
+import { ExpenseReportLink, UsageBar, UsageLegend } from "@/pages/expense-management/pages/cash-advance/components/AdvanceRowDetails";
 
 const formatMoney = (amount, currencyCode = "INR") => {
   const num = Number(amount) || 0;
@@ -259,6 +263,9 @@ export default function SettlementPage() {
     };
   }, [advances]);
 
+  // Per-advance money figures from the server: expenses added (utilization) and what Payroll has deducted.
+  const { figuresOf, isLoaded, usageById } = useAdvanceFigures(advances);
+
   useEffect(() => {
     fetchSettlementAdvances();
   }, [isFinanceExecutive]);
@@ -298,20 +305,14 @@ export default function SettlementPage() {
     });
   }, [advances, statusFilter, searchTerm, directory]);
 
-  // Statistics
-  const stats = useMemo(() => {
-    const totalDisbursedCount = advances.length;
-
-    const totalOutstanding = advances
-      .filter((a) => !["SETTLED", "CLOSED"].includes((a.status || "").toUpperCase()))
-      .reduce((sum, a) => sum + (Number(a.outstandingBalance ?? a.amount) || 0), 0);
-
-    const totalSettled = advances
-      .filter((a) => ["SETTLED", "CLOSED"].includes((a.status || "").toUpperCase()))
-      .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
-
-    return { totalDisbursedCount, totalOutstanding, totalSettled };
-  }, [advances]);
+  // Totals for the advances currently on the list (they follow the search and status filter).
+  const totals = useMemo(
+    () => settlementTotals(filteredAdvances.map((a) => figuresOf(a))),
+    // figuresOf reads usageById
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredAdvances, usageById]
+  );
+  const figuresLoading = advances.some((a) => !isLoaded(a));
 
   const handleDisburse = (adv) => {
     if (!isFinanceExecutive) return;
@@ -490,38 +491,8 @@ export default function SettlementPage() {
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
-            <DollarSign size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Disbursed Advances</p>
-            <p className="text-xl font-bold text-gray-900 mt-0.5">{stats.totalDisbursedCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-            <Clock size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Outstanding Balance</p>
-            <p className="text-xl font-bold text-amber-600 mt-0.5">{formatMoney(stats.totalOutstanding)}</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-            <CheckCircle2 size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Settled</p>
-            <p className="text-xl font-bold text-emerald-600 mt-0.5">{formatMoney(stats.totalSettled)}</p>
-          </div>
-        </div>
-      </div>
+      {/* Money summary: where the disbursed cash went, for the advances on the list */}
+      <AdvanceMoneyOverview totals={totals} loading={figuresLoading} />
 
       {/* Filter and Search Bar */}
       <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm">
@@ -567,9 +538,11 @@ export default function SettlementPage() {
               <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                 <tr>
                   {isFinanceExecutive && <th className="py-3 px-4">Employee Name</th>}
-                  <th className="py-3 px-4">Title & Purpose</th>
-                  <th className="py-3 px-4 text-right">Advance Disbursed</th>
-                  <th className="py-3 px-4 text-right">Outstanding Balance</th>
+                  <th className="py-3 px-4">Title & Money Usage</th>
+                  <th className="py-3 px-4">Trip Dates</th>
+                  <th className="py-3 px-4 text-right" title="Disbursed plus any outstanding brought into this advance">Owed</th>
+                  <th className="py-3 px-4 text-right" title="Expenses the employee added against this advance">Consumed</th>
+                  <th className="py-3 px-4 text-right" title="Owed minus consumed on this advance">Balance</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -579,7 +552,13 @@ export default function SettlementPage() {
                   const advId = adv.advanceId || adv.id;
                   const statusUpper = (adv.status || "").toUpperCase();
                   const isSettled = ["SETTLED", "CLOSED"].includes(statusUpper);
-                  const outstanding = adv.outstandingBalance != null ? adv.outstandingBalance : adv.amount;
+                  const f = figuresOf(adv);
+                  const cur = adv.currencyCode || "INR";
+                  const pending = !isLoaded(adv);
+                  // Not paid out yet (e.g. approved, waiting to disburse): later figures do not exist yet.
+                  const cell = (value) =>
+                    pending ? <span className="text-gray-300">…</span> : !f.paidOut ? <span className="text-gray-300">—</span> : formatMoney(value, cur);
+
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
@@ -588,17 +567,36 @@ export default function SettlementPage() {
                           {getEmployeeName(adv, directory)}
                         </td>
                       )}
-                      <td className="py-3 px-4 max-w-xs">
-                        <p className="font-semibold text-gray-900 truncate">{adv.title || "Cash Advance"}</p>
-                        <p className="text-[11px] text-gray-500 truncate mt-0.5">{adv.purpose || "—"}</p>
+                      <td className="py-3 px-4 min-w-[12rem] max-w-xs">
+                        <p className="font-semibold text-gray-900 truncate" title={adv.purpose || undefined}>{adv.title || "Cash Advance"}</p>
+                        {!pending && f.owed > 0 && (
+                          <div className="mt-1.5">
+                            <UsageBar figures={f} />
+                            <p className="mt-1 text-[10px] text-gray-500">{Math.round(usageShares(f).spent)}% spent on expenses</p>
+                          </div>
+                        )}
                       </td>
-                      <td className="py-3 px-4 text-right font-semibold text-gray-800 whitespace-nowrap">
-                        {formatMoney(adv.amount, adv.currencyCode || "INR")}
+                      <td className="py-3 px-4 whitespace-nowrap text-gray-600">{formatTripDates(adv)}</td>
+                      <td className="py-3 px-4 text-right whitespace-nowrap tabular-nums">
+                        <span className="font-semibold text-gray-900">{cell(f.owed)}</span>
+                        {!pending && f.paidOut && f.carriedIn > 0 && (
+                          <p className="mt-0.5 text-[10px] text-violet-700">incl. {formatMoney(f.carriedIn, cur)} brought in</p>
+                        )}
                       </td>
-                      <td className="py-3 px-4 text-right font-bold whitespace-nowrap">
-                        <span className={isSettled ? "text-emerald-600" : "text-amber-600"}>
-                          {formatMoney(outstanding, adv.currencyCode || "INR")}
+                      <td className="py-3 px-4 text-right whitespace-nowrap tabular-nums">
+                        <span className="font-semibold text-sky-700">{cell(f.consumed)}</span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold whitespace-nowrap tabular-nums">
+                        <span className={pending ? "" : f.remaining > 0 ? "text-amber-600" : "text-emerald-600"}>
+                          {cell(f.remaining)}
                         </span>
+                        {/* Outstanding differs from the balance once part of it is recovered or carried forward */}
+                        {!pending && f.paidOut && f.outstanding !== f.remaining && (
+                          <p className="mt-0.5 text-[10px] font-medium text-gray-500">Outstanding {formatMoney(f.outstanding, cur)}</p>
+                        )}
+                        {!pending && f.held > 0 && (
+                          <p className="mt-0.5 text-[10px] font-medium text-violet-700">+ {formatMoney(f.held, cur)} carried forward</p>
+                        )}
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         <span
@@ -635,6 +633,7 @@ export default function SettlementPage() {
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          <ExpenseReportLink figures={f} />
                           <button
                             onClick={() => navigate(`/expense-management/cash-advance/settlement/${adv.advanceId || adv.id}`)}
                             title="View Details & Lifecycle"
