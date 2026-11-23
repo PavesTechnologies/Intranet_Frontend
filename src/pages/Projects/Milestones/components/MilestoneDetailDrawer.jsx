@@ -250,8 +250,8 @@ const MilestoneDetailDrawer = ({ milestone, projectId, onClose, onEdit }) => {
             {m.billable && (
               <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500">
                 <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                The estimate uses the project budget. Accounts Receivable calculates the billed amount from the
-                contract value.
+                The estimate is this milestone's share of the base amount left when it was created. Accounts
+                Receivable calculates the billed amount from the contract value.
               </p>
             )}
             {m.description && (
