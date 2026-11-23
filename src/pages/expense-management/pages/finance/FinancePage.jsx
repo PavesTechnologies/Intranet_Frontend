@@ -33,6 +33,7 @@ import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/
 import InvoiceHandoffBadge from "../../components/expense-reports/InvoiceHandoffBadge";
 import { formatMoney, formatDate } from "../../approval-engine/constants/approvalLabels";
 import Pagination from "@/components/Pagination/pagination";
+import RequestTypeBadge, { reportTypeOf } from "@/pages/expense-management/components/common/RequestTypeBadge";
 
 const TABS = [
   { value: "ALL", label: "All" },
@@ -346,12 +347,6 @@ export default function FinancePage() {
     </span>
   );
 
-  const typeBadge = (kind) =>
-    kind === "ADVANCE" ? (
-      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Cash Advance</span>
-    ) : (
-      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
-    );
 
   const expenseStatusCell = (item) => {
     const tab = tabOf(item);
@@ -416,7 +411,7 @@ export default function FinancePage() {
         {ref}
       </p>
       <div className="mt-1 flex min-w-0 items-center gap-1.5">
-        {typeBadge(kind)}
+        <RequestTypeBadge type={kind} />
         {detail && detail !== "—" && <span className="truncate text-[11px] text-slate-500" title={detail}>{detail}</span>}
       </div>
     </div>
@@ -430,7 +425,7 @@ export default function FinancePage() {
     ...filteredItems.map((item) => ({
       key: `exp-${item.reportId || item.id || item.reportNumber}`,
       waiting: tabOf(item) === "PENDING",
-      reference: referenceCell("EXPENSE", item.reportNumber, merchantSummary(item.pendingLineItems), tabOf(item) === "PENDING"),
+      reference: referenceCell(reportTypeOf(item), item.reportNumber, merchantSummary(item.pendingLineItems), tabOf(item) === "PENDING"),
       employee: <EmployeeCell employeeId={item.employeeId} directory={directory} />,
       amount: amountCell(item.totalAmount, item.currencyCode),
       status: expenseStatusCell(item),

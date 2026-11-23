@@ -97,11 +97,16 @@ const MONEY_BOXES = [
   { key: "outstanding", label: "Still outstanding", box: "bg-gray-50", text: "text-gray-600" },
 ];
 
+/**
+ * carriedOut: balance already moved to another advance. carryForwardReady: balance the employee chose to carry forward
+ * that moves when their next advance is approved - shown as carried forward straight away, and no longer as outstanding.
+ */
 export default function MoneyMovements({
   settlement,
   currencyCode,
   advanceId,
   carriedOut = 0,
+  carryForwardReady = 0,
   salaryDeducted = 0,
   expensesApproved = 0,
   expensesInApproval = 0,
@@ -112,6 +117,7 @@ export default function MoneyMovements({
     return <p className="text-xs text-gray-500">No money has moved on this advance yet.</p>;
   }
   const outTotal = rows.filter((r) => r.direction === "OUT").reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const ready = Number(carryForwardReady) || 0;
   // const inTotal: repayments by the employee are not part of the current flows.
   const amounts = {
     paidOut: outTotal,
@@ -119,14 +125,18 @@ export default function MoneyMovements({
     inApproval: Number(expensesInApproval || 0),
     // What the expenses (approved and in approval) do not account for, before anything is recovered.
     left: Math.max(outTotal - Number(expensesApproved || 0) - Number(expensesInApproval || 0), 0),
-    carriedOut: Number(carriedOut || 0),
+    // Already moved to another advance, plus what is ready to move to the next one.
+    carriedOut: Number(carriedOut || 0) + ready,
     salaryDeducted: Number(salaryDeducted || 0),
     // Expenses in approval are held against the advance, so they are not part of what is still to recover.
-    // The server's settleableAmount when given; otherwise the stored balance less what is held.
-    outstanding:
-      stillOutstanding !== undefined && stillOutstanding !== null
+    // The server's settleableAmount when given; otherwise the stored balance less what is held. A balance ready to
+    // carry forward is no longer outstanding either.
+    outstanding: Math.max(
+      0,
+      (stillOutstanding !== undefined && stillOutstanding !== null
         ? Number(stillOutstanding || 0)
-        : Math.max(0, Number(settlement?.outstandingBalance || 0) - Number(expensesInApproval || 0)),
+        : Number(settlement?.outstandingBalance || 0) - Number(expensesInApproval || 0)) - ready,
+    ),
   };
 
   return (
@@ -136,6 +146,11 @@ export default function MoneyMovements({
           <div key={b.key} className={`rounded-md px-3 py-2 ${b.box}`}>
             <p className={b.text}>{b.label}</p>
             <p className="font-semibold text-gray-900">{formatMoney(amounts[b.key], currencyCode)}</p>
+            {b.key === "carriedOut" && ready > 0 && (
+              <p className="mt-0.5 text-[10.5px] text-indigo-600">
+                {formatMoney(ready, currencyCode)} moves to your next advance when it is approved
+              </p>
+            )}
           </div>
         ))}
       </div>

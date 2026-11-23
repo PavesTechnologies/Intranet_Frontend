@@ -538,8 +538,9 @@ export default function ApprovalsPage({ embedded = false }) {
 
         <div className="approvals-tab-container">
           <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-sm">
-            {/* Fixed column widths: each header sits exactly above its cells, whatever the row content is. */}
+          <table className="approvals-table w-full min-w-[1000px] table-fixed text-left text-sm">
+            {/* Fixed column widths: each header sits exactly above its cells, whatever the row content is.
+                Actions has a fixed width wide enough for four icon buttons, so they never wrap onto a second line. */}
             <colgroup>
               <col className="w-[8%]" />
               <col className="w-[14%]" />
@@ -549,9 +550,9 @@ export default function ApprovalsPage({ embedded = false }) {
               <col className="w-[10%]" />
               <col className="w-[10%]" />
               <col className="w-[9%]" />
-              <col className="w-[7%]" />
+              <col className="w-[168px]" />
             </colgroup>
-            <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-left text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-2.5 py-2.5 text-left">Type</th>
                 <th className="px-2.5 py-2.5 text-left">Employee</th>
@@ -629,7 +630,7 @@ export default function ApprovalsPage({ embedded = false }) {
             {showEmpty && (
               <tbody data-approvals-empty>
                 <tr>
-                  <td colSpan={10} className="px-4 py-14">
+                  <td colSpan={9} className="px-4 py-14">
                     <div className="mx-auto flex max-w-sm flex-col items-center text-center">
                       <span className={`flex h-14 w-14 items-center justify-center rounded-2xl ${active.tone.tile}`}>
                         <EmptyIcon size={26} aria-hidden="true" />
@@ -651,6 +652,13 @@ export default function ApprovalsPage({ embedded = false }) {
               </tbody>
             )}
           </table>
+          {/* One row style for every list in the table (expenses, finance, cash advances, supplementary claims). */}
+          <style>{`
+            .approvals-table > tbody > tr { background: #fff !important; border-bottom: 1px solid #EEF0F6; transition: background-color .15s ease; }
+            .approvals-table > tbody > tr:hover { background: #F8F9FD !important; }
+            .approvals-table > tbody > tr > td:not([colspan]) { padding: 14px 12px !important; vertical-align: middle; }
+            .approvals-table > tbody > tr > td[title="Shown for cash advances only"] { color: #CBD5E1; }
+          `}</style>
           </div>
         {combinedRows > 0 && (
           <div className="flex flex-col items-center gap-2 border-t border-slate-100 px-4 py-3 sm:flex-row sm:justify-between">

@@ -496,6 +496,10 @@ export default function MyAdvancesPage() {
                 <tr>
                   <th className="py-3 px-4">S.No</th>
                   <th className="py-3 px-4">Title</th>
+                  <th className="py-3 px-4">Cost Center</th>
+                  <th className="py-3 px-4">Currency</th>
+                  <th className="py-3 px-4">Needed By</th>
+                  <th className="py-3 px-4 text-right">Balance</th>
                   <th className="py-3 px-4">Trip Dates</th>
                   <th className="py-3 px-4 text-right" title="Approved amount, or the requested amount until it is approved">Amount</th>
                   <th className="py-3 px-4 text-right" title="Expenses you added against this advance">Consumed</th>

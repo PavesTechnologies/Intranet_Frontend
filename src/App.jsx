@@ -24,7 +24,7 @@ const Calendar = lazy(() => import("./pages/Calendar"));
 
 // Finance Management (Application Switcher landing page)
 const FinanceDashboard = lazy(() => import("./pages/finance/FinanceDashboard"));
-import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES } from "./config/sidebarConfig";
+import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES, XMS_APPROVALS_PAGE_ROLES } from "./config/sidebarConfig";
 
 // Accounts Payable
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
@@ -1987,7 +1987,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/approvals/pending" element={<Navigate to="/expense-management/approvals" replace />} />
           <Route path="/expense-management/approvals/approved" element={<Navigate to="/expense-management/approvals" replace />} />
           <Route path="/expense-management/approvals/rejected" element={<Navigate to="/expense-management/approvals" replace />} />
-          <Route path="/expense-management/approvals" element={<ProtectedRoute><XmsApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals" element={<ProtectedRoute allowedRoles={XMS_APPROVALS_PAGE_ROLES}><XmsApprovalsPage /></ProtectedRoute>} />
           <Route path="/expense-management/approvals/cash-advance/:advanceId" element={<ProtectedRoute><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
 
           {/* Approval Rules (Admin config) - ADMIN-only, matching the Masters section's own role gate. */}

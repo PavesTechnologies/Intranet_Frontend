@@ -6,6 +6,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import ApprovalStatusPill from "../components/ApprovalStatusPill";
 import EmployeeLabel from "../components/EmployeeLabel";
+import RowActionButton, { RowActions } from "../components/RowActionButton";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
 import { useMyHistory } from "../hooks/useApprovalWorkflow";
 import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
@@ -88,18 +89,9 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                 <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
                 <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
                 <td className="px-2.5 py-1.5 text-right">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setReviewingItem(report);
-                    }}
-                    aria-label={`View ${report.reportNumber}`}
-                    title="View"
-                    className="rounded p-1 text-blue-700 hover:bg-blue-50"
-                  >
-                    <Eye size={16} aria-hidden="true" />
-                  </button>
+                  <RowActions>
+                    <RowActionButton tone="view" icon={Eye} label={`View ${report.reportNumber}`} title="View" onClick={() => setReviewingItem(report)} />
+                  </RowActions>
                 </td>
               </tr>
             ))}

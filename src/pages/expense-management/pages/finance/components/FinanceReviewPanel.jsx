@@ -368,6 +368,11 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                   <Field label="Business Purpose" value={businessPurpose} />
                 </div>
               )}
+              {fullReport?.lateSubmissionReason && (
+                <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <span className="font-semibold">Submitted after the deadline.</span> Employee&apos;s reason: {fullReport.lateSubmissionReason}
+                </p>
+              )}
             </Section>
 
             {selectedLine ? (
@@ -446,15 +451,13 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
               </Section>
             )}
 
-            {/* Only a report that was raised against a cash advance can be offset against one. */}
+            {/* A report raised against a cash advance settles that one advance automatically on approval - shown read-only. */}
             {fullReport?.cashAdvanceId && (
               <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Cash advance offset">
                 <CashAdvanceOffsetSection
-                  reportId={reportId}
-                  employeeId={fullReport?.employeeId}
+                  cashAdvanceId={fullReport.cashAdvanceId}
                   reportTotal={fullReport?.totalAmount}
                   currencyCode={fullReport?.currencyCode}
-                  onApplied={() => {}}
                 />
               </Section>
             )}

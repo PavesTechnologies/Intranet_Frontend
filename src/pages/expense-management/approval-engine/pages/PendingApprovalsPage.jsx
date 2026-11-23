@@ -17,6 +17,7 @@ import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
 import { formatMoney } from "../constants/approvalLabels";
 import { resolveQueueItem } from "../utils/approvalAmounts";
 import EmployeeLabel from "../components/EmployeeLabel";
+import RowActionButton, { RowActions } from "../components/RowActionButton";
 import LineItemReviewPanel from "../components/LineItemReviewPanel";
 import CommentPromptModal from "../components/CommentPromptModal";
 import MyDelegateCard from "../components/MyDelegateCard";
@@ -225,31 +226,20 @@ export default function PendingApprovalsPage({
   };
 
   const renderActions = (item) => {
-    const flagged = hasPolicyIssue(item.relevantLines);
+    // The policy warning is already shown in the Status column, so the actions stay a single tidy row.
     return (
-      <div className="inline-flex flex-wrap items-center justify-end gap-2">
-        <Button size="small" variant="outline" disabled={isMutating} onClick={() => setReviewingItem(item)} title="Review" aria-label="Review">
-          <Eye className="h-4 w-4" />
-        </Button>
-        <Button
-          size="small"
-          variant="success"
-          disabled={isMutating || !item.eligibleForBulkApprove}
+      <RowActions>
+        <RowActionButton tone="view" icon={Eye} label="Review" disabled={isMutating} onClick={() => setReviewingItem(item)} />
+        <RowActionButton
+          tone="approve"
+          icon={CheckCircle2}
+          label="Approve"
           title={!item.eligibleForBulkApprove ? "Has open policy violations — review and act line-by-line instead." : "Approve"}
-          aria-label="Approve"
+          disabled={isMutating || !item.eligibleForBulkApprove}
           onClick={() => handleBulkApprove(item.reportId)}
-        >
-          <CheckCircle2 className="h-4 w-4" />
-        </Button>
-        <Button size="small" variant="outline" disabled={isMutating} onClick={() => setRejectingReport(item)} title="Reject" aria-label="Reject">
-          <XCircle className="h-4 w-4" />
-        </Button>
-        {flagged && (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
-            <ShieldAlert className="h-3 w-3" /> Not eligible for one-click Approve
-          </span>
-        )}
-      </div>
+        />
+        <RowActionButton tone="reject" icon={XCircle} label="Reject" disabled={isMutating} onClick={() => setRejectingReport(item)} />
+      </RowActions>
     );
   };
 
@@ -280,13 +270,18 @@ export default function PendingApprovalsPage({
                               <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
                             </div>
                           </td>
+                          <td className="px-2.5 py-1.5 text-left align-middle">
+                            <span className="font-medium text-xs text-gray-900">
+                              <EmployeeLabel employeeId={item.employeeId} />
+                            </span>
+                          </td>
                           <td className="px-2.5 py-1.5 text-left align-middle max-w-[220px]">
                             <p className="font-semibold text-gray-900 truncate text-xs">{merchantSummary(item.relevantLines)}</p>
                             {item.submittedAt && (
-                              <div className={`mt-0.5 text-[11px] ${waitingDays(item.submittedAt) >= 3 ? "font-medium text-rose-600" : "text-gray-500"}`}>
+                              <p className={`mt-0.5 truncate text-[11px] ${waitingDays(item.submittedAt) >= 3 ? "font-medium text-rose-600" : "text-gray-500"}`}>
                                 Submitted {submittedLabel(item.submittedAt)}
                                 {waitingDays(item.submittedAt) >= 3 && ` · waiting ${waitingDays(item.submittedAt)} days`}
-                              </div>
+                              </p>
                             )}
                           </td>
                           <td className="px-2.5 py-1.5 text-left align-middle text-xs text-gray-600 truncate">{item.costCenterName || "—"}</td>
@@ -302,9 +297,9 @@ export default function PendingApprovalsPage({
                             )}
                           </td>
                           <td className="px-2.5 py-1.5 whitespace-nowrap text-right text-xs">
-                            <span className="font-semibold text-gray-900">{formatMoney(item.relevantTotal, item.currencyCode)}</span>
+                            <span className="font-semibold tabular-nums text-gray-900">{formatMoney(item.relevantTotal, item.currencyCode)}</span>
                             {item.relevantTotal !== item.totalAmount && (
-                              <span className="ml-1 text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)}</span>
+                              <span className="block text-[11px] text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)}</span>
                             )}
                           </td>
                           <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>

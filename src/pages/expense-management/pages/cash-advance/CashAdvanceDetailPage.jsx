@@ -11,6 +11,7 @@ import EmployeeLabel from "@/pages/expense-management/approval-engine/components
 import { useAuth } from "@/contexts/AuthContext";
 import SettleBalancePanel from "@/pages/expense-management/pages/cash-advance/components/SettleBalancePanel";
 import MoneyMovements from "@/pages/expense-management/pages/cash-advance/components/MoneyMovements";
+import { SETTLEMENT_LOCK, useSettlementLock } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import CashAdvanceApprovalPanel from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceApprovalPanel";
@@ -78,6 +79,9 @@ export default function CashAdvanceDetailPage() {
   const [advance, setAdvance] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [settlement, setSettlement] = useState(null);
+  // A carry-forward the employee has chosen: shown in Money Movement at once, before it moves to the next advance.
+  const carryLock = useSettlementLock(advanceId);
+  const carryForwardReady = carryLock.kind === SETTLEMENT_LOCK.CARRY_FORWARD ? carryLock.amount : 0;
   const [utilization, setUtilization] = useState(null);
   // Amount Payroll has actually deducted for this advance, summed for the money-movement cards.
   const [salaryDeducted, setSalaryDeducted] = useState(0);
@@ -362,6 +366,7 @@ export default function CashAdvanceDetailPage() {
               status={advance.status}
               outstandingBalance={outstanding}
               carriedOutAmount={advance.carriedOutAmount ?? 0}
+              carryForwardReady={carryForwardReady}
               salaryDeductedAmount={salaryDeducted}
               expenseReport={advance.linkedExpenseReport}
             />
@@ -375,6 +380,7 @@ export default function CashAdvanceDetailPage() {
                 currencyCode={currencyCode}
                 advanceId={advance.advanceId || advance.id || advanceId}
                 carriedOut={advance.carriedOutAmount ?? 0}
+                carryForwardReady={carryForwardReady}
                 salaryDeducted={salaryDeducted}
                 expensesApproved={verifiedExpenses}
                 expensesInApproval={openLinkedReports(utilization?.linkedReports).reduce((t, r) => t + Number(r.claimedAmount || 0), 0)}
@@ -390,7 +396,10 @@ export default function CashAdvanceDetailPage() {
               outstanding={outstanding}
               settleable={utilization?.settleableAmount}
               currencyCode={currencyCode}
-              onSettled={fetchAdvance}
+              onSettled={() => {
+                fetchAdvance();
+                carryLock.reload();
+              }}
               linkedReports={utilization?.linkedReports}
             />
           )}

@@ -105,6 +105,25 @@ const canOpenExpenseFor = (adv, user) =>
   LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
   Number(adv.outstandingBalance ?? 0) > 0;
 
+// Status key with spaces and underscores normalised, e.g. "In Progress" and "IN_PROGRESS" are the same status.
+const statusKeyOf = (adv) => String(adv.status || "").trim().toUpperCase().replace(/\s+/g, "_");
+const statusLabel = (key) =>
+  key.toLowerCase().split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+// Workflow order for the filter list; anything unknown goes last.
+const STATUS_ORDER = [
+  "APPROVED", "DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "SUBMITTED_FOR_REVIEW", "UNDER_REVIEW",
+  "RECONCILIATION_PENDING", "EXPENSE_VERIFIED", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED", "SETTLEMENT_PENDING",
+  "ADJUSTED", "OVERDUE",
+];
+const statusRank = (key) => {
+  const i = STATUS_ORDER.indexOf(key);
+  return i === -1 ? STATUS_ORDER.length : i;
+};
+const isClosedAdvance = (adv) => ["SETTLED", "CLOSED"].includes(statusKeyOf(adv));
+const isOpenAdvance = (adv) => !isClosedAdvance(adv);
+// Disbursed and still open: the employee holds the money and the advance is not settled yet.
+const isDisbursedOpen = (adv) => statusKeyOf(adv) !== "APPROVED" && isOpenAdvance(adv);
+
 export default function SettlementPage() {
   const { user, hasRole } = useAuth();
   const { data: directory } = useEmployeeDirectory();
@@ -281,24 +300,16 @@ export default function SettlementPage() {
   // Advances matching the status filter and search, for every employee (the "By employee" table reads this).
   const listAdvances = useMemo(() => {
     return advances.filter((adv) => {
-      const statusUpper = (adv.status || "").toUpperCase();
-
+      // OPEN / ALL / DISBURSED / CLOSED are groups; any other value is one exact status (e.g. "IN_PROGRESS").
       let matchStatus = true;
       if (statusFilter === "OPEN") {
-        matchStatus = !["SETTLED", "CLOSED"].includes(statusUpper);
-      } else if (statusFilter === "APPROVED") {
-        matchStatus = ["APPROVED"].includes(statusUpper);
-      } else if (statusFilter === "DISBURSED" || statusFilter === "IN_PROGRESS") {
-        matchStatus = [
-          "DISBURSED", "IN_PROGRESS", "IN PROGRESS",
-          "RECONCILIATION_PENDING", "RECONCILIATION PENDING",
-          "SUBMITTED_FOR_REVIEW", "SUBMITTED FOR REVIEW", "EXPENSE_SUBMITTED",
-          "UNDER_REVIEW", "UNDER REVIEW",
-          "EXPENSE_VERIFIED",
-          "SETTLEMENT_PENDING", "SETTLEMENT PENDING", "PARTIALLY_SETTLED", "PARTIALLY_ADJUSTED"
-        ].includes(statusUpper);
-      } else if (statusFilter === "SETTLED" || statusFilter === "CLOSED") {
-        matchStatus = ["SETTLED", "CLOSED"].includes(statusUpper);
+        matchStatus = isOpenAdvance(adv);
+      } else if (statusFilter === "DISBURSED") {
+        matchStatus = isDisbursedOpen(adv);
+      } else if (statusFilter === "CLOSED") {
+        matchStatus = isClosedAdvance(adv);
+      } else if (statusFilter !== "ALL") {
+        matchStatus = statusKeyOf(adv) === statusFilter;
       }
 
       const empName = getEmployeeName(adv, directory);
@@ -488,13 +499,22 @@ export default function SettlementPage() {
     { label: "Additional Reimbursement Payout (Company pays employee excess expenses)", value: "REIMBURSEMENT" },
   ];
 
-  const statusOptions = [
-    { label: "Open (needs action)", value: "OPEN" },
-    { label: "All Advances (incl. closed)", value: "ALL" },
-    { label: "Approved (Awaiting Disbursement)", value: "APPROVED" },
-    { label: "Disbursed / Outstanding", value: "DISBURSED" },
-    { label: "Closed (Fully Settled)", value: "SETTLED" },
-  ];
+  // Options come from the statuses actually on this page, so every choice matches real rows. The groups Finance works
+  // from keep fixed names; below them, one option per status present (In Progress, Settlement Pending, ...).
+  const statusOptions = useMemo(() => {
+    const present = [...new Set(advances.filter(isOpenAdvance).map(statusKeyOf))]
+      .filter((key) => key !== "APPROVED")
+      .sort((a, b) => statusRank(a) - statusRank(b) || a.localeCompare(b));
+    const has = (pred) => advances.some(pred);
+    return [
+      { label: "Open (needs action)", value: "OPEN" },
+      { label: "All Advances (incl. closed)", value: "ALL" },
+      ...(has((a) => statusKeyOf(a) === "APPROVED") ? [{ label: "Approved (Awaiting Disbursement)", value: "APPROVED" }] : []),
+      ...(has(isDisbursedOpen) ? [{ label: "Disbursed / Outstanding", value: "DISBURSED" }] : []),
+      ...present.map((key) => ({ label: statusLabel(key), value: key })),
+      ...(has(isClosedAdvance) ? [{ label: "Closed (Fully Settled)", value: "CLOSED" }] : []),
+    ];
+  }, [advances]);
 
   // Shown in the header so the user can see which role this session is working under.
   const roleLabel = useMemo(() => {

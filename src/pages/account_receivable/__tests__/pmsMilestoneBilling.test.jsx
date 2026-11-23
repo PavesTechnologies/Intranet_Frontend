@@ -161,6 +161,22 @@ function Harness({ initial, projectInfo = { projectId: "3fa85f64-5717-4562-b3fc-
   );
 }
 
+// Milestones are no longer picked with a checkbox: every eligible one is billed as soon as the list
+// loads, at the allocationPercentage PMS reported, so the tests assert on the row rather than drive it.
+const row = (code) => screen.getByTestId(`milestone-row-${code}`);
+const expectBilled = (code) => expect(row(code)).toHaveAttribute("data-billed", "yes");
+const expectNotBilled = (code) => expect(row(code)).toHaveAttribute("data-billed", "no");
+const arPercent = (code) => screen.getByTestId(`ar-percentage-${code}`);
+
+const dateOnly = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+// The defaults start at today and step forward, because a Milestone Plan needs one date per milestone.
+const dayFromToday = (offset = 0) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  return dateOnly(date);
+};
+
 // The form resets to its default once the saved-plan lookup resolves, so wait for the lookup to FINISH
 // (not just to start) before interacting - otherwise the reset can overwrite what the test just did.
 const waitForPlanLoad = async () => {
@@ -195,7 +211,7 @@ describe("MilestonePlanForm — PMS milestones", () => {
   const chooseMilestonesPlan = async () => {
     await waitForPlanLoad();
     fireEvent.click(screen.getByRole("radio", { name: /milestones/i }));
-    await screen.findByLabelText("Bill milestone M-1");
+    await screen.findByTestId("milestone-row-M-1");
   };
 
   it("loads the milestones from the PMS project id (not the AR project id) when Milestones is chosen", async () => {
@@ -205,19 +221,18 @@ describe("MilestonePlanForm — PMS milestones", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: /milestones/i }));
 
-    await screen.findByLabelText("Bill milestone M-1");
+    await screen.findByTestId("milestone-row-M-1");
     expect(getProjectMilestones).toHaveBeenCalledWith(9002, expect.any(Object));
-    expect(screen.getByLabelText("Bill milestone M-2")).toBeInTheDocument();
+    expect(screen.getByTestId("milestone-row-M-2")).toBeInTheDocument();
   });
 
-  it("saves the selected milestones as MILESTONES with numeric pmsMilestoneId, percentage and billing date", async () => {
+  it("saves every eligible milestone as MILESTONES with numeric pmsMilestoneId, PMS percentage and billing date", async () => {
+    getProjectMilestones.mockResolvedValue([
+      milestone(11, "M-1", "2026-12-15", { pmsAllocationPercentage: 60 }),
+      milestone(12, "M-2", "2027-01-20", { pmsAllocationPercentage: 40 }),
+    ]);
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
-
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    fireEvent.click(screen.getByLabelText("Bill milestone M-2"));
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "60" } });
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-2"), { target: { value: "40" } });
 
     const save = screen.getByRole("button", { name: /save milestone plan/i });
     await waitFor(() => expect(save).not.toBeDisabled());
@@ -228,22 +243,19 @@ describe("MilestonePlanForm — PMS milestones", () => {
     expect(configId).toBe("cfg-1");
     expect(payload.paymentStructure).toBe("MILESTONES");
     expect(payload.entries).toEqual([
-      { sequence: 1, percentage: 60, billingDate: "2026-12-15", remarks: "Milestone M-1", pmsMilestoneId: 11 },
-      { sequence: 2, percentage: 40, billingDate: "2027-01-20", remarks: "Milestone M-2", pmsMilestoneId: 12 },
+      { sequence: 1, percentage: 60, billingDate: dayFromToday(0), remarks: "Milestone M-1", pmsMilestoneId: 11 },
+      { sequence: 2, percentage: 40, billingDate: dayFromToday(1), remarks: "Milestone M-2", pmsMilestoneId: 12 },
     ]);
     payload.entries.forEach((e) => expect(typeof e.pmsMilestoneId).toBe("number"));
   });
 
-  it("does not prefill the AR percentage from PMS allocation and allows saving a partial allocation for one eligible milestone", async () => {
+  it("takes the AR percentage from the PMS allocation, read-only, and saves a partial allocation", async () => {
+    getProjectMilestones.mockResolvedValue([milestone(11, "M-1", "2026-12-15", { pmsAllocationPercentage: 70 })]);
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
 
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-
-    expect(screen.getByLabelText("AR billing percentage for M-1")).toHaveValue(null); // PMS says 25, AR starts empty
-    expect(screen.getByRole("button", { name: /save milestone plan/i })).toBeDisabled();
-
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "70" } });
+    expect(arPercent("M-1")).toHaveTextContent("70%");
+    expect(screen.queryByLabelText(/AR billing percentage/i)).not.toBeInTheDocument();
     
     // Partial allocation is valid for milestones!
     const save = screen.getByRole("button", { name: /save milestone plan/i });
@@ -254,18 +266,17 @@ describe("MilestonePlanForm — PMS milestones", () => {
     const [, payload] = createMilestonePlanConfiguration.mock.calls[0];
     expect(payload.paymentStructure).toBe("MILESTONES");
     expect(payload.entries).toEqual([
-      { sequence: 1, percentage: 70, billingDate: "2026-12-15", remarks: "Milestone M-1", pmsMilestoneId: 11 },
+      { sequence: 1, percentage: 70, billingDate: dayFromToday(0), remarks: "Milestone M-1", pmsMilestoneId: 11 },
     ]);
   });
 
-  it("allows selecting multiple eligible milestones with a partial total", async () => {
+  it("bills several eligible milestones at once with a partial total", async () => {
+    getProjectMilestones.mockResolvedValue([
+      milestone(11, "M-1", "2026-12-15", { pmsAllocationPercentage: 30 }),
+      milestone(12, "M-2", "2027-01-20", { pmsAllocationPercentage: 40 }),
+    ]);
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
-
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    fireEvent.click(screen.getByLabelText("Bill milestone M-2"));
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "30" } });
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-2"), { target: { value: "40" } });
 
     const save = screen.getByRole("button", { name: /save milestone plan/i });
     await waitFor(() => expect(save).not.toBeDisabled());
@@ -279,39 +290,40 @@ describe("MilestonePlanForm — PMS milestones", () => {
     expect(payload.entries[1].percentage).toBe(40);
   });
 
-  it("blocks saving when total milestone percentage exceeds 100%", async () => {
+  it("blocks saving when the PMS allocations total more than 100%", async () => {
+    getProjectMilestones.mockResolvedValue([
+      milestone(11, "M-1", "2026-12-15", { pmsAllocationPercentage: 65 }),
+      milestone(12, "M-2", "2027-01-20", { pmsAllocationPercentage: 45 }),
+    ]);
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
 
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    fireEvent.click(screen.getByLabelText("Bill milestone M-2"));
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "65" } });
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-2"), { target: { value: "45" } });
-
+    await waitFor(() => expect(screen.getByRole("button", { name: /save milestone plan/i })).toBeDisabled());
     expect(screen.getByRole("button", { name: /save milestone plan/i })).toBeDisabled();
     expect(screen.getByText(/Total allocation cannot exceed 100%/i)).toBeInTheDocument();
   });
 
-  it("blocks saving when milestone percentage exceeds 2 decimal places", async () => {
+  it("rounds a PMS allocation with more than 2 decimal places instead of blocking the save", async () => {
+    getProjectMilestones.mockResolvedValue([milestone(11, "M-1", "2026-12-15", { pmsAllocationPercentage: 33.333 })]);
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
 
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "33.333" } });
-
-    expect(screen.getByRole("button", { name: /save milestone plan/i })).toBeDisabled();
-    expect(screen.getByText(/Percentage must have at most 2 decimal places/i)).toBeInTheDocument();
+    expect(arPercent("M-1")).toHaveTextContent("33.33%");
+    expect(screen.queryByText(/Percentage must have at most 2 decimal places/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: /save milestone plan/i })).not.toBeDisabled());
   });
 
-  it("blocks saving when selected milestones have duplicate billing dates", async () => {
+  it("defaults each milestone to its own date from today on, and blocks saving if two are made to collide", async () => {
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
 
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    fireEvent.click(screen.getByLabelText("Bill milestone M-2"));
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "30" } });
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-2"), { target: { value: "40" } });
-    fireEvent.change(screen.getByLabelText("Billing date for M-2"), { target: { value: "2026-12-15" } });
+    // Defaults: today, then the next free day - never a duplicate, and never in the past.
+    await waitFor(() => expect(screen.getByLabelText("Billing date for M-1")).toHaveValue(dayFromToday(0)));
+    expect(screen.getByLabelText("Billing date for M-2")).toHaveValue(dayFromToday(1));
+    expect(screen.getByLabelText("Billing date for M-2")).toHaveAttribute("min", dayFromToday(0));
+    expect(screen.getByRole("button", { name: /save milestone plan/i })).not.toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Billing date for M-2"), { target: { value: dayFromToday(0) } });
 
     expect(screen.getByRole("button", { name: /save milestone plan/i })).toBeDisabled();
     expect(screen.getByText(/Each milestone must have a unique billing date/i)).toBeInTheDocument();
@@ -322,8 +334,6 @@ describe("MilestonePlanForm — PMS milestones", () => {
     createMilestonePlanConfiguration.mockRejectedValueOnce({ response: { status: 400, data: { message: conflict } } });
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "100" } });
 
     const save = screen.getByRole("button", { name: /save milestone plan/i });
     await waitFor(() => expect(save).not.toBeDisabled());
@@ -331,8 +341,8 @@ describe("MilestonePlanForm — PMS milestones", () => {
 
     await waitFor(() => expect(showStatusToast).toHaveBeenCalledWith(conflict, "error"));
     expect(showStatusToast).not.toHaveBeenCalledWith("Milestone plan configuration saved", "success");
-    expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked();
-    expect(screen.getByLabelText("AR billing percentage for M-1")).toHaveValue(100);
+    expectBilled("M-1");
+    expect(arPercent("M-1")).toHaveTextContent("25%");
   });
 
   it("hydrates a saved MILESTONES plan, preserves the exact milestone ids, and updates (not re-creates) on save", async () => {
@@ -348,9 +358,10 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
     render(<Harness initial={{}} />);
 
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked());
-    expect(screen.getByLabelText("Bill milestone M-2")).toBeChecked();
-    expect(screen.getByLabelText("AR billing percentage for M-1")).toHaveValue(60);
+    await waitFor(() => expectBilled("M-1"));
+    expectBilled("M-2");
+    // the saved percentage and date are kept as stored, not overwritten by the PMS allocation or today
+    expect(arPercent("M-1")).toHaveTextContent("60%");
     expect(screen.getByLabelText("Billing date for M-2")).toHaveValue("2027-01-20");
 
     const update = screen.getByRole("button", { name: /update milestone plan/i });
@@ -389,10 +400,10 @@ describe("MilestonePlanForm — PMS milestones", () => {
     fireEvent.click(screen.getByRole("radio", { name: /milestones/i }));
 
     expect(await screen.findByText("PMS milestone data is unavailable")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Bill milestone M-1")).not.toBeInTheDocument(); // no sample/stored fallback
+    expect(screen.queryByTestId("milestone-row-M-1")).not.toBeInTheDocument(); // no sample/stored fallback
 
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByLabelText("Bill milestone M-1")).toBeInTheDocument();
+    expect(await screen.findByTestId("milestone-row-M-1")).toBeInTheDocument();
   });
 
   it("shows an empty state when PMS has no milestones for the project", async () => {
@@ -418,7 +429,7 @@ describe("MilestonePlanForm — PMS milestones", () => {
     expect(getProjectMilestones).not.toHaveBeenCalled();
   });
 
-  it("disables selection for not-ready, non-billable, already-billed, and reserved milestones with clear reasons", async () => {
+  it("does not bill not-ready, non-billable, already-billed or reserved milestones, and gives the reason", async () => {
     getProjectMilestones.mockResolvedValue([
       milestone(11, "M-1", "2026-12-15", { billingReadiness: "READY_FOR_BILLING" }),
       milestone(12, "M-2", "2027-01-20", { billingReadiness: "NOT_READY" }),
@@ -429,23 +440,23 @@ describe("MilestonePlanForm — PMS milestones", () => {
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
 
-    // M-1 is eligible
-    expect(screen.getByLabelText("Bill milestone M-1")).not.toBeDisabled();
+    // M-1 is eligible, so it is billed without anything being clicked
+    await waitFor(() => expectBilled("M-1"));
 
     // M-2 is not ready
-    expect(screen.getByLabelText("Bill milestone M-2")).toBeDisabled();
+    expectNotBilled("M-2");
     expect(screen.getByText("Not ready for billing in PMS")).toBeInTheDocument();
 
     // M-3 is not billable
-    expect(screen.getByLabelText("Bill milestone M-3")).toBeDisabled();
+    expectNotBilled("M-3");
     expect(screen.getByText("Not billable in PMS")).toBeInTheDocument();
 
     // M-4 is already billed
-    expect(screen.getByLabelText("Bill milestone M-4")).toBeDisabled();
+    expectNotBilled("M-4");
     expect(screen.getAllByText("Already billed").length).toBeGreaterThan(0);
 
     // M-5 is reserved
-    expect(screen.getByLabelText("Bill milestone M-5")).toBeDisabled();
+    expectNotBilled("M-5");
     expect(screen.getByText("Reserved by billing plan cfg-99")).toBeInTheDocument();
   });
 
@@ -464,9 +475,9 @@ describe("MilestonePlanForm — PMS milestones", () => {
     await screen.findByText("PMS synchronization temporarily unavailable");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
-    await screen.findByLabelText("Bill milestone M-1");
-    expect(screen.getByLabelText("Bill milestone M-2")).not.toBeDisabled();
-    expect(screen.getByLabelText("Bill milestone M-1")).toBeDisabled();
+    await screen.findByTestId("milestone-row-M-1");
+    await waitFor(() => expectBilled("M-2"));
+    expectNotBilled("M-1");
     expect(screen.getAllByText("Already billed").length).toBeGreaterThan(0);
   });
 
@@ -480,27 +491,25 @@ describe("MilestonePlanForm — PMS milestones", () => {
     expect(screen.queryByText(/manage in pms/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/a milestone can belong to only one billing plan/i)).not.toBeInTheDocument();
     expect(document.querySelector('a[href*="tab=milestones"]')).toBeNull();
-    // the milestone table itself is still there and selectable
+    // the milestone table itself is still there, and billing its rows
     expect(screen.getByTestId("pms-milestone-panel")).toBeInTheDocument();
-    expect(screen.getByLabelText("Bill milestone M-1")).not.toBeDisabled();
+    await waitFor(() => expectBilled("M-1"));
   });
 
   it("handles backend over-allocation error while preserving form state and reloading milestones", async () => {
     const errorMsg = "The selected milestones total 60000, which exceeds the remaining contract value of 50000.";
     createMilestonePlanConfiguration.mockRejectedValueOnce({ response: { status: 400, data: { message: errorMsg } } });
+    getProjectMilestones.mockResolvedValue([milestone(11, "M-1", "2026-12-15", { pmsAllocationPercentage: 60 })]);
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
-
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "60" } });
 
     const save = screen.getByRole("button", { name: /save milestone plan/i });
     await waitFor(() => expect(save).not.toBeDisabled());
     fireEvent.click(save);
 
     await waitFor(() => expect(showStatusToast).toHaveBeenCalledWith(errorMsg, "error"));
-    expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked();
-    expect(screen.getByLabelText("AR billing percentage for M-1")).toHaveValue(60);
+    expectBilled("M-1");
+    expect(arPercent("M-1")).toHaveTextContent("60%");
     // Verifies reload was called on save error
     await waitFor(() => expect(getProjectMilestones).toHaveBeenCalledTimes(2));
   });
@@ -521,7 +530,8 @@ describe("MilestonePlanForm — PMS milestones", () => {
     await waitForPlanLoad();
     await screen.findByText("Previously Billed");
     expect(screen.getByText("Remaining Contract Balance")).toBeInTheDocument();
-    expect(screen.getByText(/Current cycle allocation: 40%/)).toBeInTheDocument();
+    // the saved entry allocates 40%; M-2 is eligible and is billed automatically at its PMS allocation of 25%
+    expect(screen.getByText(/Current cycle allocation: 65%/)).toBeInTheDocument();
   });
 
   it("uses authoritative eligibleForBilling and ineligibilityReason from the backend API", async () => {
@@ -540,11 +550,11 @@ describe("MilestonePlanForm — PMS milestones", () => {
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
 
-    // M-1 is authoritative eligible
-    expect(screen.getByLabelText("Bill milestone M-1")).not.toBeDisabled();
+    // M-1 is authoritative eligible, so it is billed although PMS readiness says NOT_READY
+    await waitFor(() => expectBilled("M-1"));
 
-    // M-2 shows backend ineligibilityReason and is disabled
-    expect(screen.getByLabelText("Bill milestone M-2")).toBeDisabled();
+    // M-2 shows the backend ineligibilityReason and is not billed
+    expectNotBilled("M-2");
     expect(screen.getByText("Milestone claimed by active plan cfg-99")).toBeInTheDocument();
   });
 
@@ -576,9 +586,9 @@ describe("MilestonePlanForm — PMS milestones", () => {
     expect(screen.getAllByText("State unavailable")).toHaveLength(2);
     expect(screen.getByTestId("billing-state-unavailable-11")).toBeInTheDocument();
     expect(screen.queryByText("Available")).not.toBeInTheDocument();
-    // the missing state neither blocks nor grants selection: eligibility still comes from the existing rules
-    expect(screen.getByLabelText("Bill milestone M-1")).not.toBeDisabled();
-    expect(screen.getByLabelText("Bill milestone M-2")).not.toBeDisabled();
+    // the missing state neither blocks nor grants billing: eligibility still comes from the existing rules
+    await waitFor(() => expectBilled("M-1"));
+    expectBilled("M-2");
   });
 
   it("shows 'State unavailable' for an unrecognised billingState and does not display it as Available", async () => {
@@ -612,20 +622,16 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked());
+    await waitFor(() => expectBilled("M-1"));
 
-    // M-1 is frozen: checkbox disabled, inputs disabled, Billed / Locked indicator visible
-    const m1Checkbox = screen.getByLabelText("Bill milestone M-1");
-    expect(m1Checkbox).toBeDisabled();
+    // M-1 is frozen: its date is locked and the Billed / Locked indicator is visible
     expect(screen.getByTestId("frozen-indicator-11")).toBeInTheDocument();
-    expect(screen.getByLabelText("AR billing percentage for M-1")).toBeDisabled();
     expect(screen.getByLabelText("Billing date for M-1")).toBeDisabled();
 
-    // M-2 is not frozen: inputs enabled, can edit
-    expect(screen.getByLabelText("Bill milestone M-2")).not.toBeDisabled();
-    const m2Percent = screen.getByLabelText("AR billing percentage for M-2");
-    expect(m2Percent).not.toBeDisabled();
-    fireEvent.change(m2Percent, { target: { value: "35" } });
+    // M-2 is not frozen: its date can still be changed
+    const m2Date = screen.getByLabelText("Billing date for M-2");
+    expect(m2Date).not.toBeDisabled();
+    fireEvent.change(m2Date, { target: { value: "2027-02-20" } });
 
     // Save/update plan: frozen entry remains unchanged in payload
     const updateBtn = screen.getByRole("button", { name: /update milestone plan/i });
@@ -643,10 +649,11 @@ describe("MilestonePlanForm — PMS milestones", () => {
       remarks: "Milestone M-1",
       pmsMilestoneId: 11,
     });
-    expect(payload.entries[1].percentage).toBe(35);
+    expect(payload.entries[1].percentage).toBe(40); // read-only: unchanged by the date edit
+    expect(payload.entries[1].billingDate).toBe("2027-02-20");
   });
 
-  it("does not treat RESERVED milestones as frozen: allows editing and unchecking reserved milestone in current plan", async () => {
+  it("does not treat a RESERVED milestone as frozen: its entry in the current plan stays editable", async () => {
     getProjectMilestones.mockResolvedValue([
       milestone(11, "M-1", "2026-12-15", { billingState: "RESERVED" }),
     ]);
@@ -660,16 +667,13 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked());
+    await waitFor(() => expectBilled("M-1"));
 
-    // M-1 is RESERVED, but NOT frozen! Checkbox and inputs are enabled
-    expect(screen.getByLabelText("Bill milestone M-1")).not.toBeDisabled();
-    expect(screen.getByLabelText("AR billing percentage for M-1")).not.toBeDisabled();
+    // M-1 is RESERVED, but NOT frozen! Its date is still editable and it carries no lock.
+    expect(screen.getByLabelText("Billing date for M-1")).not.toBeDisabled();
     expect(screen.queryByTestId("frozen-indicator-11")).not.toBeInTheDocument();
-
-    // Can uncheck
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    expect(screen.getByLabelText("Bill milestone M-1")).not.toBeChecked();
+    expect(screen.queryByTestId("unknown-state-indicator-11")).not.toBeInTheDocument();
+    expect(arPercent("M-1")).toHaveTextContent("50%"); // the saved share, not the PMS allocation
   });
 
   it("prevents changing payment structure or deleting the plan when frozen entries exist", async () => {
@@ -686,7 +690,7 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked());
+    await waitFor(() => expectBilled("M-1"));
 
     // Try switching to Full Payment
     fireEvent.click(screen.getByRole("radio", { name: /full payment/i }));
@@ -721,19 +725,16 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked());
+    await waitFor(() => expectBilled("M-1"));
 
     for (const code of ["M-1", "M-2"]) {
-      expect(screen.getByLabelText(`Bill milestone ${code}`)).not.toBeDisabled();
-      expect(screen.getByLabelText(`AR billing percentage for ${code}`)).not.toBeDisabled();
+      expectBilled(code);
       expect(screen.getByLabelText(`Billing date for ${code}`)).not.toBeDisabled();
     }
     expect(screen.queryByTestId("frozen-indicator-11")).not.toBeInTheDocument();
     expect(screen.queryByTestId("unknown-state-indicator-11")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "35" } });
-    expect(screen.getByLabelText("AR billing percentage for M-1")).toHaveValue(35);
-    fireEvent.click(screen.getByLabelText("Bill milestone M-2"));
-    expect(screen.getByLabelText("Bill milestone M-2")).not.toBeChecked();
+    fireEvent.change(screen.getByLabelText("Billing date for M-1"), { target: { value: "2027-03-05" } });
+    expect(screen.getByLabelText("Billing date for M-1")).toHaveValue("2027-03-05");
   });
 
   it("occurrenceStatus TAX_PENDING / TAX_CALCULATED / INVOICED or invoiced:true do not override an explicit frozen:false", async () => {
@@ -752,10 +753,10 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked());
+    await waitFor(() => expectBilled("M-1"));
 
-    expect(screen.getByLabelText("AR billing percentage for M-1")).not.toBeDisabled();
-    expect(screen.getByLabelText("AR billing percentage for M-2")).not.toBeDisabled();
+    expect(screen.getByLabelText("Billing date for M-1")).not.toBeDisabled();
+    expect(screen.getByLabelText("Billing date for M-2")).not.toBeDisabled();
     expect(screen.queryByTestId("frozen-indicator-11")).not.toBeInTheDocument();
     expect(screen.queryByTestId("frozen-indicator-12")).not.toBeInTheDocument();
   });
@@ -772,16 +773,16 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked());
+    await waitFor(() => expectBilled("M-1"));
 
     // locked although the milestone-level state says AVAILABLE: the entry's own field decides
-    expect(screen.getByLabelText("Bill milestone M-1")).toBeDisabled();
-    expect(screen.getByLabelText("AR billing percentage for M-1")).toBeDisabled();
     expect(screen.getByLabelText("Billing date for M-1")).toBeDisabled();
     expect(screen.getByTestId("frozen-indicator-11")).toBeInTheDocument();
     expect(screen.getByTestId("frozen-occurrence-11")).toHaveTextContent("TAX_CALCULATED");
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked();
+    // a locked entry is never rewritten by the auto-fill: its saved share stands
+    expect(arPercent("M-1")).toHaveTextContent("30%");
+    fireEvent.change(screen.getByLabelText("Billing date for M-1"), { target: { value: "2027-06-06" } });
+    expect(screen.getByLabelText("Billing date for M-1")).toHaveValue("2026-12-15");
   });
 
   it("a saved entry without a frozen field is kept read-only as 'unknown' and is NOT resolved from the milestone billingState", async () => {
@@ -800,15 +801,15 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked());
+    await waitFor(() => expectBilled("M-1"));
 
     for (const id of [11, 12]) {
       // never presented as backend-confirmed frozen, whatever the aggregate says (INVOICED here, AVAILABLE there)
       expect(screen.queryByTestId(`frozen-indicator-${id}`)).not.toBeInTheDocument();
       expect(screen.getByTestId(`unknown-state-indicator-${id}`)).toBeInTheDocument();
     }
-    expect(screen.getByLabelText("AR billing percentage for M-1")).toBeDisabled();
-    expect(screen.getByLabelText("AR billing percentage for M-2")).toBeDisabled();
+    expect(screen.getByLabelText("Billing date for M-1")).toBeDisabled();
+    expect(screen.getByLabelText("Billing date for M-2")).toBeDisabled();
   });
 
   it("a frozen entry stays protected and does not block saving when its PMS milestone is absent from the list", async () => {
@@ -824,7 +825,7 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-2")).toBeChecked());
+    await waitFor(() => expectBilled("M-2"));
 
     // the unavailable-source entry is shown as locked, with no way to remove it
     expect(await screen.findByTestId("unlisted-locked-11")).toHaveTextContent(/source milestone unavailable/i);
@@ -861,7 +862,7 @@ describe("MilestonePlanForm — PMS milestones", () => {
     });
 
     render(<Harness initial={{}} />);
-    await waitFor(() => expect(screen.getByLabelText("Bill milestone M-2")).toBeChecked());
+    await waitFor(() => expectBilled("M-2"));
 
     expect(screen.queryByTestId("unlisted-locked-11")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /update milestone plan/i })).toBeDisabled();
@@ -885,22 +886,23 @@ describe("MilestonePlanForm — PMS milestones", () => {
         milestonePlanId: "plan-1",
         paymentStructure: "MILESTONES",
         totalContractValue: 100000,
-        entries: [{ paymentEntryId: "e1", sequence: 1, percentage: 25, amount: 25000, billingDate: "2026-12-15", pmsMilestoneId: 11, frozen: false, occurrenceStatus: null, invoiced: false }],
+        entries: [
+          { paymentEntryId: "e1", sequence: 1, percentage: 25, amount: 25000, billingDate: dayFromToday(0), pmsMilestoneId: 11, frozen: false, occurrenceStatus: null, invoiced: false },
+          { paymentEntryId: "e2", sequence: 2, percentage: 25, amount: 25000, billingDate: dayFromToday(1), pmsMilestoneId: 12, frozen: false, occurrenceStatus: null, invoiced: false },
+        ],
       });
 
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await waitForPlanLoad();
     fireEvent.click(screen.getByRole("radio", { name: /milestones/i }));
-    await screen.findByLabelText("Bill milestone M-1");
-    fireEvent.click(screen.getByLabelText("Bill milestone M-1"));
-    fireEvent.change(screen.getByLabelText("AR billing percentage for M-1"), { target: { value: "25" } });
+    await screen.findByTestId("milestone-row-M-1");
     const save = screen.getByRole("button", { name: /save milestone plan/i });
     await waitFor(() => expect(save).not.toBeDisabled());
     fireEvent.click(save);
 
     await waitFor(() => expect(showStatusToast).toHaveBeenCalledWith("Milestone plan configuration saved", "success"));
     expect(screen.queryByTestId("unknown-state-indicator-11")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("AR billing percentage for M-1")).not.toBeDisabled();
+    expect(screen.getByLabelText("Billing date for M-1")).not.toBeDisabled();
   });
 
   it("reloading the milestone list (Retry after a failed load) preserves all saved entries and never changes their frozen state from the milestone billingState", async () => {
@@ -933,10 +935,10 @@ describe("MilestonePlanForm — PMS milestones", () => {
     await waitFor(() => expect(getProjectMilestones).toHaveBeenCalledTimes(2));
     await screen.findByText("In Billing");
     expect(screen.queryByTestId("frozen-indicator-11")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Bill milestone M-1")).toBeChecked();
-    expect(screen.getByLabelText("Bill milestone M-1")).not.toBeDisabled();
-    expect(screen.getByLabelText("Bill milestone M-2")).toBeChecked();
-    expect(screen.getByLabelText("Bill milestone M-2")).not.toBeDisabled();
+    expectBilled("M-1");
+    expect(screen.getByLabelText("Billing date for M-1")).not.toBeDisabled();
+    expectBilled("M-2");
+    expect(screen.getByLabelText("Billing date for M-2")).not.toBeDisabled();
   });
 
   it("a failed milestone-list response does not silently remove saved entries and blocks saving", async () => {

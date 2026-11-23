@@ -5,6 +5,7 @@ import Button from "@/components/Button/Button";
 import Modal from "@/components/Modal/modal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import EmployeeLabel from "./EmployeeLabel";
+import RowActionButton, { RowActions } from "./RowActionButton";
 import { formatMoney } from "../constants/approvalLabels";
 import {
   SUPP_STATUS,
@@ -184,26 +185,14 @@ export default function SupplementaryApprovalsList({
             <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
             <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
             <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
-              <div className="flex items-center justify-end gap-1">
-                <button type="button" onClick={() => openClaim(c)} title="View claim" aria-label={`View ${c.claimNumber}`}
-                  className="rounded p-1.5 text-gray-600 transition hover:bg-blue-50 hover:text-blue-600">
-                  <Eye size={15} aria-hidden="true" />
-                </button>
-                <button type="button" onClick={() => approve(c)} disabled={busy} title="Approve" aria-label={`Approve ${c.claimNumber}`}
-                  className="rounded p-1.5 text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-30">
-                  <CheckCircle2 size={16} aria-hidden="true" />
-                </button>
-                <button type="button" onClick={() => setPending({ claim: c, decision: "clarify" })} disabled={busy} title="Ask for clarification"
-                  aria-label={`Ask for clarification on ${c.claimNumber}`}
-                  className="rounded p-1.5 text-amber-600 transition hover:bg-amber-50 disabled:opacity-30">
-                  <MessageSquareWarning size={16} aria-hidden="true" />
-                </button>
-                <button type="button" onClick={() => setPending({ claim: c, decision: "reject" })} disabled={busy} title="Reject"
-                  aria-label={`Reject ${c.claimNumber}`}
-                  className="rounded p-1.5 text-rose-600 transition hover:bg-rose-50 disabled:opacity-30">
-                  <XCircle size={16} aria-hidden="true" />
-                </button>
-              </div>
+              <RowActions>
+                <RowActionButton tone="view" icon={Eye} label={`View ${c.claimNumber}`} title="View claim" onClick={() => openClaim(c)} />
+                <RowActionButton tone="approve" icon={CheckCircle2} label={`Approve ${c.claimNumber}`} title="Approve" disabled={busy} onClick={() => approve(c)} />
+                <RowActionButton tone="clarify" icon={MessageSquareWarning} label={`Ask for clarification on ${c.claimNumber}`} title="Ask for clarification"
+                  disabled={busy} onClick={() => setPending({ claim: c, decision: "clarify" })} />
+                <RowActionButton tone="reject" icon={XCircle} label={`Reject ${c.claimNumber}`} title="Reject" disabled={busy}
+                  onClick={() => setPending({ claim: c, decision: "reject" })} />
+              </RowActions>
             </td>
           </tr>
         ))}
