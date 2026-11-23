@@ -9,8 +9,7 @@ import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
-import StatusBadge from "@/components/status/statusbadge";
-import PaymentStatusBadge, { paymentStateOf } from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
+import { paymentStateOf } from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +24,7 @@ import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-manag
 import { getSubmissionDeadlineInfo, validateTripDates } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SavedFiltersControl from "@/pages/expense-management/components/common/SavedFiltersControl";
 import Pagination from "@/components/Pagination/pagination";
+import RequestTypeBadge, { reportTypeOf } from "@/pages/expense-management/components/common/RequestTypeBadge";
  
 const ITEMS_PER_PAGE = 10;
  
@@ -38,6 +38,67 @@ const formatDate = (value) => {
 const formatAmount = (value) =>
   (Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
  
+/**
+ * One row action icon. Every row shows the same three icons in the same place; an action that
+ * doesn't apply is greyed out and its tooltip says why. The tooltip sits on a wrapper because a
+ * disabled button doesn't receive hover events.
+ */
+function RowIconAction({ icon: Icon, label, onClick, disabled = false, tone }) {
+  return (
+    <span title={label} className="inline-flex">
+      <button
+        type="button"
+        aria-label={label}
+        disabled={disabled}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled) onClick();
+        }}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition ${
+          disabled ? "cursor-not-allowed text-gray-300" : tone
+        }`}
+      >
+        <Icon size={14} />
+      </button>
+    </span>
+  );
+}
+
+// Report status as one consistent pill: same size, border and casing for every state. Once approved, the payment state
+// (Awaiting payment / Paid / Settled) replaces "Approved" because it says more.
+const REPORT_STATUS_PILLS = {
+  DRAFT: { label: "Draft", tone: "border-slate-200 bg-slate-50 text-slate-600" },
+  PENDING_APPROVAL: { label: "Pending approval", tone: "border-amber-200 bg-amber-50 text-amber-700" },
+  PENDING_FINANCE_VERIFICATION: { label: "Finance check", tone: "border-amber-200 bg-amber-50 text-amber-700" },
+  AWAITING_CORRECTION: { label: "Needs correction", tone: "border-orange-200 bg-orange-50 text-orange-700" },
+  QUERY_RAISED: { label: "Query raised", tone: "border-orange-200 bg-orange-50 text-orange-700" },
+  APPROVED: { label: "Approved", tone: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  REJECTED: { label: "Rejected", tone: "border-rose-200 bg-rose-50 text-rose-700" },
+  POLICY_REJECTED: { label: "Policy rejected", tone: "border-rose-200 bg-rose-50 text-rose-700" },
+  CANCELLED: { label: "Cancelled", tone: "border-slate-200 bg-slate-50 text-slate-500" },
+  // Payment track
+  AWAITING_PAYMENT: { label: "Awaiting payment", tone: "border-indigo-200 bg-indigo-50 text-indigo-700" },
+  PAID: { label: "Paid", tone: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  NO_PAYMENT_DUE: { label: "Settled", tone: "border-sky-200 bg-sky-50 text-sky-700", title: "Settled - no payment due (covered by the cash advance)" },
+};
+
+function ReportStatusPill({ report }) {
+  const payment = paymentStateOf(report);
+  const key = payment ? payment.key : (report.reportStatus || "DRAFT").toUpperCase();
+  const pill = REPORT_STATUS_PILLS[key] || {
+    label: key.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()),
+    tone: "border-slate-200 bg-slate-50 text-slate-600",
+  };
+  return (
+    <span
+      title={pill.title || pill.label}
+      className={`inline-flex min-w-[124px] items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none ${pill.tone}`}
+    >
+      {pill.label}
+    </span>
+  );
+}
+
 const breadcrumbs = [
   { label: "Expense Management", to: "/expense-management/dashboard" },
   { label: "Expenses", to: "/expense-management/expenses/my" },
@@ -345,8 +406,8 @@ export default function MyExpensesPage() {
     value: c.currencyId,
     label: `${c.currencyCode} - ${c.currencyName}`,
   }));
-  const headers = ["S.No", "Title", "Cost Center", "Currency", "Total Amount", "Status", "Created", "Actions"];
-  const columns = ["serial_no", "title", "costCenter", "currency", "totalAmount", "status", "created", "actions"];
+  const headers = ["S.No", "Type", "Title", "Cost Center", "Currency", "Total Amount", "Status", "Created", "Actions"];
+  const columns = ["serial_no", "type", "title", "costCenter", "currency", "totalAmount", "status", "created", "actions"];
  
   // Every row action stays visible. An action that does not apply to this report is disabled, and its tooltip says why.
   const reportEditState = (r) => {
@@ -363,67 +424,50 @@ export default function MyExpensesPage() {
   const tableRows = displayedReports.map((r, index) => ({
     serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
     reportNumber: <span className="font-mono text-[11px] font-semibold text-gray-700">{r.reportNumber || "—"}</span>,
+    // A report linked to a cash advance settles that advance; every other report is an ordinary expense claim.
+    type: <RequestTypeBadge type={reportTypeOf(r)} />,
     title: <span className="font-medium text-xs text-gray-900">{r.title || "Untitled Report"}</span>,
     costCenter: <span className="text-xs">{r.costCenterName || "—"}</span>,
     currency: <span className="font-semibold text-xs text-gray-600">{r.currencyCode || "—"}</span>,
     totalAmount: <span className="font-mono font-semibold text-xs text-gray-900">{formatAmount(r.totalAmount)}</span>,
     status: (
-      <div className="flex flex-col items-start gap-1">
+      <div className="flex flex-col items-center gap-1">
         {/* One pill: once approved, the payment state (Awaiting payment / Paid) says more than "Approved". */}
-        {paymentStateOf(r) ? <PaymentStatusBadge report={r} /> : <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />}
+        <ReportStatusPill report={r} />
         {getSubmissionDeadlineInfo(r)?.isOverdue && (
-          <span className="text-[11px] font-medium text-red-700">Overdue submission</span>
+          <span className="text-[10.5px] font-medium leading-none text-red-600">Overdue submission</span>
         )}
       </div>
     ),
     created: <span className="text-xs">{formatDate(r.createdAt)}</span>,
-    actions: (
-      <div className="flex items-center gap-1 justify-center">
-        <Button
-          type="button"
-          variant="link"
-          size="icon"
-          title="View Report"
-          className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition rounded-md"
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/expense-management/expenses/reports/${r.reportId}`);
-          }}
-        >
-          <Eye size={14} />
-        </Button>
-        {canManage && REPORT_EDITABLE_STATUSES.includes(r.reportStatus) && (
-          <Button
-            type="button"
-            variant="link"
-            size="icon"
-            title="Edit Report"
-            className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEditClick(r);
-            }}
-          >
-            <Pencil size={14} />
-          </Button>
-        )}
-        {canManage && REPORT_DELETABLE_STATUSES.includes(r.reportStatus) && (
-          <Button
-            type="button"
-            variant="link"
-            size="icon"
-            title="Delete Report"
-            className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteClick(r);
-            }}
-          >
-            <Trash2 size={14} />
-          </Button>
-        )}
-      </div>
-    ),
+    actions: (() => {
+      const edit = reportEditState(r);
+      const del = reportDeleteState(r);
+      return (
+        <div className="flex items-center justify-center gap-1">
+          <RowIconAction
+            icon={Eye}
+            label="View Report"
+            tone="text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            onClick={() => navigate(`/expense-management/expenses/reports/${r.reportId}`)}
+          />
+          <RowIconAction
+            icon={Pencil}
+            label={edit.reason}
+            disabled={!edit.allowed}
+            tone="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+            onClick={() => handleEditClick(r)}
+          />
+          <RowIconAction
+            icon={Trash2}
+            label={del.reason}
+            disabled={!del.allowed}
+            tone="text-red-600 hover:bg-red-50 hover:text-red-800"
+            onClick={() => handleDeleteClick(r)}
+          />
+        </div>
+      );
+    })(),
   }));
  
   const statusFilterOptions = [
@@ -562,7 +606,7 @@ export default function MyExpensesPage() {
           </PageCard>
         ) : (
           <>
-            <div className="w-full overflow-x-auto rounded-lg [&_td]:!py-1.5 [&_td]:!px-2.5 [&_td]:!text-xs [&_th]:!py-1.5 [&_th]:!px-2.5 [&_th]:!text-xs [&_table]:!text-xs [&_.rounded-full]:!text-[10px] [&_.rounded-full]:!px-1.5 [&_.rounded-full]:!py-0">
+            <div className="w-full overflow-x-auto rounded-lg [&_td]:!py-2.5 [&_td]:!px-3 [&_td]:!align-middle [&_td]:!text-xs [&_th]:!py-2 [&_th]:!px-3 [&_th]:!text-xs [&_table]:!text-xs">
               <GenericTable
                 headers={headers}
                 rows={tableRows.map((row, i) => ({ ...row, onRowClick: () => navigate(`/expense-management/expenses/reports/${displayedReports[i].reportId}`) }))}

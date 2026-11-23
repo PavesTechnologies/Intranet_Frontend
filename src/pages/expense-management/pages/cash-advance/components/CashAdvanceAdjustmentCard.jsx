@@ -22,16 +22,19 @@ export default function CashAdvanceAdjustmentCard({
   status = "",
   outstandingBalance = null,
   carriedOutAmount = 0,
+  // Balance the employee chose to carry forward; it moves when their next advance is approved.
+  carryForwardReady = 0,
   salaryDeductedAmount = 0,
   expenseReport = null,
   className = "",
 }) {
   const A = Number(advanceAmount) || 0;
   const E = Number(verifiedExpenseAmount) || 0;
-  const C = Number(carriedOutAmount) || 0;
+  const ready = Number(carryForwardReady) || 0;
+  const C = (Number(carriedOutAmount) || 0) + ready;
   const D = Number(salaryDeductedAmount) || 0;
   const persistedOutstanding = outstandingBalance != null ? Math.max(0, Number(outstandingBalance) || 0) : null;
-  const netBalance = persistedOutstanding != null ? persistedOutstanding : Math.max(0, A - E);
+  const netBalance = Math.max(0, (persistedOutstanding != null ? persistedOutstanding : Math.max(0, A - E)) - ready);
   const excessReimbursement = Math.max(0, E - A);
   const upperStatus = (status || "").toUpperCase();
   const isSettled = upperStatus === "SETTLED" || upperStatus === "CLOSED";
@@ -91,16 +94,18 @@ export default function CashAdvanceAdjustmentCard({
 
       {/* One result line: the calculation once, then what happens next. The amounts themselves are shown above. */}
       <div className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${
-        netBalance > 0 ? "bg-amber-50/60 border-amber-200" : excessReimbursement > 0 ? "bg-purple-50/60 border-purple-200" : "bg-emerald-50/40 border-emerald-200"
+        netBalance > 0 ? "bg-amber-50/60 border-amber-200" : excessReimbursement > 0 ? "bg-purple-50/60 border-purple-200" : ready > 0 ? "bg-indigo-50/60 border-indigo-200" : "bg-emerald-50/40 border-emerald-200"
       }`}>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Settlement result</p>
-          <p className={`text-sm font-bold mt-0.5 ${netBalance > 0 ? "text-amber-700" : excessReimbursement > 0 ? "text-purple-700" : "text-emerald-700"}`}>
+          <p className={`text-sm font-bold mt-0.5 ${netBalance > 0 ? "text-amber-700" : excessReimbursement > 0 ? "text-purple-700" : ready > 0 ? "text-indigo-700" : "text-emerald-700"}`}>
             {netBalance > 0
               ? `Employee returns ${formatMoney(netBalance, currencyCode)}`
               : excessReimbursement > 0
                 ? `Company reimburses ${formatMoney(excessReimbursement, currencyCode)}`
-                : "Fully settled, no cash to return"}
+                : ready > 0
+                  ? `${formatMoney(ready, currencyCode)} carried forward to the next advance`
+                  : "Fully settled, no cash to return"}
           </p>
         </div>
         <p className="text-[11px] text-gray-500">

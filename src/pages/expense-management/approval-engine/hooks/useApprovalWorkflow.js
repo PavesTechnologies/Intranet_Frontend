@@ -70,11 +70,17 @@ const invalidateApprovalCaches = (qc, reportId) => {
   }
 };
 
+// mutate(reportId), or mutate({ reportId, lateSubmissionReason }) for a report past its submission deadline.
+const submitArgs = (vars) => (typeof vars === "object" && vars !== null ? vars : { reportId: vars });
+
 export const useSubmitReport = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (reportId) => approvalWorkflowApi.submit(reportId).then(unwrap),
-    onSuccess: (_data, reportId) => invalidateApprovalCaches(qc, reportId),
+    mutationFn: (vars) => {
+      const { reportId, lateSubmissionReason } = submitArgs(vars);
+      return approvalWorkflowApi.submit(reportId, lateSubmissionReason).then(unwrap);
+    },
+    onSuccess: (_data, vars) => invalidateApprovalCaches(qc, submitArgs(vars).reportId),
   });
 };
 

@@ -123,6 +123,9 @@ export const MODULES = [
     id: "expense-management",
     name: "Expense Management",
     prefixes: ["/expense-management"],
+    // When CHATBOT_AI_URL is set, questions here go to the AI first: it can read the user's own
+    // claims, advances and approvals live (XMS /xms/chat). The FAQs below become the offline fallback.
+    aiFirst: true,
     intro: "You're in Expense Management. Ask me how to claim an expense, request a cash advance or track a claim.",
     suggestions: ["How do I claim an expense?", "How do I request a cash advance?", "Where are my claims?", "What happens after I submit?"],
     faqs: [

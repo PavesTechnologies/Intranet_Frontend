@@ -6,6 +6,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import ApprovalStatusPill from "../components/ApprovalStatusPill";
 import EmployeeLabel from "../components/EmployeeLabel";
+import RowActionButton, { RowActions } from "../components/RowActionButton";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
 import { useMyHistory } from "../hooks/useApprovalWorkflow";
 import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
@@ -70,14 +71,13 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
     return (
       <>
         {isPending && (
-          <tbody><tr><td colSpan={10} className="py-10 text-center text-xs text-gray-500">Loading…</td></tr></tbody>
+          <tbody><tr><td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading…</td></tr></tbody>
         )}
         {!isPending && !isError && filteredItems.length > 0 && (
           <tbody className="divide-y divide-gray-100">
             {windowItems.map((report, index) => (
               <tr key={report.reportId} className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setReviewingItem(report)}>
                 <td className="px-2.5 py-1.5 text-left"><span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span></td>
-                <td className="px-2.5 py-1.5 text-left font-mono text-[11px] font-semibold text-gray-700 whitespace-nowrap">{report.reportNumber}</td>
                 <td className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-900 whitespace-nowrap"><EmployeeLabel employeeId={report.employeeId} /></td>
                 <td className="px-2.5 py-1.5 text-left max-w-[220px]">
                   <p className="font-semibold text-gray-900 truncate text-xs">{report.title || "—"}</p>
@@ -89,18 +89,9 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                 <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
                 <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
                 <td className="px-2.5 py-1.5 text-right">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setReviewingItem(report);
-                    }}
-                    aria-label={`View ${report.reportNumber}`}
-                    title="View"
-                    className="rounded p-1 text-blue-700 hover:bg-blue-50"
-                  >
-                    <Eye size={16} aria-hidden="true" />
-                  </button>
+                  <RowActions>
+                    <RowActionButton tone="view" icon={Eye} label={`View ${report.reportNumber}`} title="View" onClick={() => setReviewingItem(report)} />
+                  </RowActions>
                 </td>
               </tr>
             ))}

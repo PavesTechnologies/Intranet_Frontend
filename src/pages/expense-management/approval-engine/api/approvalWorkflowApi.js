@@ -47,7 +47,9 @@ export const approvalWorkflowApi = {
   getLineItemReviews: (reportId) =>
     api.get(`/xms/approvals/${reportId}/line-item-reviews`, withBase()),
 
-  submit: (reportId) => api.post(`/xms/approvals/${reportId}/submit`, {}, withBase()),
+  // lateSubmissionReason: only for a report past its submission deadline - the employee's reason for the delay.
+  submit: (reportId, lateSubmissionReason) =>
+    api.post(`/xms/approvals/${reportId}/submit`, lateSubmissionReason ? { lateSubmissionReason } : {}, withBase()),
 
   recall: (reportId) => api.post(`/xms/approvals/${reportId}/recall`, {}, withBase()),
 

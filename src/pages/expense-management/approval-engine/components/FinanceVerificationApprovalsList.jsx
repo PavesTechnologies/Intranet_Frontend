@@ -44,7 +44,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
     return (
       <tbody>
         <tr>
-          <td colSpan={10} className="py-6 text-center text-xs text-gray-500">Loading Finance verification queue…</td>
+          <td colSpan={9} className="py-6 text-center text-xs text-gray-500">Loading Finance verification queue…</td>
         </tr>
       </tbody>
     );
@@ -54,7 +54,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
     return (
       <tbody>
         <tr>
-          <td colSpan={10} className="py-6 text-center text-xs text-rose-700">
+          <td colSpan={9} className="py-6 text-center text-xs text-rose-700">
             Failed to load the Finance verification queue.{" "}
             <button type="button" className="underline" onClick={() => refetch()}>Retry</button>
           </td>
@@ -71,9 +71,6 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
             <tr key={`finance-${item.reportId}`} className={`${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`}>
               <td className="px-2.5 py-1.5">
                 <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
-              </td>
-              <td className="px-2.5 py-1.5">
-                <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
               </td>
               <td className="px-2.5 py-1.5">
                 <span className="font-medium text-xs text-gray-900">
@@ -104,7 +101,7 @@ export default function FinanceVerificationApprovalsList({ searchTerm = "", excl
       {(data?.totalPages ?? 0) > 1 && (
         <tbody>
           <tr>
-            <td colSpan={10} className="py-2">
+            <td colSpan={9} className="py-2">
               <div className="flex justify-center">
                 <Pagination
                   currentPage={page + 1}
