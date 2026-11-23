@@ -9,6 +9,7 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { lookupService } from "@/pages/expense-management/api/expenseReportsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
+import RowActionButton, { RowActions } from "@/pages/expense-management/approval-engine/components/RowActionButton";
 import { useApprovalWebSocket } from "@/pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
 
 const formatMoney = (amount, currencyCode = "INR") => {
@@ -624,7 +625,6 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                       <td className="px-2.5 py-1.5 text-left">
                         <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Cash advance</span>
                       </td>
-                      <td className="px-2.5 py-1.5 text-left font-mono text-[11px] font-semibold text-gray-700 whitespace-nowrap">{adv.advanceNumber || `#${String(advId).slice(0, 8).toUpperCase()}`}</td>
                       <td className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-900 whitespace-nowrap">
                         <EmployeeLabel employeeId={empId} />
                       </td>
@@ -640,40 +640,34 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                       </td>
                       <AmountCells adv={adv} />
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
+                        <RowActions>
+                          <RowActionButton
+                            tone="view"
+                            icon={Eye}
+                            label="View details"
                             onClick={() => navigate(`/expense-management/approvals/cash-advance/${adv.advanceId || adv.id}`)}
-                            title="View Details"
-                            className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-                          >
-                            <Eye size={15} />
-                          </button>
-
+                          />
                           {showActions && (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => handleApprove(adv)}
-                                disabled={actionLoading || !isActionable}
-                                aria-label={`Approve ${adv.title || "cash advance"}`}
+                              <RowActionButton
+                                tone="approve"
+                                icon={CheckCircle2}
+                                label={`Approve ${adv.title || "cash advance"}`}
                                 title={isActionable ? "Approve" : "Not yet your turn to approve"}
-                                className="p-1.5 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                              >
-                                <CheckCircle2 size={16} aria-hidden="true" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setRejectingAdvance(adv)}
                                 disabled={actionLoading || !isActionable}
-                                aria-label={`Reject ${adv.title || "cash advance"}`}
+                                onClick={() => handleApprove(adv)}
+                              />
+                              <RowActionButton
+                                tone="reject"
+                                icon={XCircle}
+                                label={`Reject ${adv.title || "cash advance"}`}
                                 title={isActionable ? "Reject" : "Not yet your turn to reject"}
-                                className="p-1.5 rounded text-rose-600 hover:bg-rose-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                              >
-                                <XCircle size={16} aria-hidden="true" />
-                              </button>
+                                disabled={actionLoading || !isActionable}
+                                onClick={() => setRejectingAdvance(adv)}
+                              />
                             </>
                           )}
-                        </div>
+                        </RowActions>
                       </td>
                     </tr>
                   );
@@ -1096,7 +1090,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
         {loading && (
           <tbody>
             <tr>
-              <td colSpan={10} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
+              <td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading cash advance approval requests…</td>
             </tr>
           </tbody>
         )}

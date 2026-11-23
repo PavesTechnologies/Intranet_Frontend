@@ -297,6 +297,11 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                   <Field label="Business Purpose" value={businessPurpose} />
                 </div>
               )}
+              {fullReport?.lateSubmissionReason && (
+                <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <span className="font-semibold">Submitted after the deadline.</span> Employee&apos;s reason: {fullReport.lateSubmissionReason}
+                </p>
+              )}
             </Section>
 
             {selectedLine ? (

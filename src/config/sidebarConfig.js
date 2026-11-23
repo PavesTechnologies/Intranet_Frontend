@@ -63,6 +63,10 @@ const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 export const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
+// Who works the My Approvals page: managers and reporting managers (and Admin). Not employees, not Finance.
+export const XMS_APPROVER_ROLES = [ROLES.MANAGER, ROLES.REPORTING_MANAGER, ...ADMIN_ROLES];
+// Who may open the page: approvers, plus Finance (their dashboard links here for supplementary claims). Never General alone.
+export const XMS_APPROVALS_PAGE_ROLES = [...XMS_APPROVER_ROLES, ROLES.FINANCE, "Finance_Executive"];
 
 /**
  * Accounts Receivable (AR) Maker-Checker role groups.
@@ -247,11 +251,9 @@ export const XMS_SUBMENU = [
   {
     label: "Approvals",
     to: "/expense-management/approvals",
-    // Not XMS_MANAGER-only (§1.5): any employee can be a resolved approver (NAMED_USER/
-    // DEPARTMENT_OWNER/COST_CENTER_OWNER), so a General-role approver still needs a way in.
-    // "My Approvals" is presence-based - visible to everyone, empty for anyone with nothing pending.
-    // Finance users do not get this menu item: Finance approvals are on the Finance tab. The page itself stays reachable by URL.
-    allowedRoles: XMS_EVERYONE.filter((role) => !XMS_FINANCE_ROLES.includes(role)),
+    // Approvers only. Employees (General) do not get this menu item, and Finance approvals are on the Finance tab.
+    // The route (XMS_APPROVALS_PAGE_ROLES) also lets Finance in, for the supplementary-claims link on their dashboard.
+    allowedRoles: XMS_APPROVER_ROLES,
   },
   {
     // One page: verify, queried, and verified reports with their AP payment status.

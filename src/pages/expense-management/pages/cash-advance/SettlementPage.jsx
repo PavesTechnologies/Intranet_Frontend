@@ -97,6 +97,51 @@ const canOpenExpenseFor = (adv, user) =>
   LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
   Number(adv.outstandingBalance ?? 0) > 0;
 
+// Status key with spaces and underscores normalised, e.g. "In Progress" and "IN_PROGRESS" are the same status.
+const statusKeyOf = (adv) => String(adv.status || "").trim().toUpperCase().replace(/\s+/g, "_");
+const statusLabel = (key) =>
+  key.toLowerCase().split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+// Workflow order for the filter list; anything unknown goes last.
+const STATUS_ORDER = [
+  "APPROVED", "DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "SUBMITTED_FOR_REVIEW", "UNDER_REVIEW",
+  "RECONCILIATION_PENDING", "EXPENSE_VERIFIED", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED", "SETTLEMENT_PENDING",
+  "ADJUSTED", "OVERDUE",
+];
+const statusRank = (key) => {
+  const i = STATUS_ORDER.indexOf(key);
+  return i === -1 ? STATUS_ORDER.length : i;
+};
+
+// Disbursed and still open: the employee holds the money and the advance is not settled yet.
+const isDisbursedOpen = (adv) => {
+  const key = statusKeyOf(adv);
+  return key !== "APPROVED" && !["SETTLED", "CLOSED"].includes(key);
+};
+
+// One definition of "open" and "closed", shared by the Status filter and the summary cards.
+const isClosedAdvance = (adv) => ["SETTLED", "CLOSED"].includes((adv.status || "").toUpperCase());
+const isOpenAdvance = (adv) => !isClosedAdvance(adv);
+
+function SummaryCard({ active, onClick, icon, iconClass, label, value, valueClass, hint }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex items-center gap-3 rounded-xl border bg-white p-3.5 text-left shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ${
+        active ? "border-indigo-300 ring-1 ring-indigo-200" : "border-gray-200"
+      }`}
+    >
+      <div className={`rounded-lg p-2.5 ${iconClass}`}>{icon}</div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
+        <p className={`mt-0.5 text-xl font-bold ${valueClass}`}>{value}</p>
+        <p className="truncate text-[11px] text-gray-400">{hint}</p>
+      </div>
+    </button>
+  );
+}
+
 export default function SettlementPage() {
   const { user, hasRole } = useAuth();
   const { data: directory } = useEmployeeDirectory();
@@ -267,22 +312,16 @@ export default function SettlementPage() {
     return advances.filter((adv) => {
       const statusUpper = (adv.status || "").toUpperCase();
 
+      // OPEN / ALL / DISBURSED / CLOSED are groups; any other value is one exact status (e.g. "IN_PROGRESS").
       let matchStatus = true;
       if (statusFilter === "OPEN") {
-        matchStatus = !["SETTLED", "CLOSED"].includes(statusUpper);
-      } else if (statusFilter === "APPROVED") {
-        matchStatus = ["APPROVED"].includes(statusUpper);
-      } else if (statusFilter === "DISBURSED" || statusFilter === "IN_PROGRESS") {
-        matchStatus = [
-          "DISBURSED", "IN_PROGRESS", "IN PROGRESS",
-          "RECONCILIATION_PENDING", "RECONCILIATION PENDING",
-          "SUBMITTED_FOR_REVIEW", "SUBMITTED FOR REVIEW", "EXPENSE_SUBMITTED",
-          "UNDER_REVIEW", "UNDER REVIEW",
-          "EXPENSE_VERIFIED",
-          "SETTLEMENT_PENDING", "SETTLEMENT PENDING", "PARTIALLY_SETTLED", "PARTIALLY_ADJUSTED"
-        ].includes(statusUpper);
-      } else if (statusFilter === "SETTLED" || statusFilter === "CLOSED") {
-        matchStatus = ["SETTLED", "CLOSED"].includes(statusUpper);
+        matchStatus = isOpenAdvance(adv);
+      } else if (statusFilter === "DISBURSED") {
+        matchStatus = isDisbursedOpen(adv);
+      } else if (statusFilter === "CLOSED") {
+        matchStatus = isClosedAdvance(adv);
+      } else if (statusFilter !== "ALL") {
+        matchStatus = statusKeyOf(adv) === statusFilter;
       }
 
       const empName = getEmployeeName(adv, directory);
@@ -299,19 +338,26 @@ export default function SettlementPage() {
   }, [advances, statusFilter, searchTerm, directory]);
 
   // Statistics
+  // A carry-forward the employee chose counts as carried forward at once, so it is not shown as outstanding.
+  const carryReadyFor = (adv) => {
+    const lock = settlementLocks[adv.advanceId || adv.id];
+    return lock?.kind === SETTLEMENT_LOCK.CARRY_FORWARD ? Number(lock.amount) || 0 : 0;
+  };
+  const outstandingShownFor = (adv) =>
+    Math.max((Number(adv.outstandingBalance ?? adv.amount) || 0) - carryReadyFor(adv), 0);
+
+  // The cards use the same rules as the Status filter, so each card's number matches the rows that filter shows.
   const stats = useMemo(() => {
-    const totalDisbursedCount = advances.length;
+    const open = advances.filter(isOpenAdvance);
+    const closed = advances.filter(isClosedAdvance);
+    const disbursedCount = advances.filter((a) => (a.status || "").toUpperCase() !== "APPROVED").length;
 
-    const totalOutstanding = advances
-      .filter((a) => !["SETTLED", "CLOSED"].includes((a.status || "").toUpperCase()))
-      .reduce((sum, a) => sum + (Number(a.outstandingBalance ?? a.amount) || 0), 0);
+    const totalOutstanding = open.reduce((sum, a) => sum + outstandingShownFor(a), 0);
+    const totalSettled = closed.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
 
-    const totalSettled = advances
-      .filter((a) => ["SETTLED", "CLOSED"].includes((a.status || "").toUpperCase()))
-      .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
-
-    return { totalDisbursedCount, totalOutstanding, totalSettled };
-  }, [advances]);
+    return { openCount: open.length, closedCount: closed.length, disbursedCount, totalOutstanding, totalSettled };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advances, settlementLocks]);
 
   const handleDisburse = (adv) => {
     if (!isFinanceExecutive) return;
@@ -444,13 +490,22 @@ export default function SettlementPage() {
     { label: "Additional Reimbursement Payout (Company pays employee excess expenses)", value: "REIMBURSEMENT" },
   ];
 
-  const statusOptions = [
-    { label: "Open (needs action)", value: "OPEN" },
-    { label: "All Advances (incl. closed)", value: "ALL" },
-    { label: "Approved (Awaiting Disbursement)", value: "APPROVED" },
-    { label: "Disbursed / Outstanding", value: "DISBURSED" },
-    { label: "Closed (Fully Settled)", value: "SETTLED" },
-  ];
+  // Options come from the statuses actually on this page, so every choice matches real rows. The two groups Finance
+  // works from keep fixed names; below them, one option per status present (In Progress, Settlement Pending, ...).
+  const statusOptions = useMemo(() => {
+    const present = [...new Set(advances.filter(isOpenAdvance).map(statusKeyOf))]
+      .filter((key) => key !== "APPROVED")
+      .sort((a, b) => statusRank(a) - statusRank(b) || a.localeCompare(b));
+    const has = (pred) => advances.some(pred);
+    return [
+      { label: "Open (needs action)", value: "OPEN" },
+      { label: "All Advances (incl. closed)", value: "ALL" },
+      ...(has((a) => statusKeyOf(a) === "APPROVED") ? [{ label: "Approved (Awaiting Disbursement)", value: "APPROVED" }] : []),
+      ...(has(isDisbursedOpen) ? [{ label: "Disbursed / Outstanding", value: "DISBURSED" }] : []),
+      ...present.map((key) => ({ label: statusLabel(key), value: key })),
+      ...(has(isClosedAdvance) ? [{ label: "Closed (Fully Settled)", value: "CLOSED" }] : []),
+    ];
+  }, [advances]);
 
   // Shown in the header so the user can see which role this session is working under.
   const roleLabel = useMemo(() => {
@@ -490,37 +545,38 @@ export default function SettlementPage() {
         </button>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - each one also filters the table to the advances it counts */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
-            <DollarSign size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Disbursed Advances</p>
-            <p className="text-xl font-bold text-gray-900 mt-0.5">{stats.totalDisbursedCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-            <Clock size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Outstanding Balance</p>
-            <p className="text-xl font-bold text-amber-600 mt-0.5">{formatMoney(stats.totalOutstanding)}</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-            <CheckCircle2 size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Settled</p>
-            <p className="text-xl font-bold text-emerald-600 mt-0.5">{formatMoney(stats.totalSettled)}</p>
-          </div>
-        </div>
+        <SummaryCard
+          active={statusFilter === "OPEN"}
+          onClick={() => setStatusFilter("OPEN")}
+          icon={<DollarSign size={18} />}
+          iconClass="bg-indigo-50 text-indigo-600"
+          label="Open advances"
+          value={stats.openCount}
+          valueClass="text-gray-900"
+          hint={`${stats.disbursedCount} disbursed in total · ${stats.closedCount} closed`}
+        />
+        <SummaryCard
+          active={statusFilter === "OPEN"}
+          onClick={() => setStatusFilter("OPEN")}
+          icon={<Clock size={18} />}
+          iconClass="bg-amber-50 text-amber-600"
+          label="Outstanding balance"
+          value={formatMoney(stats.totalOutstanding)}
+          valueClass="text-amber-600"
+          hint={`Still owed on ${stats.openCount} open advance${stats.openCount === 1 ? "" : "s"}`}
+        />
+        <SummaryCard
+          active={statusFilter === "CLOSED"}
+          onClick={() => setStatusFilter("CLOSED")}
+          icon={<CheckCircle2 size={18} />}
+          iconClass="bg-emerald-50 text-emerald-600"
+          label="Total settled"
+          value={formatMoney(stats.totalSettled)}
+          valueClass="text-emerald-600"
+          hint={`${stats.closedCount} advance${stats.closedCount === 1 ? "" : "s"} fully settled`}
+        />
       </div>
 
       {/* Filter and Search Bar */}
@@ -597,8 +653,13 @@ export default function SettlementPage() {
                       </td>
                       <td className="py-3 px-4 text-right font-bold whitespace-nowrap">
                         <span className={isSettled ? "text-emerald-600" : "text-amber-600"}>
-                          {formatMoney(outstanding, adv.currencyCode || "INR")}
+                          {formatMoney(carryReadyFor(adv) > 0 ? outstandingShownFor(adv) : outstanding, adv.currencyCode || "INR")}
                         </span>
+                        {carryReadyFor(adv) > 0 && (
+                          <span className="block text-[10.5px] font-medium text-indigo-600">
+                            {formatMoney(carryReadyFor(adv), adv.currencyCode || "INR")} carried forward
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         <span

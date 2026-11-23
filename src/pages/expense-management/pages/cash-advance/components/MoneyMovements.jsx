@@ -72,12 +72,19 @@ export async function viewProof(path) {
   }
 }
 
-export default function MoneyMovements({ settlement, currencyCode, advanceId, carriedOut = 0, salaryDeducted = 0 }) {
+/**
+ * carriedOut: balance already moved to another advance. carryForwardReady: balance the employee chose to carry forward
+ * that moves when their next advance is approved - shown as carried forward straight away, and no longer as outstanding.
+ */
+export default function MoneyMovements({ settlement, currencyCode, advanceId, carriedOut = 0, carryForwardReady = 0, salaryDeducted = 0 }) {
   const rows = buildMovements(settlement, advanceId);
   if (rows.length === 0) {
     return <p className="text-xs text-gray-500">No money has moved on this advance yet.</p>;
   }
   const outTotal = rows.filter((r) => r.direction === "OUT").reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const ready = Number(carryForwardReady) || 0;
+  const carriedTotal = (Number(carriedOut) || 0) + ready;
+  const stillOutstanding = Math.max((Number(settlement?.outstandingBalance) || 0) - ready, 0);
   // const inTotal: repayments by the employee are not part of the current flows.
 
   return (
@@ -89,7 +96,12 @@ export default function MoneyMovements({ settlement, currencyCode, advanceId, ca
         </div>
         <div className="rounded-md bg-indigo-50 px-3 py-2">
           <p className="text-indigo-700">Carried forward</p>
-          <p className="font-semibold text-gray-900">{formatMoney(carriedOut, currencyCode)}</p>
+          <p className="font-semibold text-gray-900">{formatMoney(carriedTotal, currencyCode)}</p>
+          {ready > 0 && (
+            <p className="mt-0.5 text-[10.5px] text-indigo-600">
+              {formatMoney(ready, currencyCode)} moves to your next advance when it is approved
+            </p>
+          )}
         </div>
         <div className="rounded-md bg-rose-50 px-3 py-2">
           <p className="text-rose-700">Salary deduction</p>
@@ -97,7 +109,7 @@ export default function MoneyMovements({ settlement, currencyCode, advanceId, ca
         </div>
         <div className="rounded-md bg-gray-50 px-3 py-2">
           <p className="text-gray-600">Still outstanding</p>
-          <p className="font-semibold text-gray-900">{formatMoney(settlement?.outstandingBalance, currencyCode)}</p>
+          <p className="font-semibold text-gray-900">{formatMoney(stillOutstanding, currencyCode)}</p>
         </div>
       </div>
 

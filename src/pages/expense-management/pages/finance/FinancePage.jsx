@@ -33,6 +33,7 @@ import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/
 import InvoiceHandoffBadge from "../../components/expense-reports/InvoiceHandoffBadge";
 import { formatMoney, formatDate } from "../../approval-engine/constants/approvalLabels";
 import Pagination from "@/components/Pagination/pagination";
+import RequestTypeBadge, { reportTypeOf } from "@/pages/expense-management/components/common/RequestTypeBadge";
 
 const TABS = [
   { value: "ALL", label: "All" },
@@ -239,12 +240,6 @@ export default function FinancePage() {
     </Button>
   );
 
-  const typeBadge = (kind) =>
-    kind === "ADVANCE" ? (
-      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Cash Advance</span>
-    ) : (
-      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
-    );
 
   const expenseStatusCell = (item) => {
     const tab = tabOf(item);
@@ -286,7 +281,7 @@ export default function FinancePage() {
   const columns = ["type", "reference", "employee", "amount", "status", "date", "action"];
   const allRows = [
     ...filteredItems.map((item) => ({
-      type: typeBadge("EXPENSE"),
+      type: <RequestTypeBadge type={reportTypeOf(item)} />,
       reference: <span className="font-mono text-xs font-semibold text-gray-700">{item.reportNumber}</span>,
       employee: <EmployeeLabel employeeId={item.employeeId} />,
       amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</span>,
@@ -295,7 +290,7 @@ export default function FinancePage() {
       action: reviewButton(item, tabOf(item) === "PENDING" ? "Review" : "View", tabOf(item) === "PENDING" ? "primary" : "outline"),
     })),
     ...visibleAdvances.map((adv) => ({
-      type: typeBadge("ADVANCE"),
+      type: <RequestTypeBadge type="ADVANCE" />,
       reference: <span className="font-mono text-xs font-semibold text-gray-700">{advanceRef(adv)}</span>,
       employee: <EmployeeLabel employeeId={adv.employeeId || adv.employee_id} />,
       amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(adv.amount, adv.currencyCode)}</span>,

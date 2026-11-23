@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ClipboardCheck, Clock, Inbox, Layers, RefreshCw, XCircle } from "lucide-react";
 
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
@@ -43,6 +43,10 @@ const AMOUNT_OPTIONS = [
   { label: "Approved lower amount", value: "REDUCED" },
 ];
 
+// Statuses the table can show (the "all" view shows them in this order), and the lists behind each.
+const STATUS_KEYS = ["pending", "approved", "rejected"];
+const LIST_TYPES = ["expense", "cash", "supp"];
+
 const PENDING_SORT_OPTIONS = [
   { label: "Newest first", value: "NEWEST" },
   { label: "Oldest first", value: "OLDEST" },
@@ -57,57 +61,41 @@ export default function ApprovalsPage({ embedded = false }) {
   // -----------------------------
   // State
   // -----------------------------
-  const [activeTab, setActiveTab] = useState("pending");
+  // "all" (the default) shows every status in one table; Pending / Approved / Rejected filter it.
+  const [activeTab, setActiveTab] = useState("all");
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [pendingShow, setPendingShow] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [amountFilter, setAmountFilter] = useState("ALL");
   const showType = (t) => typeFilter === "ALL" || typeFilter === t;
-  // Rows each list currently shows, keyed by tab, so the page can show one empty message for the whole table.
+  // Rows each list currently shows, keyed by status and type (e.g. "approved-cash"), so the page can page across
+  // every list and show one empty message for the whole table.
   const [rowCounts, setRowCounts] = useState({});
-  const reportExpenseRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-expense`] === count ? prev : { ...prev, [`${activeTab}-expense`]: count })),
-    [activeTab]
-  );
-  const reportCashRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-cash`] === count ? prev : { ...prev, [`${activeTab}-cash`]: count })),
-    [activeTab]
-  );
-  const reportSuppRows = useCallback(
-    (count) => setRowCounts((prev) => (prev[`${activeTab}-supp`] === count ? prev : { ...prev, [`${activeTab}-supp`]: count })),
-    [activeTab]
-  );
+  const reporters = useMemo(() => {
+    const map = {};
+    STATUS_KEYS.forEach((status) =>
+      LIST_TYPES.forEach((type) => {
+        const key = `${status}-${type}`;
+        map[key] = (count) => setRowCounts((prev) => (prev[key] === count ? prev : { ...prev, [key]: count }));
+      })
+    );
+    return map;
+  }, []);
 
   const [pendingSort, setPendingSort] = useState("NEWEST");
 
-  // One pager for the whole table. The expense rows and the cash advance rows form one sequence (expense rows first),
-  // and each child renders only the slice of its own rows that falls inside the current page.
+  // One pager for the whole table. The rows form one sequence - status by status (pending, approved, rejected), and
+  // within each status expense reports, then cash advances, then supplementary claims - and each list renders only
+  // the slice of its own rows that falls inside the current page.
   const [page, setPage] = useState(0);
   useEffect(() => {
     setPage(0);
   }, [activeTab, searchTerm, pendingShow, pendingSort, typeFilter, amountFilter]);
-  // The amount filter only applies to cash advances; it is reset when it no longer applies.
+  // The amount filter only applies to approved cash advances; it is reset when it no longer applies.
   useEffect(() => {
-    if (typeFilter !== "CASH" || activeTab === "pending") setAmountFilter("ALL");
+    if (typeFilter !== "CASH" || activeTab !== "approved") setAmountFilter("ALL");
   }, [typeFilter, activeTab]);
-  // A list hidden by the type filter contributes no rows.
-  const expenseCount = showType("EXPENSE") ? rowCounts[`${activeTab}-expense`] ?? 0 : 0;
-  const cashCount = showType("CASH") ? rowCounts[`${activeTab}-cash`] ?? 0 : 0;
-  const suppCount = showType("SUPP") ? rowCounts[`${activeTab}-supp`] ?? 0 : 0;
-  const combinedRows = expenseCount + cashCount + suppCount;
-  const totalPages = Math.max(1, Math.ceil(combinedRows / APPROVALS_PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const winStart = safePage * APPROVALS_PAGE_SIZE;
-  const winEnd = winStart + APPROVALS_PAGE_SIZE;
-  // Each source covers its own slice of the one sequence: expense reports, then cash advances, then supplementary claims.
-  const windowFor = (offset, count) => ({
-    start: Math.max(Math.min(winStart - offset, count), 0),
-    end: Math.max(Math.min(winEnd - offset, count), 0),
-  });
-  const expenseWindow = windowFor(0, expenseCount);
-  const cashWindow = windowFor(expenseCount, cashCount);
-  const suppWindow = windowFor(expenseCount + cashCount, suppCount);
 
   // -----------------------------
   // Role check
@@ -131,13 +119,32 @@ export default function ApprovalsPage({ embedded = false }) {
     ? hasRole(["Finance", "FINANCE", "Finance_Executive", "FINANCE_EXECUTIVE"])
     : false;
 
+  // The statuses this view shows, and the lists mounted for each (a list hidden by the type filter adds no rows).
+  const visibleStatuses = activeTab === "all" ? STATUS_KEYS : [activeTab];
   const mountedLists = [
     ...(showType("EXPENSE") ? ["expense"] : []),
     ...(isManager || isFinance ? [...(showType("CASH") ? ["cash"] : []), ...(showType("SUPP") ? ["supp"] : [])] : []),
   ];
-  const allReported = mountedLists.every((key) => rowCounts[`${activeTab}-${key}`] !== undefined);
-  const totalRows = mountedLists.reduce((sum, key) => sum + (rowCounts[`${activeTab}-${key}`] ?? 0), 0);
-  const showEmptyTable = allReported && totalRows === 0;
+  const segments = visibleStatuses.flatMap((status) => mountedLists.map((type) => `${status}-${type}`));
+  const allReported = segments.every((key) => rowCounts[key] !== undefined);
+  const combinedRows = segments.reduce((sum, key) => sum + (rowCounts[key] ?? 0), 0);
+  const showEmptyTable = allReported && combinedRows === 0;
+
+  const totalPages = Math.max(1, Math.ceil(combinedRows / APPROVALS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const winStart = safePage * APPROVALS_PAGE_SIZE;
+  const winEnd = winStart + APPROVALS_PAGE_SIZE;
+  // Each list covers its own slice of the one sequence.
+  const windows = {};
+  segments.reduce((offset, key) => {
+    const count = rowCounts[key] ?? 0;
+    windows[key] = {
+      start: Math.max(Math.min(winStart - offset, count), 0),
+      end: Math.max(Math.min(winEnd - offset, count), 0),
+    };
+    return offset + count;
+  }, 0);
+  const windowOf = (key) => windows[key] || { start: 0, end: 0 };
 
   // -----------------------------
   // Breadcrumbs
@@ -269,10 +276,20 @@ export default function ApprovalsPage({ embedded = false }) {
       empty: { icon: XCircle, title: "Nothing rejected", text: "Requests you reject will be listed here." },
     },
   ];
-  const active = tabs.find((t) => t.key === activeTab) || tabs[0];
+  const allTab = {
+    key: "all",
+    label: "All",
+    caption: "Every request routed to you",
+    icon: Layers,
+    count: totalCount,
+    tone: { tile: "bg-[#0A0082]/10 text-[#0A0082]", text: "text-[#0A0082]", ring: "ring-[#0A0082]/30", bar: "from-[#0A0082] to-[#5B66B8]", chip: "bg-[#0A0082]/10 text-[#0A0082]" },
+    empty: { icon: Inbox, title: "No approval requests yet", text: "Requests your team sends you will be listed here." },
+  };
+  const toolbarTabs = [allTab, ...tabs];
+  const active = toolbarTabs.find((t) => t.key === activeTab) || allTab;
   // Empty only when every list has reported zero rows (supplementary claims included) and, on Pending,
   // the Finance verification rows (not part of the paged lists) are empty too.
-  const showEmpty = showEmptyTable && !(activeTab === "pending" && showType("EXPENSE") && financePendingCount > 0);
+  const showEmpty = showEmptyTable && !(visibleStatuses.includes("pending") && showType("EXPENSE") && financePendingCount > 0);
   const EmptyIcon = active.empty.icon;
   const pct = (n) => (totalCount > 0 ? (n / totalCount) * 100 : 0);
 
@@ -392,7 +409,15 @@ export default function ApprovalsPage({ embedded = false }) {
           );
         })}
 
-        <div className="flex flex-col justify-center rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        <button
+          type="button"
+          aria-pressed={activeTab === "all"}
+          data-approvals-card="all"
+          onClick={() => setActiveTab("all")}
+          className={`group relative flex flex-col justify-center overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40 ${
+            activeTab === "all" ? `border-transparent ring-2 ${allTab.tone.ring}` : "border-slate-100"
+          }`}
+        >
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0A0082]/10 text-[#0A0082]">
               <Layers size={20} aria-hidden="true" />
@@ -411,17 +436,17 @@ export default function ApprovalsPage({ embedded = false }) {
             {approvedCount > 0 && <span className="h-full bg-emerald-500" style={{ width: `${pct(approvedCount)}%` }} />}
             {rejectedCount > 0 && <span className="h-full bg-rose-500" style={{ width: `${pct(rejectedCount)}%` }} />}
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Delegate: only relevant while there is a queue to cover */}
-      {activeTab === "pending" && <MyDelegateCard />}
+      {(activeTab === "pending" || activeTab === "all") && <MyDelegateCard />}
 
       {/* The list: toolbar on top, then one table for expense reports and cash advances */}
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex w-full gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 lg:w-fit" role="tablist">
-            {tabs.map((tab) => {
+            {toolbarTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
               return (
@@ -437,7 +462,7 @@ export default function ApprovalsPage({ embedded = false }) {
                 >
                   <Icon size={16} aria-hidden="true" className={isActive ? tab.tone.text : ""} />
                   {tab.label}
-                  {/* The count is on the summary card above; not repeated on the tab. */}
+                  <TabCountDot count={loadingCounts ? null : tab.count} tone={tab.key} />
                 </button>
               );
             })}
@@ -510,101 +535,99 @@ export default function ApprovalsPage({ embedded = false }) {
 
         <div className="approvals-tab-container">
           <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-sm">
-            {/* Fixed column widths: each header sits exactly above its cells, whatever the row content is. */}
+          <table className="approvals-table w-full min-w-[1000px] table-fixed text-left text-sm">
+            {/* Fixed column widths: each header sits exactly above its cells, whatever the row content is.
+                Actions has a fixed width wide enough for four icon buttons, so they never wrap onto a second line. */}
             <colgroup>
-              <col className="w-[8%]" />
+              <col className="w-[11%]" />
+              <col className="w-[14%]" />
+              <col className="w-[20%]" />
+              <col className="w-[11%]" />
+              <col className="w-[13%]" />
               <col className="w-[12%]" />
               <col className="w-[10%]" />
-              <col className="w-[15%]" />
-              <col className="w-[8%]" />
-              <col className="w-[11%]" />
-              <col className="w-[10%]" />
-              <col className="w-[10%]" />
               <col className="w-[9%]" />
-              <col className="w-[7%]" />
+              <col className="w-[168px]" />
             </colgroup>
-            <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-left text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-2.5 py-2.5 text-left">Type</th>
-                <th className="px-2.5 py-2.5 text-left">Reference</th>
-                <th className="px-2.5 py-2.5 text-left">Employee</th>
-                <th className="px-2.5 py-2.5 text-left">Title / Merchant</th>
-                <th className="px-2.5 py-2.5 text-left">Cost Center</th>
-                <th className="px-2.5 py-2.5 text-left">Status</th>
-                <th className="px-2.5 py-2.5 text-right">Requested</th>
-                <th className="px-2.5 py-2.5 text-right">Approved</th>
-                <th className="px-2.5 py-2.5 text-right">Paid</th>
-                <th className="px-2.5 py-2.5 text-right">Actions</th>
+                <th className="px-3 py-3 text-left">Type</th>
+                <th className="px-3 py-3 text-left">Employee</th>
+                <th className="px-3 py-3 text-left">Title / Merchant</th>
+                <th className="px-3 py-3 text-left">Cost Center</th>
+                <th className="px-3 py-3 text-left">Status</th>
+                <th className="px-3 py-3 text-right">Requested</th>
+                <th className="px-3 py-3 text-right">Approved</th>
+                <th className="px-3 py-3 text-right">Paid</th>
+                <th className="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            {activeTab === "pending" && showType("EXPENSE") && (
-              <PendingApprovalsPage
-                key={`pending-${reloadKey}`}
-                searchTerm={searchTerm}
-                statusFilter={pendingShow}
-                sortBy={pendingSort}
-                hideHeader
-                noPadding
-                embedded
-                onRowCount={reportExpenseRows}
-                windowStart={expenseWindow.start}
-                windowEnd={expenseWindow.end}
-              />
-            )}
-            {activeTab === "pending" && isFinance && showType("EXPENSE") && (
-              <FinanceVerificationApprovalsList key={`finance-${reloadKey}`} searchTerm={searchTerm} excludeReportIds={myQueueReportIds} />
-            )}
-            {activeTab === "approved" && showType("EXPENSE") && (
-              <ApprovalHistoryPage
-                key={`approved-${reloadKey}`}
-                outcome="APPROVED"
-                searchTerm={searchTerm}
-                embedded
-                onRowCount={reportExpenseRows}
-                windowStart={expenseWindow.start}
-                windowEnd={expenseWindow.end}
-              />
-            )}
-            {activeTab === "rejected" && showType("EXPENSE") && (
-              <ApprovalHistoryPage
-                key={`rejected-${reloadKey}`}
-                outcome="REJECTED"
-                searchTerm={searchTerm}
-                embedded
-                onRowCount={reportExpenseRows}
-                windowStart={expenseWindow.start}
-                windowEnd={expenseWindow.end}
-              />
-            )}
-            {(isManager || isFinance) && showType("CASH") && (
-              <CashAdvanceApprovalsList
-                key={`cash-${activeTab}-${reloadKey}`}
-                activeTab={activeTab}
-                searchTerm={searchTerm}
-                amountFilter={amountFilter}
-                embedded
-                onRowCount={reportCashRows}
-                windowStart={cashWindow.start}
-                windowEnd={cashWindow.end}
-              />
-            )}
-            {(isManager || isFinance) && showType("SUPP") && (
-              <SupplementaryApprovalsList
-                key={`supp-${activeTab}-${reloadKey}`}
-                activeTab={activeTab}
-                searchTerm={searchTerm}
-                isManager={isManager}
-                isFinance={isFinance}
-                onRowCount={reportSuppRows}
-                windowStart={suppWindow.start}
-                windowEnd={suppWindow.end}
-              />
-            )}
+            {/* One block of lists per visible status: just the selected one, or all three in the "all" view. */}
+            {visibleStatuses.map((status) => {
+              const expenseKey = `${status}-expense`;
+              const cashKey = `${status}-cash`;
+              const suppKey = `${status}-supp`;
+              return (
+                <React.Fragment key={status}>
+                  {status === "pending" && showType("EXPENSE") && (
+                    <PendingApprovalsPage
+                      key={`pending-${reloadKey}`}
+                      searchTerm={searchTerm}
+                      statusFilter={activeTab === "pending" ? pendingShow : "ALL"}
+                      sortBy={activeTab === "pending" ? pendingSort : "NEWEST"}
+                      hideHeader
+                      noPadding
+                      embedded
+                      onRowCount={reporters[expenseKey]}
+                      windowStart={windowOf(expenseKey).start}
+                      windowEnd={windowOf(expenseKey).end}
+                    />
+                  )}
+                  {status === "pending" && isFinance && showType("EXPENSE") && (
+                    <FinanceVerificationApprovalsList key={`finance-${reloadKey}`} searchTerm={searchTerm} excludeReportIds={myQueueReportIds} />
+                  )}
+                  {status !== "pending" && showType("EXPENSE") && (
+                    <ApprovalHistoryPage
+                      key={`${status}-${reloadKey}`}
+                      outcome={status.toUpperCase()}
+                      searchTerm={searchTerm}
+                      embedded
+                      onRowCount={reporters[expenseKey]}
+                      windowStart={windowOf(expenseKey).start}
+                      windowEnd={windowOf(expenseKey).end}
+                    />
+                  )}
+                  {(isManager || isFinance) && showType("CASH") && (
+                    <CashAdvanceApprovalsList
+                      key={`cash-${status}-${reloadKey}`}
+                      activeTab={status}
+                      searchTerm={searchTerm}
+                      amountFilter={activeTab === "approved" ? amountFilter : "ALL"}
+                      embedded
+                      onRowCount={reporters[cashKey]}
+                      windowStart={windowOf(cashKey).start}
+                      windowEnd={windowOf(cashKey).end}
+                    />
+                  )}
+                  {(isManager || isFinance) && showType("SUPP") && (
+                    <SupplementaryApprovalsList
+                      key={`supp-${status}-${reloadKey}`}
+                      activeTab={status}
+                      searchTerm={searchTerm}
+                      isManager={isManager}
+                      isFinance={isFinance}
+                      onRowCount={reporters[suppKey]}
+                      windowStart={windowOf(suppKey).start}
+                      windowEnd={windowOf(suppKey).end}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
             {showEmpty && (
               <tbody data-approvals-empty>
                 <tr>
-                  <td colSpan={10} className="px-4 py-14">
+                  <td colSpan={9} className="px-4 py-14">
                     <div className="mx-auto flex max-w-sm flex-col items-center text-center">
                       <span className={`flex h-14 w-14 items-center justify-center rounded-2xl ${active.tone.tile}`}>
                         <EmptyIcon size={26} aria-hidden="true" />
@@ -626,6 +649,13 @@ export default function ApprovalsPage({ embedded = false }) {
               </tbody>
             )}
           </table>
+          {/* One row style for every list in the table (expenses, finance, cash advances, supplementary claims). */}
+          <style>{`
+            .approvals-table > tbody > tr { background: #fff !important; border-bottom: 1px solid #EEF0F6; transition: background-color .15s ease; }
+            .approvals-table > tbody > tr:hover { background: #F8F9FD !important; }
+            .approvals-table > tbody > tr > td:not([colspan]) { padding: 14px 12px !important; vertical-align: middle; }
+            .approvals-table > tbody > tr > td[title="Shown for cash advances only"] { color: #CBD5E1; }
+          `}</style>
           </div>
         {combinedRows > 0 && (
           <div className="flex flex-col items-center gap-2 border-t border-slate-100 px-4 py-3 sm:flex-row sm:justify-between">
@@ -643,5 +673,27 @@ export default function ApprovalsPage({ embedded = false }) {
         </div>
       </section>
     </div>
+  );
+}
+
+// Notification dot + count on each status tab. Pending pulses while anything is waiting for a decision.
+const DOT_TONES = {
+  all: { chip: "bg-[#0A0082]/10 text-[#0A0082]", dot: "bg-[#0A0082]" },
+  pending: { chip: "bg-amber-100 text-amber-800", dot: "bg-amber-500" },
+  approved: { chip: "bg-emerald-100 text-emerald-800", dot: "bg-emerald-500" },
+  rejected: { chip: "bg-rose-100 text-rose-700", dot: "bg-rose-500" },
+};
+
+function TabCountDot({ count, tone }) {
+  if (count === null || count === undefined || count <= 0) return null;
+  const t = DOT_TONES[tone] || DOT_TONES.all;
+  return (
+    <span className={`ml-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums ${t.chip}`}>
+      <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+        {tone === "pending" && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${t.dot}`} />}
+        <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${t.dot}`} />
+      </span>
+      {count}
+    </span>
   );
 }
