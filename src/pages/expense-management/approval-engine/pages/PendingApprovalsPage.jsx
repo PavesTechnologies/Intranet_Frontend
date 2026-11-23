@@ -280,22 +280,14 @@ export default function PendingApprovalsPage({
                               <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
                             </div>
                           </td>
-                          <td className="px-2.5 py-1.5 text-left align-middle">
-                            <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
+                          <td className="px-2.5 py-1.5 text-left align-middle max-w-[220px]">
+                            <p className="font-semibold text-gray-900 truncate text-xs">{merchantSummary(item.relevantLines)}</p>
                             {item.submittedAt && (
                               <div className={`mt-0.5 text-[11px] ${waitingDays(item.submittedAt) >= 3 ? "font-medium text-rose-600" : "text-gray-500"}`}>
                                 Submitted {submittedLabel(item.submittedAt)}
                                 {waitingDays(item.submittedAt) >= 3 && ` · waiting ${waitingDays(item.submittedAt)} days`}
                               </div>
                             )}
-                          </td>
-                          <td className="px-2.5 py-1.5 text-left align-middle">
-                            <span className="font-medium text-xs text-gray-900">
-                              <EmployeeLabel employeeId={item.employeeId} />
-                            </span>
-                          </td>
-                          <td className="px-2.5 py-1.5 text-left align-middle max-w-[220px]">
-                            <p className="font-semibold text-gray-900 truncate text-xs">{merchantSummary(item.relevantLines)}</p>
                           </td>
                           <td className="px-2.5 py-1.5 text-left align-middle text-xs text-gray-600 truncate">{item.costCenterName || "—"}</td>
                           <td className="px-2.5 py-1.5 text-left align-middle">
@@ -323,7 +315,7 @@ export default function PendingApprovalsPage({
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={10} className="bg-gray-50/60 p-0">
+                            <td colSpan={9} className="bg-gray-50/60 p-0">
                               {flagged && (
                                 <p className="flex items-center gap-1.5 text-xs text-amber-700 px-4 pt-3">
                                   <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for one-click Approve.
@@ -392,14 +384,14 @@ export default function PendingApprovalsPage({
         {isPending && !data && (
           <tbody>
             <tr>
-              <td colSpan={10} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
+              <td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading your queue…</td>
             </tr>
           </tbody>
         )}
         {isError && (
           <tbody>
             <tr>
-              <td colSpan={10} className="py-6 text-center text-xs text-rose-700">
+              <td colSpan={9} className="py-6 text-center text-xs text-rose-700">
                 Failed to load your queue. <button className="underline" onClick={() => refetch()}>Retry</button>
               </td>
             </tr>

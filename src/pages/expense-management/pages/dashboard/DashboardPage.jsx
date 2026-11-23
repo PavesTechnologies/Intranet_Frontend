@@ -8,6 +8,7 @@ import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { dashboardService } from "@/pages/expense-management/api/expenseReportsApi";
+import { useApprovalWebSocket } from "@/pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
 import SupplementaryWaitingCard from "@/pages/expense-management/pages/dashboard/SupplementaryWaitingCard";
 import EmployeeMoneyFlow from "@/pages/expense-management/components/dashboard/EmployeeMoneyFlow";
 import RoleDashboard from "@/pages/expense-management/components/dashboard/RoleDashboard";
@@ -225,6 +226,16 @@ export default function DashboardPage() {
   const approvals = useDashboard("manager", showApprovals);
   const isFetching = useIsFetching({ queryKey: ["xmsDashboard"] }) > 0;
   const refreshAll = () => queryClient.invalidateQueries({ queryKey: ["xmsDashboard"] });
+
+  // Live: when one of the user's reports changes status (or their approval queue or a notification arrives), reload the
+  // figures instead of waiting for the one-minute cache. No connection (tests, signed out) simply means no live reload.
+  const ws = useApprovalWebSocket();
+  useEffect(() => {
+    if (!ws?.subscribe) return undefined;
+    const reload = () => queryClient.invalidateQueries({ queryKey: ["xmsDashboard"] });
+    const offs = ["report-update", "queue-update", "notification"].map((event) => ws.subscribe(event, reload));
+    return () => offs.forEach((off) => off?.());
+  }, [ws, queryClient]);
   const currency = data?.baseCurrencyCode || "INR";
 
   return (

@@ -11,6 +11,7 @@ import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
 import AdvanceTypeSelector, { ADVANCE_TYPE } from "@/pages/expense-management/pages/cash-advance/components/request/AdvanceTypeSelector";
+import { CARRY_FORWARD_CLAIM_STATUSES, claimedCarryForward } from "@/pages/expense-management/pages/cash-advance/carryForwardRequest";
 import EmployeeProfileCard from "@/pages/expense-management/pages/cash-advance/components/request/EmployeeProfileCard";
 import OutstandingBalanceSummary from "@/pages/expense-management/pages/cash-advance/components/request/OutstandingBalanceSummary";
 import SupportingDocumentsUpload from "@/pages/expense-management/pages/cash-advance/components/request/SupportingDocumentsUpload";
@@ -433,24 +434,89 @@ export default function RequestAdvancePage() {
 
   /*
    * Balances Finance carried forward. That money has already left its advance and sits in the employee's outstanding,
-   * waiting for the next request, so the form opens as "Cash Advance + Outstanding" and says where it comes from. It
+   * waiting for the next request, so the form opens as "Cash Advance + Carry Forward" and says where it comes from. It
    * can be taken in whatever the status of the advance it came from.
    */
-  const waitingCarryForwards = useMemo(
+  const heldCarryForwards = useMemo(
     () => advances.filter((a) => Number(a.carryForwardReadyAmount) > 0),
     [advances]
   );
-  // What was asked to carry forward. The server caps it at each advance's real balance when Finance approves.
-  const waitingCarryForwardTotal = waitingCarryForwards.reduce(
+  // Everything held, claimed or not: it is still owed, so it counts in the outstanding balance.
+  const waitingCarryForwardTotal = heldCarryForwards.reduce(
     (sum, a) => sum + (Number(a.carryForwardReadyAmount) || 0),
     0
   );
+  /*
+   * A balance another open Carry Forward request already includes is not offered again until that request is final.
+   * If it is rejected or cancelled nothing moved, so the balance comes back here. Claims are taken oldest balance first,
+   * the order Finance's approval moves them in. The server applies the same rule.
+   */
+  const pendingCarryForwardClaims = useMemo(
+    () =>
+      advances.filter(
+        (a) =>
+          a.requestType === ADVANCE_TYPE.ADVANCE_PLUS_CARRY_FORWARD &&
+          CARRY_FORWARD_CLAIM_STATUSES.includes(String(a.status || "").toUpperCase()) &&
+          String(a.advanceId) !== String(draftId) &&
+          claimedCarryForward(a) > 0
+      ),
+    [advances, draftId]
+  );
+  const waitingCarryForwards = useMemo(() => {
+    const claimLeft = {};
+    pendingCarryForwardClaims.forEach((a) => {
+      const code = a.currencyCode || "INR";
+      claimLeft[code] = (claimLeft[code] || 0) + claimedCarryForward(a);
+    });
+    return [...heldCarryForwards]
+      .sort((x, y) => String(x.createdAt || "").localeCompare(String(y.createdAt || "")))
+      .map((a) => {
+        const code = a.currencyCode || "INR";
+        const held = Number(a.carryForwardReadyAmount) || 0;
+        const taken = Math.min(held, claimLeft[code] || 0);
+        claimLeft[code] = (claimLeft[code] || 0) - taken;
+        return { ...a, carryForwardReadyAmount: held - taken };
+      })
+      .filter((a) => a.carryForwardReadyAmount > 0);
+  }, [heldCarryForwards, pendingCarryForwardClaims]);
+  // A carried-forward balance moves only into a request in its own currency, so it is grouped by currency here.
+  const carryForwardByCurrency = useMemo(() => {
+    const totals = {};
+    waitingCarryForwards.forEach((a) => {
+      const code = a.currencyCode || "INR";
+      totals[code] = (totals[code] || 0) + (Number(a.carryForwardReadyAmount) || 0);
+    });
+    return totals;
+  }, [waitingCarryForwards]);
+  const carryForwardCurrencies = Object.keys(carryForwardByCurrency);
+  const selectedCurrencyCode = useMemo(() => {
+    const match = currencies.find((c) => String(c.currencyId ?? c.id ?? c.uuid) === String(formData.currencyId));
+    return match ? match.currencyCode ?? match.code ?? null : null;
+  }, [currencies, formData.currencyId]);
+  // The carried-forward amount this request would take in: only the balance in the chosen currency.
+  const carryForwardInCurrency = selectedCurrencyCode ? carryForwardByCurrency[selectedCurrencyCode] || 0 : 0;
+  const carryForwardCurrencyMismatch =
+    !!selectedCurrencyCode && carryForwardCurrencies.length > 0 && !carryForwardByCurrency[selectedCurrencyCode];
+
   const typeChosenRef = useRef(false);
   useEffect(() => {
     if (!typeChosenRef.current && waitingCarryForwards.length > 0) {
-      setRequestType(ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING);
+      setRequestType(ADVANCE_TYPE.ADVANCE_PLUS_CARRY_FORWARD);
     }
-  }, [waitingCarryForwards.length]);
+    // Nothing left to carry forward (for example another pending request includes it): the option is hidden, so fall
+    // back to Complete New instead of leaving a type the employee can no longer see.
+    if (waitingCarryForwards.length === 0 && !balanceLoading) {
+      setRequestType((current) => (current === ADVANCE_TYPE.ADVANCE_PLUS_CARRY_FORWARD ? ADVANCE_TYPE.COMPLETE_NEW : current));
+    }
+  }, [waitingCarryForwards.length, balanceLoading]);
+  // With Carry Forward chosen and no currency picked yet, start in the carried-forward balance's currency (when there is
+  // only one), so the balance is actually included.
+  useEffect(() => {
+    if (requestType !== ADVANCE_TYPE.ADVANCE_PLUS_CARRY_FORWARD || formData.currencyId || carryForwardCurrencies.length !== 1) return;
+    const match = currencies.find((c) => (c.currencyCode ?? c.code) === carryForwardCurrencies[0]);
+    const id = match ? match.currencyId ?? match.id ?? match.uuid : null;
+    if (id) setFormData((previous) => ({ ...previous, currencyId: String(id) }));
+  }, [requestType, formData.currencyId, carryForwardCurrencies.join(","), currencies]);
   const chooseRequestType = (type) => {
     typeChosenRef.current = true;
     setRequestType(type);
@@ -738,8 +804,8 @@ export default function RequestAdvancePage() {
     ...formData,
     amount: Number(formData.amount),
     requestType,
-    // For Cash Advance + Outstanding the amount is the additional amount; the server checks they match.
-    additionalAmount: null,
+    // For Cash Advance + Carry Forward the amount is the additional cash; the server checks they match.
+    additionalAmount: requestType === ADVANCE_TYPE.ADVANCE_PLUS_CARRY_FORWARD ? Number(formData.amount) : null,
     // Sent only when asked for: the server also checks the length of a reason it did not need.
     employeeJustification:
       justificationRequired && employeeJustification.trim() ? employeeJustification.trim() : null,
@@ -850,6 +916,8 @@ export default function RequestAdvancePage() {
         requestType,
         amount: amountNumber,
         currencyId: formData.currencyId || null,
+        // The saved draft being edited, so its own carry-forward claim does not count against it.
+        advanceId: draftId || null,
       });
       setPreview(data ?? null);
       return data ?? null;
@@ -1083,7 +1151,34 @@ export default function RequestAdvancePage() {
         onSubmit={handleSubmit}
         className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
       >
-        <AdvanceTypeSelector value={requestType} onChange={chooseRequestType} />
+        <AdvanceTypeSelector
+          value={requestType}
+          onChange={chooseRequestType}
+          hasCarryForward={waitingCarryForwards.length > 0}
+        />
+
+        {pendingCarryForwardClaims.length > 0 && (
+          <div
+            role="note"
+            data-testid="carry-forward-claimed-note"
+            className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700"
+          >
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
+            <div className="space-y-0.5">
+              {pendingCarryForwardClaims.map((a) => (
+                <p key={a.advanceId}>
+                  <span className="font-semibold">{formatMoney(claimedCarryForward(a), a.currencyCode || "INR")}</span>{" "}
+                  carried forward is already included in your request{" "}
+                  <span className="font-medium">"{a.title || "Cash advance"}"</span>{" "}
+                  <span className="text-gray-500">({String(a.status || "").replaceAll("_", " ").toLowerCase()})</span>.
+                </p>
+              ))}
+              <p className="text-gray-500">
+                It is not offered again here. If that request is rejected or cancelled, it becomes available for your next request.
+              </p>
+            </div>
+          </div>
+        )}
 
         {waitingCarryForwards.length > 0 && (
           <div
@@ -1093,7 +1188,10 @@ export default function RequestAdvancePage() {
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="space-y-1">
               <p className="font-semibold">
-                {formatMoney(waitingCarryForwardTotal, "INR")} is carried forward into this request
+                {selectedCurrencyCode && !carryForwardCurrencyMismatch
+                  ? formatMoney(carryForwardInCurrency, selectedCurrencyCode)
+                  : carryForwardCurrencies.map((code) => formatMoney(carryForwardByCurrency[code], code)).join(" + ")}{" "}
+                {carryForwardCurrencyMismatch ? "is carried forward, but not in " + selectedCurrencyCode : "is carried forward into this request"}
               </p>
               <ul className="space-y-0.5">
                 {waitingCarryForwards.map((a) => (
@@ -1104,13 +1202,19 @@ export default function RequestAdvancePage() {
                   </li>
                 ))}
               </ul>
-              {requestType === ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING ? (
+              {requestType === ADVANCE_TYPE.ADVANCE_PLUS_CARRY_FORWARD && carryForwardCurrencyMismatch ? (
+                <p className="font-medium text-amber-800">
+                  A carried-forward balance can only be added to a request in the same currency. Choose{" "}
+                  {carryForwardCurrencies.join(" or ")} as the currency to include it, or choose "Complete New".
+                </p>
+              ) : requestType === ADVANCE_TYPE.ADVANCE_PLUS_CARRY_FORWARD ? (
                 <p className="text-violet-800">
-                  Enter only the new cash you need. Finance moves the carried-forward balance into this advance when it approves.
+                  Enter only the new cash you need. The carried-forward balance is added to this request now and moves into it
+                  when Finance gives final approval. Only the new cash is paid out.
                 </p>
               ) : (
                 <p className="text-amber-800">
-                  "Complete New" keeps that balance on its own advance. Choose "Cash Advance + Outstanding" to carry it into this one.
+                  "Complete New" keeps that balance on its own advance. Choose "Cash Advance + Carry Forward" to carry it into this one.
                 </p>
               )}
             </div>
@@ -1179,7 +1283,7 @@ export default function RequestAdvancePage() {
             inputClassName="h-10"
             label={
               <RequiredLabel>
-                Amount Required
+                {requestType === ADVANCE_TYPE.ADVANCE_PLUS_CARRY_FORWARD ? "Additional Amount Required" : "Amount Required"}
               </RequiredLabel>
             }
             name="amount"

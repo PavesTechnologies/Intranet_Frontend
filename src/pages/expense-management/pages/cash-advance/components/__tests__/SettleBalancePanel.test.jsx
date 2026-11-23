@@ -54,6 +54,46 @@ describe("SettleBalancePanel - two settlement options", () => {
     expect(screen.queryByText("Ask the employee to pay the balance")).toBeNull();
   });
 
+  it("offers both options for the part not held for expenses in approval, and names the held report", async () => {
+    render(
+      <SettleBalancePanel
+        advanceId="adv-1"
+        outstanding={4000}
+        settleable={550}
+        currencyCode="INR"
+        onSettled={vi.fn()}
+        linkedReports={[
+          { reportId: "r1", reportNumber: "EXP-OLD", reportStatus: "APPROVED", claimedAmount: 100 },
+          { reportId: "r2", reportNumber: "EXP-2026-2027-28B5B400", reportStatus: "PENDING_APPROVAL", claimedAmount: 3450 },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("INR 550.00", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText(/Outstanding on the advance is INR 4,000.00. Of that, INR 3,450.00 is held/)).toBeInTheDocument();
+    expect(screen.getByText("EXP-2026-2027-28B5B400")).toBeInTheDocument();
+    expect(screen.queryByText("EXP-OLD")).toBeNull();
+    expect(screen.getByRole("radio", { name: /Salary deduction/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Carry forward/ })).toBeInTheDocument();
+    expect(await screen.findByText(/max INR 550.00/)).toBeInTheDocument();
+  });
+
+  it("says there is nothing to settle when the expenses in approval cover the whole balance", () => {
+    render(
+      <SettleBalancePanel
+        advanceId="adv-1"
+        outstanding={3000}
+        settleable={0}
+        currencyCode="INR"
+        onSettled={vi.fn()}
+        linkedReports={[{ reportId: "r2", reportNumber: "EXP-9", reportStatus: "PENDING_FINANCE_VERIFICATION", claimedAmount: 3000 }]}
+      />,
+    );
+
+    expect(screen.getByText(/nothing to settle now/)).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /Carry forward/ })).toBeNull();
+  });
+
   // Repayment by the employee is not part of the current flows (carry-forward and salary deduction only).
   it.skip("sends the payment request to the employee from the first step", async () => {
     recoveryApi.sendPaymentRequest.mockResolvedValue({ dueAt: "2026-10-27T18:00:00" });

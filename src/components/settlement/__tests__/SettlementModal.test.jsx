@@ -71,6 +71,19 @@ describe("SettlementModal", () => {
     expect(await screen.findByText(/is carried forward and held in the employee.s outstanding/)).toBeInTheDocument();
   });
 
+  it("uses the list's figures, so expenses and outstanding match the row", async () => {
+    const advance = toSettlementAdvance(
+      { advanceId: "adv-2", employeeName: "Sindhu Yanala", employeeId: "5100014", amount: 8000, outstandingBalance: 8000 },
+      { owed: 8000, carriedIn: 0, consumed: 5474, approvedConsumed: 5474, reports: [{}], remaining: 2526,
+        salaryDeducted: 0, otherRepaid: 0, carriedForward: 0, owedToEmployee: 0, outstanding: 2526 },
+    );
+    render(<SettlementModal isOpen advance={advance} onClose={vi.fn()} onSettled={vi.fn()} />);
+
+    expect(screen.getAllByText(/INR 5,474\.00/).length).toBeGreaterThan(0);
+    expect(await screen.findByLabelText(/Amount to deduct/)).toHaveValue(2526);
+    expect(screen.getByText(/Sindhu Yanala \(5100014\)/)).toBeInTheDocument();
+  });
+
   it("creates a salary deduction request and reports it", async () => {
     recoveryApi.createSalaryDeduction.mockResolvedValue({ payrollRequestId: "PR-2026-2027-AAAA1111" });
     render(<SettlementModal isOpen advance={ADVANCE} onClose={vi.fn()} onSettled={vi.fn()} />);

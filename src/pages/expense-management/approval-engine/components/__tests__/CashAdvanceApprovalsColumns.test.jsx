@@ -64,7 +64,8 @@ describe('CashAdvanceApprovalsList - columns', () => {
 
     await waitFor(() => expect(screen.getByText(/business trip/i)).toBeInTheDocument());
 
-    expect(screen.getByRole('columnheader', { name: /^report$/i })).toBeInTheDocument();
+    // The reference number column was removed.
+    expect(screen.queryByRole('columnheader', { name: /^report$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /^employee$/i })).toBeInTheDocument();
     // Amount is split into what was asked for, what was approved and what was paid.
     expect(screen.getByRole('columnheader', { name: /^requested$/i })).toBeInTheDocument();

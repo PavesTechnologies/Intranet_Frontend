@@ -107,11 +107,11 @@ const FinanceDashboard = () => {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A0082] to-[#263383] text-white shadow-md shadow-[#0A0082]/25 sm:flex">
+          <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0A0082] text-white sm:flex">
             <Wallet className="h-6 w-6" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight text-slate-900 md:text-[28px]">Finance Management</h1>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight text-slate-900">Finance Management</h1>
             <p className="mt-0.5 text-sm text-slate-500">
               A consolidated view of receivables, payables, expenses and financial health.
             </p>

@@ -70,14 +70,13 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
     return (
       <>
         {isPending && (
-          <tbody><tr><td colSpan={10} className="py-10 text-center text-xs text-gray-500">Loading…</td></tr></tbody>
+          <tbody><tr><td colSpan={9} className="py-10 text-center text-xs text-gray-500">Loading…</td></tr></tbody>
         )}
         {!isPending && !isError && filteredItems.length > 0 && (
           <tbody className="divide-y divide-gray-100">
             {windowItems.map((report, index) => (
               <tr key={report.reportId} className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setReviewingItem(report)}>
                 <td className="px-2.5 py-1.5 text-left"><span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span></td>
-                <td className="px-2.5 py-1.5 text-left font-mono text-[11px] font-semibold text-gray-700 whitespace-nowrap">{report.reportNumber}</td>
                 <td className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-900 whitespace-nowrap"><EmployeeLabel employeeId={report.employeeId} /></td>
                 <td className="px-2.5 py-1.5 text-left max-w-[220px]">
                   <p className="font-semibold text-gray-900 truncate text-xs">{report.title || "—"}</p>

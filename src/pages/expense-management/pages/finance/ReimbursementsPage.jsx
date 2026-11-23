@@ -1524,6 +1524,7 @@ export default function ReimbursementsPage() {
         <RecordDisbursementModal
           title="Disburse Cash Advance"
           submitLabel="Confirm Disburse"
+          paymentRequired={Number(disbursingAdvance.amount) - Number(disbursingAdvance.carriedInAmount || 0) > 0}
           isSubmitting={actionLoading}
           onCancel={() => setDisbursingAdvance(null)}
           onSubmit={handleConfirmDisburse}
@@ -1535,12 +1536,33 @@ export default function ReimbursementsPage() {
                   #{String(disbursingAdvance.advanceId || disbursingAdvance.id).slice(0, 8)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-xs font-medium text-gray-600">Amount:</span>
-                <span className="text-xs font-bold text-gray-900">
-                  {disbursingAdvance.currencyCode || "INR"} {Number(disbursingAdvance.amount || 0).toLocaleString()}
-                </span>
-              </div>
+              {(() => {
+                // A carried-forward balance is already with the employee: only the new cash is paid now.
+                const cur = disbursingAdvance.currencyCode || "INR";
+                const fmt = (v) => `${cur} ${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                const total = Number(disbursingAdvance.amount) || 0;
+                const carried = Math.max(0, Number(disbursingAdvance.carriedInAmount) || 0);
+                return (
+                  <>
+                    {carried > 0 && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-xs font-medium text-gray-600">+ Carried forward (already with the employee):</span>
+                          <span className="text-xs font-bold text-violet-700">{fmt(carried)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-xs font-medium text-gray-600">= Total advance (the employee accounts for this):</span>
+                          <span className="text-xs font-bold text-gray-900">{fmt(total)}</span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex justify-between border-t border-gray-200 pt-2">
+                      <span className="text-xs font-semibold text-gray-800">Pay to employee now:</span>
+                      <span className="text-sm font-bold text-emerald-700">{fmt(Math.max(0, total - carried))}</span>
+                    </div>
+                  </>
+                );
+              })()}
               <div className="flex justify-between">
                 <span className="text-xs font-medium text-gray-600">Employee:</span>
                 <span className="text-xs font-bold text-gray-900">

@@ -153,7 +153,7 @@ export default function SupplementaryApprovalsList({
       <tbody className="divide-y divide-gray-100">
         {loadError && (
           <tr>
-            <td colSpan={10} role="alert" className="bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <td colSpan={9} role="alert" className="bg-amber-50 px-4 py-3 text-sm text-amber-900">
               {loadError}
             </td>
           </tr>
@@ -165,7 +165,6 @@ export default function SupplementaryApprovalsList({
                 Supplementary
               </span>
             </td>
-            <td className="px-2.5 py-1.5 text-left font-mono text-[11px] font-semibold text-gray-700 whitespace-nowrap">{c.claimNumber}</td>
             <td className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-900 whitespace-nowrap">
               <EmployeeLabel employeeId={c.employeeId} />
             </td>
