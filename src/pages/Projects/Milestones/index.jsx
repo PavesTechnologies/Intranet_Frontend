@@ -58,7 +58,7 @@ const ErrorState = ({ error, onRetry }) => {
   );
 };
 
-const MilestonesTab = ({ projectId }) => {
+const MilestonesTab = ({ projectId, projectKey, projectStartDate, projectEndDate }) => {
   const [page, setPage] = useState(0);
   const [status, setStatus] = useState("");
   const [readiness, setReadiness] = useState("");
@@ -219,6 +219,11 @@ const MilestonesTab = ({ projectId }) => {
         isOpen={formState.open}
         onClose={() => setFormState({ open: false, milestone: null })}
         projectId={projectId}
+        projectKey={projectKey}
+        projectStartDate={projectStartDate}
+        projectEndDate={projectEndDate}
+        milestoneCount={summary.data?.total ?? list.data?.totalElements ?? 0}
+        existingCodes={rows.map((r) => r.milestoneCode)}
         milestone={formState.milestone}
         summary={summary.data}
       />

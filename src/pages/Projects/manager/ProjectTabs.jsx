@@ -267,6 +267,11 @@ const ProjectTabs = () => {
   );
 
   const [projectName, setProjectName] = useState("");
+  // Milestone codes are "<PROJECTKEY>-M001"; the Milestones tab previews the next one,
+  // and bounds milestone dates by the project's end date.
+  const [projectKey, setProjectKey] = useState("");
+  const [projectStartDate, setProjectStartDate] = useState("");
+  const [projectEndDate, setProjectEndDate] = useState("");
   const [notFound, setNotFound] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
 
@@ -294,7 +299,13 @@ const ProjectTabs = () => {
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((res) => { setProjectName(res.data.name); setNotFound(false); })
+      .then((res) => {
+        setProjectName(res.data.name);
+        setProjectKey(res.data.projectKey ?? "");
+        setProjectStartDate(res.data.startDate ?? "");
+        setProjectEndDate(res.data.endDate ?? "");
+        setNotFound(false);
+      })
       .catch(() => setNotFound(true));
   }, [projectId, token]);
 
@@ -327,7 +338,13 @@ const ProjectTabs = () => {
     if (selectedTab === "milestones")
       return canManageMilestones ? (
         <Suspense fallback={<TabSkeleton />}>
-          <MilestonesTab projectId={pid} projectName={projectName} />
+          <MilestonesTab
+            projectId={pid}
+            projectName={projectName}
+            projectKey={projectKey}
+            projectStartDate={projectStartDate}
+            projectEndDate={projectEndDate}
+          />
         </Suspense>
       ) : (
         <div className="p-6 text-sm text-slate-500">Milestones are available to project managers only.</div>
