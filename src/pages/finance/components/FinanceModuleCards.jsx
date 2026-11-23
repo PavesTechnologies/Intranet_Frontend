@@ -51,15 +51,15 @@ export default function FinanceModuleCards({ modules, metrics = {}, className = 
                   go();
                 }
               }}
-              className="group flex h-full cursor-pointer flex-col rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/60 p-3.5 transition hover:-translate-y-0.5 hover:border-[#0A0082]/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40"
+              className="group flex h-full cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-3.5 transition hover:border-[#0A0082]/30 hover:bg-slate-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0A0082]/[0.07] text-[#0A0082] transition group-hover:bg-[#0A0082] group-hover:text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A0082]/[0.07] text-[#0A0082]">
                 <Icon className="h-5 w-5" />
               </span>
               <h3 className="mt-2.5 text-sm font-semibold text-slate-900">{name}</h3>
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500" title={desc}>{desc}</p>
               {metrics[id] && (
-                <p className="mt-auto flex items-center justify-between gap-2 mt-3 border-t border-slate-100 pt-2.5 text-xs font-semibold text-[#0A0082]">
+                <p className="mt-auto flex items-center justify-between gap-2 pt-3 text-xs font-semibold text-[#0A0082]">
                   <span>{metrics[id]}</span>
                   <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
                 </p>

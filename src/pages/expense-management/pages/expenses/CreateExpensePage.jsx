@@ -41,7 +41,6 @@ import {
   validateBusinessPurpose,
 } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import {
-  getOverdueSubmitBlockMessage,
   getSubmissionDeadlineInfo,
   validateTripDates,
 } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
@@ -49,6 +48,7 @@ import {
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 
 import { useSubmitReport } from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
+import LateSubmissionReasonModal from "@/pages/expense-management/components/expense-reports/LateSubmissionReasonModal";
 
 import api from "@/api/axiosInstance";
 import { isJustified } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
@@ -229,6 +229,7 @@ export default function CreateExpensePage() {
   const { hasRole } = useAuth();
 
   const submitMutation = useSubmitReport();
+  const [lateReasonOpen, setLateReasonOpen] = useState(false);
 
 
   // ============================================================
@@ -1835,16 +1836,16 @@ export default function CreateExpensePage() {
   };
 
   // Step 3: Handle Final Submission for Approval
-  const submitNow = () => {
-    // UI guard only: the backend enforces the same deadline on the submit call.
-    const deadlineInfo = getSubmissionDeadlineInfo({ reportStatus: "DRAFT", tripEndDate: formData.tripEndDate });
-    const blockMessage = getOverdueSubmitBlockMessage(deadlineInfo);
-    if (blockMessage) {
-      showStatusToast(blockMessage, "error", 4000);
+  // Past the deadline the employee submits with a reason for the delay (the backend requires and records it).
+  const submitDeadlineInfo = getSubmissionDeadlineInfo({ reportStatus: "DRAFT", tripEndDate: formData.tripEndDate });
+  const submitNow = (lateSubmissionReason) => {
+    if (submitDeadlineInfo?.isOverdue && !lateSubmissionReason) {
+      setLateReasonOpen(true);
       return;
     }
-    submitMutation.mutate(reportId, {
+    submitMutation.mutate(lateSubmissionReason ? { reportId, lateSubmissionReason } : reportId, {
       onSuccess: () => {
+        setLateReasonOpen(false);
         showStatusToast("Expense report submitted for approval successfully!", "success");
         navigate(`/expense-management/expenses/reports/${reportId}`);
       },
@@ -3288,6 +3289,14 @@ export default function CreateExpensePage() {
           deletingLineItem
         }
         variant="danger"
+      />
+
+      <LateSubmissionReasonModal
+        isOpen={lateReasonOpen}
+        deadline={submitDeadlineInfo?.deadline}
+        submitting={submitMutation.isPending}
+        onCancel={() => setLateReasonOpen(false)}
+        onSubmit={(reason) => submitNow(reason)}
       />
 
     </div>

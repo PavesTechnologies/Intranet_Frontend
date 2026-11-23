@@ -15,6 +15,10 @@ import { getSettlementBlockReason } from "@/pages/expense-management/api/adjustm
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 import { formatTripDates, hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import AdvanceMoneyOverview from "@/pages/expense-management/pages/cash-advance/components/AdvanceMoneyOverview";
+import EmployeeAdvanceBreakdown, {
+  employeeBreakdown,
+  employeeKeyOf,
+} from "@/pages/expense-management/pages/cash-advance/components/EmployeeAdvanceBreakdown";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
@@ -101,6 +105,25 @@ const canOpenExpenseFor = (adv, user) =>
   LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
   Number(adv.outstandingBalance ?? 0) > 0;
 
+// Status key with spaces and underscores normalised, e.g. "In Progress" and "IN_PROGRESS" are the same status.
+const statusKeyOf = (adv) => String(adv.status || "").trim().toUpperCase().replace(/\s+/g, "_");
+const statusLabel = (key) =>
+  key.toLowerCase().split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+// Workflow order for the filter list; anything unknown goes last.
+const STATUS_ORDER = [
+  "APPROVED", "DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "SUBMITTED_FOR_REVIEW", "UNDER_REVIEW",
+  "RECONCILIATION_PENDING", "EXPENSE_VERIFIED", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED", "SETTLEMENT_PENDING",
+  "ADJUSTED", "OVERDUE",
+];
+const statusRank = (key) => {
+  const i = STATUS_ORDER.indexOf(key);
+  return i === -1 ? STATUS_ORDER.length : i;
+};
+const isClosedAdvance = (adv) => ["SETTLED", "CLOSED"].includes(statusKeyOf(adv));
+const isOpenAdvance = (adv) => !isClosedAdvance(adv);
+// Disbursed and still open: the employee holds the money and the advance is not settled yet.
+const isDisbursedOpen = (adv) => statusKeyOf(adv) !== "APPROVED" && isOpenAdvance(adv);
+
 export default function SettlementPage() {
   const { user, hasRole } = useAuth();
   const { data: directory } = useEmployeeDirectory();
@@ -112,6 +135,8 @@ export default function SettlementPage() {
   const [searchTerm, setSearchTerm] = useState("");
   // Open items (not yet settled or closed) are the working queue; closed records are shown only when asked for.
   const [statusFilter, setStatusFilter] = useState("OPEN");
+  // Finance only: narrows the overview card and the list to one employee ("" = everyone).
+  const [employeeFilter, setEmployeeFilter] = useState("");
 
   const isFinanceExecutive = useMemo(() => {
     if (typeof hasRole === "function") {
@@ -270,26 +295,21 @@ export default function SettlementPage() {
     fetchSettlementAdvances();
   }, [isFinanceExecutive]);
 
-  const filteredAdvances = useMemo(() => {
-    return advances.filter((adv) => {
-      const statusUpper = (adv.status || "").toUpperCase();
+  const employeeKey = (adv) => employeeKeyOf(adv, getEmployeeName(adv, directory));
 
+  // Advances matching the status filter and search, for every employee (the "By employee" table reads this).
+  const listAdvances = useMemo(() => {
+    return advances.filter((adv) => {
+      // OPEN / ALL / DISBURSED / CLOSED are groups; any other value is one exact status (e.g. "IN_PROGRESS").
       let matchStatus = true;
       if (statusFilter === "OPEN") {
-        matchStatus = !["SETTLED", "CLOSED"].includes(statusUpper);
-      } else if (statusFilter === "APPROVED") {
-        matchStatus = ["APPROVED"].includes(statusUpper);
-      } else if (statusFilter === "DISBURSED" || statusFilter === "IN_PROGRESS") {
-        matchStatus = [
-          "DISBURSED", "IN_PROGRESS", "IN PROGRESS",
-          "RECONCILIATION_PENDING", "RECONCILIATION PENDING",
-          "SUBMITTED_FOR_REVIEW", "SUBMITTED FOR REVIEW", "EXPENSE_SUBMITTED",
-          "UNDER_REVIEW", "UNDER REVIEW",
-          "EXPENSE_VERIFIED",
-          "SETTLEMENT_PENDING", "SETTLEMENT PENDING", "PARTIALLY_SETTLED", "PARTIALLY_ADJUSTED"
-        ].includes(statusUpper);
-      } else if (statusFilter === "SETTLED" || statusFilter === "CLOSED") {
-        matchStatus = ["SETTLED", "CLOSED"].includes(statusUpper);
+        matchStatus = isOpenAdvance(adv);
+      } else if (statusFilter === "DISBURSED") {
+        matchStatus = isDisbursedOpen(adv);
+      } else if (statusFilter === "CLOSED") {
+        matchStatus = isClosedAdvance(adv);
+      } else if (statusFilter !== "ALL") {
+        matchStatus = statusKeyOf(adv) === statusFilter;
       }
 
       const empName = getEmployeeName(adv, directory);
@@ -304,6 +324,39 @@ export default function SettlementPage() {
       return matchStatus && matchSearch;
     });
   }, [advances, statusFilter, searchTerm, directory]);
+
+  // ...narrowed to the selected employee, if any. The overview card and the advance table read this.
+  const filteredAdvances = useMemo(
+    () => (employeeFilter ? listAdvances.filter((adv) => employeeKey(adv) === employeeFilter) : listAdvances),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [listAdvances, employeeFilter, directory]
+  );
+
+  const employeeRows = useMemo(
+    () =>
+      isFinanceExecutive
+        ? employeeBreakdown(listAdvances, { figuresOf, nameOf: (adv) => getEmployeeName(adv, directory) })
+        : [],
+    // figuresOf reads usageById
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isFinanceExecutive, listAdvances, usageById, directory]
+  );
+
+  // Every employee with an advance on the page, whatever the other filters, so a selection never disappears.
+  const employeeOptions = useMemo(() => {
+    const seen = new Map();
+    advances.forEach((adv) => {
+      const key = employeeKey(adv);
+      if (key && !seen.has(key)) seen.set(key, getEmployeeName(adv, directory));
+    });
+    return [
+      { label: "All employees", value: "" },
+      ...[...seen.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ label, value })),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advances, directory]);
+
+  const selectedEmployeeName = employeeOptions.find((o) => o.value === employeeFilter && o.value)?.label || "";
 
   // Totals for the advances currently on the list (they follow the search and status filter).
   const totals = useMemo(
@@ -345,7 +398,8 @@ export default function SettlementPage() {
   const handleOpenSettle = (adv) => {
     if (!isFinanceExecutive) return;
     // Prevent a second settlement of an advance that is already closed or has nothing outstanding.
-    if (["SETTLED", "CLOSED"].includes(String(adv.status || "").toUpperCase()) || Number(adv.outstandingBalance) === 0) {
+    const nothingOutstanding = isLoaded(adv) ? figuresOf(adv).outstanding <= 0 : Number(adv.outstandingBalance) === 0;
+    if (["SETTLED", "CLOSED"].includes(String(adv.status || "").toUpperCase()) || nothingOutstanding) {
       showStatusToast("This advance is already settled.", "error");
       return;
     }
@@ -445,13 +499,22 @@ export default function SettlementPage() {
     { label: "Additional Reimbursement Payout (Company pays employee excess expenses)", value: "REIMBURSEMENT" },
   ];
 
-  const statusOptions = [
-    { label: "Open (needs action)", value: "OPEN" },
-    { label: "All Advances (incl. closed)", value: "ALL" },
-    { label: "Approved (Awaiting Disbursement)", value: "APPROVED" },
-    { label: "Disbursed / Outstanding", value: "DISBURSED" },
-    { label: "Closed (Fully Settled)", value: "SETTLED" },
-  ];
+  // Options come from the statuses actually on this page, so every choice matches real rows. The groups Finance works
+  // from keep fixed names; below them, one option per status present (In Progress, Settlement Pending, ...).
+  const statusOptions = useMemo(() => {
+    const present = [...new Set(advances.filter(isOpenAdvance).map(statusKeyOf))]
+      .filter((key) => key !== "APPROVED")
+      .sort((a, b) => statusRank(a) - statusRank(b) || a.localeCompare(b));
+    const has = (pred) => advances.some(pred);
+    return [
+      { label: "Open (needs action)", value: "OPEN" },
+      { label: "All Advances (incl. closed)", value: "ALL" },
+      ...(has((a) => statusKeyOf(a) === "APPROVED") ? [{ label: "Approved (Awaiting Disbursement)", value: "APPROVED" }] : []),
+      ...(has(isDisbursedOpen) ? [{ label: "Disbursed / Outstanding", value: "DISBURSED" }] : []),
+      ...present.map((key) => ({ label: statusLabel(key), value: key })),
+      ...(has(isClosedAdvance) ? [{ label: "Closed (Fully Settled)", value: "CLOSED" }] : []),
+    ];
+  }, [advances]);
 
   // Shown in the header so the user can see which role this session is working under.
   const roleLabel = useMemo(() => {
@@ -492,12 +555,22 @@ export default function SettlementPage() {
       </div>
 
       {/* Money summary: where the disbursed cash went, for the advances on the list */}
-      <AdvanceMoneyOverview totals={totals} loading={figuresLoading} />
+      <AdvanceMoneyOverview totals={totals} loading={figuresLoading} scopeLabel={selectedEmployeeName} />
+
+      {/* Per-employee figures (Finance sees every employee's advances); a row click narrows the card above and the list */}
+      {isFinanceExecutive && (
+        <EmployeeAdvanceBreakdown
+          rows={employeeRows}
+          selectedKey={employeeFilter}
+          onSelect={setEmployeeFilter}
+          loading={figuresLoading}
+        />
+      )}
 
       {/* Filter and Search Bar */}
       <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <div className="sm:col-span-2 lg:col-span-3">
+          <div className={isFinanceExecutive ? "sm:col-span-3 lg:col-span-2" : "sm:col-span-2 lg:col-span-3"}>
             <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
             <SearchInput
               value={searchTerm}
@@ -506,6 +579,18 @@ export default function SettlementPage() {
               className="!py-1.5 !px-3 !text-xs"
             />
           </div>
+
+          {isFinanceExecutive && (
+            <FormSelect
+              label="Employee"
+              name="employeeFilter"
+              value={employeeFilter}
+              onChange={(e) => setEmployeeFilter(e.target.value)}
+              options={employeeOptions}
+              className="[&>label]:text-xs [&>label]:mb-1"
+              buttonClassName="!py-1.5 !px-3 !text-xs"
+            />
+          )}
 
           <FormSelect
             label="Status"
@@ -633,7 +718,8 @@ export default function SettlementPage() {
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          <ExpenseReportLink figures={f} />
+                          {/* Expense-report shortcut is for the employee who owns the advance; finance users don't get it. */}
+                          {!isFinanceExecutive && <ExpenseReportLink figures={f} />}
                           <button
                             onClick={() => navigate(`/expense-management/cash-advance/settlement/${adv.advanceId || adv.id}`)}
                             title="View Details & Lifecycle"
@@ -715,35 +801,52 @@ export default function SettlementPage() {
           isSubmitting={submitting}
           onCancel={() => setDisbursing(null)}
           onSubmit={handleConfirmDisburse}
-          summary={
+          summary={(() => {
+            // The advance's amount includes any carried-forward balance, which the employee already holds. Only the
+            // new cash is paid now; the total is what the employee will account for with expenses or a refund.
+            const cur = disbursing.currencyCode || "INR";
+            const total = Number(disbursing.amount) || 0;
+            const carried = Math.max(0, Number(disbursing.carriedInAmount) || 0);
+            const cash = Math.max(0, total - carried);
+            const advanceRef = `#${String(disbursing.advanceId || disbursing.id).slice(0, 8)}`;
+            return (
             <>
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                <p className="text-xs text-blue-700">
-                  You are about to <strong>disburse</strong> cash advance request <strong className="text-blue-900">#{String(disbursing.advanceId || disbursing.id).slice(0, 8)}</strong> for <strong className="text-blue-900">{formatMoney(disbursing.amount, disbursing.currencyCode || "INR")}</strong>.
+                <p className="text-xs text-blue-700" data-testid="disburse-intro">
+                  You are about to <strong>pay {formatMoney(cash, cur)}</strong> for cash advance request{" "}
+                  <strong className="text-blue-900">{advanceRef}</strong>.
+                  {carried > 0 && (
+                    <> The rest of the {formatMoney(total, cur)} advance is a carried-forward balance the employee already holds, so it is not paid again.</>
+                  )}
                 </p>
               </div>
 
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-xs font-medium text-gray-600">Requested Amount:</span>
-                  <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.amount, disbursing.currencyCode || "INR")}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-xs font-medium text-gray-600">Outstanding Balance:</span>
-                  <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.outstandingBalance || disbursing.amount, disbursing.currencyCode || "INR")}</span>
-                </div>
-                {Number(disbursing.carriedInAmount) > 0 && (
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2" data-testid="disburse-breakdown">
+                {carried > 0 ? (
                   <>
                     <div className="flex justify-between">
-                      <span className="text-xs font-medium text-gray-600">Carried in (already with the employee):</span>
-                      <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.carriedInAmount, disbursing.currencyCode || "INR")}</span>
+                      <span className="text-xs font-medium text-gray-600">New cash approved</span>
+                      <span className="text-xs font-bold text-gray-900">{formatMoney(cash, cur)}</span>
                     </div>
-                    <div className="flex justify-between border-t border-gray-200 pt-2">
-                      <span className="text-xs font-medium text-gray-600">Pay to employee now:</span>
-                      <span className="text-sm font-bold text-emerald-700">{formatMoney(Number(disbursing.amount) - Number(disbursing.carriedInAmount), disbursing.currencyCode || "INR")}</span>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-medium text-gray-600">+ Carried forward (already with the employee)</span>
+                      <span className="text-xs font-bold text-violet-700">{formatMoney(carried, cur)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-medium text-gray-600">= Total advance (the employee accounts for this)</span>
+                      <span className="text-xs font-bold text-gray-900">{formatMoney(total, cur)}</span>
                     </div>
                   </>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-xs font-medium text-gray-600">Approved amount</span>
+                    <span className="text-xs font-bold text-gray-900">{formatMoney(total, cur)}</span>
+                  </div>
                 )}
+                <div className="flex justify-between border-t border-gray-200 pt-2">
+                  <span className="text-xs font-semibold text-gray-800">Pay to employee now</span>
+                  <span className="text-sm font-bold text-emerald-700">{formatMoney(cash, cur)}</span>
+                </div>
               </div>
 
               {Number(disbursing.amount) - Number(disbursing.carriedInAmount || 0) > 0 && (
@@ -753,13 +856,23 @@ export default function SettlementPage() {
                 </div>
               )}
             </>
-          }
+            );
+          })()}
         />
       )}
 
       <SettlementModal
         isOpen={isFinanceExecutive && !!settlingAdvance}
-        advance={toSettlementAdvance(settlingAdvance)}
+        /* Same figures as the list row, so owed / consumed / outstanding match what Finance clicked on. */
+        advance={
+          settlingAdvance
+            ? toSettlementAdvance(
+                { ...settlingAdvance, employeeName: getEmployeeName(settlingAdvance, directory) },
+                isLoaded(settlingAdvance) ? figuresOf(settlingAdvance) : null
+              )
+            : null
+        }
+        loading={Boolean(settlingAdvance) && !isLoaded(settlingAdvance)}
         onClose={() => setSettlingAdvance(null)}
         onSettled={() => {
           setSettlingAdvance(null);

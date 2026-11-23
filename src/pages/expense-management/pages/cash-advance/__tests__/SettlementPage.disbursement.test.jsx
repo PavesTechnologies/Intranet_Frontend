@@ -176,12 +176,12 @@ describe('SettlementPage - EP04-S3: Finance Disbursement', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('Requested Amount:').nextElementSibling).toHaveTextContent('USD 5,000.00');
+        expect(screen.getByText('Approved amount').nextElementSibling).toHaveTextContent('USD 5,000.00');
         expect(screen.getByText('Payment will be initiated to:').nextElementSibling).toHaveTextContent('John Doe');
       });
     });
 
-    it('should show outstanding balance in confirmation', async () => {
+    it('should show what is paid now, and no separate outstanding line', async () => {
       renderWithProviders(<SettlementPage />);
 
       await selectStatus('Approved (Awaiting Disbursement)');
@@ -192,8 +192,32 @@ describe('SettlementPage - EP04-S3: Finance Disbursement', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('Outstanding Balance:').nextElementSibling).toHaveTextContent('USD 5,000.00');
+        expect(screen.getByText('Pay to employee now').nextElementSibling).toHaveTextContent('USD 5,000.00');
       });
+      // Before disbursement the outstanding just repeated the amount; it is not shown here any more.
+      expect(screen.queryByText(/Outstanding Balance/)).not.toBeInTheDocument();
+    });
+
+    it('with a carried-forward balance, pays only the new cash and shows how the total is made', async () => {
+      cashAdvanceApi.getAll.mockResolvedValue({
+        data: { data: [{ ...mockAdvances[0], currencyCode: 'INR', amount: 3518, outstandingBalance: 3518, carriedInAmount: 1518 }] },
+      });
+      renderWithProviders(<SettlementPage />);
+
+      await selectStatus('Approved (Awaiting Disbursement)');
+      await waitFor(() => {
+        fireEvent.click(screen.getByRole('button', { name: /^disburse$/i }));
+      });
+
+      const intro = await screen.findByTestId('disburse-intro');
+      expect(intro).toHaveTextContent('pay INR 2,000.00');
+      expect(intro).toHaveTextContent('carried-forward balance the employee already holds');
+      const breakdown = screen.getByTestId('disburse-breakdown');
+      expect(screen.getByText('New cash approved').nextElementSibling).toHaveTextContent('INR 2,000.00');
+      expect(screen.getByText('+ Carried forward (already with the employee)').nextElementSibling).toHaveTextContent('INR 1,518.00');
+      expect(screen.getByText('= Total advance (the employee accounts for this)').nextElementSibling).toHaveTextContent('INR 3,518.00');
+      expect(screen.getByText('Pay to employee now').nextElementSibling).toHaveTextContent('INR 2,000.00');
+      expect(breakdown).not.toHaveTextContent('Outstanding');
     });
 
     it('should close modal on cancel', async () => {

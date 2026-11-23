@@ -15,15 +15,14 @@ import {
   X,
   RefreshCw,
   Wallet,
+  Clock,
 } from "lucide-react";
 import { getStatusBadge } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import GenericTable from "@/components/Table/table";
 import SearchInput from "@/components/filter/Searchbar";
 import { useFinanceQueue, useFinanceHistory, useFinancePaymentSummary } from "./hooks/useFinanceVerification";
-import EmployeeLabel from "../../approval-engine/components/EmployeeLabel";
 import { useEmployeeDirectory } from "../../approval-engine/hooks/useEmployeeDirectory";
 import FinanceReviewPanel from "./components/FinanceReviewPanel";
 import Modal from "@/components/Modal/modal";
@@ -34,6 +33,7 @@ import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/
 import InvoiceHandoffBadge from "../../components/expense-reports/InvoiceHandoffBadge";
 import { formatMoney, formatDate } from "../../approval-engine/constants/approvalLabels";
 import Pagination from "@/components/Pagination/pagination";
+import RequestTypeBadge, { reportTypeOf } from "@/pages/expense-management/components/common/RequestTypeBadge";
 
 const TABS = [
   { value: "ALL", label: "All" },
@@ -95,7 +95,82 @@ function PaymentCell({ status }) {
     return <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">Handoff failed</span>;
   }
   // NONE: verified at Finance but the report still has later approval levels.
-  return <span className="text-xs text-gray-400">Still in approval</span>;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+      <Clock className="h-3 w-3" /> In approval
+    </span>
+  );
+}
+
+const initialsOf = (name) =>
+  String(name || "?")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "?";
+
+/** Avatar, name and employee ID, resolved from the directory (falls back to the ID). */
+function EmployeeCell({ employeeId, directory }) {
+  const name = directory?.get(employeeId)?.name || directory?.get(String(employeeId))?.name;
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0A0082]/10 text-[11px] font-bold text-[#0A0082]">
+        {name ? initialsOf(name) : "#"}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-slate-900">{name || employeeId || "—"}</p>
+        {name && employeeId && <p className="truncate text-[11px] text-slate-400">{employeeId}</p>}
+      </div>
+    </div>
+  );
+}
+
+const FINANCE_COLUMNS = [
+  { key: "reference", label: "Reference", className: "text-left" },
+  { key: "employee", label: "Employee", className: "text-left" },
+  { key: "amount", label: "Amount", className: "text-right" },
+  { key: "status", label: "Status", className: "text-left" },
+  { key: "date", label: "Date", className: "text-left" },
+  { key: "action", label: "Action", className: "text-right" },
+];
+
+/** The Finance work list. Rows waiting on this user get an amber edge so they stand out. */
+function FinanceTable({ rows }) {
+  return (
+    <table className="w-full min-w-[56rem] border-separate border-spacing-0 text-sm">
+      <thead>
+        <tr>
+          {FINANCE_COLUMNS.map((col) => (
+            <th
+              key={col.key}
+              scope="col"
+              className={`border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:rounded-tl-lg last:rounded-tr-lg ${col.className}`}
+            >
+              {col.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.key} className="group transition-colors hover:bg-slate-50/80">
+            {FINANCE_COLUMNS.map((col, i) => (
+              <td
+                key={col.key}
+                className={`border-b border-slate-100 px-4 py-3 align-middle ${col.className} ${
+                  i === 0 ? `border-l-2 ${row.waiting ? "border-l-amber-400 bg-amber-50/30" : "border-l-transparent"}` : ""
+                }`}
+              >
+                {row[col.key]}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 /**
@@ -272,12 +347,6 @@ export default function FinancePage() {
     </span>
   );
 
-  const typeBadge = (kind) =>
-    kind === "ADVANCE" ? (
-      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Cash Advance</span>
-    ) : (
-      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span>
-    );
 
   const expenseStatusCell = (item) => {
     const tab = tabOf(item);
@@ -335,37 +404,44 @@ export default function FinancePage() {
       [adv.title, adv.purpose, adv.employeeId, adv.employeeName, advanceRef(adv)].some((v) => (v || "").toLowerCase().includes(query))
   );
 
-  const headers = ["Type", "Reference", "Employee", "Amount", "Status", "Date", "Action"];
-  const columns = ["type", "reference", "employee", "amount", "status", "date", "action"];
+  const referenceCell = (kind, ref, detail, waiting) => (
+    <div className="min-w-0">
+      <p className="inline-flex items-center text-[13px] font-semibold tracking-tight text-slate-900">
+        {waiting && <WaitingDot />}
+        {ref}
+      </p>
+      <div className="mt-1 flex min-w-0 items-center gap-1.5">
+        <RequestTypeBadge type={kind} />
+        {detail && detail !== "—" && <span className="truncate text-[11px] text-slate-500" title={detail}>{detail}</span>}
+      </div>
+    </div>
+  );
+  const amountCell = (amount, currency) => (
+    <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-slate-900">{formatMoney(amount, currency)}</span>
+  );
+  const dateCell = (value) => <span className="whitespace-nowrap text-[13px] text-slate-600">{formatDate(value)}</span>;
+
   const allRows = [
     ...filteredItems.map((item) => ({
-      type: typeBadge("EXPENSE"),
-      reference: (
-        <span className="inline-flex items-center font-mono text-xs font-semibold text-gray-700">
-          {tabOf(item) === "PENDING" && <WaitingDot />}
-          {item.reportNumber}
-        </span>
-      ),
-      employee: <EmployeeLabel employeeId={item.employeeId} />,
-      amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</span>,
+      key: `exp-${item.reportId || item.id || item.reportNumber}`,
+      waiting: tabOf(item) === "PENDING",
+      reference: referenceCell(reportTypeOf(item), item.reportNumber, merchantSummary(item.pendingLineItems), tabOf(item) === "PENDING"),
+      employee: <EmployeeCell employeeId={item.employeeId} directory={directory} />,
+      amount: amountCell(item.totalAmount, item.currencyCode),
       status: expenseStatusCell(item),
-      date: formatDate(item.submittedAt || item.actionedAt),
-      action: reviewButton(item, tabOf(item) === "PENDING" ? "Review" : "View"),
+      date: dateCell(item.submittedAt || item.actionedAt),
+      action: <div className="flex justify-end">{reviewButton(item, tabOf(item) === "PENDING" ? "Review" : "View")}</div>,
     })),
     ...visibleAdvances.map((adv) => ({
-      type: typeBadge("ADVANCE"),
-      reference: (
-        <span className="inline-flex items-center font-mono text-xs font-semibold text-gray-700">
-          {advanceTabOf(adv) === "PENDING" && <WaitingDot />}
-          {advanceRef(adv)}
-        </span>
-      ),
-      employee: <EmployeeLabel employeeId={adv.employeeId || adv.employee_id} />,
-      amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(adv.amount, adv.currencyCode)}</span>,
+      key: `adv-${adv.advanceId || adv.id}`,
+      waiting: advanceTabOf(adv) === "PENDING",
+      reference: referenceCell("ADVANCE", advanceRef(adv), adv.title || adv.purpose, advanceTabOf(adv) === "PENDING"),
+      employee: <EmployeeCell employeeId={adv.employeeId || adv.employee_id} directory={directory} />,
+      amount: amountCell(adv.amount, adv.currencyCode),
       status: getStatusBadge(adv.status),
-      date: formatDate(adv.neededByDate),
+      date: dateCell(adv.neededByDate),
       action: (
-        <div className="flex items-center justify-center gap-1">
+        <div className="flex items-center justify-end gap-1">
           <button
             type="button"
             title="View"
@@ -571,7 +647,7 @@ export default function FinancePage() {
             <PolicyEmptyState icon={<Inbox className="h-10 w-10" />} title={emptyTitle} description={emptyDescription} />
           ) : (
             <div className="w-full overflow-x-auto">
-              <GenericTable headers={headers} columns={columns} rows={rows} />
+              <FinanceTable rows={rows} />
             </div>
           )}
           <div className="mt-4 flex justify-center">

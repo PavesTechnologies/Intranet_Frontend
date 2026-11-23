@@ -14,8 +14,8 @@ const formatMoney = (amount, currencyCode) =>
 
 /**
  * Carry-forward of the unused balance. Clicking Carry forward moves it off this advance at once and holds it in the
- * employee's outstanding. The employee's next request (Cash Advance + Outstanding) takes it in, and Finance then pays
- * only the new cash. Nothing is paid now.
+ * employee's outstanding. The employee's next "Cash Advance + Carry Forward" request takes it in when it is finally
+ * approved, and disbursement then pays only the new cash. Nothing is paid now.
  */
 export default function CarryForwardPanel({ advanceId, currencyCode, outstanding, onChanged }) {
   const [reason, setReason] = useState("");
@@ -94,8 +94,8 @@ export default function CarryForwardPanel({ advanceId, currencyCode, outstanding
           <span className="font-semibold">{formatMoney(readyAmount, currencyCode)}</span> is carried forward and held in the employee's outstanding.
         </p>
         <p className="text-gray-600">
-          The employee's next INR request takes it in as outstanding, and Finance then pays only the new cash. Cancelling
-          returns it to this advance.
+          The employee's next "Cash Advance + Carry Forward" request takes it in when it is approved, and only the new cash
+          is paid. Cancelling returns it to this advance.
         </p>
         <label className="block text-xs font-semibold text-gray-700" htmlFor="carry-forward-cancel-reason">
           Reason to cancel (at least {MIN_REASON_LENGTH} characters)
@@ -121,7 +121,8 @@ export default function CarryForwardPanel({ advanceId, currencyCode, outstanding
     <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
       <p className="text-xs text-gray-600">
         Move the {formatMoney(outstanding, currencyCode)} unused balance off this advance now and into the employee's
-        outstanding. Their next INR request takes it in, and Finance pays only the new cash. Nothing is paid now.
+        outstanding. Their next "Cash Advance + Carry Forward" request takes it in, and only the new cash is paid. Nothing
+        is paid now.
       </p>
       <div className="flex justify-end">
         <Button type="button" variant="success" disabled={busy} loading={busy} onClick={markReady}>

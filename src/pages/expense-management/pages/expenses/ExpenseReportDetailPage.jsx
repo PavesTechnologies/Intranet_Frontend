@@ -64,11 +64,11 @@ import {
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import {
   formatDeadlineDate,
-  getOverdueSubmitBlockMessage,
   getSubmissionDeadlineInfo,
   validateTripDates,
 } from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
+import LateSubmissionReasonModal from "@/pages/expense-management/components/expense-reports/LateSubmissionReasonModal";
 import ReportHeroCard from "@/pages/expense-management/components/expense-reports/ReportHeroCard";
 import {
   LineItemAllocationDetails,
@@ -667,15 +667,17 @@ export default function ExpenseReportDetailPage() {
     }
   };
 
-  const submitNow = () => {
-    // UI guard only: the backend enforces the same deadline on the submit call.
-    const blockMessage = getOverdueSubmitBlockMessage(deadlineInfo);
-    if (blockMessage) {
-      showStatusToast(blockMessage, "error", 4000);
+  // Past the deadline the employee submits with a reason for the delay (the backend requires and records it).
+  const [lateReasonOpen, setLateReasonOpen] = useState(false);
+
+  const submitNow = (lateSubmissionReason) => {
+    if (deadlineInfo?.isOverdue && !lateSubmissionReason) {
+      setLateReasonOpen(true);
       return;
     }
-    submitReport.mutate(reportId, {
+    submitReport.mutate(lateSubmissionReason ? { reportId, lateSubmissionReason } : reportId, {
       onSuccess: () => {
+        setLateReasonOpen(false);
         showStatusToast(["AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) ? "Report resubmitted" : "Report submitted for approval", "success");
         fetchReport();
         fetchLineItems();
@@ -912,12 +914,21 @@ export default function ExpenseReportDetailPage() {
                     correctionRequestedBy={approvalStatus?.correctionRequestedBy}
                   />
             }
-            deadline={deadlineInfo && (
-                  <p className={`mt-1.5 text-xs font-medium ${deadlineInfo.isOverdue ? "text-red-700" : "text-gray-600"}`}>
-                    {deadlineInfo.isOverdue
-                      ? `Overdue: submission was due ${formatDeadlineDate(deadlineInfo.deadline)}`
-                      : `Submit by ${formatDeadlineDate(deadlineInfo.deadline)} (${deadlineInfo.daysRemaining} day${deadlineInfo.daysRemaining === 1 ? "" : "s"} left)`}
-                  </p>
+            deadline={(deadlineInfo || report.lateSubmissionReason) && (
+                  <>
+                    {deadlineInfo && (
+                      <p className={`mt-1.5 text-xs font-medium ${deadlineInfo.isOverdue ? "text-red-700" : "text-gray-600"}`}>
+                        {deadlineInfo.isOverdue
+                          ? `Overdue: submission was due ${formatDeadlineDate(deadlineInfo.deadline)}`
+                          : `Submit by ${formatDeadlineDate(deadlineInfo.deadline)} (${deadlineInfo.daysRemaining} day${deadlineInfo.daysRemaining === 1 ? "" : "s"} left)`}
+                      </p>
+                    )}
+                    {report.lateSubmissionReason && (
+                      <p className="mt-1.5 max-w-xl rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
+                        <span className="font-semibold">Submitted late:</span> {report.lateSubmissionReason}
+                      </p>
+                    )}
+                  </>
                 )}
             actions={canManage && (
                 <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -1001,15 +1012,9 @@ export default function ExpenseReportDetailPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-4 sm:text-right">
-                  <div>
-                    <p className="text-[11px] text-slate-500">Advance</p>
-                    <p className="text-sm font-bold tabular-nums text-[#0a174e]">{linkedAdvance.currencyCode || ""} {formatAmount(linkedAdvance.amount)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-slate-500">Balance</p>
-                    <p className="text-sm font-bold tabular-nums text-[#0A0082]">{linkedAdvance.currencyCode || ""} {formatAmount(linkedAdvance.outstandingBalance)}</p>
-                  </div>
+                <div className="sm:text-right">
+                  <p className="text-[11px] text-slate-500">Advance</p>
+                  <p className="text-sm font-bold tabular-nums text-[#0a174e]">{linkedAdvance.currencyCode || ""} {formatAmount(linkedAdvance.amount)}</p>
                 </div>
               </div>
             )}
@@ -1147,6 +1152,14 @@ export default function ExpenseReportDetailPage() {
         costCenterOptions={costCenterOptions}
         currencyOptions={currencyOptions}
         projects={projects}
+      />
+
+      <LateSubmissionReasonModal
+        isOpen={lateReasonOpen}
+        deadline={deadlineInfo?.deadline}
+        submitting={submitReport.isPending}
+        onCancel={() => setLateReasonOpen(false)}
+        onSubmit={(reason) => submitNow(reason)}
       />
 
       <ConfirmationModal

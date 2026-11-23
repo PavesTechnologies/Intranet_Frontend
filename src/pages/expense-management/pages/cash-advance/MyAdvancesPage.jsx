@@ -31,6 +31,7 @@ import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { useAdvanceFigures } from "@/pages/expense-management/pages/cash-advance/useAdvanceFigures";
+import { carryForwardRequest } from "@/pages/expense-management/pages/cash-advance/carryForwardRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 
 // Statuses in which an expense report can be linked to the advance (same list as the detail page).
@@ -520,6 +521,9 @@ export default function MyAdvancesPage() {
                     loading ? <span className="text-gray-300">…</span> : !f.paidOut ? <span className="text-gray-300">—</span> : formatMoney(value, cur);
 
                   const amountLabel = f.approvedKnown ? "Approved" : "Requested";
+                  // A Carry Forward request covers new cash + the carried-forward balance. Show the total, and how it is made.
+                  const cf = carryForwardRequest(adv);
+                  const shownAmount = cf && !f.approvedKnown ? cf.total : f.approvedKnown ? f.approved : f.requested;
 
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
@@ -533,10 +537,16 @@ export default function MyAdvancesPage() {
                         {formatTripDates(adv)}
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap tabular-nums">
-                        <p className="font-semibold text-gray-900">{formatMoney(f.approvedKnown ? f.approved : f.requested, cur)}</p>
+                        <p className="font-semibold text-gray-900">{formatMoney(shownAmount, cur)}</p>
                         <p className="mt-0.5 text-[10px] text-gray-400">
                           {f.paidOut && !loading ? `${formatMoney(f.disbursed, cur)} disbursed` : amountLabel}
                         </p>
+                        {cf && cf.carry > 0 && (
+                          <p className="mt-0.5 text-[10px] text-violet-700">
+                            {formatMoney(cf.newCash, cur)} new + {formatMoney(cf.carry, cur)} carry forward
+                            {cf.moved ? "" : " (on approval)"}
+                          </p>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap tabular-nums">
                         <p className="font-semibold text-sky-700">{paidCell(f.consumed)}</p>

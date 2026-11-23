@@ -33,12 +33,12 @@ export default function FinanceSectionCard({
 
   return (
     <section
-      className={`flex min-w-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_16px_-8px_rgba(15,23,42,0.08)] ${className}`}
+      className={`flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 ${className}`}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 items-center gap-3">
           {Icon ? (
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0A0082]/[0.06] text-[#0A0082] ring-1 ring-[#0A0082]/10">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0A0082]/[0.06] text-[#0A0082]">
               <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
             </span>
           ) : (

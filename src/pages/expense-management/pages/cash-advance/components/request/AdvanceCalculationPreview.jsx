@@ -1,26 +1,26 @@
 import React from "react";
 import { AlertTriangle } from "lucide-react";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
-import { ADVANCE_TYPE } from "./AdvanceTypeSelector";
+import { addsBalance } from "./AdvanceTypeSelector";
 
 // Shows the server's calculation. Nothing here is recalculated in the browser.
 export default function AdvanceCalculationPreview({ preview }) {
   if (!preview) return null;
   const cur = preview.currencyCode || "INR";
-  const isPlus = preview.requestType === ADVANCE_TYPE.ADVANCE_PLUS_OUTSTANDING;
+  const isPlus = addsBalance(preview.requestType);
 
   return (
     <section className="space-y-3 rounded-lg border border-blue-100 bg-blue-50/40 p-4" aria-label="Calculation preview">
       <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Calculation preview</p>
       <dl className="space-y-1.5 text-xs">
-        {isPlus && <Row label="Eligible outstanding balance" value={formatMoney(preview.eligibleOutstanding, cur)} />}
+        {isPlus && <Row label="Carried-forward balance" value={formatMoney(preview.eligibleOutstanding, cur)} />}
         <Row label={isPlus ? "Additional cash needed now" : "Amount required"} value={formatMoney(preview.cashRequested, cur)} />
         <Row label="Total advance amount" value={formatMoney(preview.totalAdvanceAllocation, cur)} strong />
       </dl>
 
       {isPlus && (
         <p className="text-[11px] leading-relaxed text-gray-600">
-          The eligible balance moves onto this advance when Finance approves it. Only the additional cash is paid out.
+          The carried-forward balance moves onto this advance when it is approved. Only the additional cash is paid out.
         </p>
       )}
 

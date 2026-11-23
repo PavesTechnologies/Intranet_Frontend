@@ -11,7 +11,7 @@ import { usageShares } from "@/pages/expense-management/pages/cash-advance/settl
  * {@code totals} is the summed figures the Settlement page already computes; nothing is recalculated here
  * except percentages for display.
  */
-export default function AdvanceMoneyOverview({ totals, loading = false }) {
+export default function AdvanceMoneyOverview({ totals, loading = false, scopeLabel = "" }) {
   const money = (v) => formatMoney(v);
   const owed = totals.owed || 0;
   const share = (v) => (owed > 0 ? Math.round((Math.max(0, v) / owed) * 100) : 0);
@@ -54,7 +54,10 @@ export default function AdvanceMoneyOverview({ totals, loading = false }) {
   return (
     <section aria-label="Money summary" className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 px-5 py-3.5">
-        <h2 className="text-sm font-bold text-[#0a174e]">Where the advance money went</h2>
+        <h2 className="text-sm font-bold text-[#0a174e]">
+          Where the advance money went
+          {scopeLabel && <span className="font-semibold text-blue-700"> · {scopeLabel}</span>}
+        </h2>
         <p className="text-[11px] text-gray-500">
           {totals.count} advance{totals.count === 1 ? "" : "s"} on this list
           {loading ? " · loading figures…" : ""}

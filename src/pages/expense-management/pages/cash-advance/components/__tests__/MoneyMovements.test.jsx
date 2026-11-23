@@ -22,8 +22,10 @@ const settlement = {
 describe("buildMovements", () => {
   it("lists the payout first, then employee payments and payroll deductions in date order", () => {
     const rows = buildMovements(settlement);
-    expect(rows.map((r) => r.direction)).toEqual(["OUT"]); // repayments are not part of the current flows
+    // Payroll deductions are listed; employee repayments are not part of the current flows.
+    expect(rows.map((r) => r.direction)).toEqual(["OUT", "PAYROLL"]);
     expect(rows[0]).toMatchObject({ mode: "BANK_TRANSFER", reference: "UTR123", amount: 4163 });
+    expect(rows[1]).toMatchObject({ reference: "PAY-7", amount: 2000 });
   });
 
   it("is empty when nothing has moved", () => {
@@ -37,14 +39,37 @@ describe("MoneyMovements", () => {
     render(<MoneyMovements settlement={settlement} currencyCode="INR" />);
 
     expect(screen.getByText("Out to employee")).toBeInTheDocument();
-    expect(screen.getByText("Carried forward")).toBeInTheDocument();
-    expect(screen.getByText("Salary deduction")).toBeInTheDocument();
+    expect(screen.getAllByText("Salary deduction")).toHaveLength(2); // the total box and the payroll row
     expect(screen.getByText("UTR123")).toBeInTheDocument();
+    expect(screen.getByText("PAY-7")).toBeInTheDocument();
+    expect(screen.getByText("Spent on approved expenses")).toBeInTheDocument();
+    expect(screen.getByText("Left with employee")).toBeInTheDocument();
+    expect(screen.getByText("Carried forward")).toBeInTheDocument();
+    expect(screen.getByText("Still outstanding")).toBeInTheDocument();
   });
 
   it("says so when no money has moved", () => {
     render(<MoneyMovements settlement={{ repayments: [] }} />);
     expect(screen.getByText(/No money has moved/)).toBeInTheDocument();
+  });
+});
+
+describe("MoneyMovements with expenses in approval", () => {
+  it("holds them against the advance: they are not left with the employee nor still outstanding", () => {
+    render(
+      <MoneyMovements
+        settlement={{ totalAmount: 4000, outstandingBalance: 4000, disbursement: { mode: "CASH", reference: "Rama" } }}
+        currencyCode="INR"
+        expensesApproved={0}
+        expensesInApproval={3450}
+        stillOutstanding={550}
+      />,
+    );
+
+    const box = (label) => screen.getByText(label).parentElement.textContent;
+    expect(box("Expenses in approval")).toContain("INR 3,450.00");
+    expect(box("Left with employee")).toContain("INR 550.00");
+    expect(box("Still outstanding")).toContain("INR 550.00");
   });
 });
 
@@ -66,7 +91,7 @@ describe("MoneyMovements proof view", () => {
     render(<MoneyMovements settlement={settlement} currencyCode="INR" advanceId="adv-9" />);
 
     const views = screen.getAllByRole("button", { name: "View proof" });
-    expect(views).toHaveLength(1); // the payout, the only proof in the current flows
+    expect(views).toHaveLength(1); // the payout; the payroll deduction has no proof on file
     fireEvent.click(views[0]);
 
     await waitFor(() =>
