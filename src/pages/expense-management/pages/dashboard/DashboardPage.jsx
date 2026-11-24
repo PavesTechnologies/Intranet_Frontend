@@ -16,6 +16,16 @@ import ApprovalsPanel from "@/pages/expense-management/components/dashboard/Appr
 import FinanceDashboard from "@/pages/expense-management/components/dashboard/FinanceDashboard";
 import ApDashboard from "@/pages/expense-management/components/dashboard/ApDashboard";
 import AdminDashboard from "@/pages/expense-management/components/dashboard/AdminDashboard";
+import TeamDashboard from "@/pages/expense-management/components/dashboard/TeamDashboard";
+import SegmentedControl from "@/components/ui/SegmentedControl";
+
+// Managers can switch "My money" between their own figures and their whole team's.
+const SCOPES = [
+  { key: "mine", label: "My dashboard" },
+  { key: "team", label: "My team" },
+];
+const scopeStorageKey = (user) =>
+  `xms.dashboard.scope.${user?.employeeId || user?.email || user?.id || "anonymous"}`;
 
 // Each role sees one simple money flow: four steps, left to right, showing where the money is now.
 // Each step names the figure, says what it means in one line, and points to the records behind it.
@@ -100,7 +110,7 @@ const VIEWS = [
     quickActions: [
       { key: "approvals", label: "Open approvals", hint: "Requests and reports waiting for you", icon: "ClipboardCheck", to: "/expense-management/approvals", roles: ["MANAGER", "REPORTING_MANAGER"], primary: true },
       { key: "ca-approvals", label: "Cash advance approvals", hint: "Advance requests for your decision", icon: "Banknote", to: "/expense-management/cash-advance/approvals", roles: ["MANAGER"] },
-      { key: "team", label: "Team expenses", hint: "Expense reports from your team", icon: "FileText", to: "/expense-management/expenses/all", roles: ["MANAGER"] },
+      { key: "team", label: "Team expenses", hint: "Expense reports from your team", icon: "FileText", to: "/expense-management/expenses/all", roles: ["MANAGER", "REPORTING_MANAGER"] },
     ],
     actions: [],
   },
@@ -221,8 +231,25 @@ export default function DashboardPage() {
     }
   }, [active.view]);
 
-  const { data, isLoading, isError, error, refetch } = useDashboard(active.view);
-  const showApprovals = canApprove && active.view === "employee";
+  const [scope, setScope] = useState(() => {
+    try {
+      return localStorage.getItem(scopeStorageKey(user)) === "team" ? "team" : "mine";
+    } catch {
+      return "mine";
+    }
+  });
+  const showTeam = canApprove && active.view === "employee" && scope === "team";
+  const changeScope = (next) => {
+    setScope(next);
+    try {
+      localStorage.setItem(scopeStorageKey(user), next);
+    } catch {
+      /* private mode: the choice is simply not remembered */
+    }
+  };
+
+  const { data, isLoading, isError, error, refetch } = useDashboard(active.view, !showTeam);
+  const showApprovals = canApprove && active.view === "employee" && !showTeam;
   const approvals = useDashboard("manager", showApprovals);
   const isFetching = useIsFetching({ queryKey: ["xmsDashboard"] }) > 0;
   const refreshAll = () => queryClient.invalidateQueries({ queryKey: ["xmsDashboard"] });
@@ -245,7 +272,9 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex items-baseline gap-3">
           <h1 className="text-xl font-semibold text-[#0a174e]">Expense Management</h1>
-          <p className="truncate text-sm text-slate-500">{active.subtitle}</p>
+          <p className="truncate text-sm text-slate-500">
+            {showTeam ? "What your team has claimed, who spent how much, and where it stands." : active.subtitle}
+          </p>
         </div>
         <Button variant="outline" size="small" onClick={refreshAll} disabled={isFetching}>
           <RefreshCw size={14} className={`mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
@@ -264,7 +293,15 @@ export default function DashboardPage() {
         </Tabs>
       )}
 
-      {isLoading ? (
+      {canApprove && active.view === "employee" && (
+        <div data-dashboard-scope>
+          <SegmentedControl label="Dashboard scope" options={SCOPES} value={scope} onChange={changeScope} />
+        </div>
+      )}
+
+      {showTeam ? (
+        <TeamDashboard currency={data?.baseCurrencyCode} />
+      ) : isLoading ? (
         <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-24">
           <LoadingSpinner text="Loading dashboard..." />
         </div>
