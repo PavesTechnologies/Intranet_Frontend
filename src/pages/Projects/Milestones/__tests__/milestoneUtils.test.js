@@ -11,8 +11,8 @@ const base = {
   milestoneCode: "",
   description: "",
   epicId: "",
-  plannedStartDate: "",
-  plannedDueDate: "",
+  plannedStartDate: "2026-05-01",
+  plannedDueDate: "2026-05-10",
   billable: true,
   allocationPercentage: "25",
 };
@@ -25,6 +25,37 @@ describe("validateMilestoneForm", () => {
 
   it("requires a name", () => {
     expect(validateMilestoneForm({ ...base, name: "  " }, ctx).name).toMatch(/name/i);
+  });
+
+  it("requires both planned dates", () => {
+    const errors = validateMilestoneForm({ ...base, plannedStartDate: "", plannedDueDate: "" }, ctx);
+    expect(errors.plannedStartDate).toMatch(/planned start date/i);
+    expect(errors.plannedDueDate).toMatch(/planned due date/i);
+    // Still required on edit.
+    expect(validateMilestoneForm({ ...base, plannedDueDate: "" }, { ...ctx, isEdit: true }).plannedDueDate)
+      .toBeDefined();
+  });
+
+  it("keeps both dates inside the project window", () => {
+    const bounded = {
+      ...ctx,
+      minStartDate: "2026-05-01",
+      projectStartDate: "2026-05-01",
+      projectEndDate: "2026-06-30",
+    };
+    expect(validateMilestoneForm({ ...base, plannedStartDate: "2026-04-30" }, bounded).plannedStartDate)
+      .toMatch(/project start date/i);
+    expect(
+      validateMilestoneForm({ ...base, plannedStartDate: "", plannedDueDate: "2026-04-30" }, bounded).plannedDueDate
+    ).toMatch(/project start date/i);
+    expect(
+      validateMilestoneForm({ ...base, plannedDueDate: "2026-07-01" }, bounded).plannedDueDate
+    ).toMatch(/project end date/i);
+    expect(
+      validateMilestoneForm({ ...base, plannedStartDate: "2026-07-01", plannedDueDate: "2026-07-02" }, bounded)
+        .plannedStartDate
+    ).toMatch(/project end date/i);
+    expect(validateMilestoneForm(base, bounded)).toEqual({});
   });
 
   it("rejects a due date before the start date", () => {

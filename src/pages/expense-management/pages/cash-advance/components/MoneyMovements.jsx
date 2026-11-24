@@ -36,7 +36,22 @@ export function buildMovements(settlement, advanceId) {
       proofPath: `${base}/disbursement/proof`,
     });
   }
-  /* Repayment by the employee is not part of the current flows (carry-forward and salary deduction only).
+  // Salary deductions posted by Payroll. Repayment by the employee is not part of the current flows.
+  (settlement.repayments || [])
+    .filter((r) => r.paymentMode === "PAYROLL")
+    .forEach((r) => {
+      rows.push({
+        key: r.repaymentId || `${r.repaidAt}-${r.amount}`,
+        date: r.transferDate || r.repaidAt,
+        direction: "PAYROLL",
+        mode: "PAYROLL",
+        reference: r.paymentReference || "",
+        amount: r.amount,
+        proof: r.proofAttached,
+        proofPath: `${base}/repayments/${r.repaymentId}/proof`,
+      });
+    });
+  /* Employee repayments (not part of the current flows):
   (settlement.repayments || []).forEach((r) => {
     const payroll = r.paymentMode === "PAYROLL";
     rows.push({
@@ -72,46 +87,81 @@ export async function viewProof(path) {
   }
 }
 
+const MONEY_BOXES = [
+  { key: "paidOut", label: "Paid out to employee", box: "bg-blue-50", text: "text-blue-700" },
+  { key: "expenses", label: "Spent on approved expenses", box: "bg-violet-50", text: "text-violet-700" },
+  { key: "inApproval", label: "Expenses in approval", box: "bg-sky-50", text: "text-sky-700", onlyWhenSet: true },
+  { key: "left", label: "Left with employee", box: "bg-amber-50", text: "text-amber-700" },
+  { key: "carriedOut", label: "Carried forward", box: "bg-indigo-50", text: "text-indigo-700" },
+  { key: "salaryDeducted", label: "Salary deduction", box: "bg-rose-50", text: "text-rose-700" },
+  { key: "outstanding", label: "Still outstanding", box: "bg-gray-50", text: "text-gray-600" },
+];
+
 /**
  * carriedOut: balance already moved to another advance. carryForwardReady: balance the employee chose to carry forward
  * that moves when their next advance is approved - shown as carried forward straight away, and no longer as outstanding.
  */
-export default function MoneyMovements({ settlement, currencyCode, advanceId, carriedOut = 0, carryForwardReady = 0, salaryDeducted = 0 }) {
+export default function MoneyMovements({
+  settlement,
+  currencyCode,
+  advanceId,
+  carriedOut = 0,
+  carryForwardReady = 0,
+  salaryDeducted = 0,
+  expensesApproved = 0,
+  expensesInApproval = 0,
+  stillOutstanding,
+}) {
   const rows = buildMovements(settlement, advanceId);
   if (rows.length === 0) {
     return <p className="text-xs text-gray-500">No money has moved on this advance yet.</p>;
   }
   const outTotal = rows.filter((r) => r.direction === "OUT").reduce((sum, r) => sum + Number(r.amount || 0), 0);
   const ready = Number(carryForwardReady) || 0;
-  const carriedTotal = (Number(carriedOut) || 0) + ready;
-  const stillOutstanding = Math.max((Number(settlement?.outstandingBalance) || 0) - ready, 0);
   // const inTotal: repayments by the employee are not part of the current flows.
+  const amounts = {
+    paidOut: outTotal,
+    expenses: Number(expensesApproved || 0),
+    inApproval: Number(expensesInApproval || 0),
+    // What the expenses (approved and in approval) do not account for, before anything is recovered.
+    left: Math.max(outTotal - Number(expensesApproved || 0) - Number(expensesInApproval || 0), 0),
+    // Already moved to another advance, plus what is ready to move to the next one.
+    carriedOut: Number(carriedOut || 0) + ready,
+    salaryDeducted: Number(salaryDeducted || 0),
+    // Expenses in approval are held against the advance, so they are not part of what is still to recover.
+    // The server's settleableAmount when given; otherwise the stored balance less what is held. A balance ready to
+    // carry forward is no longer outstanding either.
+    outstanding: Math.max(
+      0,
+      (stillOutstanding !== undefined && stillOutstanding !== null
+        ? Number(stillOutstanding || 0)
+        : Number(settlement?.outstandingBalance || 0) - Number(expensesInApproval || 0)) - ready,
+    ),
+  };
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 text-xs">
-        <div className="rounded-md bg-blue-50 px-3 py-2">
-          <p className="text-blue-700">Paid out to employee</p>
-          <p className="font-semibold text-gray-900">{formatMoney(outTotal, currencyCode)}</p>
-        </div>
-        <div className="rounded-md bg-indigo-50 px-3 py-2">
-          <p className="text-indigo-700">Carried forward</p>
-          <p className="font-semibold text-gray-900">{formatMoney(carriedTotal, currencyCode)}</p>
-          {ready > 0 && (
-            <p className="mt-0.5 text-[10.5px] text-indigo-600">
-              {formatMoney(ready, currencyCode)} moves to your next advance when it is approved
-            </p>
-          )}
-        </div>
-        <div className="rounded-md bg-rose-50 px-3 py-2">
-          <p className="text-rose-700">Salary deduction</p>
-          <p className="font-semibold text-gray-900">{formatMoney(salaryDeducted, currencyCode)}</p>
-        </div>
-        <div className="rounded-md bg-gray-50 px-3 py-2">
-          <p className="text-gray-600">Still outstanding</p>
-          <p className="font-semibold text-gray-900">{formatMoney(stillOutstanding, currencyCode)}</p>
-        </div>
+      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 text-xs ${amounts.inApproval > 0 ? "lg:grid-cols-7" : "lg:grid-cols-6"}`}>
+        {MONEY_BOXES.filter((b) => !b.onlyWhenSet || amounts[b.key] > 0).map((b) => (
+          <div key={b.key} className={`rounded-md px-3 py-2 ${b.box}`}>
+            <p className={b.text}>{b.label}</p>
+            <p className="font-semibold text-gray-900">{formatMoney(amounts[b.key], currencyCode)}</p>
+            {b.key === "carriedOut" && ready > 0 && (
+              <p className="mt-0.5 text-[10.5px] text-indigo-600">
+                {formatMoney(ready, currencyCode)} moves to your next advance when it is approved
+              </p>
+            )}
+          </div>
+        ))}
       </div>
+
+      {amounts.inApproval > 0 && (
+        <p className="rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-900">
+          {formatMoney(amounts.inApproval, currencyCode)} of expenses is still in approval. It is held against the advance
+          and set against it once approved, so it is not part of "Still outstanding". If the approver reduces it, the
+          difference is added back to what is outstanding.
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-xs">

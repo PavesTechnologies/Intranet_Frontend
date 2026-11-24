@@ -1,9 +1,10 @@
 import React from "react";
-import { BadgeCheck, FilePen, Landmark, ShieldCheck, Undo2, UserCheck } from "lucide-react";
+import { BadgeCheck, CheckCircle2, FilePen, Landmark, ShieldCheck, Undo2, UserCheck } from "lucide-react";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 
-// Where the employee's expense reports are right now, as the five steps every report goes through.
-// Counts come from the backend's `pipeline`. Amounts are left to the ledgers, so no figure is shown twice.
+// Where the employee's expense reports are right now. Every report the employee can follow is in exactly one step, so
+// the steps add up to their reports. An approved report ends in Paid (money received) or Settled (fully covered by a
+// cash advance, nothing to pay). Counts come from the backend's `pipeline`; amounts are left to the ledgers.
 // Reports sent back for correction sit outside the line, so they are shown as their own callout.
 
 const STEPS = {
@@ -11,7 +12,8 @@ const STEPS = {
   approval: { kpi: "approvals", icon: UserCheck, caption: "With your manager" },
   finance: { kpi: "finance", icon: ShieldCheck, caption: "Being verified" },
   ap: { kpi: "payment", icon: Landmark, caption: "Queued for payment" },
-  paid: { kpi: "paid", icon: BadgeCheck, caption: "Money received" },
+  paid: { kpi: "paid", icon: BadgeCheck, caption: "Money received", done: true },
+  settled: { kpi: "settled", icon: CheckCircle2, caption: "Covered by your advance", done: true },
 };
 
 export default function ReportJourney({ pipeline = [], byKey, currency }) {
@@ -19,6 +21,7 @@ export default function ReportJourney({ pipeline = [], byKey, currency }) {
   if (!stages.length) return null;
 
   const inFlight = stages.filter((s) => ["approval", "finance", "ap"].includes(s.key)).reduce((a, s) => a + Number(s.count || 0), 0);
+  const returnedCount = Number(pipeline.find((s) => s.key === "action")?.count || 0);
   const returnedValue = byKey.action ? Number(byKey.action.value) || 0 : 0;
 
   return (
@@ -28,21 +31,25 @@ export default function ReportJourney({ pipeline = [], byKey, currency }) {
           <span className="h-1.5 w-1.5 rounded-full bg-[#0A0082]" aria-hidden="true" />
           <span className="font-semibold tabular-nums text-[#0a174e]">{inFlight}</span> report{inFlight === 1 ? "" : "s"} moving through approval
         </span>
-        {returnedValue > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-rose-700">
+        {(returnedCount > 0 || returnedValue > 0) && (
+          <span data-testid="journey-sent-back" className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-rose-700">
             <Undo2 size={12} aria-hidden="true" />
-            Sent back to you: <span className="font-semibold tabular-nums">{formatMoney(returnedValue, currency)}</span>
+            Sent back to you:{" "}
+            <span className="font-semibold tabular-nums">
+              {returnedCount > 0 ? `${returnedCount} report${returnedCount === 1 ? "" : "s"}` : formatMoney(returnedValue, currency)}
+            </span>
+            {returnedCount > 0 && returnedValue > 0 && <span className="tabular-nums">({formatMoney(returnedValue, currency)})</span>}
           </span>
         )}
       </div>
 
-      <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-0">
+      <ol className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-0 ${stages.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
         {stages.map((s, i) => {
           const step = STEPS[s.key];
           const Icon = step.icon;
           const count = Number(s.count || 0);
           const active = count > 0;
-          const done = s.key === "paid";
+          const done = !!step.done;
           return (
             <li key={s.key} data-stage={s.key} className="relative flex flex-col items-center text-center lg:px-2">
               {/* connector to the next step (wide screens only) */}

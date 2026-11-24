@@ -11,15 +11,27 @@ const num = (byKey, key) => (byKey[key] ? Number(byKey[key].value) || 0 : 0);
 
 // The money cards in the banner. Same colours as the ledgers: navy = in the system, green = done, amber = waiting.
 const MONEY_CARDS = [
-  { key: "erClaimed", label: "Total claimed", help: "Everything you submitted", color: "#8fa0ff", target: SECTION.reimbursement },
-  { key: "erApproved", label: "Approved", help: "Approved for reimbursement", color: "#8fa0ff", target: SECTION.reimbursement },
-  { key: "erPaid", label: "Paid to you", help: "Already in your account", color: "#1baf7a", target: SECTION.reimbursement },
-  { key: "caOutstanding", label: "Advance outstanding", help: "Still to account for", color: "#eda100", target: SECTION.advance },
+  { key: "erClaimed", label: "Expenses claimed", help: "All expense reports you submitted", color: "#8fa0ff", target: SECTION.reimbursement },
+  {
+    key: "erApproved",
+    label: "Expenses approved",
+    // When part of the approved amount was set against a cash advance, say how much, so Approved vs Paid adds up.
+    help: (byKey, currency) => {
+      const offset = num(byKey, "erAdvanceOffset");
+      return offset > 0 ? `${formatMoney(offset, currency)} adjusted against advance` : "Approved for reimbursement";
+    },
+    color: "#8fa0ff",
+    target: SECTION.reimbursement,
+  },
+  { key: "erPaid", label: "Reimbursed to your bank", help: "Expense money paid out to you", color: "#1baf7a", target: SECTION.reimbursement },
+  { key: "caOutstanding", label: "Cash advance to settle", help: "Submit bills or return this amount", color: "#eda100", target: SECTION.advance },
 ];
 
 export default function EmployeeOverview({ byKey, currency, quickActions = [] }) {
   const paid = num(byKey, "erPaid");
   const onTheWay = num(byKey, "erToSendAp") + num(byKey, "erPendingAp");
+  const advanceOffset = num(byKey, "erAdvanceOffset");
+  const helpOf = (c) => (typeof c.help === "function" ? c.help(byKey, currency) : c.help);
 
   return (
     <section
@@ -34,17 +46,23 @@ export default function EmployeeOverview({ byKey, currency, quickActions = [] })
         <div className="relative grid gap-4 lg:grid-cols-12 lg:items-center">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center lg:col-span-12">
             <div className="min-w-0 sm:w-56 sm:shrink-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">Your money at a glance</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">Your expense money at a glance</p>
               <div className="mt-1">
-                <p className="text-sm font-medium text-white/80">On its way to you</p>
+                <p className="text-sm font-medium text-white/80">Reimbursement on its way to you</p>
                 <p className="mt-0.5 text-3xl font-bold tracking-tight tabular-nums sm:text-4xl">{formatMoney(onTheWay, currency)}</p>
                 <p className="mt-1 text-xs text-white/70">
                   {onTheWay > 0
-                    ? "Approved, but not in your bank account yet."
+                    ? "Approved expenses not in your bank account yet."
                     : paid > 0
-                      ? "Nothing pending. Everything approved has been paid."
-                      : "No approved claims are waiting to be paid."}
+                      ? "Nothing pending. Everything payable to you has been paid."
+                      : "No approved expenses are waiting to be paid."}
                 </p>
+                {advanceOffset > 0 && (
+                  <p className="mt-1 text-xs text-white/70" data-advance-offset-note>
+                    <span className="font-semibold text-[#ffd27a]">{formatMoney(advanceOffset, currency)}</span> of your approved
+                    expenses was adjusted against your cash advance, so it is not paid to your bank.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -55,14 +73,14 @@ export default function EmployeeOverview({ byKey, currency, quickActions = [] })
                   key={c.key}
                   type="button"
                   data-money-card={c.key}
-                  title={c.help}
+                  title={helpOf(c)}
                   onClick={() => scrollToSection(c.target)}
                   className="group relative overflow-hidden rounded-xl bg-white/[0.08] py-2 pl-4 pr-3 text-left ring-1 ring-white/15 transition hover:bg-white/[0.14] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                 >
                   <span aria-hidden="true" className="absolute inset-y-2 left-1.5 w-1 rounded-full" style={{ background: c.color }} />
                   <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-white/60">{c.label}</p>
                   <p className="truncate text-lg font-bold tabular-nums">{byKey[c.key] ? formatMoney(byKey[c.key].value, currency) : "-"}</p>
-                  <p className="truncate text-[11px] text-white/50">{c.help}</p>
+                  <p className="truncate text-[11px] text-white/50">{helpOf(c)}</p>
                 </button>
               ))}
             </div>

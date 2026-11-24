@@ -7,8 +7,13 @@ import { useMilestoneMutations, useProjectEpics } from "../hooks/useMilestones";
 import {
   estimateAmount,
   extractApiErrors,
+  formatDate,
   formatMoney,
   formatPercent,
+  generateMilestoneCode,
+  STATUS_META,
+  toIsoDate,
+  todayIso,
   validateMilestoneForm,
 } from "../utils/milestoneUtils";
 
@@ -82,7 +87,18 @@ const describedBy = (id, error, hint) => (error ? `${id}-error` : hint ? `${id}-
  * Create / edit milestone. `milestone` null → create.
  * `summary` supplies the current allocation total and project budget.
  */
-const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) => {
+const MilestoneFormModal = ({
+  isOpen,
+  onClose,
+  projectId,
+  projectKey,
+  milestoneCount = 0,
+  existingCodes = [],
+  projectStartDate,
+  projectEndDate,
+  milestone,
+  summary,
+}) => {
   const isEdit = !!milestone;
   const [values, setValues] = useState(emptyValues);
   const [errors, setErrors] = useState({});
@@ -96,6 +112,34 @@ const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) 
   const saving = create.isPending || update.isPending;
 
   const allocationLocked = isEdit && ["COMPLETED", "CANCELLED"].includes(milestone.executionStatus);
+  // Once work has started the planned start is a matter of record, not a plan.
+  const startDateLocked = isEdit && milestone.executionStatus !== "PLANNED";
+  const nameEntered = !!values.name.trim();
+
+  // Preview of the code the backend will assign. Never submitted — see generateMilestoneCode.
+  const codePreview = useMemo(
+    () => (isEdit ? milestone.milestoneCode ?? "" : generateMilestoneCode(projectKey, { count: milestoneCount, existingCodes })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isEdit, milestone, projectKey, milestoneCount, JSON.stringify(existingCodes)]
+  );
+  const codeShown = isEdit || nameEntered ? codePreview : "";
+
+  // Planned dates sit inside the project window and never in the past, so the floor is the
+  // later of today and the project start. An existing milestone that already starts earlier
+  // keeps its date — it just can't be pushed further back.
+  const projectStart = toIsoDate(projectStartDate);
+  const projectEnd = toIsoDate(projectEndDate);
+  const minStartDate = useMemo(() => {
+    const today = todayIso();
+    const floor = projectStart && projectStart > today ? projectStart : today;
+    const current = isEdit ? toIsoDate(milestone.plannedStartDate) : "";
+    return current && current < floor ? current : floor;
+  }, [isEdit, milestone, projectStart]);
+  const minDueDate = toIsoDate(values.plannedStartDate) || minStartDate;
+  const statusLabel = isEdit ? (STATUS_META[milestone.executionStatus]?.label ?? "").toLowerCase() : "";
+  const dateWindowHint = projectEnd
+    ? `Within the project: ${formatDate(minStartDate)} – ${formatDate(projectEnd)}.`
+    : `${formatDate(minStartDate)} or later.`;
 
   // Share left for this milestone: 100 − (active allocation excluding this milestone's own share).
   const availablePercentage = useMemo(() => {
@@ -106,6 +150,23 @@ const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) 
         ? Number(milestone.allocationPercentage) || 0
         : 0;
     return Math.max(0, Math.round((100 - allocated + own) * 100) / 100);
+  }, [summary, isEdit, milestone]);
+
+  /**
+   * Money left to split between milestones — `remainingAmount` from the summary, which the
+   * backend also reports as `baseAmount`. Each milestone's allocation is a share of what was
+   * left when it was created, not of the whole project budget, so this is the figure the
+   * percentage applies to. On edit, this milestone's own amount is added back first.
+   */
+  const baseAmount = useMemo(() => {
+    if (!summary) return null;
+    const remaining = summary.baseAmount ?? summary.remainingAmount;
+    if (remaining == null || !Number.isFinite(Number(remaining))) return null;
+    const own =
+      isEdit && milestone.billable && milestone.executionStatus !== "CANCELLED"
+        ? Number(milestone.estimatedAmount) || 0
+        : 0;
+    return Math.max(0, Math.round((Number(remaining) + own) * 100) / 100);
   }, [summary, isEdit, milestone]);
 
   useEffect(() => {
@@ -163,10 +224,27 @@ const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) 
     });
   };
 
+  const validationContext = {
+    isEdit,
+    availablePercentage,
+    allocationLocked,
+    startDateLocked,
+    minStartDate,
+    projectStartDate: projectStart,
+    projectEndDate: projectEnd,
+  };
+
   // Validate a field once the user leaves it, not on every keystroke.
-  const validateOnBlur = (field) => () => {
-    const fieldErrors = validateMilestoneForm(values, { isEdit, availablePercentage, allocationLocked });
-    setErrors((prev) => ({ ...prev, [field]: fieldErrors[field] }));
+  // Several fields can be passed where one input drives more than one rule (the date pair).
+  const validateOnBlur = (...fields) => () => {
+    const fieldErrors = validateMilestoneForm(values, validationContext);
+    setErrors((prev) => {
+      const next = { ...prev };
+      fields.forEach((f) => {
+        next[f] = fieldErrors[f];
+      });
+      return next;
+    });
   };
 
   const buildPayload = () => {
@@ -183,14 +261,15 @@ const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) 
     if (isEdit) {
       return { ...common, version: milestone.version };
     }
-    return { ...common, milestoneCode: values.milestoneCode.trim() || null };
+    // null → the backend generates the code under its project lock. The form only previews it.
+    return { ...common, milestoneCode: null };
   };
 
   const focusSummary = () => setTimeout(() => summaryRef.current?.focus(), 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const fieldErrors = validateMilestoneForm(values, { isEdit, availablePercentage, allocationLocked });
+    const fieldErrors = validateMilestoneForm(values, validationContext);
     setErrors(fieldErrors);
     setServerErrors([]);
     if (Object.keys(fieldErrors).length) {
@@ -222,9 +301,7 @@ const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) 
     ...fieldErrorItems,
     ...serverErrors.filter((msg) => !fieldErrorItems.some((f) => f.msg === msg)).map((msg) => ({ msg, href: null })),
   ];
-  const estimate = values.billable
-    ? estimateAmount(summary?.projectBudget, values.allocationPercentage || 0)
-    : null;
+  const estimate = values.billable ? estimateAmount(baseAmount, values.allocationPercentage || 0) : null;
 
   const footer = confirmDiscard ? (
     <div role="alertdialog" aria-labelledby="ms-discard-title" className="flex flex-wrap items-center justify-between gap-3">
@@ -327,24 +404,39 @@ const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) 
           <Field
             id="ms-code"
             label="Code"
-            hint={isEdit ? "Code can't be changed." : "Leave blank to auto-generate."}
+            hint={
+              isEdit
+                ? "Code can't be changed."
+                : !nameEntered
+                  ? "Enter the milestone name first."
+                  : codePreview
+                    ? "Assigned on save — this is a preview."
+                    : "Assigned automatically on save."
+            }
             error={errors.milestoneCode}
           >
-            <input
-              id="ms-code"
-              type="text"
-              value={values.milestoneCode}
-              onChange={set("milestoneCode")}
-              onBlur={validateOnBlur("milestoneCode")}
-              disabled={isEdit}
-              maxLength={50}
-              autoComplete="off"
-              spellCheck={false}
-              aria-invalid={!!errors.milestoneCode}
-              aria-describedby={describedBy("ms-code", errors.milestoneCode, true)}
-              className={`${inputClass(errors.milestoneCode)} font-mono uppercase`}
-              placeholder="Auto"
-            />
+            <div className="relative cursor-not-allowed">
+              <input
+                id="ms-code"
+                type="text"
+                value={codeShown}
+                readOnly
+                disabled
+                title={
+                  isEdit
+                    ? "The code can't be changed."
+                    : nameEntered
+                      ? "The code is assigned automatically when you save."
+                      : "Enter the milestone name first."
+                }
+                autoComplete="off"
+                spellCheck={false}
+                aria-invalid={!!errors.milestoneCode}
+                aria-describedby={describedBy("ms-code", errors.milestoneCode, true)}
+                className={`${inputClass(errors.milestoneCode)} font-mono uppercase disabled:cursor-not-allowed`}
+                placeholder={isEdit || nameEntered ? "Auto" : "From name"}
+              />
+            </div>
           </Field>
         </div>
 
@@ -383,27 +475,52 @@ const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) 
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="ms-start" label="Planned start" error={errors.plannedStartDate}>
-            <input
-              id="ms-start"
-              type="date"
-              value={values.plannedStartDate}
-              onChange={set("plannedStartDate")}
-              onBlur={validateOnBlur("plannedDueDate")}
-              aria-invalid={!!errors.plannedStartDate}
-              className={inputClass(errors.plannedStartDate)}
-            />
+          <Field
+            id="ms-start"
+            label="Planned start"
+            required
+            hint={
+              startDateLocked
+                ? `The start date is fixed once the milestone is ${statusLabel}.`
+                : dateWindowHint
+            }
+            error={errors.plannedStartDate}
+          >
+            <div className={startDateLocked ? "relative cursor-not-allowed" : "relative"}>
+              <input
+                id="ms-start"
+                type="date"
+                value={values.plannedStartDate}
+                min={minStartDate}
+                max={projectEnd || undefined}
+                onChange={set("plannedStartDate")}
+                onBlur={validateOnBlur("plannedStartDate", "plannedDueDate")}
+                disabled={startDateLocked}
+                readOnly={startDateLocked}
+                title={startDateLocked ? `This milestone is ${statusLabel}; its start date can't change.` : undefined}
+                aria-invalid={!!errors.plannedStartDate}
+                aria-describedby={describedBy("ms-start", errors.plannedStartDate, true)}
+                className={`${inputClass(errors.plannedStartDate)} disabled:cursor-not-allowed`}
+              />
+            </div>
           </Field>
-          <Field id="ms-due" label="Planned due" error={errors.plannedDueDate}>
+          <Field
+            id="ms-due"
+            label="Planned due"
+            required
+            hint={dateWindowHint}
+            error={errors.plannedDueDate}
+          >
             <input
               id="ms-due"
               type="date"
               value={values.plannedDueDate}
-              min={values.plannedStartDate || undefined}
+              min={minDueDate}
+              max={projectEnd || undefined}
               onChange={set("plannedDueDate")}
               onBlur={validateOnBlur("plannedDueDate")}
               aria-invalid={!!errors.plannedDueDate}
-              aria-describedby={describedBy("ms-due", errors.plannedDueDate)}
+              aria-describedby={describedBy("ms-due", errors.plannedDueDate, true)}
               className={inputClass(errors.plannedDueDate)}
             />
           </Field>
@@ -465,11 +582,19 @@ const MilestoneFormModal = ({ isOpen, onClose, projectId, milestone, summary }) 
               <div>
                 <p className="mb-1 block text-sm font-medium text-slate-700">Estimated amount</p>
                 <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 tabular-nums">
-                  {summary?.projectBudget != null ? formatMoney(estimate, summary.currency) : "No project budget set"}
+                  {baseAmount != null ? formatMoney(estimate, summary.currency) : "No project budget set"}
                 </p>
                 <p className="mt-1 flex items-start gap-1 text-xs text-slate-500">
                   <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  Estimate from the project budget. Accounts Receivable calculates the billed amount.
+                  {baseAmount != null ? (
+                    <span>
+                      {formatPercent(values.allocationPercentage || 0)} of the{" "}
+                      <span className="font-medium tabular-nums">{formatMoney(baseAmount, summary.currency)}</span> base
+                      amount left on this project. Accounts Receivable calculates the billed amount.
+                    </span>
+                  ) : (
+                    <span>Accounts Receivable calculates the billed amount.</span>
+                  )}
                 </p>
               </div>
             </div>

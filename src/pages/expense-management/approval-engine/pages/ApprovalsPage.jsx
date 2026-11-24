@@ -542,27 +542,27 @@ export default function ApprovalsPage({ embedded = false }) {
             {/* Fixed column widths: each header sits exactly above its cells, whatever the row content is.
                 Actions has a fixed width wide enough for four icon buttons, so they never wrap onto a second line. */}
             <colgroup>
-              <col className="w-[11%]" />
+              <col className="w-[8%]" />
               <col className="w-[14%]" />
-              <col className="w-[20%]" />
+              <col className="w-[23%]" />
+              <col className="w-[8%]" />
               <col className="w-[11%]" />
-              <col className="w-[13%]" />
-              <col className="w-[12%]" />
+              <col className="w-[10%]" />
               <col className="w-[10%]" />
               <col className="w-[9%]" />
               <col className="w-[168px]" />
             </colgroup>
             <thead className="border-b border-slate-200 bg-slate-50/80 text-left text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-3 py-3 text-left">Type</th>
-                <th className="px-3 py-3 text-left">Employee</th>
-                <th className="px-3 py-3 text-left">Title / Merchant</th>
-                <th className="px-3 py-3 text-left">Cost Center</th>
-                <th className="px-3 py-3 text-left">Status</th>
-                <th className="px-3 py-3 text-right">Requested</th>
-                <th className="px-3 py-3 text-right">Approved</th>
-                <th className="px-3 py-3 text-right">Paid</th>
-                <th className="px-3 py-3 text-right">Actions</th>
+                <th className="px-2.5 py-2.5 text-left">Type</th>
+                <th className="px-2.5 py-2.5 text-left">Employee</th>
+                <th className="px-2.5 py-2.5 text-left">Title / Merchant</th>
+                <th className="px-2.5 py-2.5 text-left">Cost Center</th>
+                <th className="px-2.5 py-2.5 text-left">Status</th>
+                <th className="px-2.5 py-2.5 text-right">Requested</th>
+                <th className="px-2.5 py-2.5 text-right">Approved</th>
+                <th className="px-2.5 py-2.5 text-right">Paid</th>
+                <th className="px-2.5 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
             {sources.map((src) => {

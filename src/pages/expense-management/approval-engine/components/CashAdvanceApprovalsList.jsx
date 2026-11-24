@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 import RowActionButton, { RowActions } from "@/pages/expense-management/approval-engine/components/RowActionButton";
 import { formatTripDates } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
+import { carryForwardRequest } from "@/pages/expense-management/pages/cash-advance/carryForwardRequest";
 import { useApprovalWebSocket } from "@/pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
 
 const formatMoney = (amount, currencyCode = "INR") => {
@@ -50,14 +51,18 @@ const PENDING_STATUSES = [
  * approvedAmount after Finance's final approval, or the manager's approved amount while later stages are pending.
  */
 export const advanceAmounts = (adv) => {
-  const amount = Number(adv?.amount) || 0;
-  const requested = adv?.requestedAmount != null ? Number(adv.requestedAmount) : amount;
+  // Cash Advance + Carry Forward: the request covers new cash + the carried-forward balance. Before Finance's final
+  // approval the carry-forward is not in `amount` yet, so it is added here; after, approvedAmount already includes it.
+  const cf = carryForwardRequest(adv);
+  const pendingCarry = cf && !cf.moved ? cf.carry : 0;
+  const amount = (Number(adv?.amount) || 0) + pendingCarry;
+  const requested = adv?.requestedAmount != null ? Number(adv.requestedAmount) + (cf ? cf.carry : 0) : amount;
   const status = String(adv?.status || "").toUpperCase();
   const treatment = String(adv?.managerTreatment || "").toUpperCase();
   let approved = null;
   let approvedLabel = null;
   if (adv?.approvedAmount != null) {
-    approved = Number(adv.approvedAmount);
+    approved = Number(adv.approvedAmount) + pendingCarry;
     approvedLabel = "Approved";
   } else if (status === "REJECTED") {
     approvedLabel = "Rejected";
@@ -66,18 +71,29 @@ export const advanceAmounts = (adv) => {
     approvedLabel = "Approved by manager";
   }
   const paid = adv?.disbursedAmount != null ? Number(adv.disbursedAmount) : null;
-  return { requested, approved, approvedLabel, cut: approved != null ? Math.max(requested - approved, 0) : 0, paid };
+  return {
+    requested, approved, approvedLabel, cut: approved != null ? Math.max(requested - approved, 0) : 0, paid,
+    carryForward: cf ? cf.carry : 0, carryForwardMoved: cf ? cf.moved : false,
+  };
 };
 
 // Three table cells: Requested, Approved, Paid. Each holds one figure, so the columns can be read down the table.
 function AmountCells({ adv }) {
   const cur = adv.currencyCode || "INR";
-  const { requested, approved, approvedLabel, cut, paid } = advanceAmounts(adv);
+  const { requested, approved, approvedLabel, cut, paid, carryForward, carryForwardMoved } = advanceAmounts(adv);
   const cell = "px-2.5 py-1.5 text-right align-middle whitespace-nowrap text-xs";
   return (
     <>
-      <td className={cell}>
+      <td
+        className={cell}
+        title={carryForward > 0
+          ? `Cash Advance + Carry Forward: ${formatMoney(requested - carryForward, cur)} new cash + ${formatMoney(carryForward, cur)} carried forward${carryForwardMoved ? " (moved in)" : " (moves in on Finance's final approval)"}. Only the new cash is paid out.`
+          : undefined}
+      >
         <span className="font-mono font-semibold tabular-nums text-gray-900">{formatMoney(requested, cur)}</span>
+        {carryForward > 0 && (
+          <span className="block text-[10px] text-violet-700">incl. {formatMoney(carryForward, cur)} carry forward</span>
+        )}
       </td>
       <td
         className={cell}
@@ -680,7 +696,8 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
     <>
       {/* Approve / decision modal */}
       {approvingAdvance && (() => {
-        const cur = approvalBalance?.currencyCode || approvingAdvance.currencyCode || "INR";
+        // The request's own currency labels its amounts. Other advances carry their own (see heldByCurrency).
+        const cur = approvingAdvance.currencyCode || approvalBalance?.currencyCode || "INR";
         const money = (v) => formatMoney(Number(v) || 0, cur);
         // One line of the ledger: sign (+, −, =) in its own column so every figure lines up and the sum reads top to bottom.
         const Row = ({ sign, label, help, value, strong, tone, valueTone }) => (
@@ -713,13 +730,23 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
           : reducedNum % ROUND_BLOCK !== 0 ? `Must be a multiple of ${ROUND_BLOCK} (for example ${money(Math.floor(reducedNum / ROUND_BLOCK) * ROUND_BLOCK)}).`
           : null;
         // A Cash Advance + Outstanding request carries the employee's balance into this one; a new request is just its cash.
-        const includesOutstanding = approvingAdvance.requestType === "ADVANCE_PLUS_OUTSTANDING";
-        const newCash = Number(approvingAdvance.additionalAmountRequested ?? approvingAdvance.amount) || 0;
-        const broughtIn = Math.max(0, (Number(approvingAdvance.totalAdvanceAllocation) || 0) - newCash);
+        const includesCarryForward = approvingAdvance.requestType === "ADVANCE_PLUS_CARRY_FORWARD";
+        const includesOutstanding = approvingAdvance.requestType === "ADVANCE_PLUS_OUTSTANDING" || includesCarryForward;
+        const cfFigures = carryForwardRequest(approvingAdvance);
+        const newCash = cfFigures ? cfFigures.newCash : Number(approvingAdvance.additionalAmountRequested ?? approvingAdvance.amount) || 0;
+        const broughtIn = cfFigures ? cfFigures.carry : Math.max(0, (Number(approvingAdvance.totalAdvanceAllocation) || 0) - newCash);
         // Money the employee already holds or is due on other advances; shown only when there is some.
         const alreadyHeld = approvalBalance && !approvalBalance.error
           ? (Number(approvalBalance.pendingBalanceTotal) || 0) + (Number(approvalBalance.committedAmount) || 0)
           : 0;
+        // Other advances can be in other currencies; each total keeps its own currency instead of borrowing this request's.
+        const heldByCurrency = Object.entries(
+          sources.reduce((acc, o) => {
+            const code = o.currencyCode || cur;
+            acc[code] = (acc[code] || 0) + (Number(o.outstandingBalance) || 0);
+            return acc;
+          }, {})
+        ).filter(([, total]) => total > 0);
         const setOffNum = Number(setOffAmount);
         const sourceOwed = Number(pickedSource?.outstandingBalance) || 0;
         const setOffValid = !!pickedSource && setOffAmount !== "" && setOffNum > 0 && setOffNum <= sourceOwed && setOffNum <= requested;
@@ -769,7 +796,11 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                   {includesOutstanding ? (
                     <>
                       <Row sign="" label="New cash requested" value={newCash} />
-                      <Row sign="+" label="Outstanding brought in" help="Balance the employee still holds, rolled into this advance" value={broughtIn} />
+                      {includesCarryForward ? (
+                        <Row sign="+" label="Carry forward brought in" help="Balance Finance carried forward; moves in on final approval, not paid out" value={broughtIn} />
+                      ) : (
+                        <Row sign="+" label="Outstanding brought in" help="Balance the employee still holds, rolled into this advance" value={broughtIn} />
+                      )}
                       <Row sign="=" label="Total advance" value={newCash + broughtIn} strong />
                     </>
                   ) : (
@@ -783,14 +814,20 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                   {alreadyHeld > 0 && (
                     <details className="border-t border-gray-200 py-1.5 text-[11px] text-gray-600">
                       <summary className="cursor-pointer">
-                        Employee already holds <span className="font-semibold text-gray-900">{money(alreadyHeld)}</span> on other advances
+                        Employee already holds{" "}
+                        <span className="font-semibold text-gray-900">
+                          {heldByCurrency.length > 0
+                            ? heldByCurrency.map(([code, total]) => formatMoney(total, code)).join(" + ")
+                            : money(alreadyHeld)}
+                        </span>{" "}
+                        on other advances
                         <span className="ml-1 text-blue-700 underline">show</span>
                       </summary>
                       <ul className="mt-1 space-y-0.5 pl-3">
                         {sources.map((o) => (
                           <li key={o.advanceId} className="flex justify-between gap-3">
                             <span className="truncate">{o.title || "Cash advance"}</span>
-                            <span className="shrink-0 font-mono">{money(o.outstandingBalance)} owed</span>
+                            <span className="shrink-0 font-mono">{formatMoney(Number(o.outstandingBalance) || 0, o.currencyCode || cur)} owed</span>
                           </li>
                         ))}
                         {Number(approvalBalance?.committedAmount) > 0 && (
@@ -816,7 +853,8 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                     {[
                       ["FULL", "Approve full amount"],
                       ["REDUCED", "Approve a lower amount"],
-                      ...(sources.length > 0 ? [["SET_OFF", "Set off earlier balance"]] : []),
+                      // A Carry Forward request already brings the carried balance in; a set-off on top would double it.
+                      ...(sources.length > 0 && !includesCarryForward ? [["SET_OFF", "Set off earlier balance"]] : []),
                     ].map(([code, label]) => (
                       <label
                         key={code}
@@ -891,7 +929,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                 {/* 4. The outcome, in one line, recalculated as the approver types. */}
                 <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs">
                   <span className="text-gray-700">
-                    {decision === "FULL" && "Finance will pay the employee"}
+                    {decision === "FULL" && (includesCarryForward ? "Finance will pay the employee (new cash)" : "Finance will pay the employee")}
                     {decision === "REDUCED" && (reducedValid ? `Finance will pay the employee (cut by ${money(requested - reducedNum)})` : "Enter a valid amount to see what Finance pays")}
                     {decision === "SET_OFF" && (setOffValid ? `Finance will pay in cash (${money(setOffNum)} set off from the earlier advance)` : "Choose the earlier advance and amount to see the cash paid")}
                   </span>
@@ -900,6 +938,16 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                     {decision === "REDUCED" && reducedValid && money(reducedNum)}
                     {decision === "SET_OFF" && setOffValid && money(requested - setOffNum)}
                   </span>
+                  {/* Carry Forward: the payout is only the new cash, so say why it is lower than the total. */}
+                  {includesCarryForward && broughtIn > 0 && (decision === "FULL" || (decision === "REDUCED" && reducedValid)) && (
+                    <p data-testid="carry-forward-payout-note" className="basis-full text-[11px] leading-relaxed text-gray-600">
+                      Only the new cash is paid. The employee accounts for{" "}
+                      <span className="font-semibold text-gray-900">
+                        {money((decision === "REDUCED" ? reducedNum : requested) + broughtIn)}
+                      </span>{" "}
+                      in total, including {money(broughtIn)} carried forward that they already hold.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -1033,7 +1081,6 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
               <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                 <tr>
                   <th className="w-8 px-2.5 py-2" />
-                  <th className="px-2.5 py-2 text-left">Report</th>
                   <th className="px-2.5 py-2 text-left">Employee</th>
                   <th className="px-2.5 py-2 text-left">Title / Merchant</th>
                   <th className="px-2.5 py-2 text-left">Level / Status</th>
