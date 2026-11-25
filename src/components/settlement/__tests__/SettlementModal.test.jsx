@@ -90,8 +90,27 @@ describe("SettlementModal", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Send to Payroll" }));
 
     await waitFor(() =>
-      expect(recoveryApi.createSalaryDeduction).toHaveBeenCalledWith("adv-1", { amount: 3000, payrollMonth: "2026-11" }),
+      expect(recoveryApi.createSalaryDeduction).toHaveBeenCalledWith("adv-1", { amount: 3000, payrollMonth: "2026-11", amountChangeReason: null }),
     );
     expect(showStatusToast).toHaveBeenCalledWith(expect.stringContaining("PR-2026-2027-AAAA1111"), "success");
+  });
+
+  it("asks for a reason when the amount is changed, and sends it", async () => {
+    recoveryApi.createSalaryDeduction.mockResolvedValue({ payrollRequestId: "PR-2026-2027-BBBB2222" });
+    render(<SettlementModal isOpen advance={ADVANCE} onClose={vi.fn()} onSettled={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText(/Amount to deduct/), { target: { value: "1000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send to Payroll" }));
+
+    expect(await screen.findByText(/Enter the reason for changing the amount/)).toBeInTheDocument();
+    expect(recoveryApi.createSalaryDeduction).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(/Reason for changing the amount/), { target: { value: "Two instalments" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send to Payroll" }));
+
+    await waitFor(() =>
+      expect(recoveryApi.createSalaryDeduction).toHaveBeenCalledWith("adv-1", {
+        amount: 1000, payrollMonth: "2026-11", amountChangeReason: "Two instalments",
+      }),
+    );
   });
 });

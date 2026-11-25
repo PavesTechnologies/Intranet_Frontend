@@ -1,5 +1,5 @@
 import React from "react";
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -12,6 +12,13 @@ vi.mock("@/pages/expense-management/approval-engine/api/approvalWorkflowApi", ()
   approvalWorkflowApi: { getMyQueue: vi.fn(() => Promise.resolve({ data: { data: { content: [], totalElements: 0 } } })) },
 }));
 vi.mock("@/pages/expense-management/approval-engine/pages/ApprovalsPage", () => ({ default: () => null }));
+vi.mock("@/pages/expense-management/api/supplementaryClaimApi", async (orig) => ({
+  ...(await orig()),
+  financeClaimService: { queue: vi.fn(() => Promise.resolve({ data: { data: [
+    { status: "PENDING_FINANCE", currencyCode: "INR", totalAmount: 1200 },
+    { status: "APPROVED", currencyCode: "INR", totalAmount: 999 },
+  ] } })) },
+}));
 vi.mock("@/pages/expense-management/approval-engine/components/EmployeeLabel", () => ({ default: ({ employeeId }) => <span>{employeeId}</span> }));
 
 import FinanceDashboard from "../FinanceDashboard";
@@ -77,10 +84,16 @@ const renderIt = () =>
   );
 
 describe("Finance dashboard", () => {
-  it("shows desk health against the 3-day target", () => {
+  it("the banner says what is waiting in one line, with no side panel of figures", () => {
     renderIt();
-    expect(document.querySelector("[data-desk-health]").textContent).toMatch(/2 of 4 within 3 days/);
-    expect(document.querySelector("[data-desk-health]").textContent).toMatch(/50%/);
+    expect(document.querySelector("[data-finance-headline]").textContent).toMatch(/4 reports worth ₹40,000 waiting for verification/);
+    expect(document.querySelector("[data-desk-health]")).toBeNull();
+    expect(document.querySelector("[data-desk-results]")).toBeNull();
+  });
+
+  it("supplementary claims waiting for Finance show as an insight, not a separate card", async () => {
+    renderIt();
+    await waitFor(() => expect(document.body.textContent).toMatch(/1 supplementary claim waiting for Finance/));
   });
 
   it("ranks insights with overdue reports first", () => {
@@ -91,15 +104,39 @@ describe("Finance dashboard", () => {
     expect(insights.length).toBeLessThanOrEqual(4);
   });
 
-  it("gives each queue row a priority from its wait", () => {
+  it("has no KPI card row or work area: those live on the Finance and Approvals pages", () => {
     renderIt();
-    const priorities = [...document.querySelectorAll("[data-finance-queue] tbody tr")].map((r) => r.dataset.priority);
-    expect(priorities).toEqual(["overdue", "late", "due", "new"]);
+    expect(document.querySelector("[data-kpi]")).toBeNull();
+    expect(document.querySelector("[data-finance-queue]")).toBeNull();
+    expect(document.querySelector("[role=tablist]")).toBeNull();
   });
 
-  it("shows tax and never prints NaN or undefined", () => {
+  it("with nothing to verify, the banner says the queue is clear", () => {
+    const empty = { ...data, kpis: data.kpis.map((k) => (["toVerify", "queueValue"].includes(k.key) ? { ...k, value: 0 } : k)), attention: [], aging: [] };
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <FinanceDashboard data={empty} config={config} currency="INR" />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    expect(document.querySelector("[data-finance-headline]").textContent).toMatch(/The verification queue is clear/);
+  });
+
+  it("never prints NaN or undefined", () => {
     renderIt();
-    expect(document.querySelector("[data-finance-tax]").textContent).toMatch(/67%/);
     expect(document.body.textContent).not.toMatch(/undefined|NaN/);
+  });
+
+  it("flags a month with GST but no recoverable ITC as tax lost", () => {
+    const noItc = { ...data, tax: { ...data.tax, taxThisMonth: 871, recoverableThisMonth: 0, nonRecoverableThisMonth: 871 } };
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <FinanceDashboard data={noItc} config={config} currency="INR" />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    expect(document.body.textContent).toMatch(/No GST recoverable this month: ₹871 lost/);
   });
 });

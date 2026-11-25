@@ -20,7 +20,6 @@ describe("AP sidebar sections", () => {
     ]);
     expect(shape(menu)).toEqual([
       "Dashboard",
-      "Notifications",
       "How It Works",
       // VENDOR_VIEW also opens Internal Requests (read-only), as GET /vendor-onboarding-requests allows.
       { "Invoices & Vendors": ["Invoice Management", "Recurring Invoices", "Credit & Debit Notes", "Vendor Management", "Internal Requests"] },
@@ -36,7 +35,7 @@ describe("AP sidebar sections", () => {
   it("shows an AP Executive only what they work on", () => {
     const menu = as(["AP_Executive"], ["INVOICE_VIEW", "INVOICE_UPLOAD"]);
     // Recurring Invoices and Credit & Debit Notes are readable with INVOICE_VIEW
-    expect(shape(menu)).toEqual(["Dashboard", "Notifications", "How It Works",
+    expect(shape(menu)).toEqual(["Dashboard", "How It Works",
       { "Invoices & Vendors": ["Invoice Management", "Recurring Invoices", "Credit & Debit Notes"] }]);
     expect(menu.find((i) => i.label === "Invoices & Vendors").to).toBe("/accounts-payable/invoices");
   });

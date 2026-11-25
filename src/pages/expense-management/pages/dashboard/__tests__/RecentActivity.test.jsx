@@ -143,17 +143,19 @@ describe("recent activity", () => {
 describe("recent activity filters", () => {
   const ids = (container) => [...container.querySelectorAll("[data-activity-row]")].map((el) => el.getAttribute("data-activity-row"));
 
-  it("filters by status group, with a count beside each option", () => {
+  it("offers the exact badge statuses as filter options, with a count beside each", () => {
     const { container } = renderIt();
     const select = screen.getByLabelText("Filter by status");
-    expect(within(select).getByRole("option", { name: "Completed (2)" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Needs your action (1)" })).toBeInTheDocument();
+    const options = within(select).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual(["All statuses (4)", "Returned (1)", "Disbursed (1)", "Paid (1)", "Settled (1)"]);
 
-    fireEvent.change(select, { target: { value: "done" } });
-    expect(ids(container)).toEqual([
-      "report-cccccccc-0000-0000-0000-000000000003",
-      "advance-aaaaaaaa-0000-0000-0000-000000000009",
-    ]);
+    fireEvent.change(select, { target: { value: "Paid" } });
+    expect(ids(container)).toEqual(["report-cccccccc-0000-0000-0000-000000000003"]);
+  });
+
+  it("has no period filter", () => {
+    renderIt();
+    expect(screen.queryByLabelText("Filter by period")).toBeNull();
   });
 
   it("searches reference and description", () => {
@@ -162,15 +164,6 @@ describe("recent activity filters", () => {
     expect(ids(container)).toEqual([`report-${REP_ID}`]);
     fireEvent.change(screen.getByLabelText("Search activity"), { target: { value: "client" } });
     expect(ids(container)).toEqual([`advance-${ADV_ID}`]);
-  });
-
-  it("filters by period", () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-11-12T12:00:00"));
-    const { container } = renderIt();
-    fireEvent.change(screen.getByLabelText("Filter by period"), { target: { value: "7" } });
-    expect(ids(container)).toEqual([`report-${REP_ID}`, `advance-${ADV_ID}`]);
-    vi.useRealTimers();
   });
 
   it("says when nothing matches, and Clear filters brings every row back", () => {
@@ -183,7 +176,7 @@ describe("recent activity filters", () => {
 
   it("the footer shows how many rows match and their total", () => {
     const { container } = renderIt();
-    fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "done" } });
-    expect(container.querySelector("[data-activity-summary]").textContent).toMatch(/Showing 2 of 2 matching \(of 4\).*2,800/);
+    fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "Settled" } });
+    expect(container.querySelector("[data-activity-summary]").textContent).toMatch(/Showing 1 of 1 matching \(of 4\).*2,000/);
   });
 });

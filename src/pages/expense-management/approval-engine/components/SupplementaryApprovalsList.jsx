@@ -6,6 +6,7 @@ import Modal from "@/components/Modal/modal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import EmployeeLabel from "./EmployeeLabel";
 import RowActionButton, { RowActions } from "./RowActionButton";
+import { ApprovalStatusBadge, suppStatusKey } from "./approvalStatus";
 import { formatMoney } from "../constants/approvalLabels";
 import {
   SUPP_STATUS,
@@ -35,7 +36,9 @@ function queueFailureMessage({ err, role }) {
  * Managers see claims waiting for the manager; Finance sees claims waiting for Finance. The backend decides which
  * claims each user may act on, and every action here calls the same endpoint as the claim's own review screen.
  */
+// `rowFilter` (optional): the Approvals page's column filters. Called with { employeeId, employeeName, costCenter, amount, date }.
 export default function SupplementaryApprovalsList({
+  rowFilter = null,
   activeTab = "pending",
   searchTerm = "",
   isManager = false,
@@ -88,6 +91,10 @@ export default function SupplementaryApprovalsList({
   }, [activeTab, isManager, isFinance, refreshKey]);
 
   const matches = (c) => {
+    if (rowFilter && !rowFilter({
+      employeeId: c.employeeId, employeeName: c.employeeName, costCenter: c.costCenterName,
+      amount: c.totalAmount, date: c.submittedAt || c.createdAt, status: suppStatusKey(c.status),
+    })) return false;
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
     return [c.claimNumber, c.employeeId, c.reportNumber].some((v) => String(v || "").toLowerCase().includes(q));
@@ -162,7 +169,7 @@ export default function SupplementaryApprovalsList({
         {visible.map((c) => (
           <tr key={c.claimId} className="transition hover:bg-gray-50/80">
             <td className="px-2.5 py-1.5 text-left">
-              <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800">
+              <span className="inline-flex items-center whitespace-nowrap rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800">
                 Supplementary
               </span>
             </td>
@@ -175,9 +182,7 @@ export default function SupplementaryApprovalsList({
             </td>
             <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate">—</td>
             <td className="px-2.5 py-1.5 text-left whitespace-nowrap">
-              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
-                {SUPP_STATUS_LABEL[c.status] || c.status}
-              </span>
+              <ApprovalStatusBadge statusKey={suppStatusKey(c.status)} />
             </td>
             <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap text-xs">
               {formatMoney(c.totalAmount, c.currencyCode)}
@@ -186,7 +191,7 @@ export default function SupplementaryApprovalsList({
             <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
             <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
               <RowActions>
-                <RowActionButton tone="view" icon={Eye} label={`View ${c.claimNumber}`} title="View claim" onClick={() => openClaim(c)} />
+                <RowActionButton tone="view" icon={Eye} label={`View ${c.claimNumber}`} title="View the claim" onClick={() => openClaim(c)} />
                 <RowActionButton tone="approve" icon={CheckCircle2} label={`Approve ${c.claimNumber}`} title="Approve" disabled={busy} onClick={() => approve(c)} />
                 <RowActionButton tone="clarify" icon={MessageSquareWarning} label={`Ask for clarification on ${c.claimNumber}`} title="Ask for clarification"
                   disabled={busy} onClick={() => setPending({ claim: c, decision: "clarify" })} />

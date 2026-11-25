@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { settlementFiguresFor, settlementTotals, usageShares } from "../settlementFigures";
+import { figuresForAdvance } from "../useAdvanceFigures";
 
 describe("settlementFiguresFor", () => {
   it("nothing spent yet: the whole advance remains and is outstanding", () => {
@@ -91,3 +92,20 @@ describe("settlementTotals and usageShares", () => {
     expect(usageShares(f)).toEqual({ spent: 60, recovered: 20, carried: 0, outstanding: 20 });
   });
 });
+
+describe("approval cut and approved-but-unpaid", () => {
+  // Shaped like a real advance: asked 5,000, the manager approved 3,500, not paid out yet.
+  const cutAdvance = { advanceId: "c1", status: "APPROVED", requestedAmount: 5000, approvedAmount: 3500, amount: 3500 };
+  const paid = { advanceId: "p1", status: "IN_PROGRESS", requestedAmount: 2000, approvedAmount: 2000, amount: 2000, disbursedAmount: 2000 };
+
+  it("an approved, unpaid advance shows its cut and the amount still to disburse", () => {
+    const f = figuresForAdvance(cutAdvance, null);
+    expect(f).toMatchObject({ paidOut: false, requested: 5000, approved: 3500, cut: 1500, awaitingDisbursement: 3500, disbursed: 0 });
+  });
+
+  it("totals count the cut and what is approved but not paid", () => {
+    const t = settlementTotals([figuresForAdvance(cutAdvance, null), figuresForAdvance(paid, { claimedAmount: 0 })]);
+    expect(t).toMatchObject({ requested: 7000, approved: 5500, cut: 1500, cutCount: 1, awaitingDisbursement: 3500, awaitingCount: 1, disbursed: 2000 });
+  });
+});
+

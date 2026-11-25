@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../api/axiosInstance";
 import { Search } from "lucide-react";
 
@@ -16,7 +17,11 @@ const EmployeeDirectory = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState("");
+  // ?q= pre-fills the search — the global search (header, Ctrl/Cmd+K) links people results here.
+  const [searchParams] = useSearchParams();
+  const queryParam = searchParams.get("q") || "";
+  const [search, setSearch] = useState(queryParam);
+  useEffect(() => setSearch(queryParam), [queryParam]);
   const [department, setDepartment] = useState("All");
 
   const [departmentsList, setDepartmentsList] = useState([]);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, MessageCircle, RotateCcw, SendHorizontal, Sparkles, X } from "lucide-react";
+import AssistantCharacter from "./AssistantAvatar";
 
 import { useAuth } from "../../contexts/AuthContext";
 import { useTour } from "../Tour/TourContext";
@@ -23,6 +24,9 @@ import { aiEnabled, askAI } from "./chatApi";
  */
 
 const STORAGE_KEY = "paves-assistant-chat";
+// How the assistant girl stands between actions: "idle" (standing still) or "mug" (holding a coffee mug).
+const IDLE_POSE = "idle";
+const CHARACTER_HEIGHT = 60;
 let idSeq = 0;
 const newId = () => `${Date.now()}-${idSeq++}`;
 
@@ -53,6 +57,15 @@ export default function ChatbotWidget() {
   const [messages, setMessages] = useState(loadHistory);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // The login-page girl: waves on open → stands still → thinks while typing → happy hop on answer.
+  const [charPose, setCharPose] = useState("wave");
+  const poseTimer = useRef(null);
+  const setPoseFor = useCallback((pose, ms) => {
+    clearTimeout(poseTimer.current);
+    setCharPose(pose);
+    poseTimer.current = setTimeout(() => setCharPose(IDLE_POSE), ms);
+  }, []);
+  useEffect(() => () => clearTimeout(poseTimer.current), []);
 
   const listRef = useRef(null);
   const inputRef = useRef(null);
@@ -79,6 +92,11 @@ export default function ChatbotWidget() {
   useEffect(() => {
     if (open && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, busy, open]);
+
+  // She says hi every time the chat is opened.
+  useEffect(() => {
+    if (open) setPoseFor("wave", 2600);
+  }, [open, setPoseFor]);
 
   // Focus the input on open; Esc closes.
   useEffect(() => {
@@ -156,6 +174,7 @@ export default function ChatbotWidget() {
       try {
         const reply = await respond(text, history);
         setMessages((m) => [...m, { id: newId(), role: "bot", ...reply }]);
+        setPoseFor("happy", 1300);
       } catch (err) {
         console.error("Assistant failed to answer", err);
         setMessages((m) => [
@@ -166,7 +185,7 @@ export default function ChatbotWidget() {
         setBusy(false);
       }
     },
-    [input, busy, messages, respond],
+    [input, busy, messages, respond, setPoseFor],
   );
 
   const runAction = (action) => {
@@ -189,6 +208,8 @@ export default function ChatbotWidget() {
 
   const greetingTitle = `Hi${firstName ? ` ${firstName}` : ""}! I'm your Paves Assistant.`;
   const starterChips = module?.suggestions || SUGGESTIONS;
+  // She stands next to the latest assistant message (or the typing dots while busy).
+  const lastBotId = [...messages].reverse().find((m) => m.role === "bot")?.id;
 
   return (
     <>
@@ -260,7 +281,7 @@ export default function ChatbotWidget() {
             <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-[#FAFBFE] px-4 py-4" aria-live="polite">
               {messages.length === 0 && (
                 <div className="space-y-3">
-                  <BotBubble>
+                  <BotBubble character={charPose}>
                     <p className="font-medium text-[#0A174E]">{greetingTitle}</p>
                     <p className="mt-1 text-gray-600">{module ? module.intro : "Ask me about leave, timesheets, projects, holidays or celebrations."}</p>
                   </BotBubble>
@@ -285,7 +306,7 @@ export default function ChatbotWidget() {
                         <span className="h-px flex-1 bg-gray-200" /> {m.divider} <span className="h-px flex-1 bg-gray-200" />
                       </div>
                     )}
-                    <BotBubble error={m.error}>
+                    <BotBubble error={m.error} character={!busy && m.id === lastBotId ? charPose : undefined}>
                       <p className="whitespace-pre-wrap">{m.text}</p>
                       {m.items?.length > 0 && (
                         <ul className="mt-2 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
@@ -305,7 +326,7 @@ export default function ChatbotWidget() {
               )}
 
               {busy && (
-                <BotBubble>
+                <BotBubble character="think">
                   <span className="flex items-center gap-1 py-1" aria-label="Assistant is typing">
                     {[0, 1, 2].map((i) => (
                       <motion.span
@@ -359,10 +380,18 @@ export default function ChatbotWidget() {
   );
 }
 
-function BotBubble({ children, error }) {
-  return (
+function BotBubble({ children, error, character, characterHeight = CHARACTER_HEIGHT }) {
+  const bubble = (
     <div className={`max-w-[92%] rounded-2xl rounded-bl-md border px-3.5 py-2.5 text-[13px] leading-relaxed ${error ? "border-rose-100 bg-rose-50 text-rose-700" : "border-gray-100 bg-white text-gray-700"}`}>
       {children}
+    </div>
+  );
+  if (!character) return bubble;
+  // The login-page girl stands next to the bubble, like she's the one talking.
+  return (
+    <div className="flex items-end gap-1.5">
+      <AssistantCharacter height={characterHeight} pose={character} className="shrink-0" />
+      <div className="mb-2 min-w-0 flex-1">{bubble}</div>
     </div>
   );
 }

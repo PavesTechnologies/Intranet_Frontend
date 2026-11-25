@@ -78,3 +78,17 @@ export const leaveBalance = async (employeeId, year) => {
         throw error;
     }
 };
+/** The logged-in employee's own leave requests for a year (all statuses). */
+export const myLeaveRequests = async (employeeId, year) => {
+    try {
+        const response = await api.get(`${LMS_BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return Array.isArray(response.data?.data) ? response.data.data : [];
+    } catch (error) {
+        console.error("Error fetching leave requests:", error);
+        throw error;
+    }
+};

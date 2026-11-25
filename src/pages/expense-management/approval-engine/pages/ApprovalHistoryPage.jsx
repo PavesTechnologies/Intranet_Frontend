@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { AlertTriangle, Eye, Inbox } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, Inbox, MessageSquareWarning, XCircle } from "lucide-react";
+import { ApprovalStatusBadge, expenseStatusKey } from "../components/approvalStatus";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
-import ApprovalStatusPill from "../components/ApprovalStatusPill";
 import EmployeeLabel from "../components/EmployeeLabel";
 import RowActionButton, { RowActions } from "../components/RowActionButton";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
@@ -27,7 +27,8 @@ const OUTCOME_OPTIONS = [
  * defaults to both/undefined). Rows open the same ExpenseReviewPanel used by the pending queue, in
  * read-only "history" mode.
  */
-export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, breadcrumbLabel, searchTerm = "", hideHeader = false, embedded = false, allowOutcomeFilter = false, noPadding = false, onRowCount, windowStart = 0, windowEnd }) {
+// `rowFilter` (optional): the Approvals page's column filters. Called with { employeeId, employeeName, costCenter, amount, date }.
+export default function ApprovalHistoryPage({ rowFilter = null, outcome: fixedOutcome, title, breadcrumbLabel, searchTerm = "", hideHeader = false, embedded = false, allowOutcomeFilter = false, noPadding = false, onRowCount, windowStart = 0, windowEnd }) {
   const [page, setPage] = useState(0);
   // Embedded in the approvals table: fetch a full batch; the parent pages across both lists.
   const pageSize = embedded ? 100 : DEFAULT_PAGE_SIZE;
@@ -41,6 +42,10 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
 
   const filteredItems = useMemo(() => {
     const filtered = items.filter((report) => {
+      if (rowFilter && !rowFilter({
+        employeeId: report.employeeId, employeeName: report.employeeName, costCenter: report.costCenterName,
+        amount: report.totalAmount, date: report.submittedAt || report.createdAt, status: expenseStatusKey(report),
+      })) return false;
       if (!searchTerm) return true;
       const q = searchTerm.toLowerCase();
       const reportNum = (report.reportNumber || "").toLowerCase();
@@ -56,7 +61,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
       const timeB = dateB ? new Date(dateB).getTime() : 0;
       return timeB - timeA;
     });
-  }, [items, searchTerm]);
+  }, [items, searchTerm, rowFilter]);
 
   // Embedded: only the rows inside this page's window (the parent counts every row across both lists).
   const windowItems = windowEnd === undefined ? filteredItems : filteredItems.slice(windowStart, windowEnd);
@@ -77,20 +82,23 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
           <tbody className="divide-y divide-gray-100">
             {windowItems.map((report, index) => (
               <tr key={report.reportId} className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setReviewingItem(report)}>
-                <td className="px-2.5 py-1.5 text-left"><span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span></td>
+                <td className="px-2.5 py-1.5 text-left"><span className="inline-flex items-center whitespace-nowrap rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">Expense</span></td>
                 <td className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-900 whitespace-nowrap"><EmployeeLabel employeeId={report.employeeId} /></td>
                 <td className="px-2.5 py-1.5 text-left max-w-[220px]">
                   <p className="font-semibold text-gray-900 truncate text-xs">{report.title || "—"}</p>
                   <p className="text-[11px] text-gray-500 truncate mt-0.5">Created {formatDate(report.createdAt)}</p>
                 </td>
                 <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate">{report.costCenterName || "—"}</td>
-                <td className="px-2.5 py-1.5 text-left whitespace-nowrap"><ApprovalStatusPill status={report.reportStatus} /></td>
+                <td className="px-2.5 py-1.5 text-left whitespace-nowrap"><ApprovalStatusBadge statusKey={expenseStatusKey(report)} /></td>
                 <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
                 <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
                 <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
                 <td className="px-2.5 py-1.5 text-right">
                   <RowActions>
-                    <RowActionButton tone="view" icon={Eye} label={`View ${report.reportNumber}`} title="View" onClick={() => setReviewingItem(report)} />
+                    <RowActionButton tone="view" icon={Eye} label={`View ${report.reportNumber}`} title="View the report" onClick={() => setReviewingItem(report)} />
+                    <RowActionButton tone="approve" icon={CheckCircle2} label="Approve" title="Already decided" disabled />
+                    <RowActionButton tone="clarify" icon={MessageSquareWarning} label="Send back" title="Already decided" disabled />
+                    <RowActionButton tone="reject" icon={XCircle} label="Reject" title="Already decided" disabled />
                   </RowActions>
                 </td>
               </tr>
@@ -191,7 +199,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                       <td className="px-2.5 py-1.5 text-gray-600 whitespace-nowrap text-xs">{formatDate(report.createdAt)}</td>
                       <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-right text-xs">{formatMoney(report.totalAmount, report.currencyCode)}</td>
                       <td className="px-2.5 py-1.5">
-                        <ApprovalStatusPill status={report.reportStatus} />
+                        <ApprovalStatusBadge statusKey={expenseStatusKey(report)} />
                       </td>
                     </tr>
                   ))}
@@ -218,7 +226,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                   <span>{formatDate(report.createdAt)}</span>
-                  <ApprovalStatusPill status={report.reportStatus} />
+                  <ApprovalStatusBadge statusKey={expenseStatusKey(report)} />
                 </div>
               </button>
             ))}

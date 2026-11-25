@@ -11,6 +11,7 @@ import {
   Clock3,
   FileText,
   Inbox,
+  Receipt,
   ReceiptText,
   ScanLine,
   Settings,
@@ -24,7 +25,7 @@ import { formatKpiValue, formatMoney } from "./dashboardTheme";
 // Shared pieces for every Expense dashboard, so they all read the same way: a navy banner that says what matters today
 // with the role's quick actions built into it, figure cards, a "waiting longest" queue table and a step flow.
 
-const QUICK_ICONS = { Banknote, Bell, ClipboardCheck, FileText, Clock3, ReceiptText, ScanLine, Settings, Shield, Wallet };
+const QUICK_ICONS = { Banknote, Bell, ClipboardCheck, FileText, Clock3, Inbox, Receipt, ReceiptText, ScanLine, Settings, Shield, Wallet };
 
 /** The role's quick actions as a row inside the banner. An action shows only when the role can open its route. */
 export function HeroQuickActions({ actions = [] }) {

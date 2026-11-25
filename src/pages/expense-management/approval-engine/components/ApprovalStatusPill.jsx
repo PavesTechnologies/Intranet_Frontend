@@ -1,47 +1,30 @@
 import React from "react";
-import classNames from "classnames";
+import { ApprovalStatusBadge, expenseStatusKey } from "./approvalStatus";
 
 /**
- * Deliberately not the shared StatusBadge (@/components/...) - this module renders its own
- * approval-lifecycle statuses (AWAITING_CORRECTION, PENDING_APPROVAL, level display names like
- * "Pending Manager Approval") rather than extending a shared component built for generic
- * request/task statuses elsewhere in the app.
+ * An expense report's status on the review panel, the report detail page and the AP review. It uses the same status
+ * names and colours as the My Approvals table (approvalStatus.jsx), so a report reads the same everywhere. What the
+ * shared name does not say (the approval level, who asked for a correction) is shown as a short second line.
  */
-const TONE_BY_STATUS = {
-  DRAFT: "bg-gray-100 text-gray-700",
-  PENDING_APPROVAL: "bg-amber-100 text-amber-800",
-  AWAITING_CORRECTION: "bg-orange-100 text-orange-800",
-  APPROVED: "bg-emerald-100 text-emerald-800",
-  REJECTED: "bg-rose-100 text-rose-800",
-  CANCELLED: "bg-gray-100 text-gray-600",
-  POLICY_REJECTED: "bg-rose-100 text-rose-800",
-  QUERY_RAISED: "bg-orange-100 text-orange-800",
-  PENDING_FINANCE_VERIFICATION: "bg-blue-100 text-blue-800",
-};
 
 // An approver's Needs Correction and a Finance query both leave a report AWAITING_CORRECTION;
 // ApprovalStatusResponse.correctionRequestedBy ("APPROVER" | "FINANCE") says which it was.
-const correctionLabel = (correctionRequestedBy) =>
-  correctionRequestedBy === "FINANCE"
-    ? "Finance Requested Correction"
+const correctionLabel = (correctionRequestedBy, status) =>
+  correctionRequestedBy === "FINANCE" || status === "QUERY_RAISED"
+    ? "Finance asked for a correction"
     : correctionRequestedBy === "APPROVER"
-    ? "Manager Requested Correction"
-    : "Correction Requested";
+    ? "Manager asked for a correction"
+    : status === "POLICY_REJECTED"
+    ? "Policy check failed"
+    : "Correction requested";
 
-export default function ApprovalStatusPill({ status, label, correctionRequestedBy }) {
-  const tone = TONE_BY_STATUS[status] || "bg-gray-100 text-gray-700";
-  const displayLabel =
-    label ||
-    (status === "PENDING_FINANCE_VERIFICATION"
-      ? "Pending Finance Verification"
-      : status === "AWAITING_CORRECTION"
-      ? correctionLabel(correctionRequestedBy)
-      : status === "QUERY_RAISED"
-      ? "Finance Requested Correction"
-      : status);
-  return (
-    <span className={classNames("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", tone)}>
-      {displayLabel}
-    </span>
-  );
+export default function ApprovalStatusPill({ status, label, correctionRequestedBy, paymentRoutingStatus }) {
+  const statusKey = expenseStatusKey({ reportStatus: status, paymentRoutingStatus });
+  const detail =
+    statusKey === "SENT_BACK"
+      ? correctionLabel(correctionRequestedBy, String(status || "").toUpperCase())
+      : label && !/^pending (manager|finance)/i.test(label)
+      ? label
+      : null;
+  return <ApprovalStatusBadge statusKey={statusKey} detail={detail} />;
 }

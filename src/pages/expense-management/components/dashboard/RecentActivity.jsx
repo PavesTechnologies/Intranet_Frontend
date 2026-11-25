@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   Banknote,
-  CalendarDays,
   ChevronDown,
   ChevronRight,
   Inbox,
@@ -18,13 +17,11 @@ import { formatMoney } from "@/pages/expense-management/approval-engine/constant
 import {
   ACTIVITY_FILTERS,
   ACTIVITY_LIMIT,
-  PERIODS,
-  STATUS_GROUPS,
   buildActivityRows,
-  countByStatusGroup,
   filterActivityRows,
   formatShortDate,
   refineActivityRows,
+  statusOptionsFor,
 } from "./employeeActivity";
 import { timeAgo } from "./dashboardTheme";
 
@@ -171,7 +168,6 @@ export default function RecentActivity({
   const navigate = useNavigate();
   const [filter, setFilter] = useState("all");
   const [status, setStatus] = useState("all");
-  const [period, setPeriod] = useState("all");
   const [search, setSearch] = useState("");
 
   const rows = useMemo(
@@ -179,26 +175,27 @@ export default function RecentActivity({
     [advances, reports],
   );
   const byKind = filterActivityRows(rows, filter);
-  const matching = refineActivityRows(byKind, { status, period, search });
+  const matching = refineActivityRows(byKind, { status, search });
   // Only the latest few rows are shown here; "More" opens the full list for the chosen tab.
   const visible = matching.slice(0, ACTIVITY_LIMIT);
-  const refined = status !== "all" || period !== "all" || search.trim() !== "";
+  const refined = status !== "all" || search.trim() !== "";
   const change = (setter) => (value) => setter(value);
   const clearFilters = () => {
     setStatus("all");
-    setPeriod("all");
     setSearch("");
   };
 
-  // Status counts reflect the type, period and search chosen, so each option says how many rows it would show.
-  const counts = countByStatusGroup(
-    refineActivityRows(byKind, { period, search }),
-  );
-  const statusOptions = STATUS_GROUPS.map((g) => ({
-    key: g.key,
-    label: `${g.label} (${counts[g.key] || 0})`,
-    disabled: g.key !== "all" && g.key !== status && !counts[g.key],
-  }));
+  // The status options are the exact statuses on the badges (for the chosen type and search), each with its count.
+  const searched = refineActivityRows(byKind, { search });
+  const present = statusOptionsFor(searched);
+  const statusOptions = [
+    { key: "all", label: `All statuses (${searched.length})` },
+    ...present.map((s) => ({ key: s.label, label: `${s.label} (${s.count})` })),
+    // Keep the chosen status listed even when the type or search leaves no rows with it.
+    ...(status !== "all" && !present.some((s) => s.label === status)
+      ? [{ key: status, label: `${status} (0)` }]
+      : []),
+  ];
   const total = matching.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
   const loading =
     (advancesLoading && !advances) || (reportsLoading && !reports);
@@ -275,14 +272,6 @@ export default function RecentActivity({
             active={status !== "all"}
             onChange={change(setStatus)}
             options={statusOptions}
-          />
-          <FilterSelect
-            label="Filter by period"
-            icon={CalendarDays}
-            value={period}
-            active={period !== "all"}
-            onChange={change(setPeriod)}
-            options={PERIODS}
           />
           {refined && (
             <button

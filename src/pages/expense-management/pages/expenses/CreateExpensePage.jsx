@@ -2059,8 +2059,9 @@ export default function CreateExpensePage() {
       />
 
 
-      {/* PAGE HEADER */}
+      {/* PAGE HEADER (step 1 carries its own header inside the form panel) */}
 
+      {currentStep !== 1 && (
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-center gap-3">
 
@@ -2081,22 +2082,58 @@ export default function CreateExpensePage() {
 
         </div>
       </div>
+      )}
 
 
       {/* MAIN WIZARD */}
 
-      <div className="mx-auto w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 space-y-6">
+      <div
+        className={
+          currentStep === 1
+            ? "w-full"
+            : "mx-auto w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 space-y-6"
+        }
+      >
 
 
         {/* =====================================================
-            STEP 1
+            STEP 1 — a form panel: fixed header and footer, the fields scroll in between
         ====================================================== */}
 
         {currentStep === 1 && (
           <form
             onSubmit={handleNextFromStep1}
-            className="space-y-5 max-w-2xl mx-auto"
+            className="mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm max-h-[calc(100vh-150px)]"
           >
+
+            {/* Header */}
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-5 py-4 sm:px-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-indigo-50 p-2.5 text-[#0A0082]">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <h1 className="text-base font-bold text-[#0a174e] sm:text-lg">
+                    Create Expense Report
+                  </h1>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Start a new expense report, then add individual line items with receipts.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/expense-management/expenses/my")}
+                disabled={submitting}
+                aria-label="Close"
+                className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-900"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable fields */}
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
 
             <FormInput
               label="Report Title"
@@ -2454,10 +2491,13 @@ export default function CreateExpensePage() {
 
             </div>
 
+            </div>
+            {/* end scrollable fields */}
 
-            {/* BUTTONS */}
 
-            <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-5">
+            {/* BUTTONS — fixed footer */}
+
+            <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3 sm:flex-row sm:justify-end sm:px-6">
 
               <Button
                 type="button"

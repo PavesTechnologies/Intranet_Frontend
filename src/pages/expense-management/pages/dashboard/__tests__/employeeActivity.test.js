@@ -111,6 +111,22 @@ describe("settlement reminders", () => {
     );
     expect(reminders).toEqual([]);
   });
+
+  it("does not ask to settle an advance that was never paid out (still in approval, or approved but not disbursed)", () => {
+    // Like advance 99377217: PENDING_FINANCE_APPROVAL, no money paid, but the record already has a balance and a due date.
+    const base = { outstandingBalance: 2000, settlementDueDate: "2026-11-15", disbursedAmount: null };
+    const notPaid = ["SUBMITTED", "PENDING_MANAGER_APPROVAL", "PENDING_COST_CENTER_APPROVAL", "PENDING_FINANCE_APPROVAL", "APPROVED"]
+      .map((status, i) => advance({ ...base, advanceId: `p${i}`, status }));
+    expect(settlementReminders(notPaid, NOW)).toEqual([]);
+  });
+
+  it("reminds for an advance once its money was paid out", () => {
+    const paid = [
+      advance({ advanceId: "by-amount", status: "APPROVED", disbursedAmount: 2000, outstandingBalance: 2000, settlementDueDate: "2026-11-15" }),
+      advance({ advanceId: "by-status", status: "SETTLEMENT_PENDING", outstandingBalance: 968, settlementDueDate: "2026-11-15" }),
+    ];
+    expect(settlementReminders(paid, NOW).map((r) => r.advanceId)).toEqual(["by-amount", "by-status"]);
+  });
 });
 
 describe("settlement reminders as attention rows", () => {
