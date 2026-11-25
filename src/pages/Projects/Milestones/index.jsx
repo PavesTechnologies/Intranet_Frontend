@@ -22,6 +22,9 @@ import {
 
 const PAGE_SIZE = 20;
 
+const FULL_ALLOCATION_MESSAGE =
+  "Can't add another milestone — 100% of the project value is already allocated.";
+
 const selectClass =
   "rounded-lg border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-sm text-slate-700 shadow-sm " +
   "focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200";
@@ -110,20 +113,28 @@ const MilestonesTab = ({ projectId, projectKey, projectStartDate, projectEndDate
   };
 
   const loadError = list.error || summary.error;
+  // Every percent of the project value is spoken for, so there is nothing left to allocate.
+  const allocationFull =
+    !!summary.data &&
+    (summary.data.allocationComplete === true || Number(summary.data.allocatedPercentage) >= 100);
 
   return (
     <div className="px-5 py-5 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold text-slate-800">Milestones</h1>
         {!loadError && (
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add milestone
-          </button>
+          <span className={allocationFull ? "cursor-not-allowed" : undefined} title={allocationFull ? FULL_ALLOCATION_MESSAGE : undefined}>
+            <button
+              type="button"
+              onClick={openCreate}
+              disabled={allocationFull}
+              title={allocationFull ? FULL_ALLOCATION_MESSAGE : undefined}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none disabled:hover:bg-slate-300"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add milestone
+            </button>
+          </span>
         )}
       </div>
 
