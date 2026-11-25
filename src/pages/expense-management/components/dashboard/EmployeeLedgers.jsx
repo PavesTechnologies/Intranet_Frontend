@@ -27,9 +27,12 @@ function Amount({ value, currency, minus = false, plus = false, className = "" }
 }
 
 // A footer check: total = sum of parts. Says "Balanced" or by how much it is off; never hides a difference.
-function Check({ id, total, parts, label, byKey, currency }) {
+// `minus` lists parts that are taken away rather than added.
+function Check({ id, total, parts, minus = [], label, byKey, currency }) {
   const t = byKey[total] ? Number(byKey[total].value) : null;
-  const s = sumOf(byKey, parts);
+  const added = sumOf(byKey, parts);
+  const taken = sumOf(byKey, minus);
+  const s = added === null || taken === null ? null : added - taken;
   const difference = t === null || s === null ? null : t - s;
   const ok = difference !== null && !differs(difference, 0);
   const Icon = ok ? CheckCircle2 : AlertTriangle;
@@ -233,6 +236,10 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
   const used = num(byKey, "caUsedOnBills");
   const returned = num(byKey, "caReturned");
   const carried = num(byKey, "caCarriedForward");
+  const carriedIn = num(byKey, "caCarriedIn");
+  const awaiting = num(byKey, "caAwaitingApproval");
+  const reduced = num(byKey, "caReducedOnApproval");
+  const increased = num(byKey, "caIncreasedOnApproval");
   const outstanding = num(byKey, "caOutstanding");
   const fromAdvance = num(byKey, "avAdvanceOffset");
   const extra = num(byKey, "avPayable");
@@ -289,6 +296,18 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
       <div className="mt-3 divide-y divide-dashed divide-slate-200">
         <div>
           <Line kpi="caRequested" label="Requested" note="What you asked for" muted {...shared} />
+          {awaiting > 0 && (
+            <Line kpi="caAwaitingApproval" label="Awaiting approval" note="Still with your manager or Finance" minus muted {...shared} />
+          )}
+          {carriedIn > 0 && (
+            <Line kpi="caCarriedIn" label="Carried in" note="Balance from your earlier advance, added on approval" plus muted {...shared} />
+          )}
+          {reduced > 0 && (
+            <Line kpi="caReducedOnApproval" label="Reduced on approval" note="Approver approved less than you asked" minus muted {...shared} />
+          )}
+          {increased > 0 && (
+            <Line kpi="caIncreasedOnApproval" label="Increased on approval" note="Approved more than you asked" plus muted {...shared} />
+          )}
           <Line kpi="caApproved" label="Approved" note="Manager and Finance approved" muted {...shared} />
         </div>
         <div className="pt-1">
