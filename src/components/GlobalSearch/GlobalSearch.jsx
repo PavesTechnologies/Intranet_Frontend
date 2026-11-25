@@ -31,7 +31,8 @@ async function fetchPeople() {
 /**
  * Global search for the whole intranet: pages across every module the user can
  * open (same gating as the sidebar) plus people from the employee directory.
- * Opens from the header button or Ctrl/⌘+K; ↑/↓ to move, Enter to open, Esc to close.
+ * Shows as a single icon in the header that expands inline into a search field
+ * (click or Ctrl/⌘+K); ↑/↓ to move, Enter to open, Esc / click outside to collapse.
  */
 const GlobalSearch = () => {
   const navigate = useNavigate();
@@ -41,6 +42,17 @@ const GlobalSearch = () => {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const rootRef = useRef(null);
+
+  // Clicking anywhere outside the expanded search collapses it back to the icon.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onMouseDown = (e) => {
+      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [open]);
 
   // Roles/permissions only change with the token, so rebuild the index per user.
   const pages = useMemo(
@@ -171,61 +183,59 @@ const GlobalSearch = () => {
   const shortcut = isMac ? "⌘K" : "Ctrl K";
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        data-tour="header-search"
-        aria-label="Search the intranet"
-        className="flex h-9 w-full max-w-md items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500 transition-colors hover:border-[#263383]/40 hover:bg-white"
+    <div ref={rootRef} data-tour="header-search" className="relative flex w-full max-w-md justify-end">
+      {/* Collapsed: a single icon. Expanded: the box grows leftwards into a search field. */}
+      <div
+        className={`flex h-9 items-center overflow-hidden rounded-lg border transition-[width,background-color,border-color] duration-200 ease-out ${
+          open
+            ? "w-full gap-2 border-[#263383]/40 bg-white px-3"
+            : "w-9 border-transparent bg-transparent hover:bg-gray-100"
+        }`}
       >
-        <Search className="h-4 w-4 flex-shrink-0" />
-        <span className="flex-1 truncate text-left">Search intranet…</span>
-        <kbd className="hidden flex-shrink-0 whitespace-nowrap rounded border border-gray-200 bg-white px-1.5 py-0.5 font-sans text-[11px] font-medium leading-none text-gray-400 md:inline-block">
-          {shortcut}
-        </kbd>
-      </button>
+        {open ? (
+          <>
+            <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onInputKeyDown}
+              placeholder="Search pages and people…"
+              aria-label="Search pages and people"
+              role="combobox"
+              aria-expanded={results.length > 0}
+              aria-controls="global-search-results"
+              className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-[#081534] outline-none placeholder:text-gray-400 focus:ring-0"
+            />
+            <kbd className="hidden flex-shrink-0 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 sm:inline-block">
+              Esc
+            </kbd>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Search the intranet"
+            title={`Search (${shortcut})`}
+            className="flex h-full w-full items-center justify-center text-gray-700"
+          >
+            <Search className="h-5 w-5" />
+          </button>
+        )}
+      </div>
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            className="fixed inset-0 z-[1000] flex items-start justify-center bg-[#081534]/40 px-4 pt-[12vh]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setOpen(false);
-            }}
-          >
             <motion.div
               role="dialog"
-              aria-modal="true"
               aria-label="Global search"
-              className="w-full max-w-xl overflow-hidden rounded-xl border border-gray-200 bg-white"
+              className="absolute right-0 top-full z-[1000] mt-2 w-full min-w-[20rem] overflow-hidden rounded-xl border border-gray-200 bg-white"
               style={{ boxShadow: "0 16px 48px rgba(8,21,52,0.22)" }}
-              initial={{ opacity: 0, y: -8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.15 }}
             >
-              <div className="flex items-center gap-3 border-b border-gray-100 px-4">
-                <Search className="h-5 w-5 flex-shrink-0 text-gray-400" />
-                <input
-                  ref={inputRef}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={onInputKeyDown}
-                  placeholder="Search pages and people…"
-                  aria-label="Search pages and people"
-                  role="combobox"
-                  aria-expanded={results.length > 0}
-                  aria-controls="global-search-results"
-                  className="h-12 flex-1 border-0 bg-transparent text-sm text-[#081534] outline-none placeholder:text-gray-400 focus:ring-0"
-                />
-                <kbd className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">Esc</kbd>
-              </div>
-
               <div ref={listRef} className="max-h-[60vh] overflow-y-auto p-2" id="global-search-results" role="listbox">
                 {!trimmed && (
                   <p className="px-3 py-6 text-center text-sm text-gray-500">
@@ -264,10 +274,9 @@ const GlobalSearch = () => {
                 )}
               </div>
             </motion.div>
-          </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 };
 

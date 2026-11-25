@@ -16,6 +16,16 @@ const hooks = vi.hoisted(() => ({
 vi.mock("../hooks/useMilestones", () => hooks);
 
 import MilestonesTab from "../index";
+import { formatMoney } from "../utils/milestoneUtils";
+
+// Planned dates must be today or later, so the form fixtures move with the clock.
+const isoInDays = (days) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+};
+const START_DATE = isoInDays(1);
+const DUE_DATE = isoInDays(30);
 
 const milestone = (overrides = {}) => ({
   id: 1,
@@ -53,6 +63,9 @@ const summary = {
   remainingPercentage: 40,
   allocationComplete: false,
   projectBudget: 1000000,
+  allocatedAmount: 600000,
+  remainingAmount: 400000,
+  baseAmount: 400000,
   currency: "INR",
 };
 
@@ -122,6 +135,31 @@ describe("MilestonesTab", () => {
     expect(mutations.create.mutateAsync).not.toHaveBeenCalled();
   });
 
+  it("requires both planned dates before creating a milestone", async () => {
+    const user = userEvent.setup();
+    hooks.useMilestoneList.mockReturnValue(listResult([milestone()]));
+    render(<MilestonesTab projectId={10} />);
+
+    await user.click(screen.getByRole("button", { name: /add milestone/i }));
+    await user.type(screen.getByLabelText(/milestone name/i), "Go live");
+    await user.type(screen.getByLabelText(/allocation/i), "40");
+    await user.click(screen.getByRole("button", { name: "Create milestone" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByRole("link", { name: /planned start date/i })).toHaveAttribute("href", "#ms-start");
+    expect(within(alert).getByRole("link", { name: /planned due date/i })).toHaveAttribute("href", "#ms-due");
+    expect(mutations.create.mutateAsync).not.toHaveBeenCalled();
+
+    // Filling both dates clears the block and lets the milestone through.
+    await user.type(screen.getByLabelText(/planned start/i), START_DATE);
+    await user.type(screen.getByLabelText(/planned due/i), DUE_DATE);
+    await user.click(screen.getByRole("button", { name: "Create milestone" }));
+    expect(mutations.create.mutateAsync).toHaveBeenCalledWith({
+      projectId: 10,
+      payload: expect.objectContaining({ plannedStartDate: START_DATE, plannedDueDate: DUE_DATE }),
+    });
+  });
+
   it("submits a valid milestone with backend-shaped payload", async () => {
     const user = userEvent.setup();
     hooks.useMilestoneList.mockReturnValue(listResult([milestone()]));
@@ -130,6 +168,8 @@ describe("MilestonesTab", () => {
     await user.click(screen.getByRole("button", { name: /add milestone/i }));
     await user.type(screen.getByLabelText(/milestone name/i), "Go live");
     await user.selectOptions(screen.getByLabelText(/linked epic/i), "5");
+    await user.type(screen.getByLabelText(/planned start/i), START_DATE);
+    await user.type(screen.getByLabelText(/planned due/i), DUE_DATE);
     await user.type(screen.getByLabelText(/allocation/i), "40");
     await user.click(screen.getByRole("button", { name: "Create milestone" }));
 
@@ -137,6 +177,39 @@ describe("MilestonesTab", () => {
       projectId: 10,
       payload: expect.objectContaining({ name: "Go live", epicId: 5, billable: true, allocationPercentage: 40 }),
     });
+  });
+
+  it("estimates the amount from the remaining base amount, not the whole budget", async () => {
+    const user = userEvent.setup();
+    hooks.useMilestoneList.mockReturnValue(listResult([milestone()]));
+    render(<MilestonesTab projectId={10} />);
+
+    await user.click(screen.getByRole("button", { name: /add milestone/i }));
+    await user.type(screen.getByLabelText(/allocation/i), "25");
+
+    // 25% of the 400,000 still unallocated — not 25% of the 1,000,000 budget.
+    // formatMoney follows the runtime locale (₹1,00,000.00 in en-IN, ₹100,000.00 in en-US).
+    expect(screen.getByText(formatMoney(100000, "INR"))).toBeInTheDocument();
+    expect(screen.queryByText(formatMoney(250000, "INR"))).not.toBeInTheDocument();
+  });
+
+  it("locks the planned start date once the milestone has started", async () => {
+    const user = userEvent.setup();
+    hooks.useMilestoneList.mockReturnValue(
+      listResult([
+        milestone({ id: 3, name: "Kickoff", executionStatus: "PLANNED", plannedStartDate: START_DATE }),
+        milestone({ executionStatus: "IN_PROGRESS", plannedStartDate: START_DATE }),
+      ])
+    );
+    render(<MilestonesTab projectId={10} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit Kickoff" }));
+    expect(screen.getByLabelText(/planned start/i)).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Edit UAT sign-off" }));
+    expect(screen.getByLabelText(/planned start/i)).toBeDisabled();
+    expect(screen.getByLabelText(/planned due/i)).toBeEnabled();
   });
 
   it("asks before discarding unsaved edits", async () => {

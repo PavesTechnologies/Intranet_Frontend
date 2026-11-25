@@ -260,8 +260,8 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
             </div>
           </div>
 
-          {/* ── Centre: global search across every module + people (Ctrl/Cmd+K) ── */}
-          <div className="flex flex-1 justify-center">
+          {/* ── Global search icon (expands on click / Ctrl+Cmd+K), sits just left of the right-hand actions ── */}
+          <div className="flex min-w-0 flex-1 justify-end">
             <GlobalSearch />
           </div>
 

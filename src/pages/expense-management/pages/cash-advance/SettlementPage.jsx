@@ -13,7 +13,7 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import SettlementModal, { toSettlementAdvance } from "@/components/settlement/SettlementModal";
 import { getSettlementBlockReason } from "@/pages/expense-management/api/adjustmentRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
-import { formatTripDates, hasSubmittedLinkedReport } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
+import { formatTripDates, activeLinkedReport, linkedExpensesPath } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import AdvanceMoneyOverview from "@/pages/expense-management/pages/cash-advance/components/AdvanceMoneyOverview";
 import EmployeeAdvanceBreakdown, {
   employeeBreakdown,
@@ -730,11 +730,10 @@ export default function SettlementPage() {
 
                           {canOpenExpenseFor(adv, user) && (
                             <button
-                              onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
-                              disabled={hasSubmittedLinkedReport(adv)}
-                              title={hasSubmittedLinkedReport(adv) ? "An expense report is already submitted for this advance" : "Create an expense report for this cash advance"}
+                              onClick={() => navigate(linkedExpensesPath(adv, f.reports))}
+                              title={activeLinkedReport(adv, f.reports) ? "Add expenses to the linked expense report" : "Create an expense report for this cash advance"}
                               aria-label="Cash Advance Expense"
-                              className={`inline-flex items-center rounded-md border p-1.5 ${hasSubmittedLinkedReport(adv) ? "border-gray-200 text-gray-400 cursor-not-allowed" : "border-indigo-200 text-indigo-700 hover:bg-indigo-50"}`}
+                              className="inline-flex items-center rounded-md border p-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
                             >
                               <Receipt size={15} />
                             </button>

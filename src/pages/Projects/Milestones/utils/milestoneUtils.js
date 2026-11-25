@@ -85,14 +85,64 @@ export const todayIso = () => {
 };
 
 const CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
+export const MAX_CODE_LENGTH = 50;
+
+const pad3 = (n) => String(n).padStart(3, "0");
+
+/**
+ * Mirrors the backend's generator: `<PROJECTKEY>-M001`, counting from the
+ * project-wide milestone total and skipping codes already taken (deletes leave
+ * gaps, so count + 1 can collide).
+ *
+ * PREVIEW ONLY. The backend assigns the real code under a pessimistic project
+ * lock, so this can drift if someone else creates a milestone in between. Never
+ * submit it — send the code absent and read the assigned one back from the
+ * create response.
+ *
+ * @param projectKey  project.projectKey, e.g. "pay"
+ * @param count       milestones already in the project (summary.total)
+ * @param existingCodes  codes already known on the client, for gap-skipping
+ */
+export const generateMilestoneCode = (projectKey, { count = 0, existingCodes = [] } = {}) => {
+  const prefix = String(projectKey ?? "").trim().toUpperCase();
+  if (!prefix) return "";
+
+  const taken = new Set(existingCodes.filter(Boolean).map((c) => String(c).toUpperCase()));
+  let next = (Number(count) || 0) + 1;
+  let code;
+  do {
+    code = `${prefix}-M${pad3(next++)}`;
+  } while (taken.has(code));
+  return code;
+};
 const PERCENT_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
+
+/** "2026-05-10T23:59:59" / Date → "2026-05-10". */
+export const toIsoDate = (value) => {
+  if (!value) return "";
+  const s = String(value).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+};
 
 /**
  * @param values form values
- * @param ctx { isEdit, availablePercentage, allocationLocked }
+ * @param ctx { isEdit, availablePercentage, allocationLocked, startDateLocked, minStartDate,
+ *              projectStartDate, projectEndDate }
  * @returns {Record<string,string>} field -> message
  */
-export const validateMilestoneForm = (values, { isEdit, availablePercentage, allocationLocked }) => {
+export const validateMilestoneForm = (
+  values,
+  {
+    isEdit,
+    availablePercentage,
+    allocationLocked,
+    startDateLocked,
+    minStartDate,
+    projectStartDate,
+    projectEndDate,
+  }
+) => {
   const errors = {};
   const name = values.name.trim();
 
@@ -107,8 +157,39 @@ export const validateMilestoneForm = (values, { isEdit, availablePercentage, all
 
   if (values.description.length > 2000) errors.description = "Description must be 2000 characters or fewer.";
 
-  if (values.plannedStartDate && values.plannedDueDate && values.plannedDueDate < values.plannedStartDate) {
+  const minStart = toIsoDate(minStartDate);
+  const projectStart = toIsoDate(projectStartDate);
+  const projectEnd = toIsoDate(projectEndDate);
+  const start = toIsoDate(values.plannedStartDate);
+  const due = toIsoDate(values.plannedDueDate);
+
+  // Why the floor is what it is, so the message points at the rule the user actually hit.
+  const tooEarly = (field) => {
+    if (minStart === todayIso()) return `${field} can't be in the past.`;
+    if (projectStart && minStart === projectStart)
+      return `${field} can't be before the project start date (${formatDate(projectStart)}).`;
+    return `${field} can't be before ${formatDate(minStart)}.`;
+  };
+
+  // A started milestone keeps the start date it ran with, bounds and all.
+  if (startDateLocked) {
+    // nothing to check — the field is read-only.
+  } else if (!values.plannedStartDate) {
+    errors.plannedStartDate = "Select a planned start date.";
+  } else if (minStart && start < minStart) {
+    errors.plannedStartDate = tooEarly("Start date");
+  } else if (projectEnd && start > projectEnd) {
+    errors.plannedStartDate = `Start date can't be after the project end date (${formatDate(projectEnd)}).`;
+  }
+
+  if (!values.plannedDueDate) {
+    errors.plannedDueDate = "Select a planned due date.";
+  } else if (start && due < start) {
     errors.plannedDueDate = "Due date can't be before the start date.";
+  } else if (minStart && due < minStart) {
+    errors.plannedDueDate = tooEarly("Due date");
+  } else if (projectEnd && due > projectEnd) {
+    errors.plannedDueDate = `Due date can't be after the project end date (${formatDate(projectEnd)}).`;
   }
 
   if (!allocationLocked) {

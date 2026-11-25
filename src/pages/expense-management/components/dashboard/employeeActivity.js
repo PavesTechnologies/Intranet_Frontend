@@ -128,57 +128,24 @@ export function filterActivityRows(rows, filter) {
   return rows;
 }
 
-// Status groups for the activity filter. A row's group comes from the status it already shows, so the filter
-// and the badge always agree.
-export const STATUS_GROUPS = [
-  { key: "all", label: "All statuses" },
-  { key: "action", label: "Needs your action" },
-  { key: "draft", label: "Draft" },
-  { key: "progress", label: "In progress" },
-  { key: "done", label: "Completed" },
-  { key: "closed", label: "Rejected or cancelled" },
-];
-
-export function statusGroup(row) {
-  const label = String(row.statusLabel || "").toLowerCase();
-  if (label === "draft") return "draft";
-  if (label === "rejected" || label === "cancelled") return "closed";
-  if (row.statusTone === "emerald") return "done";
-  if (row.statusTone === "rose") return "action";
-  return "progress";
-}
-
-export const PERIODS = [
-  { key: "all", label: "All time", days: null },
-  { key: "7", label: "Last 7 days", days: 7 },
-  { key: "30", label: "Last 30 days", days: 30 },
-  { key: "90", label: "Last 90 days", days: 90 },
-];
-
 /**
- * Narrows activity rows by status group, period and a free-text search over reference and description.
- * Rows with no date are kept only for "All time".
+ * Narrows activity rows by status and a free-text search over reference and description.
+ * `status` is the exact label shown on the row's badge ("Paid", "Closed", ...), so the filter and the badge always agree.
  */
-export function refineActivityRows(rows, { status = "all", period = "all", search = "" } = {}, now = new Date()) {
-  const days = PERIODS.find((p) => p.key === period)?.days ?? null;
-  const since = days ? startOfToday(now).getTime() - (days - 1) * DAY_MS : null;
+export function refineActivityRows(rows, { status = "all", search = "" } = {}) {
   const q = search.trim().toLowerCase();
   return rows.filter((r) => {
-    if (status !== "all" && statusGroup(r) !== status) return false;
-    if (since !== null && toTime(r.date) < since) return false;
+    if (status !== "all" && r.statusLabel !== status) return false;
     if (q && !`${r.reference} ${r.description}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
 
-/** How many rows fall in each status group (for the counts beside the filter options). */
-export function countByStatusGroup(rows) {
-  const counts = { all: rows.length };
-  rows.forEach((r) => {
-    const g = statusGroup(r);
-    counts[g] = (counts[g] || 0) + 1;
-  });
-  return counts;
+/** The statuses present in these rows, with how many rows carry each, in first-seen (newest-first) order. */
+export function statusOptionsFor(rows) {
+  const counts = new Map();
+  rows.forEach((r) => counts.set(r.statusLabel, (counts.get(r.statusLabel) || 0) + 1));
+  return [...counts].map(([label, count]) => ({ label, count }));
 }
 
 // "YYYY-MM-DD" (a date with no time) is read as local midnight, so it does not shift a day in western time zones.

@@ -44,6 +44,13 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // Recorded decisions on the advance's latest submission, oldest first: who approved / rejected each level, and when.
+  getApprovalTrail: (advanceId) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/approval-trail`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
   getMyApprovals: (params) =>
     api.get("/xms/employee/cash-advances/my-approvals", {
       baseURL: EXPENSE_API_BASE,

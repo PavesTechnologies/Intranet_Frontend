@@ -33,6 +33,7 @@ import {
 import { expenseDateError, expenseDateHint, useExpenseDateRange } from "@/pages/expense-management/components/expense-reports/expenseDateRange";
 import { toIsoDate } from "@/pages/expense-management/pages/reports/reportUtils";
 import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
+import LivePolicyWarnings, { usePolicyPreview } from "@/pages/expense-management/components/expense-reports/LivePolicyWarnings";
 
 const MAX_RECEIPTS = 10;
 
@@ -709,6 +710,20 @@ export default function LineItemEntryFlow({
     receiptCurrencyCode: ocrReviewData.ocrCurrencyCode,
   });
 
+  // Live policy check on the scanned values before they are confirmed. The scanned receipt counts as attached.
+  const [ocrDescriptionTouched, setOcrDescriptionTouched] = useState(false);
+  useEffect(() => {
+    setOcrDescriptionTouched(false);
+  }, [ocrReviewData.ocrReceiptId]);
+  const ocrPolicyPreview = usePolicyPreview({
+    reportId,
+    enabled: isOcrReviewOpen,
+    form: ocrReviewData,
+    lineItemId: null,
+    receiptAttached: !!ocrReviewData.ocrReceiptId,
+    descriptionTouched: ocrDescriptionTouched,
+  });
+
   const handleOcrInputChange = (e) => {
     const { name, value } = e.target;
     if (name === "amount") setOcrTaxWarning("");
@@ -1337,6 +1352,12 @@ export default function LineItemEntryFlow({
 
                     </div>
 
+                    <LivePolicyWarnings
+                      warnings={ocrPolicyPreview.warnings}
+                      loading={ocrPolicyPreview.loading}
+                      className="col-span-2"
+                    />
+
                     <div className="col-span-2 space-y-1">
                       <TaxBreakdownPanel
                         amount={ocrReviewData.amount}
@@ -1391,6 +1412,7 @@ export default function LineItemEntryFlow({
                           : "Optional notes about this expense..."}
                         value={ocrReviewData.description}
                         onChange={handleOcrInputChange}
+                        onBlur={() => setOcrDescriptionTouched(true)}
                         disabled={ocrSubmitting}
                         className={`w-full px-2.5 py-1.5 rounded-md border text-xs focus:outline-none focus:ring-2 ${
                           ocrReviewErrors.description
