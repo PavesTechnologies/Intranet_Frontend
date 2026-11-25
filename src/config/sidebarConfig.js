@@ -212,11 +212,22 @@ export const XMS_SUBMENU = [
     // Every XMS role has its own dashboard view, AP Executive included.
     allowedRoles: [...XMS_EVERYONE, ROLES.REPORTING_MANAGER, AP_ROLES.AP_EXECUTIVE],
   },
+  // Second in the menu: an approver's main page (they also land here from the Finance module switcher).
   {
-    label: "Notifications",
-    to: "/expense-management/activity/notifications",
-    allowedRoles: [...XMS_EVERYONE, ROLES.REPORTING_MANAGER, AP_ROLES.AP_EXECUTIVE],
+    label: "Approvals",
+    to: "/expense-management/approvals",
+    // Approvers only: employees (General) do not get this menu item. The route (XMS_APPROVALS_PAGE_ROLES) also lets
+    // Finance in, for the supplementary-claims link on their dashboard.
+    allowedRoles: XMS_APPROVER_ROLES,
+    // Approvals are the reporting manager's queue. Finance users act on the Finance page instead,
+    // so the entry is hidden for them unless they are also a reporting manager / manager.
+    hiddenForRoles: {
+      roles: [ROLES.FINANCE, ROLES.FINANCE_EXECUTIVE, ROLES.FINANCE_MANAGER],
+      unless: [ROLES.REPORTING_MANAGER, ROLES.MANAGER, ...ADMIN_ROLES],
+    },
   },
+  // No "Notifications" link: the header bell already shows them and links to
+  // /expense-management/activity/notifications (route kept).
   {
     label: "Expenses",
     to: "/expense-management/expenses/my",
@@ -249,25 +260,18 @@ export const XMS_SUBMENU = [
     allowedRoles: XMS_EVERYONE,
   },
   {
-    label: "Approvals",
-    to: "/expense-management/approvals",
-    // Approvers only: employees (General) do not get this menu item. The route (XMS_APPROVALS_PAGE_ROLES) also lets
-    // Finance in, for the supplementary-claims link on their dashboard.
-    allowedRoles: XMS_APPROVER_ROLES,
-    // Approvals are the reporting manager's queue. Finance users act on the Finance page instead,
-    // so the entry is hidden for them unless they are also a reporting manager / manager.
-    hiddenForRoles: {
-      roles: [ROLES.FINANCE, ROLES.FINANCE_EXECUTIVE, ROLES.FINANCE_MANAGER],
-      unless: [ROLES.REPORTING_MANAGER, ROLES.MANAGER, ...ADMIN_ROLES],
-    },
-  },
-  {
     // One page: verify, queried, and verified reports with their AP payment status.
     label: "Finance",
     to: "/expense-management/finance",
     allowedRoles: XMS_FINANCE_VERIFICATION,
     // Exact match, so "Finance" is not highlighted as well on its sub-pages (e.g. /finance/supplementary-claims).
     end: true,
+  },
+  {
+    // Input tax credit on employee expenses, ready for the GST return (pages/reports/ItcRegisterPage.jsx).
+    label: "ITC Register",
+    to: "/expense-management/finance/itc-register",
+    allowedRoles: [...XMS_FINANCE_ROLES, ...ADMIN_ROLES],
   },
   {
     // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")
@@ -353,7 +357,7 @@ export const XMS_SUBMENU = [
  * additionally gates the entire flyout <li> on hasRole(AP_ALL_ROLES) (see Sidebar.jsx),
  * matching the Account Receivable module's pattern rather than EO/XMS's ungated one.
  *
- * Dashboard and Notifications are direct links; everything else sits in four sections (see
+ * Dashboard is a direct link (notifications live in the header bell); everything else sits in four sections (see
  * AP_SUBMENU). Each page links to its area's primary list/overview, which carries its own
  * "create new" action as a page-level button; sub-views reached from within a page (Vendor
  * Onboarding/Detail, OCR Review, Payment History, ...) have routes but no sidebar entry.
@@ -377,8 +381,7 @@ const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
 export const AP_SUBMENU = [
   // AP roles see their role views; management users (no AP role) see the read-only Management view.
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
-  // Every AP user has their own notifications; the backend decides which from the JWT.
-  { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
+  // No "Notifications" link: the header bell shows them and links to AP_ROUTES.NOTIFICATIONS (route kept).
   // The whole AP flow by role, with links into each step, plus the terms used (guide/pages/ApGuidePage.jsx).
   { label: "How It Works", to: AP_ROUTES.GUIDE, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
   {

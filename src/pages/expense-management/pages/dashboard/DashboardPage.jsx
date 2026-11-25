@@ -9,7 +9,6 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { dashboardService } from "@/pages/expense-management/api/expenseReportsApi";
 import { useApprovalWebSocket } from "@/pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
-import SupplementaryWaitingCard from "@/pages/expense-management/pages/dashboard/SupplementaryWaitingCard";
 import EmployeeMoneyFlow from "@/pages/expense-management/components/dashboard/EmployeeMoneyFlow";
 import RoleDashboard from "@/pages/expense-management/components/dashboard/RoleDashboard";
 import ApprovalsPanel from "@/pages/expense-management/components/dashboard/ApprovalsPanel";
@@ -139,9 +138,12 @@ const VIEWS = [
     attentionSubtitle: "Oldest reports first, so the longest waits are seen first",
     activitySubtitle: "Reports you verified most recently",
     quickActions: [
-      { key: "finance", label: "Finance verification", hint: "Reports waiting to be verified", icon: "ClipboardCheck", to: "/expense-management/finance", roles: ["FINANCE_EXECUTIVE"], primary: true },
-      { key: "settlement", label: "Cash advance settlement", hint: "Settle advances and review balances", icon: "Banknote", to: "/expense-management/cash-advance/settlement", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "finance", label: "Verify reports", hint: "Reports waiting for Finance verification", icon: "ClipboardCheck", to: "/expense-management/finance", roles: ["FINANCE", "FINANCE_EXECUTIVE"], primary: true },
+      { key: "approvals", label: "Open approvals", hint: "Cash advances and supplementary claims waiting for you", icon: "Inbox", to: "/expense-management/approvals", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "settlement", label: "Settlement", hint: "Settle cash advance balances", icon: "Banknote", to: "/expense-management/cash-advance/settlement", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
       { key: "reports", label: "Expense reports", hint: "All reports, with their status", icon: "FileText", to: "/expense-management/reports", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "itcRegister", label: "ITC register", hint: "GST you can claim back, for the GST return", icon: "Receipt", to: "/expense-management/finance/itc-register", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "clientBilling", label: "Client billing", hint: "Client-billable expenses to invoice", icon: "ReceiptText", to: "/expense-management/client-billing", roles: ["FINANCE_EXECUTIVE"] },
     ],
     actions: [],
   },
@@ -321,7 +323,6 @@ export default function DashboardPage() {
         </div>
       ) : data ? (
         <>
-          {active.view === "finance" && <SupplementaryWaitingCard />}
           <DashboardBody
             data={data}
             config={active}

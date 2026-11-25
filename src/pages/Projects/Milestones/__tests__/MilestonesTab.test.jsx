@@ -212,6 +212,21 @@ describe("MilestonesTab", () => {
     expect(screen.getByLabelText(/planned due/i)).toBeEnabled();
   });
 
+  it("blocks Add milestone once the project value is fully allocated", async () => {
+    hooks.useMilestoneSummary.mockReturnValue({
+      data: { ...summary, allocatedPercentage: 100, remainingPercentage: 0, allocationComplete: true },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hooks.useMilestoneList.mockReturnValue(listResult([milestone()]));
+    render(<MilestonesTab projectId={10} />);
+
+    const add = screen.getByRole("button", { name: /add milestone/i });
+    expect(add).toBeDisabled();
+    expect(add).toHaveAttribute("title", expect.stringMatching(/already allocated/i));
+  });
+
   it("asks before discarding unsaved edits", async () => {
     const user = userEvent.setup();
     hooks.useMilestoneList.mockReturnValue(listResult([milestone()]));

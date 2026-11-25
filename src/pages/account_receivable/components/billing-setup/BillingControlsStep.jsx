@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-unused-vars -- used by the commented-out Expense Billing Eligible toggle
 import { Receipt } from "lucide-react";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -5,6 +6,7 @@ import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { getActivePaymentTerms, getActiveTaxRegions, getApiErrorMessage } from "../../services/billingConfigurationService";
 import RadioCardGroup from "../common/RadioCardGroup";
+// eslint-disable-next-line no-unused-vars -- used by the commented-out Expense Billing Eligible toggle
 import ToggleSwitch from "../common/ToggleSwitch";
 import { useEffect, useState } from "react";
 
@@ -259,6 +261,9 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {/* Expense Billing Eligible — hidden for now. The flag itself is untouched:
+                it keeps whatever value the configuration already holds (default false)
+                and the rest of the wizard still reads it.
             <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <Receipt className="h-4 w-4 shrink-0 text-slate-500" />
@@ -274,6 +279,7 @@ export default function BillingControlsStep({ value = {}, onChange }) {
                 onChange={(checked) => update({ expenseBillingEligible: checked })}
               />
             </div>
+            */}
 
             {/* Payment preview summary block */}
             {previewText && (

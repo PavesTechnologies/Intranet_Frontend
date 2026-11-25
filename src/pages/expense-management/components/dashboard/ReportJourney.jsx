@@ -1,5 +1,5 @@
 import React from "react";
-import { BadgeCheck, CheckCircle2, FilePen, Landmark, ShieldCheck, Undo2, UserCheck } from "lucide-react";
+import { BadgeCheck, CheckCircle2, CircleSlash, FilePen, Landmark, ShieldCheck, Undo2, UserCheck } from "lucide-react";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 
 // Where the employee's expense reports are right now. Every report the employee can follow is in exactly one step, so
@@ -14,10 +14,12 @@ const STEPS = {
   ap: { kpi: "payment", icon: Landmark, caption: "Queued for payment" },
   paid: { kpi: "paid", icon: BadgeCheck, caption: "Money received", done: true },
   settled: { kpi: "settled", icon: CheckCircle2, caption: "Covered by your advance", done: true },
+  // Approved with nothing payable and no advance involved (e.g. only non-reimbursable lines). Shown only when it has reports.
+  noPayment: { icon: CircleSlash, caption: "Nothing payable to you", done: true, onlyWhenUsed: true },
 };
 
 export default function ReportJourney({ pipeline = [], byKey, currency }) {
-  const stages = pipeline.filter((s) => STEPS[s.key]);
+  const stages = pipeline.filter((s) => STEPS[s.key] && !(STEPS[s.key].onlyWhenUsed && !(Number(s.count) > 0)));
   if (!stages.length) return null;
 
   const inFlight = stages.filter((s) => ["approval", "finance", "ap"].includes(s.key)).reduce((a, s) => a + Number(s.count || 0), 0);
@@ -43,7 +45,7 @@ export default function ReportJourney({ pipeline = [], byKey, currency }) {
         )}
       </div>
 
-      <ol className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-0 ${stages.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
+      <ol className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-0 ${stages.length > 6 ? "lg:grid-cols-7" : stages.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
         {stages.map((s, i) => {
           const step = STEPS[s.key];
           const Icon = step.icon;

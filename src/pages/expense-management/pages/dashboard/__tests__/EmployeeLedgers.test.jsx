@@ -77,6 +77,18 @@ describe("employee ledgers", () => {
     expect(container.querySelector("[data-offset-mismatch]").textContent).toMatch(/1,200.*used on bills.*1,394\.25 paid from advance/);
   });
 
+  it("warns when money was carried in without being carried out of another advance", () => {
+    const flagged = { ...byKey, caCarryUnmatched: { key: "caCarryUnmatched", value: 968 } };
+    const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={flagged} currency="INR" />);
+    expect(container.querySelector("[data-carry-unmatched]").textContent).toMatch(/INR 968.00 was carried into your advances.*Ask Finance/);
+  });
+
+  it("shows no carried-in row and no warning when there is no carry-forward", () => {
+    const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={{ ...byKey, caCarryUnmatched: { key: "caCarryUnmatched", value: 0 } }} currency="INR" />);
+    expect(container.querySelector('[data-kpi="caCarriedIn"]')).toBeNull();
+    expect(container.querySelector("[data-carry-unmatched]")).toBeNull();
+  });
+
   it("shows a dash for a missing figure", () => {
     const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={{}} currency="INR" />);
     expect(amount(container, "caRequested")).toBe("-");
