@@ -99,7 +99,7 @@ describe("employee dashboard: two ledgers", () => {
   it("cash advance ledger reconciles: received = settled + outstanding", async () => {
     renderPage();
     await waitFor(() => expect(document.querySelector('[data-check="Cash advance ledger"]')).not.toBeNull());
-    expect(document.querySelector('[data-check="Cash advance ledger"]').textContent).toMatch(/Received = Settled \+ Outstanding/);
+    expect(document.querySelector('[data-check="Cash advance ledger"]').textContent).toMatch(/Received \+ Carried in = Settled \+ Outstanding/);
     expect(document.querySelector('[data-check="Cash advance ledger"]').textContent).toMatch(/Balanced/);
   });
 

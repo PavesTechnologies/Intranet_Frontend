@@ -274,6 +274,7 @@ const XmsSeverityThresholdPage = lazy(() => import("./pages/expense-management/p
 const XmsPolicyVersionsPage = lazy(() => import("./pages/expense-management/pages/PolicyVersions.jsx"));
 import { POLICY_VIEW_ROLES } from "./pages/expense-management/components/policy/common/policyEnums.js";
 const XmsReportsPage = lazy(() => import("./pages/expense-management/pages/reports/ReportsPage.jsx"));
+const XmsItcRegisterPage = lazy(() => import("./pages/expense-management/pages/reports/ItcRegisterPage.jsx"));
 const XmsNotificationsPage = lazy(() => import("./pages/expense-management/pages/activity/NotificationsPage.jsx"));
 const XmsAuditLogsPage = lazy(() => import("./pages/expense-management/pages/activity/AuditLogsPage.jsx"));
 const XmsSettingsPage = lazy(() => import("./pages/expense-management/pages/settings/SettingsPage.jsx"));
@@ -2036,6 +2037,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/policy-engine/severity-thresholds" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsSeverityThresholdPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/versions" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyVersionsPage /></ProtectedRoute>} />
           <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Finance_Executive", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/itc-register" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive", "Admin", "Super_Admin"]}><XmsItcRegisterPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
           <Route path="/expense-management/activity/audit-logs" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsAuditLogsPage /></ProtectedRoute>} />

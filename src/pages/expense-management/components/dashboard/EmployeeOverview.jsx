@@ -18,7 +18,12 @@ const MONEY_CARDS = [
     // When part of the approved amount was set against a cash advance, say how much, so Approved vs Paid adds up.
     help: (byKey, currency) => {
       const offset = num(byKey, "erAdvanceOffset");
-      return offset > 0 ? `${formatMoney(offset, currency)} adjusted against advance` : "Approved for reimbursement";
+      const noPayment = num(byKey, "erNoPaymentDue");
+      const parts = [
+        offset > 0 && `${formatMoney(offset, currency)} adjusted against advance`,
+        noPayment > 0 && `${formatMoney(noPayment, currency)} not payable`,
+      ].filter(Boolean);
+      return parts.length ? parts.join(" · ") : "Approved for reimbursement";
     },
     color: "#8fa0ff",
     target: SECTION.reimbursement,
@@ -31,6 +36,7 @@ export default function EmployeeOverview({ byKey, currency, quickActions = [] })
   const paid = num(byKey, "erPaid");
   const onTheWay = num(byKey, "erToSendAp") + num(byKey, "erPendingAp");
   const advanceOffset = num(byKey, "erAdvanceOffset");
+  const noPaymentDue = num(byKey, "erNoPaymentDue");
   const helpOf = (c) => (typeof c.help === "function" ? c.help(byKey, currency) : c.help);
 
   return (
@@ -61,6 +67,12 @@ export default function EmployeeOverview({ byKey, currency, quickActions = [] })
                   <p className="mt-1 text-xs text-white/70" data-advance-offset-note>
                     <span className="font-semibold text-[#ffd27a]">{formatMoney(advanceOffset, currency)}</span> of your approved
                     expenses was adjusted against your cash advance, so it is not paid to your bank.
+                  </p>
+                )}
+                {noPaymentDue > 0 && (
+                  <p className="mt-1 text-xs text-white/70" data-no-payment-note>
+                    <span className="font-semibold text-white">{formatMoney(noPaymentDue, currency)}</span> was approved with
+                    nothing reimbursable to you, so no payment is due.
                   </p>
                 )}
               </div>

@@ -1,27 +1,23 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   Eye,
   Inbox,
-  ShieldAlert,
   Lock,
   ClipboardCheck,
   MessageSquareWarning,
   Hourglass,
   BadgeCheck,
-  Check,
-  X,
-  RefreshCw,
   Wallet,
-  Clock,
+  Layers,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
-import { getStatusBadge } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import SearchInput from "@/components/filter/Searchbar";
 import { useFinanceQueue, useFinanceHistory, useFinancePaymentSummary } from "./hooks/useFinanceVerification";
 import { useEmployeeDirectory } from "../../approval-engine/hooks/useEmployeeDirectory";
 import FinanceReviewPanel from "./components/FinanceReviewPanel";
@@ -34,21 +30,10 @@ import InvoiceHandoffBadge from "../../components/expense-reports/InvoiceHandoff
 import { formatMoney, formatDate } from "../../approval-engine/constants/approvalLabels";
 import Pagination from "@/components/Pagination/pagination";
 import RequestTypeBadge, { reportTypeOf } from "@/pages/expense-management/components/common/RequestTypeBadge";
-
-const TABS = [
-  { value: "ALL", label: "All" },
-  { value: "PENDING", label: "To verify" },
-  { value: "ADVANCES", label: "Advances to approve" },
-  { value: "QUERIED", label: "Queried" },
-  { value: "VERIFIED", label: "Verified & payments" },
-];
-
-// Reimbursement state of a verified report (backend PaymentRoutingStatus).
-const PAYMENT_FILTERS = [
-  { value: "", label: "All" },
-  { value: "APPROVED_FOR_PAYMENT", label: "With AP" },
-  { value: "PAYMENT_COMPLETED", label: "Paid" },
-];
+import TableFilterBar from "@/pages/expense-management/components/common/TableFilterBar";
+import { HeroQuickActions } from "@/pages/expense-management/components/dashboard/DashboardHero";
+import RowActionButton, { RowActions } from "../../approval-engine/components/RowActionButton";
+import { APPROVAL_STATUS_OPTIONS, ApprovalStatusBadge, cashStatusKey, expenseStatusKey } from "../../approval-engine/components/approvalStatus";
 
 const EMPTY_TEXT = {
   ALL: ["Nothing to show yet.", "Reports and cash advances at every stage appear here, newest first."],
@@ -56,6 +41,36 @@ const EMPTY_TEXT = {
   ADVANCES: ["No cash advances waiting.", "Cash advances reach Finance after the manager approves them."],
   QUERIED: ["No open queries.", "Reports you send back to an employee for correction appear here until they resubmit."],
   VERIFIED: ["Nothing verified yet.", "Reports you verify appear here, with whether AP has paid the employee."],
+};
+
+// Type filter: the same request types as the badges in the Type column.
+const TYPE_FILTER_OPTIONS = [
+  { label: "All types", value: "" },
+  { label: "Expense", value: "EXPENSE" },
+  { label: "Advance settlement", value: "SETTLEMENT" },
+  { label: "Cash advance", value: "ADVANCE" },
+];
+
+// Quick actions in the banner. Each reuses an existing route; `roles` mirrors that route's guard in App.jsx.
+const FINANCE_QUICK_ACTIONS = [
+  { key: "settlement", label: "Settlement", hint: "Settle cash advance balances", icon: "Banknote", to: "/expense-management/cash-advance/settlement", primary: true },
+  { key: "reports", label: "Expense reports", hint: "All expense reports, with their status", icon: "FileText", to: "/expense-management/reports", roles: ["FINANCE", "FINANCE_EXECUTIVE", "MANAGER", "ADMIN", "SUPER_ADMIN"] },
+  { key: "financeDashboard", label: "Finance dashboard", hint: "Finance Management overview", icon: "ClipboardCheck", to: "/finance/dashboard" },
+  { key: "itcRegister", label: "ITC register", hint: "GST you can claim back, for the GST return", icon: "Receipt", to: "/expense-management/finance/itc-register" },
+  { key: "clientBilling", label: "Client billing", hint: "Client-billable expenses to invoice", icon: "ReceiptText", to: "/expense-management/client-billing", roles: ["FINANCE_EXECUTIVE"] },
+];
+
+/**
+ * An expense row's status in the shared approval vocabulary (approvalStatus.jsx), so Finance, managers and employees
+ * see the same name for the same stage: waiting on Finance, sent back, approved, with AP or paid.
+ */
+const financeStatusKey = (item) => {
+  const tab = item.__tab;
+  if (tab === "PENDING") return "PENDING_FINANCE";
+  if (tab === "QUERIED") return "SENT_BACK";
+  if (item.paymentRoutingStatus === "PAYMENT_COMPLETED") return "PAID";
+  if (item.paymentRoutingStatus === "APPROVED_FOR_PAYMENT" || item.paymentRoutingStatus === "HANDOFF_FAILED") return "AWAITING_PAYMENT";
+  return item.reportStatus ? expenseStatusKey(item) : "APPROVED";
 };
 
 // Rows read per status for the "All" view. Each status is paged on screen from this list.
@@ -76,31 +91,13 @@ const isLineEligible = (line) => {
 
 const hasIneligibleLines = (lineItems) => (lineItems || []).some((l) => !isLineEligible(l));
 
-function PaymentCell({ status }) {
-  if (status === "PAYMENT_COMPLETED") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-        <BadgeCheck className="h-3 w-3" /> Paid
-      </span>
-    );
-  }
-  if (status === "APPROVED_FOR_PAYMENT") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
-        <Hourglass className="h-3 w-3" /> With AP
-      </span>
-    );
-  }
-  if (status === "HANDOFF_FAILED") {
-    return <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">Handoff failed</span>;
-  }
-  // NONE: verified at Finance but the report still has later approval levels.
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-      <Clock className="h-3 w-3" /> In approval
-    </span>
-  );
-}
+// Lines whose tax check failed: Finance must confirm the tax before verifying (same rule as the dashboard's count).
+const TAX_REVIEW_STATUSES = ["MISMATCH", "REQUIRES_FINANCE_REVIEW"];
+export const needsTaxReview = (lineItems) => (lineItems || []).some((l) => TAX_REVIEW_STATUSES.includes(l?.taxValidationStatus));
+const TAX_FILTER_OPTIONS = [
+  { label: "Any", value: "" },
+  { label: "Needs tax review", value: "REVIEW" },
+];
 
 const initialsOf = (name) =>
   String(name || "?")
@@ -128,7 +125,7 @@ function EmployeeCell({ employeeId, directory }) {
 }
 
 const FINANCE_COLUMNS = [
-  { key: "reference", label: "Reference", className: "text-left" },
+  { key: "type", label: "Type", className: "text-left" },
   { key: "employee", label: "Employee", className: "text-left" },
   { key: "amount", label: "Amount", className: "text-right" },
   { key: "status", label: "Status", className: "text-left" },
@@ -181,12 +178,24 @@ function FinanceTable({ rows }) {
  * /payment-summary. Verify / Query happen in FinanceReviewPanel (opened with Review).
  */
 export default function FinancePage() {
-  const [activeTab, setActiveTab] = useState("ALL");
+  // ?tab=QUERIED / VERIFIED / PENDING / ADVANCES opens that view (the Finance dashboard's cards link here).
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = String(searchParams.get("tab") || "").toUpperCase();
+    return ["ALL", "PENDING", "ADVANCES", "QUERIED", "VERIFIED"].includes(t) ? t : "ALL";
+  });
   const [pageByTab, setPageByTab] = useState({});
   const pageSize = DEFAULT_PAGE_SIZE;
   const [reviewingReport, setReviewingReport] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
+  // Column filters, the same bar as My Expenses and My Approvals. The cards above choose the stage.
+  const EMPTY_COLUMNS = { type: "", status: "", employee: "", tax: "", amount: { min: "", max: "" }, date: { from: "", to: "" } };
+  // ?tax=review (the dashboard's "Review now") opens only the reports with lines that need a tax check.
+  const [columnFilters, setColumnFilters] = useState(() => ({
+    ...EMPTY_COLUMNS,
+    tax: String(searchParams.get("tax") || "").toLowerCase() === "review" ? "REVIEW" : "",
+  }));
 
   const pageFor = (tab) => pageByTab[tab] ?? 0;
   const setPageFor = (tab, next) => setPageByTab((prev) => ({ ...prev, [tab]: next }));
@@ -304,6 +313,28 @@ export default function FinancePage() {
     setPaymentFilter(tab === "VERIFIED" ? payment : "");
   };
 
+  // One check for every row (expense reports and cash advances): type, status, employee, amount, date.
+  const matchesColumns = (row) => {
+    const { type, status, employee, tax, amount, date } = columnFilters;
+    if (type && row.type !== type) return false;
+    if (tax === "REVIEW" && !row.taxReview) return false;
+    if (status && row.status !== status) return false;
+    const emp = employee.trim().toLowerCase();
+    if (emp && !`${row.employeeId || ""} ${row.employeeName || ""}`.toLowerCase().includes(emp)) return false;
+    const n = Number(row.amount) || 0;
+    if (amount.min !== "" && n < Number(amount.min)) return false;
+    if (amount.max !== "" && n > Number(amount.max)) return false;
+    if (date.from || date.to) {
+      if (!row.date) return false;
+      const d = new Date(row.date);
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      if (date.from && day < new Date(`${date.from}T00:00:00`).getTime()) return false;
+      if (date.to && day > new Date(`${date.to}T00:00:00`).getTime()) return false;
+    }
+    return true;
+  };
+  const nameOf = (employeeId) => directory?.get(employeeId)?.name || directory?.get(String(employeeId))?.name || "";
+
   // Search / payment filter work on the loaded page only - these endpoints take no such parameter.
   const filteredItems = useMemo(() => {
     const query = searchTerm.toLowerCase();
@@ -313,31 +344,20 @@ export default function FinancePage() {
         !query ||
         (item.reportNumber || "").toLowerCase().includes(query) ||
         merchantSummary(item.pendingLineItems).toLowerCase().includes(query) ||
-        empName.includes(query);
+        empName.includes(query) ||
+        (item.title || "").toLowerCase().includes(query);
       const matchesPayment = tabOf(item) !== "VERIFIED" || !paymentFilter || item.paymentRoutingStatus === paymentFilter;
-      return matchesSearch && matchesPayment;
+      const matchesCols = matchesColumns({
+        type: reportTypeOf(item), status: financeStatusKey({ ...item, __tab: tabOf(item) }), employeeId: item.employeeId,
+        employeeName: nameOf(item.employeeId), amount: item.totalAmount, date: item.submittedAt || item.actionedAt,
+        taxReview: needsTaxReview(item.pendingLineItems),
+      });
+      return matchesSearch && matchesPayment && matchesCols;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, searchTerm, paymentFilter, directory, activeTab]);
+  }, [items, searchTerm, paymentFilter, directory, activeTab, columnFilters]);
 
   const navigate = useNavigate();
-
-  // Row actions are icons; the title/aria-label carry the name.
-  const ICON_BTN = "inline-flex h-8 w-8 items-center justify-center rounded-lg transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/40";
-  const reviewButton = (item, label) => {
-    const toReview = label === "Review";
-    return (
-      <button
-        type="button"
-        title={toReview ? "Review and verify" : "View"}
-        aria-label={`${toReview ? "Review" : "View"} ${item.reportNumber || "report"}`}
-        onClick={() => setReviewingReport(item)}
-        className={`${ICON_BTN} ${toReview ? "bg-[#0A0082]/10 text-[#0A0082] hover:bg-[#0A0082] hover:text-white" : "text-gray-500 hover:bg-blue-50 hover:text-blue-600"}`}
-      >
-        {toReview ? <ClipboardCheck size={16} /> : <Eye size={16} />}
-      </button>
-    );
-  };
 
   // A pulsing dot marks rows that are waiting for this user.
   const WaitingDot = () => (
@@ -347,26 +367,6 @@ export default function FinancePage() {
     </span>
   );
 
-
-  const expenseStatusCell = (item) => {
-    const tab = tabOf(item);
-    if (tab === "QUERIED") {
-      return <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">Queried</span>;
-    }
-    if (tab === "VERIFIED") {
-      return <PaymentCell status={item.paymentRoutingStatus} />;
-    }
-    return hasIneligibleLines(item.pendingLineItems) ? (
-      <span
-        title="Some expenses can't be verified yet - open Review to see why"
-        className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
-      >
-        <ShieldAlert className="h-3 w-3" /> Needs attention
-      </span>
-    ) : (
-      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Ready to verify</span>
-    );
-  };
 
   // Pending shows what Finance must act on; Verified shows what is done. Queried has only expense reports.
   const query = searchTerm.toLowerCase();
@@ -400,21 +400,20 @@ export default function FinancePage() {
   const tabNeedsYou = (tab) => (tab === "PENDING" ? pendingReportCount > 0 : tab === "ADVANCES" ? pendingAdvanceCount > 0 : tab === "ALL" && waitingCount > 0);
   const visibleAdvances = advanceList.filter(
     (adv) =>
-      !query ||
-      [adv.title, adv.purpose, adv.employeeId, adv.employeeName, advanceRef(adv)].some((v) => (v || "").toLowerCase().includes(query))
+      (!query ||
+        [adv.title, adv.purpose, adv.employeeId, adv.employeeName, advanceRef(adv)].some((v) => (v || "").toLowerCase().includes(query))) &&
+      matchesColumns({
+        type: "ADVANCE", status: cashStatusKey(adv.status), employeeId: adv.employeeId || adv.employee_id,
+        employeeName: adv.employeeName || nameOf(adv.employeeId || adv.employee_id), amount: adv.amount, date: adv.neededByDate || adv.createdAt,
+      })
   );
 
-  const referenceCell = (kind, ref, detail, waiting) => (
-    <div className="min-w-0">
-      <p className="inline-flex items-center text-[13px] font-semibold tracking-tight text-slate-900">
-        {waiting && <WaitingDot />}
-        {ref}
-      </p>
-      <div className="mt-1 flex min-w-0 items-center gap-1.5">
-        <RequestTypeBadge type={kind} />
-        {detail && detail !== "—" && <span className="truncate text-[11px] text-slate-500" title={detail}>{detail}</span>}
-      </div>
-    </div>
+  // Type column: the request type only. A row waiting for this user gets a small pulsing dot.
+  const typeCell = (kind, waiting) => (
+    <span className="inline-flex items-center whitespace-nowrap">
+      {waiting && <WaitingDot />}
+      <RequestTypeBadge type={kind} />
+    </span>
   );
   const amountCell = (amount, currency) => (
     <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-slate-900">{formatMoney(amount, currency)}</span>
@@ -425,56 +424,56 @@ export default function FinancePage() {
     ...filteredItems.map((item) => ({
       key: `exp-${item.reportId || item.id || item.reportNumber}`,
       waiting: tabOf(item) === "PENDING",
-      reference: referenceCell(reportTypeOf(item), item.reportNumber, merchantSummary(item.pendingLineItems), tabOf(item) === "PENDING"),
+      type: typeCell(reportTypeOf(item), tabOf(item) === "PENDING"),
       employee: <EmployeeCell employeeId={item.employeeId} directory={directory} />,
       amount: amountCell(item.totalAmount, item.currencyCode),
-      status: expenseStatusCell(item),
+      status: (
+        <ApprovalStatusBadge
+          statusKey={financeStatusKey({ ...item, __tab: tabOf(item) })}
+          detail={
+            tabOf(item) === "PENDING" && hasIneligibleLines(item.pendingLineItems)
+              ? "Needs attention"
+              : item.paymentRoutingStatus === "HANDOFF_FAILED"
+              ? "Handoff to AP failed"
+              : null
+          }
+          detailTone="text-amber-700"
+        />
+      ),
       date: dateCell(item.submittedAt || item.actionedAt),
-      action: <div className="flex justify-end">{reviewButton(item, tabOf(item) === "PENDING" ? "Review" : "View")}</div>,
+      action: (() => {
+        // Finance verifies line by line, so each decision opens the review. Done reports can only be viewed.
+        const pending = tabOf(item) === "PENDING";
+        const done = pending ? null : tabOf(item) === "QUERIED" ? "Sent back; waiting for the employee" : "Already verified";
+        return (
+          <RowActions>
+            <RowActionButton tone="view" icon={Eye} label={`View ${item.reportNumber || "report"}`} title="View the report" onClick={() => setReviewingReport(item)} />
+            <RowActionButton tone="approve" icon={CheckCircle2} label="Verify" title={done || "Open the review to verify the lines"} disabled={!pending} onClick={() => setReviewingReport(item)} />
+            <RowActionButton tone="clarify" icon={MessageSquareWarning} label="Send back" title={done || "Open the review to query a line"} disabled={!pending} onClick={() => setReviewingReport(item)} />
+            <RowActionButton tone="reject" icon={XCircle} label="Reject" title={done || "Open the review to reject"} disabled={!pending} onClick={() => setReviewingReport(item)} />
+          </RowActions>
+        );
+      })(),
     })),
     ...visibleAdvances.map((adv) => ({
       key: `adv-${adv.advanceId || adv.id}`,
       waiting: advanceTabOf(adv) === "PENDING",
-      reference: referenceCell("ADVANCE", advanceRef(adv), adv.title || adv.purpose, advanceTabOf(adv) === "PENDING"),
+      type: typeCell("ADVANCE", advanceTabOf(adv) === "PENDING"),
       employee: <EmployeeCell employeeId={adv.employeeId || adv.employee_id} directory={directory} />,
       amount: amountCell(adv.amount, adv.currencyCode),
-      status: getStatusBadge(adv.status),
+      status: <ApprovalStatusBadge statusKey={cashStatusKey(adv.status)} />,
       date: dateCell(adv.neededByDate),
-      action: (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            type="button"
-            title="View"
-            aria-label={`View cash advance ${advanceRef(adv)}`}
-            onClick={() => navigate(`/expense-management/approvals/cash-advance/${adv.advanceId || adv.id}`)}
-            className={`${ICON_BTN} text-gray-500 hover:bg-blue-50 hover:text-blue-600`}
-          >
-            <Eye size={16} />
-          </button>
-          {advanceTabOf(adv) === "PENDING" && (
-            <>
-              <button
-                type="button"
-                title="Approve"
-                aria-label={`Approve cash advance ${advanceRef(adv)}`}
-                onClick={() => setApprovingAdvance(adv)}
-                className={`${ICON_BTN} bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white`}
-              >
-                <Check size={16} />
-              </button>
-              <button
-                type="button"
-                title="Reject"
-                aria-label={`Reject cash advance ${advanceRef(adv)}`}
-                onClick={() => setRejectingAdvance(adv)}
-                className={`${ICON_BTN} bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white`}
-              >
-                <X size={16} />
-              </button>
-            </>
-          )}
-        </div>
-      ),
+      action: (() => {
+        const pending = advanceTabOf(adv) === "PENDING";
+        return (
+          <RowActions>
+            <RowActionButton tone="view" icon={Eye} label={`View cash advance ${advanceRef(adv)}`} title="View the advance" onClick={() => navigate(`/expense-management/approvals/cash-advance/${adv.advanceId || adv.id}`)} />
+            <RowActionButton tone="approve" icon={CheckCircle2} label={`Approve cash advance ${advanceRef(adv)}`} title={pending ? "Approve" : "Already decided"} disabled={!pending} onClick={() => setApprovingAdvance(adv)} />
+            <RowActionButton tone="clarify" icon={MessageSquareWarning} label="Send back" title="Cash advances are approved or rejected; give the reason when rejecting" disabled />
+            <RowActionButton tone="reject" icon={XCircle} label={`Reject cash advance ${advanceRef(adv)}`} title={pending ? "Reject" : "Already decided"} disabled={!pending} onClick={() => setRejectingAdvance(adv)} />
+          </RowActions>
+        );
+      })(),
     })),
   ];
 
@@ -518,20 +517,15 @@ export default function FinancePage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => { sourceQueries.forEach((q) => q.refetch()); advancesQuery.refetch(); }}
-            className="inline-flex items-center gap-2 self-start rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-[#0A0082] shadow-sm transition hover:bg-white/90 lg:self-center"
-          >
-            <RefreshCw size={15} className={advancesQuery.isFetching || sourceQueries.some((q) => q.isFetching) ? "animate-spin" : ""} aria-hidden="true" />
-            Refresh
-          </button>
         </div>
+        {/* Quick actions, as on the dashboard and My Approvals. */}
+        <HeroQuickActions actions={FINANCE_QUICK_ACTIONS} />
       </section>
 
       {/* Summary cards; each also filters the list below */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         {[
+          { key: "ALL", label: "All", caption: "Every report and advance", icon: Layers, value: countFor("ALL"), tone: "bg-[#0A0082]/10 text-[#0A0082]", text: "text-[#0a174e]", active: "border-indigo-300 bg-indigo-50/40", isActive: activeTab === "ALL", onClick: () => switchTab("ALL") },
           { key: "PENDING", label: "To verify", caption: "Reports waiting on you", icon: ClipboardCheck, value: pendingReportCount, tone: "bg-amber-50 text-amber-600", text: "text-amber-600", active: "border-amber-300 bg-amber-50/40", isActive: activeTab === "PENDING", onClick: () => switchTab("PENDING"), dot: pendingReportCount > 0 },
           { key: "ADVANCES", label: "Advances", caption: "Cash advances to approve", icon: Wallet, value: pendingAdvanceCount, tone: "bg-[#ff3d72]/10 text-[#e0245e]", text: "text-[#e0245e]", active: "border-[#ff3d72]/40 bg-[#ff3d72]/[0.04]", isActive: isAdvancesTab, onClick: () => switchTab("ADVANCES"), dot: pendingAdvanceCount > 0 },
           { key: "QUERIED", label: "Queried", caption: "Back with the employee", icon: MessageSquareWarning, value: queriedQuery.data?.totalElements ?? 0, tone: "bg-rose-50 text-rose-600", text: "text-rose-600", active: "border-rose-300 bg-rose-50/40", isActive: activeTab === "QUERIED", onClick: () => switchTab("QUERIED") },
@@ -566,58 +560,32 @@ export default function FinancePage() {
         })}
       </div>
 
-      {/* The list: status tabs and search on top, then the table */}
+      {/* Filters: the same bar as My Expenses and My Approvals. The cards above choose the stage. */}
+      <TableFilterBar
+        filters={[
+          { key: "search", label: "Search", type: "search", placeholder: "Report number, title, employee or merchant" },
+          { key: "type", label: "Type", type: "select", options: TYPE_FILTER_OPTIONS },
+          { key: "status", label: "Status", type: "select", options: APPROVAL_STATUS_OPTIONS },
+          { key: "employee", label: "Employee", type: "search", placeholder: "Name or employee ID" },
+          { key: "tax", label: "Tax", type: "select", options: TAX_FILTER_OPTIONS },
+          { key: "amount", label: "Amount", type: "amountRange" },
+          { key: "date", label: "Date", type: "dateRange" },
+        ]}
+        values={{ search: searchTerm, ...columnFilters }}
+        onChange={(v) => {
+          setSearchTerm(v.search ?? "");
+          setColumnFilters({ type: v.type ?? "", status: v.status ?? "", employee: v.employee ?? "", tax: v.tax ?? "", amount: v.amount, date: v.date });
+        }}
+        onReset={() => {
+          setSearchTerm("");
+          setColumnFilters(EMPTY_COLUMNS);
+        }}
+        resultCount={allRows.length}
+        totalCount={countFor(activeTab)}
+        noun="items"
+      />
+
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex w-full gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 lg:w-fit" role="tablist" aria-label="Status">
-            {TABS.map((tab) => {
-              const isActive = activeTab === tab.value;
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => switchTab(tab.value)}
-                  className={`relative flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
-                    isActive ? "bg-white text-[#0A0082] shadow-sm" : "text-slate-500 hover:text-[#0a174e]"
-                  }`}
-                >
-                  {tab.label}
-                  <span className={`rounded-full px-1.5 py-0.5 text-[11px] tabular-nums ${isActive ? "bg-[#0A0082]/10 text-[#0A0082]" : "bg-white text-slate-500"}`}>
-                    {countFor(tab.value)}
-                  </span>
-                  {tabNeedsYou(tab.value) && tab.value !== "ALL" && (
-                    <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white" aria-label="Needs your action" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-full lg:w-80">
-            <SearchInput value={searchTerm} onSearch={(val) => setSearchTerm(val || "")} placeholder="Employee, merchant or report #..." />
-          </div>
-        </div>
-
-        {activeTab === "VERIFIED" && (
-          <div className="flex items-center gap-1 border-b border-slate-100 px-4 py-2.5">
-            <span className="mr-1 text-xs font-medium text-slate-600">Payment:</span>
-            {PAYMENT_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setPaymentFilter(f.value)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  paymentFilter === f.value ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600 hover:border-slate-300"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
-
       {isError ? (
         <div className="m-3 flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center px-4">
           {isAuthError ? <Lock className="h-6 w-6 text-rose-500" /> : <AlertTriangle className="h-6 w-6 text-rose-500" />}

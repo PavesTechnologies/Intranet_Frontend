@@ -14,18 +14,21 @@ const share = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0
 // Same meaning on both cards and in the summary banner: green = done, amber = waiting, grey = not started.
 const COLOR = { done: "#1baf7a", waiting: "#eda100", idle: "#a8b3c7" };
 
-function Amount({ byKey, kpi, currency, minus = false, className = "" }) {
+function Amount({ byKey, kpi, currency, minus = false, plus = false, className = "" }) {
   const item = byKey[kpi];
   return (
     <p data-amount className={`whitespace-nowrap text-right tabular-nums ${className}`}>
-      {item ? `${minus ? "− " : ""}${formatMoney(item.value, currency)}` : "-"}
+      {item ? `${minus ? "− " : plus ? "+ " : ""}${formatMoney(item.value, currency)}` : "-"}
     </p>
   );
 }
 
-function Check({ title, total, parts, label, byKey, currency }) {
-  const t = byKey[total] ? Number(byKey[total].value) : null;
-  const values = parts.map((k) => (byKey[k] ? Number(byKey[k].value) : null));
+// `total` may be one key or several (summed). Keys in `optional` count as zero when the backend does not send them.
+function Check({ title, total, parts, label, optional = [], byKey, currency }) {
+  const value = (k) => (byKey[k] ? Number(byKey[k].value) : optional.includes(k) ? 0 : null);
+  const totals = [].concat(total).map(value);
+  const t = totals.some((v) => v === null) ? null : totals.reduce((a, b) => a + b, 0);
+  const values = parts.map(value);
   const difference = t === null || values.some((v) => v === null) ? null : t - values.reduce((a, b) => a + b, 0);
   const ok = difference !== null && Math.abs(difference) < 0.005;
   const Icon = ok ? CheckCircle2 : AlertTriangle;
@@ -69,6 +72,7 @@ function Card({ ledger, byKey, currency, icon: Icon, tile, headline, anchor, chi
           title={ledger.title}
           total={ledger.check.total}
           parts={ledger.check.parts}
+          optional={ledger.check.optional}
           label={ledger.check.label}
           byKey={byKey}
           currency={currency}
@@ -90,7 +94,7 @@ function Headline({ label, value, note, currency }) {
 }
 
 // One line of the receipt: label and note on the left, a dotted leader, then the amount on the right.
-function Line({ kpi, label, note, byKey, currency, minus = false, indent = false, muted = false, strong = false, result = false, dot, pct }) {
+function Line({ kpi, label, note, byKey, currency, minus = false, plus = false, indent = false, muted = false, strong = false, result = false, dot, pct }) {
   return (
     <div
       data-kpi={kpi}
@@ -112,6 +116,7 @@ function Line({ kpi, label, note, byKey, currency, minus = false, indent = false
         kpi={kpi}
         currency={currency}
         minus={minus}
+        plus={plus}
         className={
           result
             ? "text-lg font-bold text-[#0A0082]"
@@ -160,6 +165,11 @@ const SectionLabel = ({ children }) => (
 
 export function CashAdvanceCard({ ledger, byKey, currency }) {
   const received = num(byKey, "caDisbursed");
+  // Balance carried in from an earlier advance is held by the employee but was not paid out as cash, so the money to
+  // account for is cash received plus carried in. That is what settled + outstanding add up to.
+  const carriedIn = num(byKey, "caCarriedIn");
+  const held = received + carriedIn;
+  const unmatched = num(byKey, "caCarryUnmatched");
   const settled = num(byKey, "caSettled");
   const outstanding = num(byKey, "caOutstanding");
   const shared = { byKey, currency };
@@ -180,15 +190,15 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
           label="Outstanding"
           value={outstanding}
           currency={currency}
-          note={received > 0 ? `${share(settled, received)}% of received is settled` : "No advance received yet"}
+          note={held > 0 ? `${share(settled, held)}% of ${carriedIn > 0 ? "received and carried in" : "received"} is settled` : "No advance received yet"}
         />
       }
     >
       <div className="mt-3">
-        <SectionLabel>Received, split</SectionLabel>
+        <SectionLabel>{carriedIn > 0 ? "Received and carried in, split" : "Received, split"}</SectionLabel>
         <div className="mt-2">
-          <Bar base={received} parts={parts} label={`Settled ${share(settled, received)}%, outstanding ${share(outstanding, received)}%`} />
-          <Legend parts={parts} base={received} />
+          <Bar base={held} parts={parts} label={`Settled ${share(settled, held)}%, outstanding ${share(outstanding, held)}%`} />
+          <Legend parts={parts} base={held} />
         </div>
       </div>
 
@@ -199,12 +209,28 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
         </div>
         <div className="pt-1">
           <Line kpi="caDisbursed" label="Received" note="Paid out to you" strong {...shared} />
+          {carriedIn > 0 && <Line kpi="caCarriedIn" label="Carried in" note="Balance moved from an earlier advance" plus {...shared} />}
           <Line kpi="caSettled" label="Settled" note="Verified expenses and refunds against your advances" minus dot={COLOR.done} {...shared} />
         </div>
         <div className="pt-1">
           <Line kpi="caOutstanding" label="Outstanding" note="Still to account for" result {...shared} />
         </div>
       </div>
+
+      {/* Carried-in money must come from another of your advances. A gap means the records do not show where it came
+          from, so the outstanding balance may be too high. Shown, never hidden, until Finance corrects the records. */}
+      {Math.abs(unmatched) >= 0.005 && (
+        <p data-carry-unmatched className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">{formatMoney(Math.abs(unmatched), currency)}</span>{" "}
+            {unmatched > 0
+              ? "was carried into your advances but is not recorded as carried out of any other advance, so your outstanding balance may be too high by this amount."
+              : "was carried out of your advances but not into another advance."}{" "}
+            Ask Finance to review the carry-forward on your advances.
+          </span>
+        </p>
+      )}
     </Card>
   );
 }
@@ -245,6 +271,9 @@ export function ReimbursementCard({ ledger, byKey, currency }) {
         <div className="pt-1">
           <Line kpi="erApproved" label="Approved" note="Approved for reimbursement" strong {...shared} />
           <Line kpi="erAdvanceOffset" label="Covered by advance" note="Set against your cash advance" minus {...shared} />
+          {num(byKey, "erNoPaymentDue") > 0 && (
+            <Line kpi="erNoPaymentDue" label="No payment due" note="Approved, nothing reimbursable, no advance involved" minus {...shared} />
+          )}
         </div>
         <div className="pt-1">
           <Line kpi="erPayable" label="Payable to you" note="What AP will pay you" result {...shared} />

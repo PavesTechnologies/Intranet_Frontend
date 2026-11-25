@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Eye, Inbox, Layers, ShieldAlert, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Eye, Inbox, Layers, MessageSquareWarning, ShieldAlert, XCircle } from "lucide-react";
+import { ApprovalStatusBadge, expenseStatusKey } from "../components/approvalStatus";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -91,7 +92,9 @@ const statusGroup = (item) => {
   return "PENDING";
 };
 
+// `rowFilter` (optional): the Approvals page's column filters. Called with { employeeId, employeeName, costCenter, amount, date }.
 export default function PendingApprovalsPage({
+  rowFilter = null,
   searchTerm = "",
   statusFilter = "ALL",
   sortBy = "NEWEST",
@@ -131,11 +134,16 @@ export default function PendingApprovalsPage({
 
   const filteredItems = useMemo(() => {
     const filtered = resolvedItems.filter((item) => {
+      if (rowFilter && !rowFilter({
+        employeeId: item.employeeId, employeeName: item.employeeName, costCenter: item.costCenterName,
+        amount: item.relevantTotal ?? item.totalAmount, date: item.submittedAt, status: expenseStatusKey(item),
+      })) return false;
       if (!searchTerm) return true;
       const q = searchTerm.toLowerCase();
       const reportNum = (item.reportNumber || "").toLowerCase();
       const merchant = merchantSummary(item.relevantLines).toLowerCase();
-      return reportNum.includes(q) || merchant.includes(q);
+      const titleText = (item.title || "").toLowerCase();
+      return reportNum.includes(q) || titleText.includes(q) || merchant.includes(q);
     });
 
     const byStatus = statusFilter === "ALL" ? filtered : filtered.filter((item) => statusGroup(item) === statusFilter);
@@ -148,7 +156,7 @@ export default function PendingApprovalsPage({
       return [...byStatus].sort((a, b) => time(a.submittedAt) - time(b.submittedAt));
     }
     return [...byStatus].sort((a, b) => time(b.submittedAt) - time(a.submittedAt));
-  }, [resolvedItems, searchTerm, statusFilter, sortBy]);
+  }, [resolvedItems, searchTerm, statusFilter, sortBy, rowFilter]);
 
   // Only rows that can be approved in one click can be selected for a bulk approval.
   const toggleSelected = (reportId) =>
@@ -229,7 +237,7 @@ export default function PendingApprovalsPage({
     // The policy warning is already shown in the Status column, so the actions stay a single tidy row.
     return (
       <RowActions>
-        <RowActionButton tone="view" icon={Eye} label="Review" disabled={isMutating} onClick={() => setReviewingItem(item)} />
+        <RowActionButton tone="view" icon={Eye} label="View" title="View the report" disabled={isMutating} onClick={() => setReviewingItem(item)} />
         <RowActionButton
           tone="approve"
           icon={CheckCircle2}
@@ -237,6 +245,14 @@ export default function PendingApprovalsPage({
           title={!item.eligibleForBulkApprove ? "Has open policy violations — review and act line-by-line instead." : "Approve"}
           disabled={isMutating || !item.eligibleForBulkApprove}
           onClick={() => handleBulkApprove(item.reportId)}
+        />
+        <RowActionButton
+          tone="clarify"
+          icon={MessageSquareWarning}
+          label="Send back"
+          title={item.reportStatus === "AWAITING_CORRECTION" ? "Already sent back to the employee" : "Send back: open the report and flag the lines to correct"}
+          disabled={isMutating || item.reportStatus === "AWAITING_CORRECTION"}
+          onClick={() => setReviewingItem(item)}
         />
         <RowActionButton tone="reject" icon={XCircle} label="Reject" disabled={isMutating} onClick={() => setRejectingReport(item)} />
       </RowActions>
@@ -276,7 +292,8 @@ export default function PendingApprovalsPage({
                             </span>
                           </td>
                           <td className="px-2.5 py-1.5 text-left align-middle max-w-[220px]">
-                            <p className="font-semibold text-gray-900 truncate text-xs">{merchantSummary(item.relevantLines)}</p>
+                            {/* The report's own title; the merchants only when a report has none. */}
+                            <p className="font-semibold text-gray-900 truncate text-xs" title={item.title || undefined}>{item.title || merchantSummary(item.relevantLines)}</p>
                             {item.submittedAt && (
                               <p className={`mt-0.5 truncate text-[11px] ${waitingDays(item.submittedAt) >= 3 ? "font-medium text-rose-600" : "text-gray-500"}`}>
                                 Submitted {submittedLabel(item.submittedAt)}
@@ -286,15 +303,12 @@ export default function PendingApprovalsPage({
                           </td>
                           <td className="px-2.5 py-1.5 text-left align-middle text-xs text-gray-600 truncate">{item.costCenterName || "—"}</td>
                           <td className="px-2.5 py-1.5 text-left align-middle">
-                            {needsCorrection ? (
-                              <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800">Awaiting employee</span>
-                            ) : flagged ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                                <ShieldAlert className="h-3 w-3" /> Policy warning · Level {item.levelOrder}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">Pending · Level {item.levelOrder}</span>
-                            )}
+                            {/* Same status names as every other row; the level and any policy warning go on a second line. */}
+                            <ApprovalStatusBadge
+                              statusKey={expenseStatusKey(item)}
+                              detail={needsCorrection ? "Waiting for the employee" : flagged ? `Policy warning · Level ${item.levelOrder}` : item.levelOrder ? `Level ${item.levelOrder}` : null}
+                              detailTone={flagged && !needsCorrection ? "text-amber-700" : "text-slate-400"}
+                            />
                           </td>
                           <td className="px-2.5 py-1.5 whitespace-nowrap text-right text-xs">
                             <span className="font-semibold tabular-nums text-gray-900">{formatMoney(item.relevantTotal, item.currencyCode)}</span>

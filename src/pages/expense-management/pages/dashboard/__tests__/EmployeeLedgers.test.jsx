@@ -47,6 +47,38 @@ describe("employee ledgers", () => {
     expect(container.querySelector('[data-check="Reimbursement ledger"]').textContent).toMatch(/Off by/);
   });
 
+  it("counts carried-in money: received + carried in = settled + outstanding (no more 'Off by' the carry-in)", () => {
+    // The live case: 44,000 paid out, 1,518 carried in, 16,032 settled, 29,486 outstanding.
+    const live = {
+      ...byKey,
+      caDisbursed: { key: "caDisbursed", value: 44000 },
+      caCarriedIn: { key: "caCarriedIn", value: 1518 },
+      caSettled: { key: "caSettled", value: 16032 },
+      caOutstanding: { key: "caOutstanding", value: 29486 },
+    };
+    const carry = { ...ledgers, advance: { ...ledgers.advance, check: {
+      total: ["caDisbursed", "caCarriedIn"], optional: ["caCarriedIn"], parts: ["caSettled", "caOutstanding"],
+      label: "Received + Carried in = Settled + Outstanding" } } };
+    const { container } = render(<EmployeeLedgers ledgers={carry} byKey={live} currency="INR" />);
+    expect(amount(container, "caCarriedIn")).toMatch(/^\+.*1,518/);
+    expect(container.querySelector('[data-check="Cash advance ledger"]').textContent).toMatch(/Balanced/);
+    // 16,032 of 45,518: the split adds up to 100%, not 103%.
+    expect(container.textContent).toMatch(/Settled\s*35%/);
+    expect(container.textContent).toMatch(/Outstanding\s*65%/);
+  });
+
+  it("warns when money was carried in without being carried out of another advance", () => {
+    const flagged = { ...byKey, caCarryUnmatched: { key: "caCarryUnmatched", value: 968 } };
+    const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={flagged} currency="INR" />);
+    expect(container.querySelector("[data-carry-unmatched]").textContent).toMatch(/INR 968.00 was carried into your advances.*Ask Finance/);
+  });
+
+  it("shows no carried-in row and no warning when there is no carry-forward", () => {
+    const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={{ ...byKey, caCarryUnmatched: { key: "caCarryUnmatched", value: 0 } }} currency="INR" />);
+    expect(container.querySelector('[data-kpi="caCarriedIn"]')).toBeNull();
+    expect(container.querySelector("[data-carry-unmatched]")).toBeNull();
+  });
+
   it("shows a dash for a missing figure", () => {
     const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={{}} currency="INR" />);
     expect(amount(container, "caRequested")).toBe("-");

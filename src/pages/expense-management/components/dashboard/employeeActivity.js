@@ -14,6 +14,19 @@ const REMINDER_WINDOW_DAYS = 7;
 // Advances that no longer owe anything, or never went anywhere, are not settlement reminders.
 const NO_SETTLEMENT_STATUSES = ["DRAFT", "SETTLED", "CLOSED", "CANCELLED", "REJECTED"];
 
+// Statuses an advance can only reach after its money was paid out.
+const PAID_OUT_STATUSES = [
+  "DISBURSED", "IN_PROGRESS", "PARTIALLY_SETTLED", "SETTLEMENT_PENDING", "AWAITING_REIMBURSEMENT", "RECONCILIATION_PENDING", "OVERDUE",
+];
+
+// Only money the employee actually received can be settled. An advance still in approval (or approved but not paid out)
+// already carries an outstanding balance and a due date on the record, but asking to settle it would be wrong.
+const isPaidOut = (a) => {
+  const status = String(a.status || "").toUpperCase();
+  return Boolean(a.disbursedAt || a.disbursed_at) || Number(a.disbursedAmount ?? a.disbursed_amount) > 0
+    || PAID_OUT_STATUSES.includes(status) || status.startsWith("RECOVERY_");
+};
+
 const DAY_MS = 86400000;
 
 const humanize = (status) => {
@@ -201,7 +214,7 @@ const startOfToday = (now) => {
 export function settlementReminders(advances = [], now = new Date()) {
   const today = startOfToday(now);
   return advances
-    .filter((a) => !NO_SETTLEMENT_STATUSES.includes(String(a.status || "").toUpperCase()))
+    .filter((a) => !NO_SETTLEMENT_STATUSES.includes(String(a.status || "").toUpperCase()) && isPaidOut(a))
     .map((a) => {
       const outstanding = Number(a.outstandingBalance ?? a.outstanding_balance ?? 0) || 0;
       const due = localDay(a.settlementDueDate || a.settlement_due_date);

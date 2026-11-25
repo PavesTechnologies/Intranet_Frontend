@@ -110,56 +110,56 @@ export const getStatusBadge = (status) => {
   const upper = (status || "").toUpperCase();
   switch (upper) {
     case "DRAFT":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700 border border-gray-300">Draft</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-gray-100 text-gray-700 border border-gray-300">Draft</span>;
     case "SUBMITTED":
     case "PENDING":
     case "PENDING_APPROVAL":
     case "PENDING_MANAGER_APPROVAL":
     case "PENDING_COST_CENTER_APPROVAL":
     case "PENDING_FINANCE_APPROVAL":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</span>;
     case "APPROVED":
     case "EXPENSE_VERIFIED":
     case "EXPENSE VERIFIED":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>;
     case "DISBURSED":
     case "IN_PROGRESS":
     case "IN PROGRESS":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">In Progress</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">In Progress</span>;
     case "RECONCILIATION_PENDING":
     case "RECONCILIATION PENDING":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-50 text-orange-700 border border-orange-200">Reconciliation Pending</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-orange-50 text-orange-700 border border-orange-200">Reconciliation Pending</span>;
     case "SUBMITTED_FOR_REVIEW":
     case "SUBMITTED FOR REVIEW":
     case "EXPENSE_SUBMITTED":
     case "EXPENSE SUBMITTED":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">Submitted for Review</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-blue-50 text-blue-700 border border-blue-200">Submitted for Review</span>;
     case "UNDER_REVIEW":
     case "UNDER REVIEW":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-200">Under Review</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-purple-50 text-purple-700 border border-purple-200">Under Review</span>;
     case "SETTLEMENT_PENDING":
     case "SETTLEMENT PENDING":
     case "PARTIALLY_SETTLED":
     case "PARTIALLY_ADJUSTED":
     case "PARTIALLY ADJUSTED":
     case "ADJUSTED":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Settlement Pending</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-amber-50 text-amber-700 border border-amber-200">Settlement Pending</span>;
     case "AWAITING_REIMBURSEMENT":
     case "AWAITING REIMBURSEMENT":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-sky-50 text-sky-700 border border-sky-200">Awaiting Reimbursement</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-sky-50 text-sky-700 border border-sky-200">Awaiting Reimbursement</span>;
     case "CLOSED":
     case "SETTLED":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Closed</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Closed</span>;
     case "REJECTED":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Rejected</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-rose-50 text-rose-700 border border-rose-200">Rejected</span>;
     case "DEFERRED":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200">Deferred</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-amber-50 text-amber-800 border border-amber-200">Deferred</span>;
     case "OVERDUE":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Overdue</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-rose-50 text-rose-700 border border-rose-200">Overdue</span>;
     case "CANCELLED":
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-600 border border-slate-300">Cancelled</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-slate-100 text-slate-600 border border-slate-300">Cancelled</span>;
     default:
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">{status || "Unknown"}</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold leading-none rounded-full bg-gray-100 text-gray-600">{status || "Unknown"}</span>;
   }
 };
 

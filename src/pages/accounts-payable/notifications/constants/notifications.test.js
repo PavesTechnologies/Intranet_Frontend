@@ -437,17 +437,9 @@ describe("ACTION_REQUIRED_TYPES", () => {
 });
 
 describe("AP navigation wiring", () => {
-  it("exposes Notifications in the Accounts Payable sidebar submenu", async () => {
+  it("keeps Notifications out of the sidebar: the header bell is the way in", async () => {
     const { AP_SUBMENU } = await import("../../../../config/sidebarConfig");
-    const { AP_ALL_ROLES } = await import("../../constants/apRoles");
-
-    const item = AP_SUBMENU.find((entry) => entry.label === "Notifications");
-
-    expect(item).toBeDefined();
-    // Reuses the one route the header bell and the dashboard also link to.
-    expect(item.to).toBe(AP_ROUTES.NOTIFICATIONS);
-    // Same gate as the route: any AP user, with the backend deciding what they see.
-    expect(item.allowedRoles).toBe(AP_ALL_ROLES);
+    expect(AP_SUBMENU.find((entry) => entry.label === "Notifications")).toBeUndefined();
   });
 
   it("keeps the existing AP submenu destinations intact", async () => {
