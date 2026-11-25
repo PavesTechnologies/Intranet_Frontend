@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CheckCircle2, Keyboard, Pencil, Plus, Sparkles, Trash2, XCircle, MessageSquareWarning } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, History, Keyboard, Paperclip, Pencil, Plus, Receipt, Search, Sparkles, Trash2, XCircle, MessageSquareWarning } from "lucide-react";
 import { showStatusToast } from "@/components/toastfy/toast";
 import Button from "@/components/Button/Button";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
@@ -24,7 +24,7 @@ import {
 import { MIN_COMMENT_LENGTH, claimActions } from "@/pages/expense-management/pages/supplementary/supplementaryClaimActions";
 import ReceiptFirstExpense from "@/pages/expense-management/pages/supplementary/ReceiptFirstExpense";
 import ClaimExpenseDrawer from "@/pages/expense-management/pages/supplementary/ClaimExpenseDrawer";
-import SupplementaryFlowChart from "@/pages/expense-management/pages/supplementary/SupplementaryFlowChart";
+import ClaimHeroCard, { ClaimMoneySummary } from "@/pages/expense-management/pages/supplementary/ClaimHeroCard";
 import { employeeActionStates } from "@/pages/expense-management/pages/supplementary/supplementaryClaimList";
 
 // Maps a claim status to the status pill the rest of Expense Management uses (the label is the claim's own wording).
@@ -39,13 +39,6 @@ const PILL_STATUS = {
   PAYMENT_PENDING: "APPROVED",
   SETTLED: "APPROVED",
   CANCELLED: "CANCELLED",
-};
-
-const REASON_LABEL = {
-  RECEIPT_RECEIVED_LATE: "Receipt received late",
-  FORGOT_TO_SUBMIT: "Forgot to submit it in the report",
-  NOT_AVAILABLE_IN_REPORT: "Expense was not in the report",
-  OTHER: "Other",
 };
 
 const EMPTY_ITEM = { expenseDate: "", categoryId: "", merchantName: "", description: "", amount: "", employeePaymentMethod: "", notes: "" };
@@ -92,6 +85,10 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
   // The edited expense is tracked by id and read from the claim, so the drawer always shows the latest receipts.
   const [editingId, setEditingId] = useState(null);
   const [deletingItem, setDeletingItem] = useState(null);
+  // Search and sort over the claim's expenses, as on the expense report.
+  const [itemSearch, setItemSearch] = useState("");
+  const [itemSort, setItemSort] = useState("date-desc");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const listPath = {
     employee: "/expense-management/expenses/supplementary",
@@ -206,6 +203,18 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
   ];
 
   const workflow = employeeActionStates(claim);
+  const query = itemSearch.trim().toLowerCase();
+  const visibleItems = claim.items
+    .filter((it) => !query || `${it.merchantName || ""} ${categoryName(it.categoryId)} ${it.description || ""}`.toLowerCase().includes(query))
+    .sort((a, b) => {
+      switch (itemSort) {
+        case "date-asc": return String(a.expenseDate).localeCompare(String(b.expenseDate));
+        case "amount-desc": return Number(b.amount) - Number(a.amount);
+        case "amount-asc": return Number(a.amount) - Number(b.amount);
+        case "merchant": return String(a.merchantName || "").localeCompare(String(b.merchantName || ""));
+        default: return String(b.expenseDate).localeCompare(String(a.expenseDate));
+      }
+    });
   const withReceipt = claim.items.filter((i) => (i.receipts || []).length > 0).length;
   const addTitle = addMode === "manual" ? "Enter the expense" : addMode === "auto" ? "Add from a receipt" : "Add an expense";
 
@@ -242,56 +251,78 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
         variant="danger"
       />
 
-      {/* Header: the claim, its status and total, then the details that matter. */}
-      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-[#0a174e]">Supplementary claim</h1>
-              <ApprovalStatusPill status={PILL_STATUS[claim.status] || "DRAFT"} label={SUPP_STATUS_LABEL[claim.status] || claim.status} />
-            </div>
-            <p className="mt-1 font-mono text-xs text-gray-400">{claim.claimNumber}</p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Claim total</p>
-            <p className="text-2xl font-bold text-[#0a174e]">{formatMoney(claim.totalAmount, claim.currencyCode)}</p>
-          </div>
-        </div>
-        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-gray-100 pt-4 text-sm md:grid-cols-4">
-          <Detail label="Report" value={claim.reportNumber} mono />
-          <Detail label="Employee" value={claim.employeeId} />
-          <Detail label="Reason" value={claim.lateReasonText || REASON_LABEL[claim.lateReasonCode] || "—"} />
-          <Detail
-            label="Trip / event period"
-            value={`${claim.reportTripStart ? formatDate(claim.reportTripStart) : "—"} to ${claim.reportTripEnd ? formatDate(claim.reportTripEnd) : "—"}`}
+      {/* The claim at the top, laid out like an expense report: status, total, actions, facts and the five steps. */}
+      <ClaimHeroCard
+        claim={claim}
+        statusPill={<ApprovalStatusPill status={PILL_STATUS[claim.status] || "DRAFT"} label={SUPP_STATUS_LABEL[claim.status] || claim.status} />}
+        actions={mode === "employee" ? (
+          <ClaimActions
+            claim={claim}
+            workflow={workflow}
+            busy={busy}
+            onAcknowledge={() => runAction(() => supplementaryClaimService.acknowledge(claimId), "Acknowledged. This does not approve the claim.")}
+            onSubmit={() => runAction(() => supplementaryClaimService.submit(claimId), "Submitted to your manager.")}
+            onResubmit={() => runAction(() => supplementaryClaimService.resubmit(claimId), "Resubmitted.")}
+            onCancel={() => runAction(() => supplementaryClaimService.cancel(claimId), "Claim cancelled.")}
           />
-          {claim.createdOnBehalf && (
-            <Detail
-              label="Created by Finance"
-              value={claim.employeeConfirmedAt ? `Acknowledged ${formatDateTime(claim.employeeConfirmedAt)}` : "Waiting for acknowledgment"}
-            />
-          )}
-          <Detail label="Submitted" value={formatDateTime(claim.submittedAt)} />
-        </dl>
-      </section>
-
-      <SupplementaryFlowChart status={claim.status} />
+        ) : null}
+        notice={claim.createdOnBehalf ? (
+          <p className="mt-2 text-xs text-slate-500">
+            Created by Finance on your behalf ·{" "}
+            {claim.employeeConfirmedAt ? `acknowledged ${formatDateTime(claim.employeeConfirmedAt)}` : "waiting for your acknowledgment"}
+          </p>
+        ) : null}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         {/* Left: the expenses. Adding one opens a dialog, as on the expense report. */}
         <div className="lg:col-span-2">
-          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-gray-900">Expenses</h2>
-                <p className="text-xs text-gray-500">{claim.items.length} item{claim.items.length === 1 ? "" : "s"}</p>
+          <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_1px_2px_rgba(10,0,130,0.04),0_10px_30px_-18px_rgba(10,0,130,0.18)] sm:p-5" data-claim-expenses>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0A0082]/10 text-[#0A0082]">
+                  <Receipt size={18} aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#0a174e]">
+                    Expenses <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{claim.items.length}</span>
+                  </h2>
+                  <p className="text-xs text-slate-500">Each missed expense on this claim, with its receipt and amount in {claim.currencyCode || "INR"}.</p>
+                </div>
               </div>
               {actions.canEditItems && (
                 <Button variant="primary" size="small" onClick={openAdd} disabled={busy}>
-                  <Plus size={14} aria-hidden="true" /> Add expense
+                  <Plus size={14} aria-hidden="true" /> Add Line Item
                 </Button>
               )}
-            </header>
+            </div>
+            {claim.items.length > 0 && (
+              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <label className="relative sm:col-span-2">
+                  <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={itemSearch}
+                    onChange={(e) => setItemSearch(e.target.value)}
+                    placeholder="Search by merchant, category, description..."
+                    aria-label="Search expenses"
+                    className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-[#0A0082] focus:outline-none focus:ring-2 focus:ring-[#0A0082]/15"
+                  />
+                </label>
+                <FormSelect
+                  name="itemSort"
+                  value={itemSort}
+                  onChange={(e) => setItemSort(e.target.value)}
+                  options={[
+                    { value: "date-desc", label: "Date (Newest first)" },
+                    { value: "date-asc", label: "Date (Oldest first)" },
+                    { value: "amount-desc", label: "Amount (High to Low)" },
+                    { value: "amount-asc", label: "Amount (Low to High)" },
+                    { value: "merchant", label: "Merchant (A-Z)" },
+                  ]}
+                />
+              </div>
+            )}
             {claim.items.length === 0 ? (
               <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-gray-200 px-4 py-10 text-center">
                 <p className="text-sm font-medium text-gray-700">No expenses yet</p>
@@ -302,18 +333,20 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
             ) : (
               <div className="overflow-x-auto rounded-lg shadow-sm">
                 <table className="w-full table-auto border-collapse text-sm">
-                  <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs text-white">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold">Date</th>
-                      <th className="px-4 py-3 font-semibold">Category</th>
-                      <th className="px-4 py-3 font-semibold">Merchant</th>
-                      <th className="px-4 py-3 font-semibold">Receipt</th>
-                      <th className="px-4 py-3 text-right font-semibold">Amount</th>
-                      <th className="w-24 px-2 py-3"><span className="sr-only">Actions</span></th>
+                  <thead>
+                    <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-sm text-white">
+                      <th className="px-3 py-3 text-left font-semibold">Expense</th>
+                      <th className="px-2 py-3 text-center font-semibold">Date</th>
+                      <th className="px-2 py-3 text-center font-semibold">Receipt</th>
+                      <th className="px-2 py-3 text-center font-semibold">Amount ({claim.currencyCode || "INR"})</th>
+                      <th className="px-2 py-3 text-center font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {claim.items.map((it) => (
+                    {visibleItems.length === 0 && (
+                      <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500">No expenses match "{itemSearch}".</td></tr>
+                    )}
+                    {visibleItems.map((it) => (
                       <ExpenseRow
                         key={it.claimItemId}
                         claimId={claimId}
@@ -337,50 +370,7 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
 
         {/* Right: the totals, what can be done now, the review for the approver, and the history. */}
         <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            <h2 className="mb-3 text-sm font-semibold text-gray-900">Summary</h2>
-            <dl className="space-y-2 text-sm">
-              <SummaryRow label="Expenses" value={claim.items.length} />
-              <SummaryRow label="With a receipt" value={`${withReceipt} of ${claim.items.length}`} />
-              <SummaryRow label="Claim total" value={formatMoney(claim.totalAmount, claim.currencyCode)} strong />
-            </dl>
-          </section>
-
-          {mode === "employee" && (
-            <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="text-sm font-semibold text-gray-900">Next step</h2>
-              <ul className="space-y-3">
-                <WorkflowAction
-                  label="Acknowledge"
-                  state={workflow.acknowledge}
-                  disabled={busy}
-                  variant="primary"
-                  onRun={() => runAction(() => supplementaryClaimService.acknowledge(claimId), "Acknowledged. This does not approve the claim.")}
-                />
-                <WorkflowAction
-                  label="Submit claim"
-                  state={workflow.submit}
-                  disabled={busy}
-                  variant="primary"
-                  onRun={() => runAction(() => supplementaryClaimService.submit(claimId), "Submitted to your manager.")}
-                />
-                <WorkflowAction
-                  label="Resubmit"
-                  state={workflow.resubmit}
-                  disabled={busy}
-                  variant="primary"
-                  onRun={() => runAction(() => supplementaryClaimService.resubmit(claimId), "Resubmitted.")}
-                />
-                <WorkflowAction
-                  label="Cancel claim"
-                  state={workflow.cancel}
-                  disabled={busy}
-                  variant="outline"
-                  onRun={() => runAction(() => supplementaryClaimService.cancel(claimId), "Claim cancelled.")}
-                />
-              </ul>
-            </section>
-          )}
+          <ClaimMoneySummary claim={claim} withReceipt={withReceipt} statusLabel={SUPP_STATUS_LABEL[claim.status] || claim.status} />
 
           {isReviewer && (
             <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
@@ -413,22 +403,39 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
             </section>
           )}
 
-          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            <h2 className="mb-3 text-sm font-semibold text-gray-900">History</h2>
-            {claim.history.length === 0 ? (
-              <p className="text-xs text-gray-500">No activity yet.</p>
-            ) : (
-              <ol className="max-h-72 space-y-3 overflow-y-auto pr-1 text-xs">
-                {claim.history.map((h, idx) => (
-                  <li key={`${h.createdAt}-${idx}`} className="border-l-2 border-gray-200 pl-3">
-                    <p className="font-medium capitalize text-gray-800">{h.action.replaceAll("_", " ").toLowerCase()}</p>
-                    <p className="text-gray-500">{h.actorRole || "user"} · {formatDateTime(h.createdAt)}</p>
-                    {h.comment && <p className="mt-0.5 text-gray-700">{h.comment}</p>}
-                  </li>
-                ))}
-              </ol>
+          <div className="rounded-xl border border-gray-200 bg-white" data-claim-history>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              aria-expanded={historyOpen}
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-gray-800"
+            >
+              <span className="flex items-center gap-2">
+                <History className="h-4 w-4 text-gray-400" aria-hidden="true" /> Claim history
+              </span>
+              {historyOpen ? <ChevronUp className="h-4 w-4 text-gray-400" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />}
+            </button>
+            {historyOpen && (
+              <div className="border-t border-gray-100 px-4 py-3">
+                {claim.history.length === 0 ? (
+                  <p className="text-xs text-gray-400">Nothing has happened to this claim yet.</p>
+                ) : (
+                  <ol className="space-y-2.5">
+                    {claim.history.map((h, idx) => (
+                      <li key={`${h.createdAt}-${idx}`} className="flex gap-3">
+                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-400" />
+                        <div className="min-w-0 text-xs">
+                          <p className="font-medium capitalize text-gray-800">{h.action.replaceAll("_", " ").toLowerCase()}</p>
+                          <p className="text-gray-500">{formatDateTime(h.createdAt)} · {h.actorRole || "user"}</p>
+                          {h.comment && <p className="mt-0.5 text-gray-700">{h.comment}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
             )}
-          </section>
+          </div>
         </div>
       </div>
 
@@ -438,10 +445,13 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
         onClose={closeAdd}
         title={addTitle}
         subtitle={claim.claimNumber}
-        size={addMode === "auto" ? "2xl" : "lg"}
+        size={addMode === "auto" ? "full" : addMode === null ? "4xl" : "lg"}
+        // The receipt scan takes the whole screen, like a report's receipt review: the receipt beside every field.
+        className={addMode === "auto" ? "!fixed !inset-0 !max-w-none !rounded-none !border-0" : ""}
+        maxHeight={addMode === "auto" ? "max-h-screen" : undefined}
       >
         {addMode === null && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 p-2 md:grid-cols-2">
             <AddModeCard
               title="Manual Entry"
               icon={Keyboard}
@@ -470,6 +480,7 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
               periodStart={claim.reportTripStart}
               periodEnd={claim.reportTripEnd}
               categories={categories}
+              currencyCode={claim.currencyCode}
               onClaimChanged={(res) => {
                 setClaim(unwrap(res));
                 closeAdd();
@@ -593,21 +604,32 @@ function ExpenseRow({ claimId, item, categoryName, editable, busy, releasable, s
 
   return (
     <>
-      <tr className="align-top">
-        <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatDate(item.expenseDate)}</td>
-        <td className="px-4 py-3 text-gray-700">{categoryName}</td>
-        <td className="px-4 py-3">
-          <div className="font-medium text-gray-900">{item.merchantName || "—"}</div>
-          {item.description && <div className="text-xs text-gray-500">{item.description}</div>}
+      <tr className="align-middle transition hover:bg-slate-50/60" data-claim-item={item.claimItemId}>
+        <td className="px-3 py-3">
+          <div className="text-base font-semibold uppercase tracking-tight text-gray-900">{item.merchantName || "Merchant not given"}</div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-700">{categoryName}</span>
+            {item.employeePaymentMethod && (
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                {PAYMENT_METHOD_OPTIONS.find((o) => o.value === item.employeePaymentMethod)?.label || item.employeePaymentMethod}
+              </span>
+            )}
+          </div>
+          {item.description && <div className="mt-1 text-xs text-gray-500">{item.description}</div>}
         </td>
-        <td className="px-4 py-3">
+        <td className="whitespace-nowrap px-2 py-3 text-center text-gray-700">{formatDate(item.expenseDate)}</td>
+        <td className="px-2 py-3 text-center">
           {receipts.length === 0 ? (
-            <span className="text-xs font-medium text-red-600">Missing</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200">Receipt missing</span>
           ) : (
-            <span className="text-xs text-gray-700">{receipts.length} attached</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+              <Paperclip size={11} aria-hidden="true" /> {receipts.length} attached
+            </span>
           )}
         </td>
-        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">{formatMoney(item.amount, item.currencyCode)}</td>
+        <td className="whitespace-nowrap px-2 py-3 text-center">
+          <span className="text-base font-bold tabular-nums text-[#0a174e]">{formatMoney(item.amount, item.currencyCode)}</span>
+        </td>
         <td className="px-2 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
               <button
@@ -635,7 +657,7 @@ function ExpenseRow({ claimId, item, categoryName, editable, busy, releasable, s
       </tr>
       {(receipts.length > 0 || editable) && (
         <tr>
-          <td colSpan={6} className="bg-gray-50/60 px-4 py-2">
+          <td colSpan={5} className="bg-gray-50/60 px-4 py-2">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {receipts.map((r) => (
                 <span key={r.receiptId} className="flex items-center gap-1 rounded-md bg-white px-2 py-1 text-gray-700 shadow-sm">
@@ -679,39 +701,21 @@ function ExpenseRow({ claimId, item, categoryName, editable, busy, releasable, s
   );
 }
 
-function SummaryRow({ label, value, strong }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className={strong ? "text-base font-bold text-[#0a174e]" : "font-medium text-gray-900"}>{value}</dd>
-    </div>
-  );
-}
-
-function Detail({ label, value, mono }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
-      <dd className={`truncate text-gray-900 ${mono ? "font-mono text-xs" : ""}`}>{value}</dd>
-    </div>
-  );
-}
-
 /** One of the two ways to add an expense, styled like the Add Line Item choice on the expense screen. */
 function AddModeCard({ title, icon: Icon, text, action, badge, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex flex-col items-center justify-between overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 text-center transition-all duration-300 hover:border-indigo-600 hover:shadow-lg"
+      className="group relative flex min-h-[16rem] flex-col items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white px-8 py-10 text-center transition-all duration-300 hover:border-indigo-600 hover:shadow-lg"
     >
-      {badge && <span className="absolute right-0 top-0 rounded-bl-lg bg-indigo-600 px-2 py-0.5 text-[9px] font-bold text-white">{badge}</span>}
-      <span className="mb-3 rounded-full bg-indigo-50 p-4 text-indigo-700 transition-colors group-hover:bg-indigo-100">
-        <Icon size={26} />
+      {badge && <span className="absolute right-0 top-0 rounded-bl-lg bg-indigo-600 px-2.5 py-1 text-[10px] font-bold text-white">{badge}</span>}
+      <span className="mb-4 rounded-full bg-indigo-50 p-5 text-indigo-700 transition-colors group-hover:bg-indigo-100">
+        <Icon size={34} />
       </span>
-      <span className="text-base font-bold text-gray-900 group-hover:text-indigo-700">{title}</span>
-      <span className="mt-2 text-xs leading-relaxed text-gray-400">{text}</span>
-      <span className="mt-4 text-xs font-semibold text-indigo-700">{action} &rarr;</span>
+      <span className="text-xl font-bold text-gray-900 group-hover:text-indigo-700">{title}</span>
+      <span className="mt-2 max-w-xs text-sm leading-relaxed text-gray-500">{text}</span>
+      <span className="mt-5 text-sm font-semibold text-indigo-700">{action} &rarr;</span>
     </button>
   );
 }
@@ -730,21 +734,38 @@ function BackButton({ onClick }) {
 }
 
 /** One workflow action. It is always shown; when it is not allowed it is disabled and the reason is written under it. */
-function WorkflowAction({ label, state, disabled, variant, onRun }) {
-  const allowed = state.allowed && !disabled;
+/** The employee's actions in the claim header, like Submit for Approval / Edit / Delete on an expense report. */
+function ClaimActions({ claim, workflow, busy, onAcknowledge, onSubmit, onResubmit, onCancel }) {
+  const isDraft = claim.status === SUPP_STATUS.DRAFT;
+  const needsChanges = claim.status === SUPP_STATUS.CLARIFICATION_REQUIRED;
+  const primary = needsChanges ? { label: "Resubmit", state: workflow.resubmit, run: onResubmit }
+    : isDraft ? { label: "Submit for Approval", state: workflow.submit, run: onSubmit } : null;
+  if (!primary && !workflow.acknowledge.allowed && !workflow.cancel.allowed) return null;
   return (
-    <li className="space-y-1">
-      <Button
-        variant={variant}
-        size="small"
-        className="w-full"
-        disabled={!allowed}
-        onClick={allowed ? onRun : undefined}
-        title={state.allowed ? "" : state.reason}
-      >
-        {label}
-      </Button>
-      {!state.allowed && <p className="text-[11px] leading-snug text-gray-500">{state.reason}</p>}
-    </li>
+    <div className="flex flex-col items-start gap-1.5 lg:items-end" data-claim-actions>
+      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        {workflow.acknowledge.allowed && (
+          <Button variant="primary" size="small" disabled={busy} onClick={onAcknowledge}>Acknowledge</Button>
+        )}
+        {primary && (
+          <Button
+            variant="primary"
+            size="small"
+            disabled={busy || !primary.state.allowed}
+            onClick={primary.state.allowed ? primary.run : undefined}
+            title={primary.state.allowed ? "" : primary.state.reason}
+          >
+            {primary.label}
+          </Button>
+        )}
+        {workflow.cancel.allowed && (
+          <Button variant="outline" size="small" disabled={busy} onClick={onCancel}>Cancel claim</Button>
+        )}
+      </div>
+      {primary && !primary.state.allowed && (
+        <p className="max-w-xs text-[11px] leading-snug text-slate-500 lg:text-right">{primary.state.reason}</p>
+      )}
+    </div>
   );
 }
+
