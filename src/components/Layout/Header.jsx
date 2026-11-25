@@ -23,6 +23,7 @@ import { APPLICATIONS, isFinanceEnabled } from "../../utils/applicationRoutes";
 
 import Modal from "../Modal/modal";
 import TourCenter from "../Tour/TourCenter";
+import GlobalSearch from "../GlobalSearch/GlobalSearch";
 
 import ExpenseNotificationBell from "../../pages/expense-management/components/notifications/NotificationBell";
 
@@ -228,14 +229,14 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
   return (
     <>
       <header className="bg-white border-b border-gray-200 px-5 py-2 sticky top-0 z-[50]">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-6">
 
           {/* ── Left: sidebar toggle + welcome ── */}
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 flex-shrink items-center gap-4">
             <button
               data-tour="header-toggle"
               onClick={onToggleSidebar}
-              className="flex items-center justify-center p-2 rounded-md hover:bg-gray-100 transition-colors"
+              className="flex flex-shrink-0 items-center justify-center p-2 rounded-md hover:bg-gray-100 transition-colors"
               title="Toggle Sidebar"
             >
               <AnimatePresence mode="wait" initial={true}>
@@ -251,16 +252,21 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
               </AnimatePresence>
             </button>
 
-            <div data-tour="header-welcome">
-              <h2 className="text-1.5xl font-bold text-gray-900">Welcome back, {firstName}</h2>
-              <p className="text-sm text-gray-600">
+            <div data-tour="header-welcome" className="min-w-0">
+              <h2 className="truncate text-1.5xl font-bold text-gray-900">Welcome back, {firstName}</h2>
+              <p className="hidden truncate text-sm text-gray-600 2xl:block">
                 Here's what's happening with your organization today.
               </p>
             </div>
           </div>
 
+          {/* ── Global search icon (expands on click / Ctrl+Cmd+K), sits just left of the right-hand actions ── */}
+          <div className="flex min-w-0 flex-1 justify-end">
+            <GlobalSearch />
+          </div>
+
           {/* ── Right: application switcher + notifications + profile ── */}
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-shrink-0 items-center space-x-4">
             {/* Expense Management notifications - unread badge, dropdown, live updates */}
             {isExpenseManagement && (
               <span data-tour="header-notifications" className="inline-flex">

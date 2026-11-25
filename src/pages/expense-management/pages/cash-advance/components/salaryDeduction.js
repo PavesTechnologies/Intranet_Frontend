@@ -43,6 +43,22 @@ export const validateRequestAmount = (raw, outstanding) => {
   return "";
 };
 
+/** True when Finance changed the amount away from the full outstanding balance, so a reason is needed. */
+export const isAmountChanged = (raw, outstanding) => {
+  const value = toNumber(raw);
+  if (Number.isNaN(value)) return false;
+  return Math.round(value * 100) !== Math.round(Number(outstanding || 0) * 100);
+};
+
+/** Returns an error for the amount-change reason, or "" when it is valid or not needed. */
+export const validateAmountChangeReason = (raw, outstanding, reason) => {
+  if (!isAmountChanged(raw, outstanding)) return "";
+  const text = (reason || "").trim();
+  if (!text) return "Enter the reason for changing the amount from the full balance.";
+  if (text.length > 500) return "The reason must be 500 characters or fewer.";
+  return "";
+};
+
 /** Result form. `requested` is the request amount; a zero result is allowed. */
 export const validateResult = (values, requested) => {
   const errors = {};

@@ -16,6 +16,7 @@ const hooks = vi.hoisted(() => ({
 vi.mock("../hooks/useMilestones", () => hooks);
 
 import MilestonesTab from "../index";
+import { formatMoney } from "../utils/milestoneUtils";
 
 // Planned dates must be today or later, so the form fixtures move with the clock.
 const isoInDays = (days) => {
@@ -187,8 +188,9 @@ describe("MilestonesTab", () => {
     await user.type(screen.getByLabelText(/allocation/i), "25");
 
     // 25% of the 400,000 still unallocated — not 25% of the 1,000,000 budget.
-    expect(screen.getByText("₹1,00,000.00")).toBeInTheDocument();
-    expect(screen.queryByText("₹2,50,000.00")).not.toBeInTheDocument();
+    // formatMoney follows the runtime locale (₹1,00,000.00 in en-IN, ₹100,000.00 in en-US).
+    expect(screen.getByText(formatMoney(100000, "INR"))).toBeInTheDocument();
+    expect(screen.queryByText(formatMoney(250000, "INR"))).not.toBeInTheDocument();
   });
 
   it("locks the planned start date once the milestone has started", async () => {

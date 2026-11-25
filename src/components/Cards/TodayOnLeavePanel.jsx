@@ -1,13 +1,9 @@
-import { useState, useEffect } from "react";
 import AppCard from "./AppCard";
-import LoadingSpinner from "../LoadingSpinner";
-import { User } from "lucide-react";
-import { FullHouseIllustration } from "../illustrations/DashboardIllustrations";
-import { todayOnLeave } from "../../services/dashboard";
+import { CheckCircle2 } from "lucide-react";
 
 const AVATAR_COLORS = [
-  "bg-teal-400", "bg-rose-400", "bg-blue-400", "bg-violet-400",
-  "bg-orange-400", "bg-emerald-400", "bg-pink-400", "bg-indigo-400",
+  "bg-teal-500", "bg-rose-500", "bg-blue-500", "bg-violet-500",
+  "bg-orange-500", "bg-emerald-500", "bg-pink-500", "bg-indigo-500",
 ];
 
 function getInitials(name) {
@@ -17,7 +13,7 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function getColor(name) {
+function getColor(name = "") {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -26,54 +22,50 @@ function getColor(name) {
 }
 
 function EmployeeCard({ employee }) {
-  const initials = getInitials(employee.employeeName);
-  const color = getColor(employee.employeeName);
-
   return (
-    <div className="group relative flex flex-col items-center gap-1.5 transition-all duration-200 hover:-translate-y-1">
-      {/* Tooltip */}
-      {employee.session && (
-        <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-gray-900/90 text-white text-[10px] px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap z-20 pointer-events-none translate-y-2 group-hover:translate-y-0">
-          {employee.session}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-900/90" />
-        </div>
-      )}
-
-      {/* Avatar */}
-      <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center font-semibold text-white text-xs shadow-sm border-2 border-white`}>
-        {initials}
+    <li className="flex min-w-0 items-center gap-2.5 rounded-xl border border-[#EEF0F7] bg-[#FAFBFE] p-2 pr-3 transition hover:border-[#D9DCEC] hover:bg-white">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white shadow-sm ${getColor(employee.employeeName)}`}>
+        {getInitials(employee.employeeName)}
       </div>
+      <div className="min-w-0 leading-tight">
+        <p className="truncate text-[13px] font-semibold text-[#0A174E]" title={employee.employeeName}>
+          {employee.employeeName}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-[#78716C]">{employee.session || "On leave"}</p>
+      </div>
+    </li>
+  );
+}
 
-      {/* Name */}
-      <span className="text-[10px] font-semibold text-gray-600 w-[80px] line-clamp-2 text-center leading-tight">
-        {employee.employeeName}
-      </span>
+function SkeletonRow() {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 animate-pulse">
+      {[0, 1].map((i) => (
+        <div key={i} className="flex items-center gap-2.5 rounded-xl border border-[#EEF0F7] p-2">
+          <div className="h-9 w-9 rounded-full bg-[#EEF0F7]" />
+          <div className="space-y-1.5">
+            <div className="h-3 w-24 rounded bg-[#EEF0F7]" />
+            <div className="h-2.5 w-14 rounded bg-[#EEF0F7]" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-export default function TodayOnLeavePanel() {
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    todayOnLeave()
-      .then((res) => setEmployees(res?.data ?? []))
-      .catch(() => setEmployees([]))
-      .finally(() => setLoading(false));
-  }, []);
-
+/** Colleagues on leave today. Data is fetched by the Dashboard and passed in. */
+export default function TodayOnLeavePanel({ employees = [], loading = false }) {
   return (
     <AppCard
       density="comfortable"
       renderHeader={() => (
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span className="h-1 w-6 rounded bg-gradient-to-r from-[#0A0082] to-[#FF3D72]" />
-            <span className="font-heading text-sm font-semibold text-[#0A174E]">Today on Leave</span>
+            <span className="font-heading text-sm font-semibold text-[#0A174E]">Who&apos;s Out Today</span>
           </div>
           {!loading && employees.length > 0 && (
-            <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
               {employees.length} out
             </span>
           )}
@@ -81,23 +73,20 @@ export default function TodayOnLeavePanel() {
       )}
     >
       {loading ? (
-        <div className="flex items-center justify-center py-6">
-          <LoadingSpinner text="Loading..." />
-        </div>
+        <SkeletonRow />
       ) : employees.length === 0 ? (
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-5 py-2 text-center sm:text-left">
-          <FullHouseIllustration className="w-28 h-20" />
-          <div>
-            <p className="font-heading text-sm font-semibold text-[#0A174E]">Full house today!</p>
-            <p className="text-xs text-[#78716C] mt-0.5">No one is on leave, the whole team is in.</p>
-          </div>
+        <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50/70 px-3 py-2.5">
+          <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+          <p className="text-xs text-emerald-800">
+            <span className="font-semibold">Full house today.</span> No one is on leave.
+          </p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-4">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {employees.map((emp, i) => (
             <EmployeeCard key={emp.id ?? i} employee={emp} />
           ))}
-        </div>
+        </ul>
       )}
     </AppCard>
   );

@@ -11,55 +11,54 @@ const KPI = toByKey({
 });
 
 describe("employee summary banner", () => {
-  it("headline is what is approved and not paid yet: not yet with AP + waiting for AP", () => {
-    const { container } = render(<EmployeeOverview byKey={KPI} currency="INR" />);
-    expect(container.querySelector("[data-overview]").textContent).toMatch(/Reimbursement on its way to you\s*INR 1,200/);
+  const byKey = toByKey({
+    drApproved: 1000, drToSendAp: 0, drPendingAp: 200, drPaid: 800,
+    caDisbursed: 9000, caUsedOnBills: 1200, caReturned: 1000, caCarriedForward: 500, caOutstanding: 6300,
+    erApproved: 2500, erAdvanceOffset: 1200, erPayable: 1300,
+  });
+  const col = (container, k) => container.querySelector(`[data-money-col="${k}"]`);
+  const main = (container, k) => col(container, k).querySelector("[data-money-main]").textContent;
+  const line = (container, k) => container.querySelector(`[data-money-line="${k}"]`).textContent;
+
+  it("shows three columns: direct, cash advance, total", () => {
+    const { container } = render(<EmployeeOverview byKey={byKey} currency="INR" />);
+    const cols = [...container.querySelectorAll("[data-money-col]")].map((c) => c.getAttribute("data-money-col"));
+    expect(cols).toEqual(["direct", "advance", "total"]);
+    expect(container.querySelectorAll("[data-money-line]")).toHaveLength(6);
   });
 
-  it("shows the money cards: claimed, approved, paid and advance outstanding", () => {
-    const { container } = render(<EmployeeOverview byKey={KPI} currency="INR" attentionCount={0} reminders={[]} />);
-    const card = (key) => container.querySelector(`[data-money-card="${key}"]`).textContent;
-    expect(card("erClaimed")).toMatch(/Expenses claimed.*1,900/);
-    expect(card("erApproved")).toMatch(/Expenses approved.*1,900/);
-    expect(card("erPaid")).toMatch(/Reimbursed to your bank.*400/);
-    expect(card("caOutstanding")).toMatch(/Cash advance to settle.*3,000/);
-    // Payable and received stay in the ledgers only.
-    expect(container.textContent).not.toMatch(/1,600|9,000/);
+  it("each column leads with one figure and two lines behind it", () => {
+    const { container } = render(<EmployeeOverview byKey={byKey} currency="INR" />);
+    expect(main(container, "direct")).toMatch(/INR 800/);
+    expect(line(container, "drApproved")).toMatch(/Approved.*1,000/);
+    expect(line(container, "drPending")).toMatch(/On its way.*200/);
+    expect(main(container, "advance")).toMatch(/INR 6,300/);
+    expect(line(container, "caDisbursed")).toMatch(/Received.*9,000/);
+    expect(line(container, "caAccounted")).toMatch(/Used on bills \+ returned.*2,700/);
+    expect(main(container, "total")).toMatch(/INR 2,500/);
+    expect(line(container, "erAdvanceOffset")).toMatch(/From advance.*1,200/);
+    expect(line(container, "erPayable")).toMatch(/To your bank.*1,300/);
   });
 
-  it("shows a dash on a money card whose figure is missing", () => {
+  it("shows a dash for a figure that has not loaded, never NaN", () => {
     const { container } = render(<EmployeeOverview byKey={{}} currency="INR" />);
-    expect(container.querySelector('[data-money-card="erClaimed"]').textContent).toMatch(/Expenses claimed-/);
+    expect(main(container, "direct")).toBe("-");
+    expect(line(container, "drPending")).toMatch(/On its way-/);
+    expect(container.textContent).not.toMatch(/NaN|undefined/);
   });
 
-  it("has no next-step box; a money card scrolls to and focuses its ledger", () => {
+  it("a column scrolls to and focuses its ledger", () => {
     const { container } = render(
       <>
-        <EmployeeOverview byKey={KPI} currency="INR" />
+        <EmployeeOverview byKey={byKey} currency="INR" />
         <section id="em-advance-ledger" tabIndex={-1} />
       </>
     );
-    expect(container.querySelector("[data-next-step-box]")).toBeNull();
-    expect(container.textContent).not.toMatch(/Action needed/);
     const advance = document.getElementById("em-advance-ledger");
     advance.scrollIntoView = vi.fn();
-    fireEvent.click(container.querySelector('[data-money-card="caOutstanding"]'));
+    fireEvent.click(col(container, "advance"));
     expect(advance.scrollIntoView).toHaveBeenCalled();
     expect(document.activeElement).toBe(advance);
-  });
-
-  it("with nothing owed, shows no NaN or undefined", () => {
-    const { container } = render(<EmployeeOverview byKey={toByKey({ erPaid: 400, erPayable: 400 })} currency="INR" />);
-    expect(container.textContent).toMatch(/Everything payable to you has been paid/);
-    expect(container.textContent).not.toMatch(/NaN|undefined/);
-    expect(container.querySelector("[data-advance-offset-note]")).toBeNull();
-  });
-
-  it("says how much of the approved amount was adjusted against the cash advance", () => {
-    const byKey = toByKey({ erApproved: 12000, erAdvanceOffset: 9000, erPayable: 3000, erPaid: 3000 });
-    const { container } = render(<EmployeeOverview byKey={byKey} currency="INR" />);
-    expect(container.querySelector("[data-advance-offset-note]").textContent).toMatch(/INR 9,000.*adjusted against your cash advance/);
-    expect(container.querySelector('[data-money-card="erApproved"]').textContent).toMatch(/INR 9,000\.00 adjusted against advance/);
   });
 });
 

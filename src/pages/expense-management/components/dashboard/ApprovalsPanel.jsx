@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowUpRight, Banknote, ChevronDown, ClipboardCheck, FileText, Inbox, TrendingUp, Undo2, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Banknote, ChevronDown, ClipboardCheck, FileText, Inbox, TrendingUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatMoney, timeAgo } from "./dashboardTheme";
 import { ItemList } from "./DashboardWidgets";
@@ -21,40 +21,6 @@ function Stat({ label, value, sub, box, text }) {
       <p className="truncate text-[11px] font-semibold uppercase tracking-wide opacity-80">{label}</p>
       <p className={`mt-0.5 truncate text-lg font-bold tabular-nums leading-tight ${text}`}>{value}</p>
       {sub && <p className="truncate text-[11px] opacity-70">{sub}</p>}
-    </div>
-  );
-}
-
-// How the last 30 days of decisions split between approved and sent back.
-function DecisionMix({ approved, sentBack }) {
-  const total = approved + sentBack;
-  const rate = total > 0 ? Math.round((approved / total) * 100) : 0;
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4" data-decision-mix>
-      <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
-        <span className="font-semibold text-[#0a174e]">Your decisions, last 30 days</span>
-        <span className="tabular-nums text-slate-500">
-          {total > 0 ? (
-            <>
-              <span className="font-semibold text-emerald-700">{rate}%</span> approved
-            </>
-          ) : (
-            "No decisions yet"
-          )}
-        </span>
-      </div>
-      <div className="mt-2.5 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-slate-200" role="img" aria-label={`${approved} approved, ${sentBack} sent back in the last 30 days`}>
-        {approved > 0 && <span className="h-full rounded-l-full bg-emerald-500 last:rounded-r-full" style={{ width: `${(approved / total) * 100}%` }} />}
-        {sentBack > 0 && <span className="h-full rounded-r-full bg-[#ff3d72] first:rounded-l-full" style={{ width: `${(sentBack / total) * 100}%` }} />}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
-        <span className="inline-flex items-center gap-1.5">
-          <CheckCircle2 size={12} className="text-emerald-600" aria-hidden="true" /> Approved
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Undo2 size={12} className="text-[#ff3d72]" aria-hidden="true" /> Sent back
-        </span>
-      </div>
     </div>
   );
 }
@@ -141,7 +107,8 @@ export default function ApprovalsPanel({ config, query, currency }) {
         </span>
 
         {!isLoading && !isError && (
-          <span className="grid w-full grid-cols-2 gap-2 lg:w-auto lg:min-w-[300px]">
+          <span className="grid w-full grid-cols-3 gap-2 lg:w-auto lg:min-w-[440px]">
+            <Stat label="Pending" value={pending} sub="waiting now" box="bg-amber-50 text-amber-800" text="text-amber-700" />
             <Stat label="Approved" value={approved} sub="last 30 days" box="bg-emerald-50 text-emerald-800" text="text-emerald-700" />
             <Stat label="Sent back" value={sentBack} sub="last 30 days" box="bg-rose-50 text-rose-800" text="text-[#ff3d72]" />
           </span>
@@ -167,8 +134,6 @@ export default function ApprovalsPanel({ config, query, currency }) {
             <p className="py-8 text-center text-xs text-slate-400">Loading...</p>
           ) : (
             <>
-              <DecisionMix approved={approved} sentBack={sentBack} />
-
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
                 <div className="rounded-xl border border-slate-100 bg-white p-3 lg:col-span-3">
                   <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold text-[#0a174e]">
