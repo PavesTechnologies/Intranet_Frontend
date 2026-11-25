@@ -8,7 +8,7 @@ import EmployeeLedgers from "@/pages/expense-management/components/dashboard/Emp
 // 1,200 from the advance, 300 extra to the bank. Total = direct + advance.
 const KPI = {
   drClaimed: 1000, drNotApproved: 0, drApproved: 1000, drPayable: 1000, drToSendAp: 0, drPendingAp: 0, drPaid: 1000,
-  caRequested: 12000, caApproved: 11000, caDisbursed: 9000, caUsedOnBills: 1200, caReturned: 4800, caCarriedForward: 0, caOutstanding: 3000, caRecordGap: 0,
+  caRequested: 12000, caAwaitingApproval: 0, caCarriedIn: 0, caReducedOnApproval: 1000, caIncreasedOnApproval: 0, caApproved: 11000, caDisbursed: 9000, caUsedOnBills: 1200, caReturned: 4800, caCarriedForward: 0, caOutstanding: 3000, caRecordGap: 0,
   avClaimed: 1500, avApproved: 1500, avAdvanceOffset: 1200, avPayable: 300, avToSendAp: 0, avPendingAp: 300, avPaid: 0,
   erClaimed: 2500, erApproved: 2500, erAdvanceOffset: 1200, erPayable: 1300, erToSendAp: 0, erPendingAp: 300, erPaid: 1000,
 };
