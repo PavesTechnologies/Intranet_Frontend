@@ -93,6 +93,12 @@ export function settlementTotals(figuresList) {
     count: figuresList.length,
     requested: sum("requested"),
     approved: sum("approved"),
+    // Reduced at approval (asked for minus approved), and on how many advances.
+    cut: sum("cut"),
+    cutCount: figuresList.filter((f) => num(f.cut) > 0).length,
+    // Approved, not paid out yet.
+    awaitingDisbursement: sum("awaitingDisbursement"),
+    awaitingCount: figuresList.filter((f) => num(f.awaitingDisbursement) > 0).length,
     disbursed: sum("disbursed"),
     carriedIn: sum("carriedIn"),
     owed: sum("owed"),

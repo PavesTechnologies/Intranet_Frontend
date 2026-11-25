@@ -29,14 +29,16 @@ export const REQUEST_TYPES = {
 /** Type of an expense report: a settlement when it is linked to a cash advance, otherwise a plain expense. */
 export const reportTypeOf = (report) => (report?.cashAdvanceId ? "SETTLEMENT" : "EXPENSE");
 
-export default function RequestTypeBadge({ type }) {
+// `label` / `description` override the wording on one page only. My Expenses calls a settlement report "Cash advance",
+// because advance requests never appear there; pages that list both (e.g. Finance) keep the two names apart.
+export default function RequestTypeBadge({ type, label, description }) {
   const t = REQUEST_TYPES[type] || REQUEST_TYPES.EXPENSE;
   return (
     <span
-      title={t.description}
+      title={description || t.description}
       className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.className}`}
     >
-      {t.label}
+      {label || t.label}
     </span>
   );
 }

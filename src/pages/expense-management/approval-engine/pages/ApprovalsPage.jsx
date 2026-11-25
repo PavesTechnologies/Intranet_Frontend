@@ -11,8 +11,9 @@ import { useFinanceQueue } from "@/pages/expense-management/pages/finance/hooks/
 import SupplementaryApprovalsList from "../components/SupplementaryApprovalsList";
 import MyDelegateCard from "../components/MyDelegateCard";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
-import SearchInput from "@/components/filter/Searchbar";
-import FormSelect from "@/components/forms/FormSelect";
+import TableFilterBar from "@/pages/expense-management/components/common/TableFilterBar";
+import { HeroQuickActions } from "@/pages/expense-management/components/dashboard/DashboardHero";
+import { APPROVAL_STATUS_OPTIONS } from "../components/approvalStatus";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
@@ -21,16 +22,9 @@ const QUEUE_PAGE_SIZE = 20;
 // Rows per page across the whole table: expense reports first, then cash advances, as one sequence.
 const APPROVALS_PAGE_SIZE = 10;
 
-const PENDING_SHOW_OPTIONS = [
-  { label: "All", value: "ALL" },
-  { label: "Ready to approve", value: "PENDING" },
-  { label: "Policy warnings", value: "FLAGGED" },
-  { label: "Awaiting employee", value: "AWAITING" },
-];
-
 // Which kinds of request the table shows, on every tab.
 const TYPE_OPTIONS = [
-  { label: "All types", value: "ALL" },
+  { label: "All types", value: "" },
   { label: "Expense reports", value: "EXPENSE" },
   { label: "Cash advances", value: "CASH" },
   { label: "Supplementary claims", value: "SUPP" },
@@ -38,15 +32,24 @@ const TYPE_OPTIONS = [
 
 // Cash advances only: approved as requested, or at a lower amount.
 const AMOUNT_OPTIONS = [
-  { label: "Any amount", value: "ALL" },
+  { label: "Any", value: "" },
   { label: "Approved in full", value: "FULL" },
   { label: "Approved lower amount", value: "REDUCED" },
 ];
 
 const PENDING_SORT_OPTIONS = [
-  { label: "Newest first", value: "NEWEST" },
+  { label: "Newest first", value: "" },
   { label: "Oldest first", value: "OLDEST" },
   { label: "Amount, high to low", value: "AMOUNT_DESC" },
+];
+
+// Quick actions in the banner. Each reuses an existing route; `roles` mirrors that route's guard.
+const APPROVER_QUICK_ACTIONS = [
+  { key: "myExpenses", label: "My Expenses", hint: "Your own expense reports", icon: "FileText", to: "/expense-management/expenses/my", primary: true },
+  { key: "submit", label: "Submit expense", hint: "Create an expense report", icon: "ReceiptText", to: "/expense-management/expenses/create", roles: ["GENERAL", "MANAGER"] },
+  { key: "myAdvances", label: "My Advances", hint: "Your cash advances and balances", icon: "Wallet", to: "/expense-management/cash-advance/my" },
+  { key: "team", label: "Team expenses", hint: "Expense reports from your team", icon: "FileText", to: "/expense-management/expenses/all", roles: ["MANAGER"] },
+  { key: "supplementary", label: "Supplementary review", hint: "Supplementary claims waiting for you", icon: "ClipboardCheck", to: "/expense-management/manager/supplementary-claims", roles: ["MANAGER"] },
 ];
 
 // `embedded`: rendered inside another page (the Finance dashboard), so the page's own breadcrumb and banner are
@@ -74,10 +77,12 @@ export default function ApprovalsPage({ embedded = false }) {
   const [activeTab, setActiveTab] = useState("all");
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const [pendingShow, setPendingShow] = useState("ALL");
-  const [typeFilter, setTypeFilter] = useState("ALL");
-  const [amountFilter, setAmountFilter] = useState("ALL");
-  const showType = (t) => typeFilter === "ALL" || typeFilter === t;
+  const [typeFilter, setTypeFilter] = useState("");
+  const [amountFilter, setAmountFilter] = useState("");
+  // Column filters, applied by every list in the table (expense reports, Finance, cash advances, supplementary claims).
+  const EMPTY_COLUMNS = { status: "", employee: "", costCenter: "", amount: { min: "", max: "" }, submitted: { from: "", to: "" } };
+  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMNS);
+  const showType = (t) => !typeFilter || typeFilter === t;
   // Rows each list currently shows, keyed by source ("cash-approved", ...), so the page can page them as one table
   // and show one empty message for the whole table. One stable reporter per source.
   const [rowCounts, setRowCounts] = useState({});
@@ -92,18 +97,46 @@ export default function ApprovalsPage({ embedded = false }) {
     []
   );
 
-  const [pendingSort, setPendingSort] = useState("NEWEST");
+  const [pendingSort, setPendingSort] = useState("");
 
   // One pager for the whole table. The expense rows and the cash advance rows form one sequence (expense rows first),
   // and each child renders only the slice of its own rows that falls inside the current page.
   const [page, setPage] = useState(0);
   useEffect(() => {
     setPage(0);
-  }, [activeTab, searchTerm, pendingShow, pendingSort, typeFilter, amountFilter]);
-  // The amount filter only applies to cash advances; it is reset when it no longer applies.
+  }, [activeTab, searchTerm, pendingSort, typeFilter, amountFilter, columnFilters]);
+  // The cash amount filter only applies to cash advances; it is reset when it no longer applies.
   useEffect(() => {
-    if (typeFilter !== "CASH" || activeTab === "pending") setAmountFilter("ALL");
+    if (typeFilter !== "CASH" || activeTab === "pending") setAmountFilter("");
   }, [typeFilter, activeTab]);
+
+  // One check for every list: employee (name or ID), cost center, amount range, submitted date range. Null when no
+  // column filter is set, so the lists skip it.
+  const rowFilter = useMemo(() => {
+    const { status, employee, costCenter, amount, submitted } = columnFilters;
+    const emp = employee.trim().toLowerCase();
+    const cc = costCenter.trim().toLowerCase();
+    const hasAmount = amount.min !== "" || amount.max !== "";
+    const hasDate = Boolean(submitted.from || submitted.to);
+    if (!status && !emp && !cc && !hasAmount && !hasDate) return null;
+    return (row) => {
+      // Same status keys in every list (approvalStatus.jsx), so one filter works for the whole table.
+      if (status && row.status !== status) return false;
+      if (emp && !`${row.employeeId || ""} ${row.employeeName || ""}`.toLowerCase().includes(emp)) return false;
+      if (cc && !String(row.costCenter || "").toLowerCase().includes(cc)) return false;
+      const n = Number(row.amount) || 0;
+      if (amount.min !== "" && n < Number(amount.min)) return false;
+      if (amount.max !== "" && n > Number(amount.max)) return false;
+      if (hasDate) {
+        if (!row.date) return false;
+        const d = new Date(row.date);
+        const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        if (submitted.from && day < new Date(`${submitted.from}T00:00:00`).getTime()) return false;
+        if (submitted.to && day > new Date(`${submitted.to}T00:00:00`).getTime()) return false;
+      }
+      return true;
+    };
+  }, [columnFilters]);
   // -----------------------------
   // Role check
   // -----------------------------
@@ -239,9 +272,6 @@ export default function ApprovalsPage({ embedded = false }) {
   // -----------------------------
   // Search
   // -----------------------------
-  const handleSearch = (value) => {
-    setSearchTerm(value || "");
-  };
 
   // -----------------------------
   // Which cash advance stage this page acts on: managers approve at manager stage; a Finance-only
@@ -254,6 +284,20 @@ export default function ApprovalsPage({ embedded = false }) {
     (isFinance && financeQueueQuery.isLoading);
   const decided = approvedCount + rejectedCount;
   const approvalRate = decided > 0 ? Math.round((approvedCount / decided) * 100) : null;
+
+  // How long the oldest request in your queue has waited (expense reports and the Finance queue; their submit dates).
+  const oldestWaitingDays = (() => {
+    const dates = [...(queueQuery.data?.content || []), ...(isFinance ? financeQueueQuery.data?.content || [] : [])]
+      .map((i) => (i.submittedAt ? new Date(i.submittedAt).getTime() : null))
+      .filter(Boolean);
+    if (!dates.length) return null;
+    return Math.max(0, Math.floor((Date.now() - Math.min(...dates)) / 86400000));
+  })();
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const reportTotal =
+    (queueQuery.data?.totalElements ?? 0) + financePendingCount + (approvedQuery.data?.totalElements ?? 0) + (rejectedQuery.data?.totalElements ?? 0);
+  const cashTotal = (cashAdvancePendingQuery.data ?? 0) + (cashAdvanceApprovedQuery.data ?? 0) + (cashAdvanceRejectedQuery.data ?? 0);
+  const pct = (n) => (decided > 0 ? Math.round((n / decided) * 100) : null);
   const isRefreshing = queueQuery.isFetching || approvedQuery.isFetching || rejectedQuery.isFetching;
 
   // -----------------------------
@@ -283,7 +327,7 @@ export default function ApprovalsPage({ embedded = false }) {
     {
       key: "all",
       label: "All",
-      caption: "All requests sent to you",
+      caption: `${plural(reportTotal, "report")} · ${plural(cashTotal, "cash advance")}`,
       icon: Layers,
       count: totalCount,
       tone: { tile: "bg-[#0A0082]/10 text-[#0A0082]", text: "text-[#0a174e]", ring: "ring-indigo-300", active: "border-indigo-300 bg-indigo-50/40", bar: "from-indigo-500 to-blue-400", chip: "bg-indigo-100 text-indigo-800" },
@@ -292,7 +336,7 @@ export default function ApprovalsPage({ embedded = false }) {
     {
       key: "pending",
       label: "Pending",
-      caption: "Waiting for your decision",
+      caption: pendingCount === 0 ? "Nothing waiting for you" : oldestWaitingDays === null ? "Waiting for your decision" : oldestWaitingDays === 0 ? "Oldest arrived today" : `Oldest waiting ${plural(oldestWaitingDays, "day")}`,
       icon: Clock,
       count: pendingCount,
       tone: { tile: "bg-amber-50 text-amber-600", text: "text-amber-600", ring: "ring-amber-300", active: "border-amber-300 bg-amber-50/40", bar: "from-amber-400 to-orange-300", chip: "bg-amber-100 text-amber-800" },
@@ -301,7 +345,7 @@ export default function ApprovalsPage({ embedded = false }) {
     {
       key: "approved",
       label: "Approved",
-      caption: "Requests you approved",
+      caption: pct(approvedCount) === null ? "Requests you approved" : `${pct(approvedCount)}% of your decisions`,
       icon: CheckCircle2,
       count: approvedCount,
       tone: { tile: "bg-emerald-50 text-emerald-600", text: "text-emerald-600", ring: "ring-emerald-300", active: "border-emerald-300 bg-emerald-50/40", bar: "from-emerald-500 to-teal-400", chip: "bg-emerald-100 text-emerald-800" },
@@ -310,7 +354,7 @@ export default function ApprovalsPage({ embedded = false }) {
     {
       key: "rejected",
       label: "Rejected",
-      caption: "Requests you rejected",
+      caption: pct(rejectedCount) === null ? "Requests you rejected" : `${pct(rejectedCount)}% of your decisions`,
       icon: XCircle,
       count: rejectedCount,
       tone: { tile: "bg-rose-50 text-rose-600", text: "text-rose-600", ring: "ring-rose-300", active: "border-rose-300 bg-rose-50/40", bar: "from-[#ff3d72] to-[#ff7aa0]", chip: "bg-rose-100 text-rose-800" },
@@ -384,25 +428,9 @@ export default function ApprovalsPage({ embedded = false }) {
             </div>
           </div>
 
-          <div className="flex items-stretch gap-3">
-            <div className="rounded-xl bg-white/[0.08] px-4 py-3 ring-1 ring-white/10">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-white/60">Approval rate</p>
-              <p className="mt-0.5 text-2xl font-bold tabular-nums">{approvalRate === null ? "—" : `${approvalRate}%`}</p>
-              <p className="text-[11px] text-white/60">
-                {decided} decision{decided === 1 ? "" : "s"} made
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleReload}
-              title="Reload approval data"
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-[#0A0082] shadow-sm transition hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-            >
-              <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} aria-hidden="true" />
-              Refresh
-            </button>
-          </div>
         </div>
+        {/* Quick actions, as on the dashboard: the approver's own expenses and advances are one click away. */}
+        <HeroQuickActions actions={APPROVER_QUICK_ACTIONS} />
       </section>
       )}
 
@@ -442,100 +470,50 @@ export default function ApprovalsPage({ embedded = false }) {
       {/* Delegate: only relevant while there is a queue to cover */}
       {(activeTab === "pending" || activeTab === "all") && <MyDelegateCard />}
 
-      {/* The list: toolbar on top, then one table for expense reports and cash advances */}
+      {/* Filters: one per table column, the same bar as My Expenses and My Advances. The cards above choose the status. */}
+      <TableFilterBar
+        filters={[
+          { key: "search", label: "Search", type: "search", placeholder: "Number, title or category" },
+          { key: "type", label: "Type", type: "select", options: TYPE_OPTIONS },
+          { key: "status", label: "Status", type: "select", options: APPROVAL_STATUS_OPTIONS },
+          { key: "employee", label: "Employee", type: "search", placeholder: "Name or employee ID" },
+          { key: "costCenter", label: "Cost center", type: "search", placeholder: "Cost center" },
+          { key: "amount", label: "Amount", type: "amountRange" },
+          { key: "submitted", label: "Submitted", type: "dateRange" },
+          ...(activeTab === "pending" || activeTab === "all"
+            ? [
+                { key: "sort", label: "Sort by", type: "select", options: PENDING_SORT_OPTIONS },
+              ]
+            : []),
+          ...((activeTab === "approved" || activeTab === "all") && typeFilter === "CASH"
+            ? [{ key: "cashAmount", label: "Approved amount", type: "select", options: AMOUNT_OPTIONS }]
+            : []),
+        ]}
+        values={{
+          search: searchTerm, type: typeFilter, status: columnFilters.status, sort: pendingSort, cashAmount: amountFilter,
+          employee: columnFilters.employee, costCenter: columnFilters.costCenter,
+          amount: columnFilters.amount, submitted: columnFilters.submitted,
+        }}
+        onChange={(v) => {
+          setSearchTerm(v.search ?? "");
+          setTypeFilter(v.type ?? "");
+          setPendingSort(v.sort ?? "");
+          setAmountFilter(v.cashAmount ?? "");
+          setColumnFilters({ status: v.status ?? "", employee: v.employee ?? "", costCenter: v.costCenter ?? "", amount: v.amount, submitted: v.submitted });
+        }}
+        onReset={() => {
+          setSearchTerm("");
+          setTypeFilter("");
+          setPendingSort("");
+          setAmountFilter("");
+          setColumnFilters(EMPTY_COLUMNS);
+        }}
+        resultCount={combinedRows}
+        totalCount={active.count}
+        noun={`${active.label.toLowerCase() === "all" ? "" : active.label.toLowerCase() + " "}requests`}
+      />
+
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex w-full gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 lg:w-fit" role="tablist">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                    isActive ? "bg-white text-[#0A0082] shadow-sm" : "text-slate-500 hover:text-[#0a174e]"
-                  }`}
-                >
-                  <span className="relative">
-                    <Icon size={16} aria-hidden="true" className={isActive ? tab.tone.text : ""} />
-                    {tab.key === "pending" && hasNewPending && <NewDot />}
-                  </span>
-                  {tab.label}
-                  {/* The count is on the summary card above; not repeated on the tab. */}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-full lg:w-80">
-            <SearchInput
-              value={searchTerm}
-              onSearch={handleSearch}
-              placeholder="Search by number, title or category..."
-              className="!px-3 !py-2 !text-sm"
-            />
-          </div>
-
-          <div className="w-full lg:w-48">
-            <FormSelect
-              label="Type"
-              name="typeFilter"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              options={TYPE_OPTIONS}
-              className="[&>label]:mb-1 [&>label]:text-xs"
-              buttonClassName="!px-3 !py-1.5 !text-xs"
-            />
-          </div>
-
-          {/* Approved tab, cash advances: approved as requested or at a lower amount */}
-          {(activeTab === "approved" || activeTab === "all") && typeFilter === "CASH" && (
-            <div className="w-full lg:w-52">
-              <FormSelect
-                label="Amount"
-                name="amountFilter"
-                value={amountFilter}
-                onChange={(e) => setAmountFilter(e.target.value)}
-                options={AMOUNT_OPTIONS}
-                className="[&>label]:mb-1 [&>label]:text-xs"
-                buttonClassName="!px-3 !py-1.5 !text-xs"
-              />
-            </div>
-          )}
-
-          {/* Pending rows (also on All): which to show, and their order */}
-          {(activeTab === "pending" || activeTab === "all") && (
-            <>
-              <div className="w-full lg:w-44">
-                <FormSelect
-                  label="Show"
-                  name="pendingShow"
-                  value={pendingShow}
-                  onChange={(e) => setPendingShow(e.target.value)}
-                  options={PENDING_SHOW_OPTIONS}
-                  className="[&>label]:mb-1 [&>label]:text-xs"
-                  buttonClassName="!px-3 !py-1.5 !text-xs"
-                />
-              </div>
-              <div className="w-full lg:w-44">
-                <FormSelect
-                  label="Sort by"
-                  name="pendingSort"
-                  value={pendingSort}
-                  onChange={(e) => setPendingSort(e.target.value)}
-                  options={PENDING_SORT_OPTIONS}
-                  className="[&>label]:mb-1 [&>label]:text-xs"
-                  buttonClassName="!px-3 !py-1.5 !text-xs"
-                />
-              </div>
-            </>
-          )}
-        </div>
-
         <div className="approvals-tab-container">
           <div className="overflow-x-auto">
           <table className="approvals-table w-full min-w-[1000px] table-fixed text-left text-sm">
@@ -556,7 +534,7 @@ export default function ApprovalsPage({ embedded = false }) {
               <tr>
                 <th className="px-2.5 py-2.5 text-left">Type</th>
                 <th className="px-2.5 py-2.5 text-left">Employee</th>
-                <th className="px-2.5 py-2.5 text-left">Title / Merchant</th>
+                <th className="px-2.5 py-2.5 text-left">Title</th>
                 <th className="px-2.5 py-2.5 text-left">Cost Center</th>
                 <th className="px-2.5 py-2.5 text-left">Status</th>
                 <th className="px-2.5 py-2.5 text-right">Requested</th>
@@ -573,8 +551,9 @@ export default function ApprovalsPage({ embedded = false }) {
                   <React.Fragment key={`${src.key}-${reloadKey}`}>
                     <PendingApprovalsPage
                       searchTerm={searchTerm}
-                      statusFilter={pendingShow}
-                      sortBy={pendingSort}
+                      statusFilter="ALL"
+                      sortBy={pendingSort || "NEWEST"}
+                      rowFilter={rowFilter}
                       hideHeader
                       noPadding
                       embedded
@@ -582,7 +561,7 @@ export default function ApprovalsPage({ embedded = false }) {
                       windowStart={win.start}
                       windowEnd={win.end}
                     />
-                    {isFinance && <FinanceVerificationApprovalsList searchTerm={searchTerm} excludeReportIds={myQueueReportIds} />}
+                    {isFinance && <FinanceVerificationApprovalsList searchTerm={searchTerm} excludeReportIds={myQueueReportIds} rowFilter={rowFilter} />}
                   </React.Fragment>
                 );
               }
@@ -592,6 +571,7 @@ export default function ApprovalsPage({ embedded = false }) {
                     key={`${src.key}-${reloadKey}`}
                     outcome={src.outcome.toUpperCase()}
                     searchTerm={searchTerm}
+                    rowFilter={rowFilter}
                     embedded
                     onRowCount={onRowCount}
                     windowStart={win.start}
@@ -605,7 +585,8 @@ export default function ApprovalsPage({ embedded = false }) {
                     key={`${src.key}-${reloadKey}`}
                     activeTab={src.outcome}
                     searchTerm={searchTerm}
-                    amountFilter={src.outcome === "approved" ? amountFilter : "ALL"}
+                    amountFilter={src.outcome === "approved" && amountFilter ? amountFilter : "ALL"}
+                    rowFilter={rowFilter}
                     embedded
                     onRowCount={onRowCount}
                     onDecided={handleReload}
@@ -619,6 +600,7 @@ export default function ApprovalsPage({ embedded = false }) {
                   key={`${src.key}-${reloadKey}`}
                   activeTab={src.outcome}
                   searchTerm={searchTerm}
+                  rowFilter={rowFilter}
                   isManager={isManager}
                   isFinance={isFinance}
                   onRowCount={onRowCount}

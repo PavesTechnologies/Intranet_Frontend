@@ -316,6 +316,21 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
         </div>
         {extra > 0 && <BankSplit px="av" {...shared} />}
       </div>
+
+      {/* Carried-in money must come from another of your advances. A gap means the records do not show where it came
+          from, so the outstanding balance may be too high. Shown, never hidden, until Finance corrects the records. */}
+      {Math.abs(unmatched) >= 0.005 && (
+        <p data-carry-unmatched className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">{formatMoney(Math.abs(unmatched), currency)}</span>{" "}
+            {unmatched > 0
+              ? "was carried into your advances but is not recorded as carried out of any other advance, so your outstanding balance may be too high by this amount."
+              : "was carried out of your advances but not into another advance."}{" "}
+            Ask Finance to review the carry-forward on your advances.
+          </span>
+        </p>
+      )}
     </Card>
   );
 }

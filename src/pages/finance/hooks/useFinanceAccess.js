@@ -43,9 +43,16 @@ export function useFinanceAccess() {
 
   const canAp = hasRole(AP_ALL_ROLES);
   const canXmsReports = hasRole(XMS_REPORT_VIEWERS);
+  const isXmsApprover = hasRole(["Manager", "MANAGER", "Reporting_Manager", "REPORTING_MANAGER"]);
 
   const modules = {
-    xms: { visible: hasRole(XMS_EVERYONE), to: "/expense-management/dashboard" },
+    // Each role opens Expense Management on its own work page: Finance Executives on Finance (verify, approve advances,
+    // track payments), approvers (managers, reporting managers) on Approvals, everyone else on the dashboard. The
+    // dashboard stays one click away in the menu.
+    xms: {
+      visible: hasRole(XMS_EVERYONE),
+      to: isFinanceExecutive ? "/expense-management/finance" : isXmsApprover ? "/expense-management/approvals" : "/expense-management/dashboard",
+    },
     ap: { visible: canAp, to: AP_ROUTES.DASHBOARD },
     ar: {
       visible: canSeeArMaker || canSeeArChecker || isFinanceExecutive,

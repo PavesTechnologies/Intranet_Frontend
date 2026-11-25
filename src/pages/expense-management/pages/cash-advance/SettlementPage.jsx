@@ -3,8 +3,6 @@ import { loadSettlementLock, SETTLEMENT_LOCK } from "@/pages/expense-management/
 import { CheckCircle2, RefreshCw, Eye, Receipt, XCircle, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
-import SearchInput from "@/components/filter/Searchbar";
-import FormSelect from "@/components/forms/FormSelect";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -15,10 +13,9 @@ import { getSettlementBlockReason } from "@/pages/expense-management/api/adjustm
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 import { formatTripDates, activeLinkedReport, linkedExpensesPath } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import AdvanceMoneyOverview from "@/pages/expense-management/pages/cash-advance/components/AdvanceMoneyOverview";
-import EmployeeAdvanceBreakdown, {
-  employeeBreakdown,
-  employeeKeyOf,
-} from "@/pages/expense-management/pages/cash-advance/components/EmployeeAdvanceBreakdown";
+import { employeeKeyOf } from "@/pages/expense-management/pages/cash-advance/components/EmployeeAdvanceBreakdown";
+import TableFilterBar, { applyTableFilters, inAmountRange } from "@/pages/expense-management/components/common/TableFilterBar";
+import { inPeriod, tripOverlaps } from "@/pages/expense-management/pages/expenses/MyExpensesPage";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
@@ -124,6 +121,72 @@ const isOpenAdvance = (adv) => !isClosedAdvance(adv);
 // Disbursed and still open: the employee holds the money and the advance is not settled yet.
 const isDisbursedOpen = (adv) => statusKeyOf(adv) !== "APPROVED" && isOpenAdvance(adv);
 
+const advanceCreatedAt = (adv) => adv.createdAt || adv.createdDate || adv.created_at || adv.submittedAt;
+const advanceTrip = (adv) => ({ tripStartDate: adv.expectedTripStartDate, tripEndDate: adv.expectedTripEndDate });
+
+/** Matches the Owed / Consumed / Balance columns: where the advance's money stands now. */
+const MONEY_OPTIONS = [
+  { label: "Any", value: "" },
+  { label: "Not paid yet", value: "NOT_PAID" },
+  { label: "Balance with employee", value: "BALANCE" },
+  { label: "Fully used", value: "USED" },
+  { label: "Company owes employee", value: "OWED_TO_EMPLOYEE" },
+  { label: "Cut at approval", value: "CUT" },
+];
+
+const PERIOD_OPTIONS = [
+  { label: "Any time", value: "" },
+  { label: "This week", value: "WEEK" },
+  { label: "This month", value: "MONTH" },
+  { label: "Last 30 days", value: "30" },
+  { label: "Last 60 days", value: "60" },
+  { label: "Last 90 days", value: "90" },
+];
+
+const SORT_OPTIONS = [
+  { label: "Newest first", value: "" },
+  { label: "Oldest first", value: "OLDEST" },
+  { label: "Trip date, latest first", value: "TRIP_LATEST" },
+  { label: "Trip date, earliest first", value: "TRIP_EARLIEST" },
+  { label: "Balance, high to low", value: "BALANCE_DESC" },
+  { label: "Amount, high to low", value: "AMOUNT_DESC" },
+];
+
+/** The amount a row shows: owed once paid out, else what was approved (or asked for). */
+const rowAmount = (f) => (f.paidOut ? f.owed : f.approved || f.requested);
+
+export const moneyStateMatches = (f, value) => {
+  switch (value) {
+    case "NOT_PAID": return !f.paidOut;
+    case "BALANCE": return f.paidOut && f.remaining > 0;
+    case "USED": return f.paidOut && f.remaining === 0 && f.owedToEmployee === 0;
+    case "OWED_TO_EMPLOYEE": return f.owedToEmployee > 0;
+    case "CUT": return f.cut > 0;
+    default: return true;
+  }
+};
+
+/** The column filters the Settlement table applies on top of search, employee and status. */
+const SETTLEMENT_COLUMN_FILTERS = (figuresOf) => [
+  { key: "money", type: "select", match: (adv, v) => moneyStateMatches(figuresOf(adv), v) },
+  { key: "amount", type: "amountRange", match: (adv, v) => inAmountRange(rowAmount(figuresOf(adv)), v) },
+  { key: "trip", type: "dateRange", match: (adv, v) => tripOverlaps(advanceTrip(adv), v) },
+  { key: "period", type: "select", match: (adv, v) => inPeriod(advanceCreatedAt(adv), v) },
+];
+
+export function sortAdvances(rows, sort, figuresOf) {
+  const time = (d) => (d ? new Date(d).getTime() || 0 : 0);
+  const trip = (adv) => String(adv.expectedTripStartDate || adv.expectedTripEndDate || "");
+  const by = {
+    OLDEST: (a, b) => time(advanceCreatedAt(a)) - time(advanceCreatedAt(b)),
+    TRIP_LATEST: (a, b) => trip(b).localeCompare(trip(a)),
+    TRIP_EARLIEST: (a, b) => (trip(a) || "9999").localeCompare(trip(b) || "9999"),
+    BALANCE_DESC: (a, b) => figuresOf(b).remaining - figuresOf(a).remaining,
+    AMOUNT_DESC: (a, b) => rowAmount(figuresOf(b)) - rowAmount(figuresOf(a)),
+  }[sort] || ((a, b) => time(advanceCreatedAt(b)) - time(advanceCreatedAt(a)));
+  return [...rows].sort(by);
+}
+
 export default function SettlementPage() {
   const { user, hasRole } = useAuth();
   const { data: directory } = useEmployeeDirectory();
@@ -137,6 +200,9 @@ export default function SettlementPage() {
   const [statusFilter, setStatusFilter] = useState("OPEN");
   // Finance only: narrows the overview card and the list to one employee ("" = everyone).
   const [employeeFilter, setEmployeeFilter] = useState("");
+  // Column filters and sort, the same bar as My Expenses and Approvals.
+  const EMPTY_EXTRA = { money: "", amount: { min: "", max: "" }, trip: { from: "", to: "" }, period: "", sort: "" };
+  const [extra, setExtra] = useState(EMPTY_EXTRA);
 
   const isFinanceExecutive = useMemo(() => {
     if (typeof hasRole === "function") {
@@ -297,7 +363,7 @@ export default function SettlementPage() {
 
   const employeeKey = (adv) => employeeKeyOf(adv, getEmployeeName(adv, directory));
 
-  // Advances matching the status filter and search, for every employee (the "By employee" table reads this).
+  // Advances matching the status filter and search, for every employee.
   const listAdvances = useMemo(() => {
     return advances.filter((adv) => {
       // OPEN / ALL / DISBURSED / CLOSED are groups; any other value is one exact status (e.g. "IN_PROGRESS").
@@ -325,22 +391,14 @@ export default function SettlementPage() {
     });
   }, [advances, statusFilter, searchTerm, directory]);
 
-  // ...narrowed to the selected employee, if any. The overview card and the advance table read this.
-  const filteredAdvances = useMemo(
-    () => (employeeFilter ? listAdvances.filter((adv) => employeeKey(adv) === employeeFilter) : listAdvances),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [listAdvances, employeeFilter, directory]
-  );
-
-  const employeeRows = useMemo(
-    () =>
-      isFinanceExecutive
-        ? employeeBreakdown(listAdvances, { figuresOf, nameOf: (adv) => getEmployeeName(adv, directory) })
-        : [],
+  // ...narrowed to the selected employee and the column filters, then sorted. The overview card and the table read this.
+  const filteredAdvances = useMemo(() => {
+    const byEmployee = employeeFilter ? listAdvances.filter((adv) => employeeKey(adv) === employeeFilter) : listAdvances;
+    const rows = applyTableFilters(byEmployee, SETTLEMENT_COLUMN_FILTERS(figuresOf), extra);
+    return sortAdvances(rows, extra.sort, figuresOf);
     // figuresOf reads usageById
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isFinanceExecutive, listAdvances, usageById, directory]
-  );
+  }, [listAdvances, employeeFilter, directory, extra, usageById]);
 
   // Every employee with an advance on the page, whatever the other filters, so a selection never disappears.
   const employeeOptions = useMemo(() => {
@@ -557,52 +615,35 @@ export default function SettlementPage() {
       {/* Money summary: where the disbursed cash went, for the advances on the list */}
       <AdvanceMoneyOverview totals={totals} loading={figuresLoading} scopeLabel={selectedEmployeeName} />
 
-      {/* Per-employee figures (Finance sees every employee's advances); a row click narrows the card above and the list */}
-      {isFinanceExecutive && (
-        <EmployeeAdvanceBreakdown
-          rows={employeeRows}
-          selectedKey={employeeFilter}
-          onSelect={setEmployeeFilter}
-          loading={figuresLoading}
-        />
-      )}
-
-      {/* Filter and Search Bar */}
-      <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <div className={isFinanceExecutive ? "sm:col-span-3 lg:col-span-2" : "sm:col-span-2 lg:col-span-3"}>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
-            <SearchInput
-              value={searchTerm}
-              onSearch={(val) => setSearchTerm(val || "")}
-              placeholder="Search by title, purpose, or advance ID..."
-              className="!py-1.5 !px-3 !text-xs"
-            />
-          </div>
-
-          {isFinanceExecutive && (
-            <FormSelect
-              label="Employee"
-              name="employeeFilter"
-              value={employeeFilter}
-              onChange={(e) => setEmployeeFilter(e.target.value)}
-              options={employeeOptions}
-              className="[&>label]:text-xs [&>label]:mb-1"
-              buttonClassName="!py-1.5 !px-3 !text-xs"
-            />
-          )}
-
-          <FormSelect
-            label="Status"
-            name="statusFilter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            options={statusOptions}
-            className="[&>label]:text-xs [&>label]:mb-1"
-            buttonClassName="!py-1.5 !px-3 !text-xs"
-          />
-        </div>
-      </div>
+      {/* Filters: one per table column, plus the period and the sort */}
+      <TableFilterBar
+        filters={[
+          { key: "search", label: "Search", type: "search", placeholder: "Title, purpose, advance ID or employee" },
+          ...(isFinanceExecutive ? [{ key: "employee", label: "Employee", type: "select", options: employeeOptions }] : []),
+          { key: "status", label: "Status", type: "select", options: statusOptions },
+          { key: "money", label: "Money", type: "select", options: MONEY_OPTIONS },
+          { key: "amount", label: "Owed amount", type: "amountRange" },
+          { key: "trip", label: "Trip dates", type: "dateRange" },
+          { key: "period", label: "Requested", type: "select", options: PERIOD_OPTIONS },
+          { key: "sort", label: "Sort by", type: "select", options: SORT_OPTIONS },
+        ]}
+        values={{ search: searchTerm, employee: employeeFilter, status: statusFilter, ...extra }}
+        onChange={(v) => {
+          setSearchTerm(v.search ?? "");
+          setEmployeeFilter(v.employee ?? "");
+          setStatusFilter(v.status || "OPEN");
+          setExtra({ money: v.money ?? "", amount: v.amount, trip: v.trip, period: v.period ?? "", sort: v.sort ?? "" });
+        }}
+        onReset={() => {
+          setSearchTerm("");
+          setEmployeeFilter("");
+          setStatusFilter("OPEN");
+          setExtra(EMPTY_EXTRA);
+        }}
+        resultCount={filteredAdvances.length}
+        totalCount={advances.length}
+        noun="advances"
+      />
 
       {/* Data Table */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -642,7 +683,7 @@ export default function SettlementPage() {
                   const pending = !isLoaded(adv);
                   // Not paid out yet (e.g. approved, waiting to disburse): later figures do not exist yet.
                   const cell = (value) =>
-                    pending ? <span className="text-gray-300">…</span> : !f.paidOut ? <span className="text-gray-300">—</span> : formatMoney(value, cur);
+                    pending ? <span className="text-gray-300">…</span> : !f.paidOut ? <span className="text-[11px] font-normal text-gray-400">Not paid yet</span> : formatMoney(value, cur);
 
 
                   return (
@@ -654,6 +695,13 @@ export default function SettlementPage() {
                       )}
                       <td className="py-3 px-4 min-w-[12rem] max-w-xs">
                         <p className="font-semibold text-gray-900 truncate" title={adv.purpose || undefined}>{adv.title || "Cash Advance"}</p>
+                        {/* Reduced at approval: what was asked, what was approved, and the cut */}
+                        {f.cut > 0 && (
+                          <p className="mt-0.5 text-[11px] text-gray-500" data-approval-cut>
+                            Asked {formatMoney(f.requested, cur)} · approved {formatMoney(f.approved, cur)}{" "}
+                            <span className="font-semibold text-rose-600">(cut {formatMoney(f.cut, cur)})</span>
+                          </p>
+                        )}
                         {!pending && f.owed > 0 && (
                           <div className="mt-1.5">
                             <UsageBar figures={f} />
@@ -663,7 +711,14 @@ export default function SettlementPage() {
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap text-gray-600">{formatTripDates(adv)}</td>
                       <td className="py-3 px-4 text-right whitespace-nowrap tabular-nums">
-                        <span className="font-semibold text-gray-900">{cell(f.owed)}</span>
+                        {!pending && !f.paidOut && f.awaitingDisbursement > 0 ? (
+                          <>
+                            <span className="font-semibold text-gray-500">{formatMoney(f.awaitingDisbursement, cur)}</span>
+                            <p className="mt-0.5 text-[10px] text-amber-700">Approved, to disburse</p>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-gray-900">{cell(f.owed)}</span>
+                        )}
                         {!pending && f.paidOut && f.carriedIn > 0 && (
                           <p className="mt-0.5 text-[10px] text-violet-700">incl. {formatMoney(f.carriedIn, cur)} brought in</p>
                         )}

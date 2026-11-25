@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, XCircle, Eye, DollarSign, Calendar, RefreshCw, Send, AlertCircle, ChevronRight } from "lucide-react";
+import { CheckCircle2, XCircle, Eye, DollarSign, Calendar, RefreshCw, Send, AlertCircle, ChevronRight, MessageSquareWarning } from "lucide-react";
+import { ApprovalStatusBadge, cashStatusKey } from "@/pages/expense-management/approval-engine/components/approvalStatus";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
@@ -387,7 +388,8 @@ export const canApproveAdvance = (adv, user, hasRole) => {
  * "MANAGER" (the Approvals tab) shows advances waiting for the manager, "FINANCE" (the Finance tab)
  * shows advances waiting for Finance. Approved and rejected history is not split by stage.
  */
-export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", amountFilter = "ALL", embedded = false, onRowCount, onDecided, windowStart = 0, windowEnd }) {
+// `rowFilter` (optional): the Approvals page's column filters. Called with { employeeId, employeeName, costCenter, amount, date }.
+export default function CashAdvanceApprovalsList({ rowFilter = null, activeTab = "pending", searchTerm = "", amountFilter = "ALL", embedded = false, onRowCount, onDecided, windowStart = 0, windowEnd }) {
   const { user, hasRole } = useAuth();
   const ws = useApprovalWebSocket();
   const [advances, setAdvances] = useState([]);
@@ -499,9 +501,15 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
 
       // The backend already scopes /my-approvals to what this user is part of. Rows the user cannot act on yet
       // stay visible with disabled actions, as the card counts above do.
-      return matchTab && matchAmount && matchSearch;
+      const matchColumns = !rowFilter || rowFilter({
+        employeeId: adv.employeeId || adv.employee_id, employeeName: adv.employeeName || adv.employee_name,
+        costCenter: adv.costCenterName || adv.costCenterCode, amount: adv.approvedAmount ?? adv.requestedAmount ?? adv.amount,
+        date: adv.submittedAt || adv.createdAt, status: cashStatusKey(adv.status),
+      });
+
+      return matchTab && matchAmount && matchSearch && matchColumns;
     });
-  }, [advances, activeTab, searchTerm, amountFilter]);
+  }, [advances, activeTab, searchTerm, amountFilter, rowFilter]);
 
   // Balance the approver sees before deciding: the employee's other open advances, loaded when the modal opens.
   const [approvalBalance, setApprovalBalance] = useState(null);
@@ -642,7 +650,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                   return (
                     <tr key={advId} className="hover:bg-gray-50/80 transition">
                       <td className="px-2.5 py-1.5 text-left">
-                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Cash advance</span>
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Cash advance</span>
                       </td>
                       <td className="px-2.5 py-1.5 text-left text-xs font-medium text-gray-900 whitespace-nowrap">
                         <EmployeeLabel employeeId={empId} />
@@ -655,7 +663,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                       </td>
                       <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate">{getCostCenterValue(adv, costCentersMap)}</td>
                       <td className="px-2.5 py-1.5 text-left whitespace-nowrap">
-                        {getStatusBadge(adv.status)}
+                        <ApprovalStatusBadge statusKey={cashStatusKey(adv.status)} />
                       </td>
                       <AmountCells adv={adv} />
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
@@ -666,26 +674,30 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                             label="View details"
                             onClick={() => navigate(`/expense-management/approvals/cash-advance/${adv.advanceId || adv.id}`)}
                           />
-                          {showActions && (
-                            <>
-                              <RowActionButton
-                                tone="approve"
-                                icon={CheckCircle2}
-                                label={`Approve ${adv.title || "cash advance"}`}
-                                title={isActionable ? "Approve" : "Not yet your turn to approve"}
-                                disabled={actionLoading || !isActionable}
-                                onClick={() => handleApprove(adv)}
-                              />
-                              <RowActionButton
-                                tone="reject"
-                                icon={XCircle}
-                                label={`Reject ${adv.title || "cash advance"}`}
-                                title={isActionable ? "Reject" : "Not yet your turn to reject"}
-                                disabled={actionLoading || !isActionable}
-                                onClick={() => setRejectingAdvance(adv)}
-                              />
-                            </>
-                          )}
+                          {/* Every row shows the same actions; one that does not apply is disabled and says why. */}
+                          <RowActionButton
+                            tone="approve"
+                            icon={CheckCircle2}
+                            label={`Approve ${adv.title || "cash advance"}`}
+                            title={!showActions ? "Already decided" : isActionable ? "Approve" : "Not yet your turn to approve"}
+                            disabled={actionLoading || !showActions || !isActionable}
+                            onClick={() => handleApprove(adv)}
+                          />
+                          <RowActionButton
+                            tone="clarify"
+                            icon={MessageSquareWarning}
+                            label="Send back"
+                            title="Cash advances are approved or rejected; give the reason when rejecting"
+                            disabled
+                          />
+                          <RowActionButton
+                            tone="reject"
+                            icon={XCircle}
+                            label={`Reject ${adv.title || "cash advance"}`}
+                            title={!showActions ? "Already decided" : isActionable ? "Reject" : "Not yet your turn to reject"}
+                            disabled={actionLoading || !showActions || !isActionable}
+                            onClick={() => setRejectingAdvance(adv)}
+                          />
                         </RowActions>
                       </td>
                     </tr>
@@ -1082,7 +1094,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                 <tr>
                   <th className="w-8 px-2.5 py-2" />
                   <th className="px-2.5 py-2 text-left">Employee</th>
-                  <th className="px-2.5 py-2 text-left">Title / Merchant</th>
+                  <th className="px-2.5 py-2 text-left">Title</th>
                   <th className="px-2.5 py-2 text-left">Level / Status</th>
                   <th className="px-2.5 py-2 text-right">Requested</th>
                   <th className="px-2.5 py-2 text-right">Approved</th>
