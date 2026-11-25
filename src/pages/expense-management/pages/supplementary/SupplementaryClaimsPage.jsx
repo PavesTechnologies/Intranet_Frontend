@@ -66,6 +66,9 @@ export default function SupplementaryClaimsPage() {
   const [cancelling, setCancelling] = useState(false);
 
   const [settledReports, setSettledReports] = useState([]);
+  // Backend eligibility per candidate report: { [reportId]: { eligible, reason, hasCashAdvance } }.
+  const [eligibilityById, setEligibilityById] = useState({});
+  const [checkingAll, setCheckingAll] = useState(false);
   const [reportId, setReportId] = useState("");
   const [raiseOpen, setRaiseOpen] = useState(false);
   const closeRaise = () => setRaiseOpen(false);
@@ -104,6 +107,36 @@ export default function SupplementaryClaimsPage() {
       cancelled = true;
     };
   }, []);
+
+  // Ask the backend about every candidate, so the dropdown lists only reports whose money is settled (paid by AP, or
+  // settled against a reconciled cash advance) and the rest are shown with the reason they are not ready yet.
+  useEffect(() => {
+    if (!settledReports.length) return undefined;
+    let cancelled = false;
+    setCheckingAll(true);
+    Promise.all(
+      settledReports.map((r) =>
+        supplementaryClaimService
+          .eligibility(r.reportId)
+          .then((res) => [r.reportId, unwrap(res)])
+          .catch((err) => [r.reportId, { eligible: false, reason: errorMessage(err, "Could not check this report.") }]),
+      ),
+    )
+      .then((pairs) => !cancelled && setEligibilityById(Object.fromEntries(pairs)))
+      .finally(() => !cancelled && setCheckingAll(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [settledReports]);
+  const readyReports = settledReports.filter((r) => eligibilityById[r.reportId]?.eligible);
+  const notReadyReports = settledReports.filter((r) => eligibilityById[r.reportId] && !eligibilityById[r.reportId].eligible);
+  const settledHow = (r) => {
+    const e = eligibilityById[r.reportId];
+    if (e?.settleAgainstAdvanceId) return `balance carried to ${e.settleAgainstAdvanceTitle || "your next advance"}`;
+    // Otherwise the claim is paid by AP: no advance, the advance was closed by repayment or salary deduction, or the
+    // advance holding the carried balance is already in use.
+    return "paid by AP";
+  };
 
   const summary = useMemo(() => summarizeClaims(claims), [claims]);
   const visibleClaims = useMemo(
@@ -225,20 +258,39 @@ export default function SupplementaryClaimsPage() {
       </header>
 
       {/* Raise a new claim against a settled report, in a dialog opened from the page. */}
-      <Modal isOpen={raiseOpen} onClose={closeRaise} title="Raise a new claim" subtitle="Choose the settled report that is missing an expense." size="lg">
-        <div className="space-y-4">
-        {settledReports.length === 0 ? (
-          <p className="text-sm text-gray-600">You have no settled reports (reimbursed or closed) that can take a supplementary claim.</p>
+      <Modal isOpen={raiseOpen} onClose={closeRaise} title="Raise a new claim" subtitle="Choose the paid or settled report that is missing an expense or receipt." size="lg">
+        <div className="flex flex-col gap-4">
+        {!checkingAll && notReadyReports.length > 0 && (
+          <details className="order-last rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900" data-not-ready-reports>
+            <summary className="cursor-pointer font-semibold">
+              {notReadyReports.length} approved report{notReadyReports.length === 1 ? " is" : "s are"} not paid or settled yet
+            </summary>
+            <ul className="mt-2 space-y-1">
+              {notReadyReports.map((r) => (
+                <li key={r.reportId}>
+                  <span className="font-mono">{r.reportNumber || r.reportId}</span>: {eligibilityById[r.reportId].reason}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        {checkingAll ? (
+          <p className="text-sm text-gray-500" role="status">Checking which of your reports are paid or settled…</p>
+        ) : readyReports.length === 0 ? (
+          <p className="text-sm text-gray-600" data-no-ready-reports>
+            None of your reports is paid or settled yet. A claim can be added once the report is paid by AP, or settled against
+            a closed cash advance.
+          </p>
         ) : (
           <>
             <FormSelect
-              label="Settled report"
+              label="Paid or settled report"
               name="reportId"
               value={reportId}
               onChange={(e) => chooseReport(e.target.value)}
-              options={settledReports.map((r) => ({
+              options={readyReports.map((r) => ({
                 value: r.reportId,
-                label: `${r.reportNumber || r.reportId} — ${r.title || "Expense report"}`,
+                label: `${r.reportNumber || r.reportId} — ${r.title || "Expense report"} (${settledHow(r)})`,
               }))}
               placeholder="Select a report"
             />
@@ -248,6 +300,14 @@ export default function SupplementaryClaimsPage() {
                 {eligibility.eligible
                   ? "This report can take a supplementary claim."
                   : eligibility.reason}
+                {eligibility.eligible && eligibility.settleAgainstAdvanceId && (
+                  <span className="mt-1 block text-xs text-gray-600" data-settle-against>
+                    This report's advance balance was carried forward to <b>{eligibility.settleAgainstAdvanceTitle || "your next advance"}</b>.
+                    Once Finance approves the claim, up to{" "}
+                    <b>{formatMoney(eligibility.settleAgainstRemaining, eligibility.currencyCode || "INR")}</b> (what that advance still
+                    holds) is set against it, so nothing is paid to your bank for that part. Anything above it is paid by AP.
+                  </span>
+                )}
               </p>
             )}
             {eligibility?.eligible && (
