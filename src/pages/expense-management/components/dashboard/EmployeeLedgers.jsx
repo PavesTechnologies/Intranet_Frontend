@@ -237,6 +237,8 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
   const fromAdvance = num(byKey, "avAdvanceOffset");
   const extra = num(byKey, "avPayable");
   const gap = num(byKey, "caRecordGap");
+  // Carried in with no matching carry-out on the records (0 when the backend does not send it).
+  const unmatched = num(byKey, "caCarryUnmatched");
   const shared = { byKey, currency };
   const parts = [
     { label: "Used on bills", value: used, color: COLOR.done },
