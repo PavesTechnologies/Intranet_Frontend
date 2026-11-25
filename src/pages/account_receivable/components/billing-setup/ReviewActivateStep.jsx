@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { Wallet, Receipt, Pencil, ChevronRight, Building2, Calendar, Info, Lock } from "lucide-react";
+import { Wallet, Receipt, Pencil, ChevronRight, Building2, Calendar, Clock, Info, Lock } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
 import SearchInput from "../../../../components/filter/Searchbar";
@@ -14,7 +14,7 @@ import {
   getBillingRecurringSchedule,
   getBillingRecurringScheduleByBillingConfigurationId,
 } from "../../services/billingConfigurationService";
-import { isMilestoneEntryFrozen } from "../../services/projectMilestoneService";
+import { getMilestoneIneligibilityReason, isMilestoneEntryFrozen } from "../../services/projectMilestoneService";
 import { useProjectMilestones } from "./useProjectMilestones";
 
 // Display-time safety net: a Project Code must never be the project's own
@@ -618,6 +618,32 @@ function buildMilestonePlanReview(wizardData, projectInfo, milestones = []) {
       };
     });
 
+  // PMS milestones this plan does NOT bill — typically still NOT_READY, so the
+  // Milestones step could not add them. They are shown in the review for the full
+  // picture of the project, and deliberately kept out of every total below: they
+  // are not part of this schedule and no occurrence will be opened for them.
+  const plannedMilestoneIds = new Set(
+    sourceEntries.map((entry) => entry.pmsMilestoneId).filter((id) => id !== null && id !== undefined),
+  );
+  const pendingMilestones = !isMilestones
+    ? []
+    : milestones
+      .filter((m) => !plannedMilestoneIds.has(m.pmsMilestoneId))
+      .map((m) => {
+        const percentage = parseNumericValue(m.pmsAllocationPercentage) || 0;
+        return {
+          pmsMilestoneId: m.pmsMilestoneId,
+          code: m.code || "",
+          name: m.name || "",
+          percentage,
+          amount: (percentage / 100) * totalValue,
+          billingDate: m.plannedCompletionDate || "",
+          executionStatus: m.executionStatus || "",
+          billingReadiness: m.billingReadiness || "",
+          reason: getMilestoneIneligibilityReason(m) || "",
+        };
+      });
+
   const allocationPercentage = Math.round(payments.reduce((sum, p) => sum + p.percentage, 0) * 100) / 100;
   const scheduledTotal = payments.reduce((sum, p) => sum + p.amount, 0);
   const remainingAmount = Math.max(0, totalValue - scheduledTotal);
@@ -639,6 +665,7 @@ function buildMilestonePlanReview(wizardData, projectInfo, milestones = []) {
       ? "Milestones (Managed by PMS)"
       : "Installments",
     payments,
+    pendingMilestones,
     allocationPercentage,
     scheduledTotal,
     remainingAmount,
@@ -751,6 +778,54 @@ function PaymentCard({ payment, index, currency }) {
   );
 }
 
+// A PMS milestone that this plan does not bill. Deliberately quieter than a
+// PaymentCard (dashed, no payment number) so it cannot be mistaken for a
+// scheduled payment, and it carries PMS's own reason for leaving it out.
+function PendingMilestoneCard({ milestone, currency }) {
+  const readinessLabel =
+    milestone.billingReadiness === "NOT_READY"
+      ? "Not ready"
+      : milestone.billingReadiness === "NOT_BILLABLE"
+        ? "Not billable"
+        : milestone.billingReadiness
+          ? milestone.billingReadiness.replace(/_/g, " ").toLowerCase()
+          : "Not billed";
+  return (
+    <div
+      className="rounded-lg border border-dashed border-amber-300 bg-amber-50/40 px-3.5 py-2.5"
+      data-testid={`pending-milestone-${milestone.code || milestone.pmsMilestoneId}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+          <span className="truncate">{milestone.code || `PMS milestone ${milestone.pmsMilestoneId}`}</span>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium normal-case text-amber-800">
+            {readinessLabel}
+          </span>
+        </span>
+        <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-slate-700">
+          {milestone.percentage}%
+        </span>
+      </div>
+      {milestone.name && <p className="mt-0.5 truncate text-xs font-medium text-slate-800">{milestone.name}</p>}
+      <div className="mt-1.5 grid grid-cols-2 gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] text-slate-500">Estimated Amount</p>
+          <p className="text-sm font-semibold tabular-nums text-slate-700">
+            {formatMoney(milestone.amount, currency) || "—"}
+          </p>
+        </div>
+        <div className="min-w-0 text-right">
+          <p className="text-[11px] text-slate-500">Planned Due</p>
+          <p className="text-[13px] font-medium text-slate-800">{formatDisplayDate(milestone.billingDate)}</p>
+        </div>
+      </div>
+      {milestone.reason && (
+        <p className="mt-2 border-t border-amber-200/70 pt-1.5 text-[11px] text-amber-800">{milestone.reason}</p>
+      )}
+    </div>
+  );
+}
+
 function PaymentSchedule({ review, currency }) {
   const meta = review.isFullPayment
     ? [{ label: "Schedule Type", value: "One-Time Payment" }]
@@ -787,6 +862,25 @@ function PaymentSchedule({ review, currency }) {
         <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-center text-xs text-slate-500">
           {review.isMilestones ? "No milestones selected yet." : "No payments configured yet."}
         </p>
+      )}
+
+      {review.pendingMilestones?.length > 0 && (
+        <div className="space-y-2 pt-1">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-amber-700">
+            <Clock className="h-3.5 w-3.5" />
+            Not billed by this plan ({review.pendingMilestones.length})
+            <span className="font-medium normal-case tracking-normal text-slate-500">
+              · PMS milestones that are not ready for billing yet
+            </span>
+          </p>
+          <div
+            className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 ${review.pendingMilestones.length > 4 ? "xl:grid-cols-3" : ""}`}
+          >
+            {review.pendingMilestones.map((milestone) => (
+              <PendingMilestoneCard key={milestone.pmsMilestoneId} milestone={milestone} currency={currency} />
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
