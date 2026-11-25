@@ -1,59 +1,68 @@
 import React from "react";
-import { AlertTriangle, CheckCircle2, ReceiptText, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ReceiptText, Sigma, Wallet } from "lucide-react";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 import { ANCHOR_CLASS, SECTION, anchorProps } from "./sectionAnchors";
 
-// The employee's two ledgers. Each card leads with its closing figure (outstanding / payable) and how far along it is,
-// then lists the figures top to bottom like a receipt: deductions marked with a minus, the result in a highlighted row,
-// and a segmented bar showing what the result is made of. A footer checks that the parts add up.
-// Every figure is the backend's. This file only arranges them and checks that the parts add up.
+// The employee's ledgers, one per money flow, then the total of both:
+//   Direct expenses: bills not linked to an advance, paid back to the bank       (dr* figures)
+//   Cash advance:    the advance money, and the bills settled against it          (ca* and av* figures)
+//   Total:           direct + advance                                             (er* figures)
+// Each card reads like a receipt: deductions marked with a minus, the result in a highlighted row, and a footer that
+// checks the parts add up. Every figure is the backend's. This file only arranges them and checks the sums.
 
-const num = (byKey, key) => (byKey[key] ? Number(byKey[key].value) : 0);
+const num = (byKey, key) => (byKey[key] ? Number(byKey[key].value) || 0 : 0);
+const sumOf = (byKey, keys) => (keys.every((k) => byKey[k]) ? keys.reduce((a, k) => a + num(byKey, k), 0) : null);
 const share = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+const differs = (a, b) => Math.abs(a - b) >= 0.005;
 
-// Same meaning on both cards and in the summary banner: green = done, amber = waiting, grey = not started.
-const COLOR = { done: "#1baf7a", waiting: "#eda100", idle: "#a8b3c7" };
+// Same meaning on every card and in the summary banner: green = done, amber = waiting, grey = not started.
+const COLOR = { done: "#1baf7a", returned: "#5fd0a5", waiting: "#eda100", idle: "#a8b3c7" };
 
-function Amount({ byKey, kpi, currency, minus = false, plus = false, className = "" }) {
-  const item = byKey[kpi];
+function Amount({ value, currency, minus = false, plus = false, className = "" }) {
   return (
     <p data-amount className={`whitespace-nowrap text-right tabular-nums ${className}`}>
-      {item ? `${minus ? "− " : plus ? "+ " : ""}${formatMoney(item.value, currency)}` : "-"}
+      {value === null || value === undefined ? "-" : `${minus ? "− " : plus ? "+ " : ""}${formatMoney(value, currency)}`}
     </p>
   );
 }
 
-// `total` may be one key or several (summed). Keys in `optional` count as zero when the backend does not send them.
-function Check({ title, total, parts, label, optional = [], byKey, currency }) {
-  const value = (k) => (byKey[k] ? Number(byKey[k].value) : optional.includes(k) ? 0 : null);
-  const totals = [].concat(total).map(value);
-  const t = totals.some((v) => v === null) ? null : totals.reduce((a, b) => a + b, 0);
-  const values = parts.map(value);
-  const difference = t === null || values.some((v) => v === null) ? null : t - values.reduce((a, b) => a + b, 0);
-  const ok = difference !== null && Math.abs(difference) < 0.005;
+// A footer check: total = sum of parts. Says "Balanced" or by how much it is off; never hides a difference.
+function Check({ id, total, parts, label, byKey, currency }) {
+  const t = byKey[total] ? Number(byKey[total].value) : null;
+  const s = sumOf(byKey, parts);
+  const difference = t === null || s === null ? null : t - s;
+  const ok = difference !== null && !differs(difference, 0);
   const Icon = ok ? CheckCircle2 : AlertTriangle;
   return (
     <span
-      data-check={title}
+      data-check={id}
       className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium ${
         ok ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"
       }`}
     >
       <Icon size={13} className="shrink-0" />
       <span className="truncate">
-        {difference === null
-          ? "Waiting for figures"
-          : ok
-            ? `Balanced: ${label}`
-            : `Off by ${formatMoney(Math.abs(difference), currency)}: ${label}`}
+        {difference === null ? "Waiting for figures" : ok ? `Balanced: ${label}` : `Off by ${formatMoney(Math.abs(difference), currency)}: ${label}`}
       </span>
     </span>
   );
 }
 
-function Card({ ledger, byKey, currency, icon: Icon, tile, headline, anchor, children }) {
+// An amber note explaining a data problem in plain words, with who should fix it.
+const Warning = ({ children, ...rest }) => (
+  <p {...rest} className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+    <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+    <span>{children}</span>
+  </p>
+);
+
+function Card({ ledger, byKey, currency, icon: Icon, tile, headline, anchor, warnings = null, className = "", children }) {
   return (
-    <section {...(anchor ? anchorProps(anchor) : {})} className={`${ANCHOR_CLASS} flex flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_1px_2px_rgba(10,0,130,0.04),0_10px_30px_-18px_rgba(10,0,130,0.18)] sm:p-5`}>
+    <section
+      {...anchorProps(anchor)}
+      data-ledger={anchor}
+      className={`${ANCHOR_CLASS} flex flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_1px_2px_rgba(10,0,130,0.04),0_10px_30px_-18px_rgba(10,0,130,0.18)] sm:p-5 ${className}`}
+    >
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tile}`}>
@@ -67,16 +76,13 @@ function Card({ ledger, byKey, currency, icon: Icon, tile, headline, anchor, chi
         {headline}
       </header>
       <div className="flex-1">{children}</div>
-      <footer className="mt-3 border-t border-slate-100 pt-3">
-        <Check
-          title={ledger.title}
-          total={ledger.check.total}
-          parts={ledger.check.parts}
-          optional={ledger.check.optional}
-          label={ledger.check.label}
-          byKey={byKey}
-          currency={currency}
-        />
+      <footer className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+        {warnings}
+        <div className="flex flex-wrap gap-2">
+          {(ledger.checks || []).map((c) => (
+            <Check key={c.label} id={`${ledger.title}: ${c.label}`} {...c} byKey={byKey} currency={currency} />
+          ))}
+        </div>
       </footer>
     </section>
   );
@@ -94,7 +100,9 @@ function Headline({ label, value, note, currency }) {
 }
 
 // One line of the receipt: label and note on the left, a dotted leader, then the amount on the right.
-function Line({ kpi, label, note, byKey, currency, minus = false, plus = false, indent = false, muted = false, strong = false, result = false, dot, pct }) {
+// `value` overrides the figure for a line that adds two backend figures together.
+function Line({ kpi, label, note, byKey, currency, value, minus = false, plus = false, indent = false, muted = false, strong = false, result = false, dot, pct }) {
+  const v = value !== undefined ? value : byKey[kpi] ? Number(byKey[kpi].value) : null;
   return (
     <div
       data-kpi={kpi}
@@ -112,8 +120,7 @@ function Line({ kpi, label, note, byKey, currency, minus = false, plus = false, 
       </div>
       <span className="mb-1.5 min-w-6 flex-1 border-b border-dotted border-slate-300" aria-hidden="true" />
       <Amount
-        byKey={byKey}
-        kpi={kpi}
+        value={v}
         currency={currency}
         minus={minus}
         plus={plus}
@@ -132,7 +139,8 @@ function Line({ kpi, label, note, byKey, currency, minus = false, plus = false, 
 }
 
 // Segmented bar whose parts add up to `base`; segments are separated by a small gap.
-function Bar({ parts, base, label }) {
+function Bar({ parts, base }) {
+  const label = parts.map((p) => `${p.label} ${share(p.value, base)}%`).join(", ");
   return (
     <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={label}>
       {base > 0 &&
@@ -159,24 +167,99 @@ function Legend({ parts, base }) {
   );
 }
 
-const SectionLabel = ({ children }) => (
-  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{children}</p>
-);
+const SectionLabel = ({ children }) => <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{children}</p>;
 
-export function CashAdvanceCard({ ledger, byKey, currency }) {
-  const received = num(byKey, "caDisbursed");
-  // Balance carried in from an earlier advance is held by the employee but was not paid out as cash, so the money to
-  // account for is cash received plus carried in. That is what settled + outstanding add up to.
-  const carriedIn = num(byKey, "caCarriedIn");
-  const held = received + carriedIn;
-  const unmatched = num(byKey, "caCarryUnmatched");
-  const settled = num(byKey, "caSettled");
-  const outstanding = num(byKey, "caOutstanding");
+// Where the money payable to the bank is now: not yet with AP, waiting for AP, paid. `px` is "dr", "av" or "er".
+function BankSplit({ px, byKey, currency }) {
+  const payable = num(byKey, `${px}Payable`);
+  const toSend = num(byKey, `${px}ToSendAp`);
+  const waiting = num(byKey, `${px}PendingAp`);
+  const paid = num(byKey, `${px}Paid`);
   const shared = { byKey, currency };
   const parts = [
-    { label: "Settled", value: settled, color: COLOR.done },
-    { label: "Outstanding", value: outstanding, color: COLOR.waiting },
+    { label: "Paid", value: paid, color: COLOR.done },
+    { label: "Waiting for AP", value: waiting, color: COLOR.waiting },
+    { label: "Not yet with AP", value: toSend, color: COLOR.idle },
   ];
+  return (
+    <div className="mt-2">
+      <Bar base={payable} parts={parts} />
+      <div className="mt-1 divide-y divide-slate-100">
+        <Line kpi={`${px}ToSendAp`} label="Not yet with AP" note="Approved, not sent to AP yet" indent dot={COLOR.idle} pct={share(toSend, payable)} {...shared} />
+        <Line kpi={`${px}PendingAp`} label="Waiting for AP" note="Sent to AP, not paid yet" indent dot={COLOR.waiting} pct={share(waiting, payable)} {...shared} />
+        <Line kpi={`${px}Paid`} label="Paid" note="In your bank account" indent dot={COLOR.done} pct={share(paid, payable)} {...shared} />
+      </div>
+    </div>
+  );
+}
+
+// ---- Direct expenses: claimed -> approved -> paid to your bank.
+export function DirectExpenseCard({ ledger, byKey, currency }) {
+  const payable = num(byKey, "drPayable");
+  const paid = num(byKey, "drPaid");
+  const shared = { byKey, currency };
+  return (
+    <Card
+      ledger={ledger}
+      byKey={byKey}
+      currency={currency}
+      icon={ReceiptText}
+      anchor={SECTION.direct}
+      tile="bg-[#0A0082]/10 text-[#0A0082]"
+      headline={
+        <Headline label="To your bank" value={payable} currency={currency} note={payable > 0 ? `${share(paid, payable)}% already paid` : "Nothing approved yet"} />
+      }
+    >
+      <div className="mt-4 divide-y divide-dashed divide-slate-200">
+        <div>
+          <Line kpi="drClaimed" label="Claimed" note="Bills you submitted" strong {...shared} />
+          <Line kpi="drNotApproved" label="Not approved yet" note="Pending, returned or rejected" minus {...shared} />
+        </div>
+        <div className="pt-1">
+          <Line kpi="drPayable" label="Approved, to your bank" note="AP pays all of it to you" result {...shared} />
+        </div>
+      </div>
+      <div className="mt-3">
+        <SectionLabel>Where it is now</SectionLabel>
+        <BankSplit px="dr" {...shared} />
+      </div>
+    </Card>
+  );
+}
+
+// ---- Cash advance: the advance money, then the bills settled against it.
+export function CashAdvanceCard({ ledger, byKey, currency }) {
+  const received = num(byKey, "caDisbursed");
+  const used = num(byKey, "caUsedOnBills");
+  const returned = num(byKey, "caReturned");
+  const carried = num(byKey, "caCarriedForward");
+  const outstanding = num(byKey, "caOutstanding");
+  const fromAdvance = num(byKey, "avAdvanceOffset");
+  const extra = num(byKey, "avPayable");
+  const gap = num(byKey, "caRecordGap");
+  const shared = { byKey, currency };
+  const parts = [
+    { label: "Used on bills", value: used, color: COLOR.done },
+    { label: "Returned", value: returned, color: COLOR.returned },
+    ...(carried > 0 ? [{ label: "Carried forward", value: carried, color: COLOR.idle }] : []),
+    { label: "Still to settle", value: outstanding, color: COLOR.waiting },
+  ];
+  const warnings = (
+    <>
+      {differs(gap, 0) && (
+        <Warning data-record-gap>
+          Advance records differ by <b className="tabular-nums">{formatMoney(Math.abs(gap), currency)}</b>: the amount recorded as paid out
+          does not match the approved advance. Ask Finance to correct it.
+        </Warning>
+      )}
+      {byKey.caUsedOnBills && byKey.avAdvanceOffset && differs(used, fromAdvance) && (
+        <Warning data-offset-mismatch>
+          Advance records show <b className="tabular-nums">{formatMoney(used, currency)}</b> used on bills, but your reports show{" "}
+          <b className="tabular-nums">{formatMoney(fromAdvance, currency)}</b> paid from advance. Ask Finance to check.
+        </Warning>
+      )}
+    </>
+  );
   return (
     <Card
       ledger={ledger}
@@ -185,20 +268,21 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
       icon={Wallet}
       anchor={SECTION.advance}
       tile="bg-amber-400/15 text-amber-700"
+      warnings={warnings}
       headline={
         <Headline
-          label="Outstanding"
+          label="Still to settle"
           value={outstanding}
           currency={currency}
-          note={held > 0 ? `${share(settled, held)}% of ${carriedIn > 0 ? "received and carried in" : "received"} is settled` : "No advance received yet"}
+          note={received > 0 ? `${share(received - outstanding, received)}% of received is accounted for` : "No advance received yet"}
         />
       }
     >
       <div className="mt-3">
-        <SectionLabel>{carriedIn > 0 ? "Received and carried in, split" : "Received, split"}</SectionLabel>
+        <SectionLabel>Advance money, where it went</SectionLabel>
         <div className="mt-2">
-          <Bar base={held} parts={parts} label={`Settled ${share(settled, held)}%, outstanding ${share(outstanding, held)}%`} />
-          <Legend parts={parts} base={held} />
+          <Bar base={received} parts={parts} />
+          <Legend parts={parts} base={received} />
         </div>
       </div>
 
@@ -208,13 +292,29 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
           <Line kpi="caApproved" label="Approved" note="Manager and Finance approved" muted {...shared} />
         </div>
         <div className="pt-1">
-          <Line kpi="caDisbursed" label="Received" note="Paid out to you" strong {...shared} />
-          {carriedIn > 0 && <Line kpi="caCarriedIn" label="Carried in" note="Balance moved from an earlier advance" plus {...shared} />}
-          <Line kpi="caSettled" label="Settled" note="Verified expenses and refunds against your advances" minus dot={COLOR.done} {...shared} />
+          <Line kpi="caDisbursed" label="Received" note="Advance paid out to you" strong {...shared} />
+          <Line kpi="caUsedOnBills" label="Used on bills" note="Approved bills paid from it" minus dot={COLOR.done} {...shared} />
+          <Line kpi="caReturned" label="Returned by you" note="Cash you paid back" minus dot={COLOR.returned} {...shared} />
+          {carried > 0 && <Line kpi="caCarriedForward" label="Carried forward" note="Moved to your next advance" minus dot={COLOR.idle} {...shared} />}
         </div>
         <div className="pt-1">
-          <Line kpi="caOutstanding" label="Outstanding" note="Still to account for" result {...shared} />
+          <Line kpi="caOutstanding" label="Still to settle" note="Submit bills or return this" result {...shared} />
         </div>
+      </div>
+
+      <div className="mt-4">
+        <SectionLabel>Bills against your advance</SectionLabel>
+        <div className="mt-1 divide-y divide-dashed divide-slate-200">
+          <div>
+            <Line kpi="avClaimed" label="Claimed" note="Bills linked to an advance" muted {...shared} />
+            <Line kpi="avApproved" label="Approved" note="Approved bills" strong {...shared} />
+            <Line kpi="avAdvanceOffset" label="Paid from advance" note="Not paid to your bank" minus {...shared} />
+          </div>
+          <div className="pt-1">
+            <Line kpi="avPayable" label="Extra, to your bank" note="Bills above your advance" result {...shared} />
+          </div>
+        </div>
+        {extra > 0 && <BankSplit px="av" {...shared} />}
       </div>
 
       {/* Carried-in money must come from another of your advances. A gap means the records do not show where it came
@@ -235,60 +335,49 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
   );
 }
 
-export function ReimbursementCard({ ledger, byKey, currency }) {
-  const payable = num(byKey, "erPayable");
-  const toSend = num(byKey, "erToSendAp");
-  const waiting = num(byKey, "erPendingAp");
-  const paid = num(byKey, "erPaid");
+// ---- Total: both flows added together.
+export function TotalCard({ ledger, byKey, currency }) {
   const shared = { byKey, currency };
-  const parts = [
-    { label: "Paid", value: paid, color: COLOR.done },
-    { label: "Waiting for AP", value: waiting, color: COLOR.waiting },
-    { label: "Not yet with AP", value: toSend, color: COLOR.idle },
-  ];
+  const pending = sumOf(byKey, ["erToSendAp", "erPendingAp"]);
   return (
     <Card
       ledger={ledger}
       byKey={byKey}
       currency={currency}
-      icon={ReceiptText}
-      anchor={SECTION.reimbursement}
-      tile="bg-[#0A0082]/10 text-[#0A0082]"
+      icon={Sigma}
+      anchor={SECTION.total}
+      tile="bg-emerald-500/10 text-emerald-700"
+      className="xl:col-span-2"
       headline={
         <Headline
-          label="Payable to you"
-          value={payable}
+          label="Total approved"
+          value={num(byKey, "erApproved")}
           currency={currency}
-          note={payable > 0 ? `${share(paid, payable)}% already paid` : "Nothing payable yet"}
+          note={`${formatMoney(num(byKey, "erAdvanceOffset"), currency)} from advance · ${formatMoney(num(byKey, "erPayable"), currency)} to bank`}
         />
       }
     >
-      <div className="mt-4 divide-y divide-dashed divide-slate-200">
-        <div>
-          <Line kpi="erClaimed" label="Claimed" note="Everything you submitted" strong {...shared} />
-          <Line kpi="erNotApproved" label="Not approved yet" note="Pending, returned or rejected" minus {...shared} />
+      <div className="mt-4 grid gap-x-8 gap-y-2 lg:grid-cols-2">
+        <div className="divide-y divide-dashed divide-slate-200">
+          <SectionLabel>Approved, by flow</SectionLabel>
+          <div className="pt-1">
+            <Line kpi="drApproved" label="Direct expenses" note="Approved, not linked to an advance" {...shared} />
+            <Line kpi="avApproved" label="Against your advance" note="Approved, linked to an advance" plus {...shared} />
+          </div>
+          <div className="pt-1">
+            <Line kpi="erApproved" label="Total approved" note="Direct + against advance" result {...shared} />
+          </div>
         </div>
-        <div className="pt-1">
-          <Line kpi="erApproved" label="Approved" note="Approved for reimbursement" strong {...shared} />
-          <Line kpi="erAdvanceOffset" label="Covered by advance" note="Set against your cash advance" minus {...shared} />
-          {num(byKey, "erNoPaymentDue") > 0 && (
-            <Line kpi="erNoPaymentDue" label="No payment due" note="Approved, nothing reimbursable, no advance involved" minus {...shared} />
-          )}
-        </div>
-        <div className="pt-1">
-          <Line kpi="erPayable" label="Payable to you" note="What AP will pay you" result {...shared} />
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <SectionLabel>Payable, by where it is</SectionLabel>
-        <div className="mt-2">
-          <Bar base={payable} parts={parts} label={`Paid ${share(paid, payable)}%, waiting for AP ${share(waiting, payable)}%, not yet with AP ${share(toSend, payable)}%`} />
-        </div>
-        <div className="mt-2 divide-y divide-slate-100">
-          <Line kpi="erToSendAp" label="Not yet with AP" note="Approved, not sent to AP yet" indent dot={COLOR.idle} pct={share(toSend, payable)} {...shared} />
-          <Line kpi="erPendingAp" label="Waiting for AP" note="Sent to AP, not paid yet" indent dot={COLOR.waiting} pct={share(waiting, payable)} {...shared} />
-          <Line kpi="erPaid" label="Paid" note="Already paid to you" indent dot={COLOR.done} pct={share(paid, payable)} {...shared} />
+        <div className="divide-y divide-dashed divide-slate-200">
+          <SectionLabel>How it was paid</SectionLabel>
+          <div className="pt-1">
+            <Line kpi="erAdvanceOffset" label="Paid from advance" note="Used your cash advance" dot={COLOR.done} {...shared} />
+            <Line kpi="erPaid" label="Paid to your bank" note="Direct + extra above advance" dot={COLOR.done} {...shared} />
+            <Line kpi="erPending" label="On its way to your bank" note="Approved, not paid yet" dot={COLOR.waiting} value={pending} {...shared} />
+          </div>
+          <div className="pt-1">
+            <Line kpi="caOutstanding" label="Advance still to settle" note="Submit bills or return this" muted {...shared} />
+          </div>
         </div>
       </div>
     </Card>
@@ -298,8 +387,9 @@ export function ReimbursementCard({ ledger, byKey, currency }) {
 export default function EmployeeLedgers({ ledgers, byKey, currency }) {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
+      <DirectExpenseCard ledger={ledgers.direct} byKey={byKey} currency={currency} />
       <CashAdvanceCard ledger={ledgers.advance} byKey={byKey} currency={currency} />
-      <ReimbursementCard ledger={ledgers.reimbursement} byKey={byKey} currency={currency} />
+      <TotalCard ledger={ledgers.total} byKey={byKey} currency={currency} />
     </div>
   );
 }

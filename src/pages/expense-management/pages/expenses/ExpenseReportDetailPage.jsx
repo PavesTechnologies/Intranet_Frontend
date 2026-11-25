@@ -102,6 +102,7 @@ import PolicyStatusBadge, {
   isJustified,
 } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import PolicyJustificationModal from "@/pages/expense-management/components/expense-reports/PolicyJustificationModal";
+import LivePolicyWarnings, { usePolicyPreview } from "@/pages/expense-management/components/expense-reports/LivePolicyWarnings";
 import ApprovalStatusPill from "@/pages/expense-management/approval-engine/components/ApprovalStatusPill";
 import { useApprovalLiveSync } from "@/pages/expense-management/approval-engine/hooks/useApprovalLiveSync";
 import {
@@ -1675,6 +1676,20 @@ export function LineItemDrawer({
 
   const isEditingExisting = !!lineItem;
 
+  // Live policy check while the form is filled in (saves nothing; the same rules run again on save).
+  const [descriptionTouched, setDescriptionTouched] = useState(false);
+  useEffect(() => {
+    if (isOpen) setDescriptionTouched(!!lineItem?.lineItemId);
+  }, [isOpen, lineItem?.lineItemId]);
+  const policyPreview = usePolicyPreview({
+    reportId,
+    enabled: isOpen,
+    form: formData,
+    lineItemId: savedLineItem?.lineItemId || lineItem?.lineItemId,
+    receiptAttached: receipts.length > 0 || pendingFiles.length > 0 || !!ocrReceiptId,
+    descriptionTouched,
+  });
+
   const fetchReceipts = useCallback(async () => {
     const idToFetch = lineItem?.lineItemId || savedLineItem?.lineItemId;
     if (!idToFetch) return;
@@ -2341,6 +2356,7 @@ export function LineItemDrawer({
             name="description"
             value={formData.description}
             onChange={handleInputChange}
+            onBlur={() => setDescriptionTouched(true)}
             placeholder="Optional notes about this expense..."
             rows={2}
             disabled={submitting}
@@ -2383,6 +2399,8 @@ export function LineItemDrawer({
           </div>
 
         </div>
+
+        <LivePolicyWarnings warnings={policyPreview.warnings} loading={policyPreview.loading} />
 
         <TaxBreakdownPanel
           amount={formData.amount}

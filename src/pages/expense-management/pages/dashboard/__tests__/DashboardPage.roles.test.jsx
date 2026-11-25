@@ -95,9 +95,12 @@ describe("role dashboards: one simple money flow per role", () => {
     expect(screen.queryByRole("tab", { name: "Approvals" })).toBeNull();
     expect(document.querySelector('[data-kpi="pending"]')).toBeNull();
 
-    // opened, it adds the rate and the lists without repeating the header's figures
+    // the header shows pending next to approved and sent back
+    expect(document.querySelector("[data-approvals-toggle]").textContent).toMatch(/Pending\s*4/);
+
+    // opened, it adds the lists without repeating the header's figures
     fireEvent.click(document.querySelector("[data-approvals-toggle]"));
-    expect(document.querySelector("[data-decision-mix]").textContent).toMatch(/92% approved/);
+    expect(document.querySelector("[data-decision-mix]")).toBeNull();
     expect(document.querySelector("[data-approvals-panel]").querySelectorAll("[data-kpi]")).toHaveLength(0);
     expect(document.querySelector("[data-approvals-panel]").textContent.match(/18,500/g)).toHaveLength(1);
   });

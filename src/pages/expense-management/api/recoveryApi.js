@@ -40,9 +40,9 @@ export const recoveryApi = {
   listSalaryDeductions: (advanceId) =>
     api.get(`/xms/finance/salary-deductions/cash-advances/${advanceId}`, json()).then(unwrap),
 
-  createSalaryDeduction: (advanceId, { amount, payrollMonth }) =>
+  createSalaryDeduction: (advanceId, { amount, payrollMonth, amountChangeReason = null }) =>
     api
-      .post(`/xms/finance/salary-deductions/cash-advances/${advanceId}`, { amount, payrollMonth }, json())
+      .post(`/xms/finance/salary-deductions/cash-advances/${advanceId}`, { amount, payrollMonth, amountChangeReason }, json())
       .then(unwrap),
 
   retrySalaryEmail: (requestId) =>

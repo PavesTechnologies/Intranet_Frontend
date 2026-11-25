@@ -106,6 +106,28 @@ export const hasSubmittedLinkedReport = (adv) => {
   return reports.some((r) => !DEAD_REPORT_STATUSES.includes(String(r.status || r.reportStatus || "").toUpperCase()));
 };
 
+const reportStatusOf = (r) => String(r?.status || r?.reportStatus || "").toUpperCase();
+
+/**
+ * The live expense report already linked to this advance (a draft first, since that is where expenses get added), or
+ * null. Looks at the reports the server lists for the advance (utilization.linkedReports) and any the page attached.
+ */
+export const activeLinkedReport = (adv, serverReports = []) => {
+  const attached = adv?.linkedExpenseReports || (adv?.linkedExpenseReport ? [adv.linkedExpenseReport] : []);
+  const live = [...(serverReports || []), ...attached].filter(
+    (r) => (r?.reportId || r?.id) && !DEAD_REPORT_STATUSES.includes(reportStatusOf(r))
+  );
+  return live.find((r) => reportStatusOf(r) === "DRAFT") || live[0] || null;
+};
+
+/** Where "submit linked expenses" goes: the advance's existing report if it has one, otherwise a new report for it. */
+export const linkedExpensesPath = (adv, serverReports = []) => {
+  const report = activeLinkedReport(adv, serverReports);
+  return report
+    ? `/expense-management/expenses/reports/${report.reportId || report.id}`
+    : `/expense-management/expenses/create?cashAdvanceId=${adv?.advanceId || adv?.id}`;
+};
+
 export const getStatusBadge = (status) => {
   const upper = (status || "").toUpperCase();
   switch (upper) {

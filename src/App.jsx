@@ -1971,7 +1971,8 @@ const AppRoutes = () => {
           <Route path="/expense-management/expenses/supplementary/:claimId" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Finance_Executive", "Admin"]}><XmsSupplementaryClaimDetailPage mode="employee" /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports/:reportId" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsExpenseReportDetailPage /></ProtectedRoute>} />
-          <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
+          {/* Same roles as the backend's /xms/manager/team endpoints and the dashboard's "My team" tab. */}
+          <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager", "Reporting_Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsExpenseReportsPage /></ProtectedRoute>} />
 
 

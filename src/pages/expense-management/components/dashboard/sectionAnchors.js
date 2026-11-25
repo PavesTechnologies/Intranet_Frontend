@@ -5,7 +5,8 @@ export const SECTION = {
   journey: "em-report-journey",
   needsYou: "em-needs-you",
   advance: "em-advance-ledger",
-  reimbursement: "em-reimbursement-ledger",
+  direct: "em-direct-ledger",
+  total: "em-total-ledger",
 };
 
 // Props for a section that can be scrolled to: id, focusable without joining the tab order, and a small top margin.

@@ -239,7 +239,7 @@ export const XMS_SUBMENU = [
       { label: "My Expenses",     to: "/expense-management/expenses/my" },
       { label: "Supplementary Claims", to: "/expense-management/expenses/supplementary", hiddenForRoles: XMS_FINANCE_ROLES },
       { label: "Supplementary Review", to: "/expense-management/manager/supplementary-claims", allowedRoles: XMS_MANAGER },
-      { label: "All Expenses",    to: "/expense-management/expenses/all",     allowedRoles: XMS_MANAGER },
+      { label: "All Expenses",    to: "/expense-management/expenses/all",     allowedRoles: [ROLES.MANAGER, ROLES.REPORTING_MANAGER] },
       { label: "Expense Reports", to: "/expense-management/expenses/reports", allowedRoles: XMS_MANAGER },
     ],
   },

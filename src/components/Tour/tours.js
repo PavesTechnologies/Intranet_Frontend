@@ -202,7 +202,7 @@ const WELCOME = {
     },
     {
       target: '[data-tour="dash-quick-actions"]',
-      placement: "right",
+      placement: "bottom",
       title: "Quick actions",
       body: "The three most common tasks, one click away:",
       items: [
@@ -210,6 +210,12 @@ const WELCOME = {
         { label: "Enter Timesheets", desc: "Opens this week's timesheet." },
         { label: "Manage Tasks", desc: "Opens My Work: every task assigned to you." },
       ],
+    },
+    {
+      target: '[data-tour="dash-priority-tasks"]',
+      placement: "right",
+      title: "Priority tasks",
+      body: "Your open work that needs attention first: overdue, due today or this week, and critical or high priority items across your projects.",
     },
     {
       target: '[data-tour="dash-on-leave"]',
@@ -221,7 +227,7 @@ const WELCOME = {
       target: '[data-tour="dash-leave-balance"]',
       placement: "right",
       title: "Leave balance",
-      body: "Your Earned, Sick and Comp-Off leave: used and remaining. Click Explore for history or to apply.",
+      body: "Your Earned, Sick and Comp-Off balances — remaining out of total. Click Apply to request leave, or Explore for the full history.",
     },
     {
       target: '[data-tour="dash-holidays"]',
