@@ -145,8 +145,8 @@ export default function InvoiceGeneration() {
       setWorkspaceItems(rows || []);
       setBackendSummary(summary || null);
 
-      // Re-sync delivery state from the backend on each data refresh
-      setDeliveryMap(await loadSentDeliveryMap());
+      // Re-sync delivery state on each data refresh
+      setDeliveryMap(loadDemoDeliveryMap());
 
       if (isManualRefresh) {
         showStatusToast(
@@ -470,7 +470,7 @@ export default function InvoiceGeneration() {
       if (outcome.kind !== DELIVERY_OUTCOME.SENT) {
         if (outcome.entry) {
           saveDemoDelivery(invId, outcome.entry);
-          setDemoDeliveryMap(loadDemoDeliveryMap());
+          setDeliveryMap(loadDemoDeliveryMap());
         }
         showStatusToast(outcome.message, outcome.toastType);
         setSendTarget(null);
@@ -478,7 +478,7 @@ export default function InvoiceGeneration() {
       }
 
       saveDemoDelivery(invId, outcome.entry);
-      setDemoDeliveryMap(loadDemoDeliveryMap());
+      setDeliveryMap(loadDemoDeliveryMap());
       showStatusToast(
         `Invoice ${sendTarget.invoiceNumber || invId} sent${clientEmail ? ` to ${clientEmail}` : ""} successfully.`,
         "success"

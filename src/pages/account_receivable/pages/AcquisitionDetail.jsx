@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Sparkles,
@@ -18,6 +18,8 @@ import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
+import Modal from "../../../components/Modal/modal";
+import FormInput from "../../../components/forms/FormInput";
 import { showStatusToast } from "../../../components/toastfy/toast";
  
 import {
@@ -118,19 +120,19 @@ const QUEUE_PATH = "/account-receivable/billing-data-acquisition/workspace";
  
 // Resolves the single primary, state-aware action shown in the page header —
 // avoids ever presenting more than one competing primary call-to-action.
-// canAcquire mirrors the backend's acquisitionAllowed for the next eligible period;
-// acquisition actions stay disabled until the backend says the period can be acquired.
-function getPrimaryAction(status, { acquiring, calculatingTax, onAcquire, onCheckAgain, checking = false, canAcquire = false, onReValidate, onContinueToTax, hasSnapshotId = true }) {
+// Acquisition actions are no longer gated on the backend's acquisitionAllowed flag:
+// the button stays clickable and the backend remains the authority on whether the
+// period can actually be acquired. Only an in-flight request still disables it.
+function getPrimaryAction(status, { acquiring, calculatingTax, onAcquire, onCheckAgain, checking = false, onReValidate, onContinueToTax, hasSnapshotId = true }) {
   switch (status) {
     case "NOT_ACQUIRED":
       return {
         label: acquiring ? "Acquiring Snapshot..." : "Acquire Snapshot",
         icon: Play,
         onClick: onAcquire,
-        disabled: acquiring || !canAcquire,
+        disabled: acquiring,
         spin: acquiring,
         variant: "primary",
-        className: !canAcquire && !acquiring ? "opacity-50 cursor-not-allowed" : "",
       };
     case "VALIDATING":
       return { label: "Validating...", icon: RefreshCw, onClick: null, disabled: true, spin: true, variant: "primary" };
@@ -161,10 +163,9 @@ function getPrimaryAction(status, { acquiring, calculatingTax, onAcquire, onChec
         label: acquiring ? "Retrying..." : "Retry Acquisition",
         icon: RefreshCw,
         onClick: onAcquire,
-        disabled: acquiring || !canAcquire,
+        disabled: acquiring,
         spin: acquiring,
         variant: "danger",
-        className: !canAcquire && !acquiring ? "opacity-50 cursor-not-allowed" : "",
       };
     case "CONFIGURATION_REQUIRED":
       return {
@@ -262,6 +263,8 @@ export default function AcquisitionDetail() {
   // Period of the snapshot currently shown in the workspace (always taken from backend data).
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
+  // Manual-period fallback: only opened when the backend-offered period fails validation.
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
 
   // Next eligible billing period, computed by the backend — never derived here.
   const [nextPeriod, setNextPeriod] = useState(null);
@@ -876,25 +879,101 @@ export default function AcquisitionDetail() {
     };
   }, [projectId]);
  
-  // Acquires exactly the period the backend offered — no manual dates, no frontend derivation.
+  // Project duration bounds — the billing period can never fall outside the
+  // project's own start/end dates, so they drive both the date pickers' min/max
+  // and the guard below.
+  const projectBounds = useMemo(() => {
+    const start = toIsoDateOnly(
+      config?.projectStartDate || config?.effectiveFrom || config?.startDate
+    );
+    const end = toIsoDateOnly(
+      config?.projectEndDate || config?.effectiveTo || config?.endDate
+    );
+    return { start: start || "", end: end || "" };
+  }, [config]);
+
+  const projectDurationLabel =
+    projectBounds.start && projectBounds.end
+      ? formatBillingPeriod(projectBounds.start, projectBounds.end)
+      : config?.projectDuration && config.projectDuration !== "—"
+      ? config.projectDuration
+      : "";
+
+  // Returns a user-facing message when the chosen period is invalid, else null.
+  const getPeriodValidationError = (start, end) => {
+    if (!start || !end) return "Please select both start date and end date.";
+    if (start > end) return "End date must be on or after start date.";
+
+    const { start: projStart, end: projEnd } = projectBounds;
+    if (projStart && start < projStart) {
+      return `Billing period start date cannot be before the project start date (${projStart}).`;
+    }
+    if (projEnd && end > projEnd) {
+      return `Billing period end date cannot be after the project end date (${projEnd}).`;
+    }
+    if (projStart && end < projStart) {
+      return `Billing period end date cannot be before the project start date (${projStart}).`;
+    }
+    if (projEnd && start > projEnd) {
+      return `Billing period start date cannot be after the project end date (${projEnd}).`;
+    }
+    return null;
+  };
+
+  // Re-asks the backend which period is next; used by "Check again" and the card's refresh.
+  const handleCheckNextPeriod = () => {
+    if (nextPeriodLoading || acquiring || creatingBatchRef.current) return;
+    loadNextPeriod(config?.billingConfigurationId);
+  };
+
+  // Prefers the period the backend offered. The backend's acquisitionAllowed flag is no
+  // longer a gate here — when no usable period is on offer the manual period modal opens
+  // instead of refusing, and the acquire call itself remains the backend's decision.
   const handleAcquireNextPeriod = () => {
-    if (acquiring || nextPeriodLoading || creatingBatchRef.current || !config) return;
+    if (acquiring || creatingBatchRef.current || !config) return;
     const offered = nextPeriod;
     const belongsToConfig =
       offered && (!offered.billingConfigurationId || String(offered.billingConfigurationId) === String(config.billingConfigurationId));
-    if (!belongsToConfig || !offered.acquisitionAllowed || !offered.billingPeriodStart || !offered.billingPeriodEnd) {
-      showStatusToast(
-        nextPeriodError || offered?.reason || "No billing period is currently eligible for acquisition.",
-        "warning"
-      );
+    if (!belongsToConfig || !offered.billingPeriodStart || !offered.billingPeriodEnd) {
+      // No period to acquire from — let the user enter one rather than dead-ending.
+      setShowPeriodModal(true);
+      if (nextPeriodError || offered?.reason) {
+        showStatusToast(nextPeriodError || offered.reason, "info");
+      }
       return;
     }
+ 
+    const validationError = getPeriodValidationError(offered.billingPeriodStart, offered.billingPeriodEnd);
+    if (validationError) {
+      // Let the user correct the period instead of silently failing — seeded with the
+      // offered dates, since an empty modal gives them nothing to correct.
+      setPeriodStart(toIsoDateOnly(offered.billingPeriodStart) || "");
+      setPeriodEnd(toIsoDateOnly(offered.billingPeriodEnd) || "");
+      setShowPeriodModal(true);
+      showStatusToast(validationError, "warning");
+      return;
+    }
+
     executeAcquisition(config, offered.billingPeriodStart, offered.billingPeriodEnd);
   };
-
-  const handleCheckNextPeriod = () => {
+ 
+  const handleModalCancel = () => {
+    setShowPeriodModal(false);
+    if (!config?.snapshotId) {
+      setPeriodStart("");
+      setPeriodEnd("");
+    }
+  };
+ 
+  const handleModalProceed = () => {
     if (acquiring) return;
-    loadNextPeriod(config?.billingConfigurationId);
+    const validationError = getPeriodValidationError(periodStart, periodEnd);
+    if (validationError) {
+      showStatusToast(validationError, "warning");
+      return;
+    }
+    setShowPeriodModal(false);
+    executeAcquisition(config, periodStart, periodEnd);
   };
 
   const executeAcquisition = (cfg, start, end) => {
@@ -1538,7 +1617,6 @@ export default function AcquisitionDetail() {
     onAcquire: handleAcquireNextPeriod,
     onCheckAgain: handleCheckNextPeriod,
     checking: nextPeriodLoading,
-    canAcquire: Boolean(nextPeriod?.acquisitionAllowed) && !nextPeriodLoading && !creatingPeriodKey,
     onReValidate: handleReValidate,
     onContinueToTax: handleContinueToTax,
     hasSnapshotId: Boolean(realSnapshotId),
@@ -1574,7 +1652,9 @@ export default function AcquisitionDetail() {
         </div>
       )}
  
-      {/* Next eligible billing period — backend-calculated; replaces manual date entry for T&M */}
+      {/* Next eligible billing period — backend-calculated; replaces manual date entry for T&M.
+          Temporarily hidden. The next-period data is still fetched and still drives the header
+          Acquire action; only this card is hidden. Restore by uncommenting the block below.
       <NextBillingPeriodCard
         nextPeriod={nextPeriod}
         loading={nextPeriodLoading}
@@ -1583,6 +1663,7 @@ export default function AcquisitionDetail() {
         onAcquire={handleAcquireNextPeriod}
         onRefresh={handleCheckNextPeriod}
       />
+      */}
 
       {/* Incremental T&M billing — every period, its newly eligible records and its batches */}
       <IncrementalBillingPanel
@@ -1609,6 +1690,58 @@ export default function AcquisitionDetail() {
         onRemindPM={handleRemindPM}
         remindingPM={remindingPM}
       />
+ 
+      {/* Date Period Selection Modal */}
+      <Modal
+        isOpen={showPeriodModal}
+        onClose={handleModalCancel}
+        title="Select Billing Period"
+        subtitle="Select the billing period start and end dates to acquire source data for this snapshot."
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={handleModalCancel}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleModalProceed} disabled={acquiring}>
+              Acquire Snapshot
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {projectDurationLabel && (
+            <div className="flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs font-medium text-indigo-800">
+              <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <span>
+                Billing period must fall within the project duration:{" "}
+                <span className="font-semibold">{projectDurationLabel}</span>
+              </span>
+            </div>
+          )}
+          <FormInput
+            label="Billing Period Start Date *"
+            aria-label="Billing Period Start Date"
+            name="periodStart"
+            type="date"
+            value={periodStart}
+            // Days outside the project duration are disabled in the calendar.
+            min={projectBounds.start || undefined}
+            max={periodEnd || projectBounds.end || undefined}
+            onChange={(e) => setPeriodStart(e.target.value)}
+          />
+          <FormInput
+            label="Billing Period End Date *"
+            aria-label="Billing Period End Date"
+            name="periodEnd"
+            type="date"
+            value={periodEnd}
+            min={periodStart || projectBounds.start || undefined}
+            max={projectBounds.end || undefined}
+            onChange={(e) => setPeriodEnd(e.target.value)}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }

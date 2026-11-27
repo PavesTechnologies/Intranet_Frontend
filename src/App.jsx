@@ -337,6 +337,10 @@ const NewConfigurationWizard = lazy(() => import("./pages/account_receivable/pag
 const BillingApprovals = lazy(() => import("./pages/account_receivable/pages/BillingApprovals.jsx"));
 const BillingDataAcquisition = lazy(() => import("./pages/account_receivable/pages/BillingDataAcquisition.jsx"));
 const AcquisitionDetail = lazy(() => import("./pages/account_receivable/pages/AcquisitionDetail.jsx"));
+// Redesigned period-schedule workspace for billing-data-acquisition/:projectId.
+// TO REVERT: set USE_PERIOD_BILLING_WORKSPACE to false — the old page is untouched.
+const PeriodBillingWorkspace = lazy(() => import("./pages/account_receivable/pages/PeriodBillingWorkspace.jsx"));
+const USE_PERIOD_BILLING_WORKSPACE = true;
 const TaxCalculationPage = lazy(() => import("./pages/account_receivable/pages/TaxCalculation.jsx"));
 const InvoiceGeneration = lazy(() => import("./pages/account_receivable/pages/InvoiceGeneration.jsx"));
 const InvoiceGenerationDetail = lazy(() => import("./pages/account_receivable/pages/InvoiceGenerationDetail.jsx"));
@@ -1029,7 +1033,11 @@ const AppRoutes = () => {
             />
             <Route
               path="billing-data-acquisition/:projectId"
-              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><AcquisitionDetail /></ProtectedRoute>}
+              element={
+                <ProtectedRoute allowedRoles={AR_MAKER_ROLES}>
+                  {USE_PERIOD_BILLING_WORKSPACE ? <PeriodBillingWorkspace /> : <AcquisitionDetail />}
+                </ProtectedRoute>
+              }
             />
             <Route
               path="tax-configuration"

@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import SearchInput from "../../../../components/filter/Searchbar";
 import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 import { Fonts } from "../../../../components/Fonts/Fonts";

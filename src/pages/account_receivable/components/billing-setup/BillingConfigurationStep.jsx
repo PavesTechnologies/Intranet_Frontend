@@ -23,6 +23,9 @@ import {
   CONTRACT_VALUE_SOURCE_OPTIONS,
   RECURRING_RENEWAL_MODE_OPTIONS,
   PAYMENT_STRUCTURE_OPTIONS,
+  BILLING_TYPE_LABELS,
+  BILLING_MODE_LABELS,
+  BILLING_FREQUENCIES,
 } from "../../data/wizardOptions";
 import { formatCurrency, formatDisplayDate, formatIndianNumber, isValidCurrency } from "../../utils/format";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
@@ -193,11 +196,13 @@ function getBillingFrequencyOptions(billingType, frequencies = []) {
   );
 }
 
-const RATE_PERIOD_OPTIONS = [
-  { value: "HOURLY", label: "Hourly" },
-  { value: "DAILY", label: "Daily" },
-  { value: "WEEKLY", label: "Weekly" },
-];
+// Time & Material is always billed hourly, so the rate period is a fixed value
+// rather than a choice: the field is rendered read-only and every T&M rate card
+// (standard and role-based) is built with this period. Daily/Weekly were never
+// valid here — the discount-schedule guards below already rejected them.
+const TM_RATE_PERIOD = "HOURLY";
+
+const RATE_PERIOD_OPTIONS = [{ value: TM_RATE_PERIOD, label: "Hourly" }];
 
 // Effective From/To only ever apply to recurring billing frequencies — a
 // One-Time configuration is settled as a single lump sum with no schedule, so
@@ -278,7 +283,7 @@ const EMPTY_RATE_CARD = {
   role: "",
   roleName: "",
   rate: "",
-  ratePeriod: "HOURLY",
+  ratePeriod: TM_RATE_PERIOD,
   effectiveFrom: "",
   effectiveTo: "",
   rateCardId: null,
@@ -353,7 +358,9 @@ const mapRateCard = (card = {}, includeRole = true) => {
       : {}),
     roleName: card.roleName || card.role || card.name || "",
     rate,
-    ratePeriod: card.ratePeriod || card.period || "HOURLY",
+    // Pinned, not read from the card: a legacy DAILY/WEEKLY value would otherwise
+    // leave the read-only Rate Period field showing a period that is no longer offered.
+    ratePeriod: TM_RATE_PERIOD,
     effectiveFrom: normalizeRateCardDate(card.effectiveFrom || card.validFrom),
     effectiveTo: normalizeRateCardDate(card.effectiveTo || card.validTo),
     rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
@@ -476,6 +483,12 @@ function ReadOnlyField({ label, value }) {
   return <FormInput label={label} value={value || "—"} disabled onChange={() => { }} />;
 }
 
+// Module scope: the component-level frequencyLabel below resolves against fetched
+// master data, which this header has no access to, so it falls back to the static list.
+function billingFrequencyLabel(value) {
+  return BILLING_FREQUENCIES.find((option) => option.value === value)?.label || value || "—";
+}
+
 function BillingSummaryHeader({ projectInfo }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -487,7 +500,7 @@ function BillingSummaryHeader({ projectInfo }) {
         label="Billing Mode"
         value={BILLING_MODE_LABELS[projectInfo.billingMode] || projectInfo.billingMode}
       />
-      <SummaryCard label="Billing Frequency" value={frequencyLabel(projectInfo.billingFrequency)} />
+      <SummaryCard label="Billing Frequency" value={billingFrequencyLabel(projectInfo.billingFrequency)} />
       <SummaryCard label="Currency" value={projectInfo.currency} />
     </div>
   );
@@ -560,7 +573,7 @@ function TimeAndMaterialForm({
   const standardRate = {
     ...EMPTY_RATE_CARD,
     rate: value.rate || "",
-    ratePeriod: value.ratePeriod || "HOURLY",
+    ratePeriod: TM_RATE_PERIOD,
     effectiveFrom: value.effectiveFrom || "",
     effectiveTo: value.effectiveTo || "",
     rateCardId: value.rateCardId || null,
@@ -990,7 +1003,7 @@ function TimeAndMaterialForm({
             role: roleName || role,
             roleName: roleName || role,
             rate,
-            ratePeriod: ratePeriod || "HOURLY",
+            ratePeriod: TM_RATE_PERIOD,
             effectiveFrom: effectiveFrom || "",
             effectiveTo: effectiveTo || "",
             rateCardId: rateCardId || null,
@@ -1097,7 +1110,7 @@ function TimeAndMaterialForm({
       role: "",
       roleName: "",
       rate: "",
-      ratePeriod: "HOURLY",
+      ratePeriod: TM_RATE_PERIOD,
       effectiveFrom: "",
       effectiveTo: "",
       remarks: "",
@@ -1413,17 +1426,12 @@ function TimeAndMaterialForm({
     };
   }, [billingMode, billingConfigurationId]);
 
-  const buildTmRateCardPayload = (row, billingConfigurationId) => {
+  // rowIndex is only a fallback for getRoleStableKey when the row has no _uid/rateCardId.
+  const buildTmRateCardPayload = (row, billingConfigurationId, rowIndex) => {
     const periods = Array.isArray(row.discountPeriods) ? row.discountPeriods : [];
     if (periods.length > 0 && row.ratePeriod && row.ratePeriod !== "HOURLY") {
       showStatusToast("Commercial discount schedules are only permitted for hourly rate cards. Remove discounts or change rate frequency to Hourly.", "error");
-      const rKey = getRoleStableKey(row, index);
-      setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
-      return;
-    }
-    if (periods.length > 0 && row.ratePeriod && row.ratePeriod !== "HOURLY") {
-      showStatusToast("Commercial discount schedules are only permitted for hourly rate cards. Remove discounts or change rate frequency to Hourly.", "error");
-      const rKey = getRoleStableKey(row, index);
+      const rKey = getRoleStableKey(row, rowIndex);
       setExpandedRoleKeys((prev) => new Set([...prev, rKey]));
       return;
     }
@@ -1458,7 +1466,7 @@ function TimeAndMaterialForm({
           ? String(row.roleName || row.role || "").trim()
           : null,
       rate: row.rate || "",
-      ratePeriod: row.ratePeriod || "HOURLY",
+      ratePeriod: TM_RATE_PERIOD,
       effectiveFrom: row.effectiveFrom || "",
       effectiveTo: row.effectiveTo || "",
       remarks: row.remarks || row.notes || "",
@@ -1798,6 +1806,7 @@ function TimeAndMaterialForm({
       const payload = buildTmRateCardPayload(
         { ...row, roleName },
         resolvedConfigId,
+        index,
       );
       let saved = null;
       if (row.rateCardId) {
@@ -1814,7 +1823,7 @@ function TimeAndMaterialForm({
         role: saved?.roleName || saved?.role || saved?.name || roleName,
         roleName,
         rate: saved?.rate !== undefined && saved?.rate !== null && saved?.rate !== "" ? saved.rate : row.rate,
-        ratePeriod: saved?.ratePeriod || row.ratePeriod || "HOURLY",
+        ratePeriod: TM_RATE_PERIOD,
         effectiveFrom: mappedSaved.effectiveFrom || row.effectiveFrom,
         effectiveTo: mappedSaved.effectiveTo || row.effectiveTo,
         remarks: mappedSaved.remarks || row.remarks,
@@ -1919,13 +1928,15 @@ function TimeAndMaterialForm({
                 placeholder={`e.g. 1800 (${currency})`}
                 disabled={isExisting}
               />
+              {/* Fixed for Time & Material — hourly is the only valid rate period. */}
               <FormSelect
                 anchorOptions
                 label="Rate Period *"
                 name="ratePeriod"
-                value={standardRate.ratePeriod}
+                value={TM_RATE_PERIOD}
                 onChange={(event) => update({ ratePeriod: event.target.value })}
                 options={RATE_PERIOD_OPTIONS}
+                disabled
               />
               {!isOneTime && (
                 <>
@@ -2585,13 +2596,14 @@ function TimeAndMaterialForm({
                                 error={roleErrors.rate}
                                 disabled={isExisting}
                               />
+                              {/* Fixed for Time & Material — hourly is the only valid rate period. */}
                               <FormSelect
                                 label="Rate Period *"
-                                value={item.ratePeriod || "HOURLY"}
+                                value={TM_RATE_PERIOD}
                                 onChange={(e) => handleRoleChange(index, "ratePeriod", e.target.value)}
                                 options={RATE_PERIOD_OPTIONS}
                                 anchorOptions
-                                disabled={isExisting}
+                                disabled
                               />
                               {!isOneTime && (
                                 <>
