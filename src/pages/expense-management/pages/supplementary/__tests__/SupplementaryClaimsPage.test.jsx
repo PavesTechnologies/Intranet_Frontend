@@ -239,6 +239,7 @@ describe("My Supplementary Claims page", () => {
     });
     expect(note.textContent).toMatch(/carried forward to Advance 2/);
     expect(note.textContent).toMatch(/1,500\.00/);
-    expect(note.textContent).toMatch(/Anything above it is paid by AP/);
+    expect(note.textContent).toMatch(/balance carried\s+forward from this report.s advance/);
+    expect(note.textContent).toMatch(/Anything\s+above it is paid to you by AP/);
   });
 });

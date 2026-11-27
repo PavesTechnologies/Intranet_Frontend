@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import Pagination from "@/components/Pagination/pagination";
 import { loadSettlementLock, SETTLEMENT_LOCK } from "@/pages/expense-management/pages/cash-advance/components/settlementLock";
 import { CheckCircle2, RefreshCw, Eye, Receipt, XCircle, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
@@ -120,6 +121,9 @@ const isClosedAdvance = (adv) => ["SETTLED", "CLOSED"].includes(statusKeyOf(adv)
 const isOpenAdvance = (adv) => !isClosedAdvance(adv);
 // Disbursed and still open: the employee holds the money and the advance is not settled yet.
 const isDisbursedOpen = (adv) => statusKeyOf(adv) !== "APPROVED" && isOpenAdvance(adv);
+
+/** Advances per page in the Settlement table. */
+const SETTLEMENT_PAGE_SIZE = 10;
 
 const advanceCreatedAt = (adv) => adv.createdAt || adv.createdDate || adv.created_at || adv.submittedAt;
 const advanceTrip = (adv) => ({ tripStartDate: adv.expectedTripStartDate, tripEndDate: adv.expectedTripEndDate });
@@ -416,12 +420,28 @@ export default function SettlementPage() {
 
   const selectedEmployeeName = employeeOptions.find((o) => o.value === employeeFilter && o.value)?.label || "";
 
-  // Totals for the advances currently on the list (they follow the search and status filter).
+  // The table shows one page at a time; the totals above still cover every advance on the list.
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filteredAdvances.length / SETTLEMENT_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedAdvances = filteredAdvances.slice((safePage - 1) * SETTLEMENT_PAGE_SIZE, safePage * SETTLEMENT_PAGE_SIZE);
+  // A new search, filter or sort starts again on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, employeeFilter, extra]);
+
+  // Totals for every advance of the employee (or everyone, for Finance), whatever its status, so they match the
+  // dashboard and My Advances. The Status and column filters narrow only the table below.
+  const scopeAdvances = useMemo(
+    () => (employeeFilter ? advances.filter((adv) => employeeKey(adv) === employeeFilter) : advances),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [advances, employeeFilter, directory]
+  );
   const totals = useMemo(
-    () => settlementTotals(filteredAdvances.map((a) => figuresOf(a))),
+    () => settlementTotals(scopeAdvances.map((a) => figuresOf(a))),
     // figuresOf reads usageById
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredAdvances, usageById]
+    [scopeAdvances, usageById]
   );
   const figuresLoading = advances.some((a) => !isLoaded(a));
 
@@ -613,7 +633,19 @@ export default function SettlementPage() {
       </div>
 
       {/* Money summary: where the disbursed cash went, for the advances on the list */}
-      <AdvanceMoneyOverview totals={totals} loading={figuresLoading} scopeLabel={selectedEmployeeName} />
+      {/* Until the advances and their figures are loaded, the global spinner instead of a summary full of zeros. */}
+      {loading || figuresLoading ? (
+        <section aria-label="Money summary" aria-busy="true" className="flex min-h-[14rem] items-center justify-center rounded-xl border border-gray-200 bg-white shadow-sm" data-overview-loading>
+          <LoadingSpinner size="lg" text={loading ? "Loading cash advances..." : "Working out where the advance money went..."} />
+        </section>
+      ) : (
+      <AdvanceMoneyOverview
+        totals={totals}
+        loading={figuresLoading}
+        scopeLabel={selectedEmployeeName}
+        scopeNote="All advances, whatever their status, as on the dashboard. The Status filter below narrows only the table."
+      />
+      )}
 
       {/* Filters: one per table column, plus the period and the sort */}
       <TableFilterBar
@@ -649,8 +681,7 @@ export default function SettlementPage() {
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-12 flex flex-col items-center justify-center text-gray-500">
-            <LoadingSpinner size="lg" className="mb-2" />
-            <p className="text-xs">Loading cash advance settlement records...</p>
+            <LoadingSpinner size="lg" text="Loading cash advance settlement records..." />
           </div>
         ) : filteredAdvances.length === 0 ? (
           <div className="p-12 text-center text-gray-500">
@@ -659,6 +690,7 @@ export default function SettlementPage() {
             <p className="text-xs text-gray-400 mt-1">There are no cash advance settlements matching your filter criteria.</p>
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-gray-700">
               <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
@@ -667,14 +699,14 @@ export default function SettlementPage() {
                   <th className="py-3 px-4">Title & Money Usage</th>
                   <th className="py-3 px-4">Trip Dates</th>
                   <th className="py-3 px-4 text-right" title="Disbursed plus any outstanding brought into this advance">Owed</th>
-                  <th className="py-3 px-4 text-right" title="Expenses the employee added against this advance">Consumed</th>
+                  <th className="py-3 px-4 text-right" title="Expenses on approved reports, set against this advance">Used</th>
                   <th className="py-3 px-4 text-right" title="Owed minus consumed on this advance">Balance</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredAdvances.map((adv) => {
+                {pagedAdvances.map((adv) => {
                   const advId = adv.advanceId || adv.id;
                   const statusUpper = (adv.status || "").toUpperCase();
                   const isSettled = ["SETTLED", "CLOSED"].includes(statusUpper);
@@ -724,7 +756,10 @@ export default function SettlementPage() {
                         )}
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap tabular-nums">
-                        <span className="font-semibold text-sky-700">{cell(f.consumed)}</span>
+                        <span className="font-semibold text-sky-700">{cell(f.approvedConsumed ?? f.consumed)}</span>
+                        {!pending && f.paidOut && f.approvedConsumed != null && f.consumed > f.approvedConsumed && (
+                          <p className="mt-0.5 text-[10px] text-gray-500">+ {formatMoney(f.consumed - f.approvedConsumed, cur)} not approved yet</p>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right font-bold whitespace-nowrap tabular-nums">
                         <span className={pending ? "" : f.remaining > 0 ? "text-amber-600" : "text-emerald-600"}>
@@ -841,6 +876,21 @@ export default function SettlementPage() {
               </tbody>
             </table>
           </div>
+          {totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-4 py-2" data-settlement-pagination>
+              <p className="text-xs text-gray-500">
+                Showing {(safePage - 1) * SETTLEMENT_PAGE_SIZE + 1}–{Math.min(safePage * SETTLEMENT_PAGE_SIZE, filteredAdvances.length)} of{" "}
+                {filteredAdvances.length} advances
+              </p>
+              <Pagination
+                currentPage={safePage}
+                totalPages={totalPages}
+                onPrevious={() => setPage(Math.max(1, safePage - 1))}
+                onNext={() => setPage(Math.min(totalPages, safePage + 1))}
+              />
+            </div>
+          )}
+          </>
         )}
       </div>
 

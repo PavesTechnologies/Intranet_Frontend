@@ -29,6 +29,7 @@ import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/
 import InvoiceHandoffBadge from "../../components/expense-reports/InvoiceHandoffBadge";
 import { formatMoney, formatDate } from "../../approval-engine/constants/approvalLabels";
 import Pagination from "@/components/Pagination/pagination";
+import { financeClaimService, unwrapList } from "@/pages/expense-management/api/supplementaryClaimApi";
 import RequestTypeBadge, { reportTypeOf } from "@/pages/expense-management/components/common/RequestTypeBadge";
 import TableFilterBar from "@/pages/expense-management/components/common/TableFilterBar";
 import { HeroQuickActions } from "@/pages/expense-management/components/dashboard/DashboardHero";
@@ -49,6 +50,7 @@ const TYPE_FILTER_OPTIONS = [
   { label: "Expense", value: "EXPENSE" },
   { label: "Advance settlement", value: "SETTLEMENT" },
   { label: "Cash advance", value: "ADVANCE" },
+  { label: "Supplementary claim", value: "SUPPLEMENTARY" },
 ];
 
 // Quick actions in the banner. Each reuses an existing route; `roles` mirrors that route's guard in App.jsx.
@@ -143,7 +145,7 @@ function FinanceTable({ rows }) {
             <th
               key={col.key}
               scope="col"
-              className={`border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:rounded-tl-lg last:rounded-tr-lg ${col.className}`}
+              className={`bg-blue-900 bg-gradient-to-r from-blue-900 to-indigo-900 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-white first:rounded-tl-lg last:rounded-tr-lg ${col.className}`}
             >
               {col.label}
             </th>
@@ -221,6 +223,17 @@ export default function FinancePage() {
     staleTime: 30_000,
   });
   const allAdvances = advancesQuery.data || [];
+
+  // Supplementary claims waiting for Finance (late or missing bills on paid reports) sit in the same table. An account
+  // without the claim permission gets a 403; the table then simply shows none rather than failing.
+  const supplementaryQuery = useQuery({
+    queryKey: ["financeSupplementaryQueue"],
+    queryFn: () => financeClaimService.queue().then(unwrapList),
+    staleTime: 30_000,
+    retry: false,
+  });
+  const pendingClaims = supplementaryQuery.data || [];
+  const claimPath = (claim) => `/expense-management/finance/supplementary-claims/${claim.claimId}`;
   const advanceIsPending = (adv) => (adv.status || "").toUpperCase().includes("FINANCE");
   const advanceIsDone = (adv) => ["APPROVED", "DISBURSED", "SETTLED"].includes((adv.status || "").toUpperCase());
   const advanceRef = (adv) => adv.advanceNumber || `ADV-${String(adv.advanceId || adv.id || "").slice(0, 8).toUpperCase()}`;
@@ -380,12 +393,13 @@ export default function FinancePage() {
   const advanceTabOf = (adv) => (advanceIsPending(adv) ? "PENDING" : "VERIFIED");
   const pendingAdvanceCount = allAdvances.filter(advanceIsPending).length;
   const doneAdvanceCount = allAdvances.filter(advanceIsDone).length;
-  const pendingReportCount = pendingQuery.data?.totalElements ?? 0;
+  const pendingClaimCount = pendingClaims.length;
+  const pendingReportCount = (pendingQuery.data?.totalElements ?? 0) + pendingClaimCount;
   const waitingCount = pendingReportCount + pendingAdvanceCount;
   const countFor = (tab) => {
     switch (tab) {
       case "ALL":
-        return sourceQueries.reduce((sum, q) => sum + (q.data?.totalElements ?? 0), 0) + pendingAdvanceCount + doneAdvanceCount;
+        return sourceQueries.reduce((sum, q) => sum + (q.data?.totalElements ?? 0), 0) + pendingClaimCount + pendingAdvanceCount + doneAdvanceCount;
       case "PENDING":
         return pendingReportCount;
       case "ADVANCES":
@@ -405,6 +419,18 @@ export default function FinancePage() {
       matchesColumns({
         type: "ADVANCE", status: cashStatusKey(adv.status), employeeId: adv.employeeId || adv.employee_id,
         employeeName: adv.employeeName || nameOf(adv.employeeId || adv.employee_id), amount: adv.amount, date: adv.neededByDate || adv.createdAt,
+      })
+  );
+
+  // Supplementary claims show under All and To verify (on its first page; that tab is paged by the server).
+  const claimList = isAll || (activeTab === "PENDING" && pageFor("PENDING") === 0) ? pendingClaims : [];
+  const visibleClaims = claimList.filter(
+    (c) =>
+      (!query ||
+        [c.claimNumber, c.reportNumber, c.employeeId, nameOf(c.employeeId)].some((v) => (v || "").toLowerCase().includes(query))) &&
+      matchesColumns({
+        type: "SUPPLEMENTARY", status: "PENDING_FINANCE", employeeId: c.employeeId, employeeName: nameOf(c.employeeId),
+        amount: c.totalAmount, date: c.submittedAt || c.createdAt,
       })
   );
 
@@ -454,6 +480,24 @@ export default function FinancePage() {
           </RowActions>
         );
       })(),
+    })),
+    // Finance decides a supplementary claim on its own page (with the bills and receipts), so every action opens it.
+    ...visibleClaims.map((c) => ({
+      key: `supp-${c.claimId}`,
+      waiting: true,
+      type: typeCell("SUPPLEMENTARY", true),
+      employee: <EmployeeCell employeeId={c.employeeId} directory={directory} />,
+      amount: amountCell(c.totalAmount, c.currencyCode),
+      status: <ApprovalStatusBadge statusKey="PENDING_FINANCE" detail={c.claimNumber} detailTone="text-slate-500" />,
+      date: dateCell(c.submittedAt || c.createdAt),
+      action: (
+        <RowActions>
+          <RowActionButton tone="view" icon={Eye} label={`View supplementary claim ${c.claimNumber}`} title="View the claim" onClick={() => navigate(claimPath(c))} />
+          <RowActionButton tone="approve" icon={CheckCircle2} label={`Approve supplementary claim ${c.claimNumber}`} title="Open the claim to approve" onClick={() => navigate(claimPath(c))} />
+          <RowActionButton tone="clarify" icon={MessageSquareWarning} label={`Ask about supplementary claim ${c.claimNumber}`} title="Open the claim to ask for clarification" onClick={() => navigate(claimPath(c))} />
+          <RowActionButton tone="reject" icon={XCircle} label={`Reject supplementary claim ${c.claimNumber}`} title="Open the claim to reject" onClick={() => navigate(claimPath(c))} />
+        </RowActions>
+      ),
     })),
     ...visibleAdvances.map((adv) => ({
       key: `adv-${adv.advanceId || adv.id}`,

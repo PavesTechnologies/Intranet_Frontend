@@ -134,6 +134,7 @@ export const receiptReleaseService = {
 /** AP payment for supplementary claims. Only AP_EXECUTIVE can use these endpoints. */
 export const supplementaryPaymentService = {
   queue: () => api.get("/xms/ap/supplementary-payments/queue", config()),
+  paid: () => api.get("/xms/ap/supplementary-payments/paid", config()),
   confirm: (paymentId, payload) => api.post(`/xms/ap/supplementary-payments/${paymentId}/confirm`, payload, config()),
 };
 

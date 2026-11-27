@@ -11,7 +11,7 @@ import { usageShares } from "@/pages/expense-management/pages/cash-advance/settl
  * {@code totals} is the summed figures the Settlement page already computes; nothing is recalculated here
  * except percentages for display.
  */
-export default function AdvanceMoneyOverview({ totals, loading = false, scopeLabel = "" }) {
+export default function AdvanceMoneyOverview({ totals, loading = false, scopeLabel = "", scopeNote = "" }) {
   const money = (v) => formatMoney(v);
   const owed = totals.owed || 0;
   const share = (v) => (owed > 0 ? Math.round((Math.max(0, v) / owed) * 100) : 0);
@@ -44,7 +44,15 @@ export default function AdvanceMoneyOverview({ totals, loading = false, scopeLab
   ];
 
   const usage = [
-    { key: "spent", label: "Consumed by expenses", value: totals.consumed, pct: s.spent, dot: "bg-sky-500", text: "text-sky-700" },
+    {
+      key: "spent",
+      label: "Used on approved reports",
+      value: totals.consumed,
+      pct: s.spent,
+      dot: "bg-sky-500",
+      text: "text-sky-700",
+      note: totals.pendingInReports > 0 ? `+ ${money(totals.pendingInReports)} on reports not approved yet` : null,
+    },
     {
       key: "recovered",
       label: "Recovered",
@@ -79,6 +87,7 @@ export default function AdvanceMoneyOverview({ totals, loading = false, scopeLab
           {totals.count} advance{totals.count === 1 ? "" : "s"} on this list
           {loading ? " · loading figures…" : ""}
         </p>
+        {scopeNote && <p className="w-full text-[11px] text-gray-500" data-overview-scope>{scopeNote}</p>}
       </div>
 
       {/* 1. Pipeline: how much moved through each step */}
@@ -112,7 +121,7 @@ export default function AdvanceMoneyOverview({ totals, loading = false, scopeLab
               How the owed <span className="tabular-nums text-[#0a174e]">{money(owed)}</span> was used
             </p>
             <p className="text-[11px] text-gray-500">
-              Balance (owed − consumed): <span className="font-semibold tabular-nums text-gray-800">{money(totals.remaining)}</span>
+              Still to settle: <span className="font-semibold tabular-nums text-gray-800">{money(totals.outstandingOnAdvances)}</span>
             </p>
           </div>
 

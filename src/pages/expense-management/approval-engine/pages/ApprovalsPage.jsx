@@ -530,7 +530,8 @@ export default function ApprovalsPage({ embedded = false }) {
               <col className="w-[9%]" />
               <col className="w-[168px]" />
             </colgroup>
-            <thead className="border-b border-slate-200 bg-slate-50/80 text-left text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
+            {/* Blue header, the same as every other table in Expense Management. */}
+            <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-[10.5px] font-semibold uppercase tracking-wider text-white">
               <tr>
                 <th className="px-2.5 py-2.5 text-left">Type</th>
                 <th className="px-2.5 py-2.5 text-left">Employee</th>
@@ -643,10 +644,8 @@ export default function ApprovalsPage({ embedded = false }) {
           `}</style>
           </div>
         {combinedRows > 0 && (
-          <div className="flex flex-col items-center gap-2 border-t border-slate-100 px-4 py-3 sm:flex-row sm:justify-between">
-            <p className="text-xs text-slate-500">
-              Showing {winStart + 1}–{Math.min(winEnd, combinedRows)} of {combinedRows}
-            </p>
+          // Pager in the middle of the table's foot.
+          <div className="flex items-center justify-center border-t border-slate-100 px-4 py-3" data-approvals-pager>
             <Pagination
               currentPage={safePage + 1}
               totalPages={totalPages}

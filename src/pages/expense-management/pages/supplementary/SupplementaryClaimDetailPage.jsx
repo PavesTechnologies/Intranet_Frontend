@@ -70,12 +70,14 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
   const [releasable, setReleasable] = useState([]);
   const [addMode, setAddMode] = useState(null); // null | "manual" | "auto"
   const [addOpen, setAddOpen] = useState(false);
+  const [receiptRead, setReceiptRead] = useState(false); // a receipt is being read or shown beside the form
   const openAdd = () => {
     setAddMode(null);
     setAddOpen(true);
   };
   const closeAdd = () => {
     setAddMode(null);
+    setReceiptRead(false);
     setAddOpen(false);
   };
   const [item, setItem] = useState(EMPTY_ITEM);
@@ -445,10 +447,11 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
         onClose={closeAdd}
         title={addTitle}
         subtitle={claim.claimNumber}
-        size={addMode === "auto" ? "full" : addMode === null ? "4xl" : "lg"}
-        // The receipt scan takes the whole screen, like a report's receipt review: the receipt beside every field.
-        className={addMode === "auto" ? "!fixed !inset-0 !max-w-none !rounded-none !border-0" : ""}
-        maxHeight={addMode === "auto" ? "max-h-screen" : undefined}
+        // The receipt scan starts as a compact upload box, then takes the whole screen so the full receipt sits beside
+        // every field.
+        size={addMode === "auto" ? (receiptRead ? "full" : "2xl") : addMode === null ? "4xl" : "lg"}
+        className={addMode === "auto" && receiptRead ? "!fixed !inset-0 !max-w-none !rounded-none !border-0" : ""}
+        maxHeight={addMode === "auto" ? (receiptRead ? "max-h-screen" : "max-h-[90vh]") : undefined}
       >
         {addMode === null && (
           <div className="grid grid-cols-1 gap-6 p-2 md:grid-cols-2">
@@ -473,7 +476,7 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
         {addMode === "auto" && (
           <div className="space-y-4">
             <div className="flex items-center justify-end">
-              <BackButton onClick={() => setAddMode(null)} />
+              <BackButton onClick={() => { setAddMode(null); setReceiptRead(false); }} />
             </div>
             <ReceiptFirstExpense
               claimId={claimId}
@@ -481,6 +484,7 @@ export default function SupplementaryClaimDetailPage({ mode = "employee" }) {
               periodEnd={claim.reportTripEnd}
               categories={categories}
               currencyCode={claim.currencyCode}
+              onPhaseChange={(p) => setReceiptRead(p !== "idle")}
               onClaimChanged={(res) => {
                 setClaim(unwrap(res));
                 closeAdd();

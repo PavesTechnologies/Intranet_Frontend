@@ -249,6 +249,10 @@ export function DirectExpenseCard({ ledger, byKey, currency }) {
 // ---- Cash advance: the advance money, then the bills settled against it.
 export function CashAdvanceCard({ ledger, byKey, currency }) {
   const received = num(byKey, "caDisbursed");
+  // Carried in from an earlier advance: held, but not cash paid out. What was held = received + carried in.
+  const carriedIn = num(byKey, "caCarriedIn");
+  const held = received + carriedIn;
+  const cut = num(byKey, "caCut");
   const used = num(byKey, "caUsedOnBills");
   const returned = num(byKey, "caReturned");
   const carried = num(byKey, "caCarriedForward");

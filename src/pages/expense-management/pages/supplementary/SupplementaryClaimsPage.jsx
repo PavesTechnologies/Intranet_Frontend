@@ -258,9 +258,9 @@ export default function SupplementaryClaimsPage() {
       </header>
 
       {/* Raise a new claim against a settled report, in a dialog opened from the page. */}
-      <Modal isOpen={raiseOpen} onClose={closeRaise} title="Raise a new claim" subtitle="Choose the paid or settled report that is missing an expense or receipt." size="3xl">
-        {/* min-h leaves room for the report dropdown (label + button + 6 rows) inside the scrolling body, so it is not clipped. */}
-        <div className="flex min-h-[20rem] flex-col gap-4">
+      <Modal isOpen={raiseOpen} onClose={closeRaise} title="Raise a new claim" subtitle="Choose the paid or settled report that is missing an expense or receipt." size="4xl"
+        maxHeight="max-h-[90vh]" bodyClassName="min-h-[60vh] px-6 pt-5 pb-6 sm:px-8 sm:pt-6 sm:pb-8">
+        <div className="flex flex-col gap-5">
         {!checkingAll && notReadyReports.length > 0 && (
           <details className="order-last rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900" data-not-ready-reports>
             <summary className="cursor-pointer font-semibold">
@@ -306,8 +306,9 @@ export default function SupplementaryClaimsPage() {
                   <span className="mt-1 block text-xs text-gray-600" data-settle-against>
                     This report's advance balance was carried forward to <b>{eligibility.settleAgainstAdvanceTitle || "your next advance"}</b>.
                     Once Finance approves the claim, up to{" "}
-                    <b>{formatMoney(eligibility.settleAgainstRemaining, eligibility.currencyCode || "INR")}</b> (what that advance still
-                    holds) is set against it, so nothing is paid to your bank for that part. Anything above it is paid by AP.
+                    <b>{formatMoney(eligibility.settleAgainstRemaining, eligibility.currencyCode || "INR")}</b> (the balance carried
+                    forward from this report's advance) is set against it, so nothing is paid to your bank for that part. Anything
+                    above it is paid to you by AP.
                   </span>
                 )}
               </p>

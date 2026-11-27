@@ -1,8 +1,8 @@
 /**
  * The money of one cash advance, for the Settlement list, in the order it moves:
  *
- *   requested      what the employee asked for (before any manager reduction)
- *   approved       what Finance approved: the advance's amount, frozen at approval
+ *   requested      cash the employee asked for (before any manager reduction). Carried-in money is not requested cash.
+ *   approved       cash approved: the approved amount less any balance carried in (the same rule on every page)
  *   disbursed      cash actually paid to the employee
  *   carriedIn      outstanding from earlier advances brought into this one (Cash Advance + Outstanding, or a set-off)
  *   owed           disbursed + carriedIn: what the employee must account for on this advance. For a plain new
@@ -33,7 +33,9 @@ const round2 = (n) => Math.round(n * 100) / 100;
 export function settlementFiguresFor(advance, utilization, salaryDeducted = 0) {
   const amount = num(advance?.amount);
   const carriedIn = Math.max(0, num(advance?.carriedInAmount));
-  const approved = num(advance?.approvedAmount) || amount;
+  // amount and approvedAmount include any balance carried in; requested and approved here are cash only, so every page
+  // reads Requested -> Cut off -> Approved -> Disbursed in cash, with Carried in added after.
+  const approved = Math.max(0, (num(advance?.approvedAmount) || amount) - carriedIn);
   // Cash paid. Before disbursement figures are stored, the cash part of the amount (the carried-in part is not paid).
   const disbursed = num(advance?.disbursedAmount) || Math.max(0, (num(utilization?.advanceAmount) || amount) - carriedIn);
   const owed = disbursed + carriedIn;
@@ -45,7 +47,7 @@ export function settlementFiguresFor(advance, utilization, salaryDeducted = 0) {
   const held = Math.min(carriedForward || Infinity, Math.max(0, num(advance?.carryForwardReadyAmount)));
   const balance = round2(owed - consumed);
   return {
-    requested: round2(Math.max(num(advance?.requestedAmount), amount)),
+    requested: round2(advance?.requestedAmount != null ? num(advance.requestedAmount) : Math.max(0, amount - carriedIn)),
     approved: round2(approved),
     disbursed: round2(disbursed),
     carriedIn: round2(carriedIn),
@@ -59,7 +61,11 @@ export function settlementFiguresFor(advance, utilization, salaryDeducted = 0) {
     moved: round2(Math.max(0, carriedForward - held)),
     salaryDeducted: round2(salary),
     otherRepaid: round2(otherRepaid),
-    outstanding: Math.max(0, round2(balance - salary - otherRepaid - carriedForward)),
+    // The advance's own balance (the server's, used by the dashboard and My Advances), so Outstanding is the same number
+    // everywhere. It only drops once expenses are approved; the computed figure is a fallback for records without one.
+    outstanding: advance?.outstandingBalance != null
+      ? Math.max(0, round2(num(advance.outstandingBalance)))
+      : Math.max(0, round2(balance - salary - otherRepaid - carriedForward)),
     // Expense reports linked to the advance: { reportId, reportNumber, reportStatus, claimedAmount }.
     reports: Array.isArray(utilization?.linkedReports) ? utilization.linkedReports : [],
     loaded: Boolean(utilization),
@@ -102,7 +108,11 @@ export function settlementTotals(figuresList) {
     disbursed: sum("disbursed"),
     carriedIn: sum("carriedIn"),
     owed: sum("owed"),
-    consumed: sum("consumed"),
+    // Used = expenses on approved reports set against the advances (the dashboard's "Used on bills"). Expenses on
+    // reports not approved yet do not reduce a balance, so they are counted apart.
+    consumed: round2(figuresList.reduce((total, f) => total + num(f.approvedConsumed ?? f.consumed), 0)),
+    claimed: sum("consumed"),
+    pendingInReports: round2(Math.max(0, sum("consumed") - figuresList.reduce((total, f) => total + num(f.approvedConsumed ?? f.consumed), 0))),
     remaining: sum("remaining"),
     carriedForward: sum("carriedForward"),
     held,

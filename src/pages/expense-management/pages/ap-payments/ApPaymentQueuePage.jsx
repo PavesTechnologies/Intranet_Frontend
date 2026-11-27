@@ -1,4 +1,7 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supplementaryPaymentService, unwrapList } from "@/pages/expense-management/api/supplementaryClaimApi";
 import { AlertTriangle, Inbox, Wallet, CalendarCheck, BadgeCheck } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PageHeader from "@/components/ui/PageHeader";
@@ -22,12 +25,39 @@ import Pagination from "@/components/Pagination/pagination";
 // Real PaymentRoutingStatus values (backend enum). Client-billable reports are paid here like any
 // other; their invoice handoff is a separate track, shown in the Client invoice column.
 const TABS = [
+  { value: "ALL", label: "All records" },
   { value: "APPROVED_FOR_PAYMENT", label: "To pay" },
   { value: "PAYMENT_COMPLETED", label: "Paid" },
   { value: "HANDOFF_FAILED", label: "Handoff failed" },
 ];
 
+// Rows read per status for "All records"; that list is then paged on screen.
+const ALL_FETCH_SIZE = 100;
+
+const SUPP_PAYMENTS_PATH = "/expense-management/ap/supplementary-payments";
+
+/**
+ * A supplementary-claim payment (a late or missing bill on a report already paid), shaped like a report row so it
+ * sits in the same table. REQUESTED is "to pay", PAID is "payment completed".
+ */
+const fromSupplementaryPayment = (p) => ({
+  __supp: true,
+  key: `supp-${p.paymentId}`,
+  reportNumber: p.claimNumber,
+  title: "Supplementary claim",
+  employeeId: p.employeeId,
+  costCenterName: null,
+  paidAmount: p.status === "PAID" ? p.amount : null,
+  reimbursableAmount: p.amount,
+  currencyCode: p.currencyCode,
+  approvedAt: p.requestedAt,
+  paymentDate: p.paymentDate || p.paidAt,
+  paymentReference: p.bankReference,
+  paymentRoutingStatus: p.status === "PAID" ? "PAYMENT_COMPLETED" : "APPROVED_FOR_PAYMENT",
+});
+
 const EMPTY_TEXT = {
+  ALL: ["No payment records yet.", "Reports appear here once Finance has verified them, and stay here after they are paid."],
   APPROVED_FOR_PAYMENT: ["Nothing to pay right now.", "Reports appear here once Finance has verified them."],
   PAYMENT_COMPLETED: ["No payments recorded yet.", "Reports you mark as paid are listed here."],
   HANDOFF_FAILED: ["No failed handoffs.", "Reports whose downstream handoff failed would appear here."],
@@ -39,7 +69,8 @@ const EMPTY_TEXT = {
  * server-paginated; the summary cards come from /summary and are global totals.
  */
 export default function ApPaymentQueuePage() {
-  const [activeTab, setActiveTab] = useState("APPROVED_FOR_PAYMENT");
+  // "All records" is the default: every report AP has seen, whatever its payment status, in one table.
+  const [activeTab, setActiveTab] = useState("ALL");
   const [pageByTab, setPageByTab] = useState({});
   const pageSize = DEFAULT_PAGE_SIZE;
   const [reviewingReport, setReviewingReport] = useState(null);
@@ -48,20 +79,74 @@ export default function ApPaymentQueuePage() {
   const pageFor = (status) => pageByTab[status] ?? 0;
   const setPageFor = (status, next) => setPageByTab((prev) => ({ ...prev, [status]: next }));
 
-  const pendingQuery = useApPaymentQueue(pageFor("APPROVED_FOR_PAYMENT"), pageSize);
-  const completedQuery = useApPaymentHistory("PAYMENT_COMPLETED", pageFor("PAYMENT_COMPLETED"), pageSize);
-  const handoffFailedQuery = useApPaymentHistory("HANDOFF_FAILED", pageFor("HANDOFF_FAILED"), pageSize);
+  // "All records" reads the first ALL_FETCH_SIZE rows of each status, merges them and pages the list on screen.
+  // The single-status tabs are paged by the server.
+  const isAll = activeTab === "ALL";
+  const srcPage = (status) => (isAll ? 0 : pageFor(status));
+  const srcSize = isAll ? ALL_FETCH_SIZE : pageSize;
+  const pendingQuery = useApPaymentQueue(srcPage("APPROVED_FOR_PAYMENT"), srcSize);
+  const completedQuery = useApPaymentHistory("PAYMENT_COMPLETED", srcPage("PAYMENT_COMPLETED"), srcSize);
+  const handoffFailedQuery = useApPaymentHistory("HANDOFF_FAILED", srcPage("HANDOFF_FAILED"), srcSize);
   const { data: summary } = useApPaymentSummary();
+  const navigate = useNavigate();
+
+  // Supplementary-claim payments: waiting for AP, and already paid. A failure leaves them out, not the page.
+  const suppToPay = useQuery({
+    queryKey: ["apSupplementaryPayments", "queue"],
+    queryFn: () => supplementaryPaymentService.queue().then(unwrapList),
+    staleTime: 30_000,
+    retry: false,
+  });
+  const suppPaid = useQuery({
+    queryKey: ["apSupplementaryPayments", "paid"],
+    queryFn: () => supplementaryPaymentService.paid().then(unwrapList),
+    staleTime: 30_000,
+    retry: false,
+  });
+  const suppRows = useMemo(
+    () => ({
+      APPROVED_FOR_PAYMENT: (suppToPay.data || []).map(fromSupplementaryPayment),
+      PAYMENT_COMPLETED: (suppPaid.data || []).map(fromSupplementaryPayment),
+      HANDOFF_FAILED: [],
+    }),
+    [suppToPay.data, suppPaid.data]
+  );
 
   const queriesByTab = {
     APPROVED_FOR_PAYMENT: pendingQuery,
     PAYMENT_COMPLETED: completedQuery,
     HANDOFF_FAILED: handoffFailedQuery,
   };
-  const activeQuery = queriesByTab[activeTab];
+  const allSources = [pendingQuery, completedQuery, handoffFailedQuery];
+  const activeQuery = isAll
+    ? {
+        data: undefined,
+        isLoading: allSources.some((q) => q.isLoading),
+        isError: allSources.some((q) => q.isError),
+        error: allSources.find((q) => q.error)?.error,
+        refetch: () => allSources.forEach((q) => q.refetch()),
+      }
+    : queriesByTab[activeTab];
   const { data, isLoading, isError, error, refetch } = activeQuery;
-  const items = data?.content || [];
+  const items = useMemo(() => {
+    // Single-status tabs: the server page, plus that status's supplementary payments on the first page.
+    if (!isAll) return [...(data?.content || []), ...(pageFor(activeTab) === 0 ? suppRows[activeTab] || [] : [])];
+    // Each row keeps its own status, newest decision first.
+    return [...allSources.flatMap((q) => q.data?.content || []), ...suppRows.APPROVED_FOR_PAYMENT, ...suppRows.PAYMENT_COMPLETED]
+      .sort((a, b) =>
+        String(b.paymentDate || b.paymentCompletedAt || b.approvedAt || "").localeCompare(
+          String(a.paymentDate || a.paymentCompletedAt || a.approvedAt || "")
+        )
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAll, activeTab, pageByTab, data, pendingQuery.data, completedQuery.data, handoffFailedQuery.data, suppRows]);
+  const suppCount = (tab) => (suppRows[tab] || []).length;
+  const allCount =
+    allSources.reduce((sum, q) => sum + (q.data?.totalElements ?? 0), 0) + suppCount("APPROVED_FOR_PAYMENT") + suppCount("PAYMENT_COMPLETED");
+  const tabCount = (tab) => (tab === "ALL" ? allCount : (queriesByTab[tab].data?.totalElements ?? 0) + suppCount(tab));
+  // Paid on / Reference show on the Paid tab and on All records (blank for rows not paid yet).
   const isPaidTab = activeTab === "PAYMENT_COMPLETED";
+  const showPaidColumns = isPaidTab || isAll;
 
   // Search filters the loaded page only - these endpoints take no search parameter.
   const filteredItems = useMemo(() => {
@@ -74,35 +159,45 @@ export default function ApPaymentQueuePage() {
 
   const switchTab = (tab) => {
     setActiveTab(tab);
+    setPageFor(tab, 0);
     setSearchTerm("");
   };
 
   // What the employee is owed (claimed less any cash advance) - or, once paid, what AP confirmed paying.
-  const headers = ["Report", "Employee", "Cost Center", isPaidTab ? "Amount Paid" : "Amount to Pay", "Approved On"];
+  const headers = ["Report", "Employee", "Cost Center", isPaidTab ? "Amount Paid" : isAll ? "Amount" : "Amount to Pay", "Approved On"];
   const columns = ["report", "employee", "costCenter", "amount", "approvedOn"];
-  if (isPaidTab) {
+  if (showPaidColumns) {
     headers.push("Paid On", "Reference");
     columns.push("paidOn", "reference");
   }
   headers.push("Status", "Client invoice", "Action");
   columns.push("status", "invoice", "action");
 
-  const rows = filteredItems.map((item) => ({
+  // All records is paged on screen; the single-status tabs are paged by the server.
+  const listPage = pageFor(activeTab);
+  const pagedItems = isAll ? filteredItems.slice(listPage * pageSize, (listPage + 1) * pageSize) : filteredItems;
+  const totalPages = isAll ? Math.ceil(filteredItems.length / pageSize) : data?.totalPages ?? 0;
+
+  const rows = pagedItems.map((item) => ({
     report: (
       <div className="leading-tight text-left">
         <span className="font-mono text-xs font-semibold text-gray-700">{item.reportNumber}</span>
-        {item.title && <span className="block max-w-[220px] truncate text-[11px] text-gray-400">{item.title}</span>}
+        {item.__supp ? (
+          <span className="mt-0.5 block w-fit rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-800">Supplementary claim</span>
+        ) : (
+          item.title && <span className="block max-w-[220px] truncate text-[11px] text-gray-400">{item.title}</span>
+        )}
       </div>
     ),
     employee: <EmployeeLabel employeeId={item.employeeId} />,
     costCenter: item.costCenterName || "—",
     amount: (
-      <span className="font-mono font-semibold text-gray-900">
+      <span className="whitespace-nowrap font-mono font-semibold text-gray-900">
         {formatMoney(item.paidAmount ?? item.reimbursableAmount ?? item.totalAmount, item.currencyCode)}
       </span>
     ),
-    approvedOn: formatDate(item.approvedAt),
-    paidOn: formatDate(item.paymentDate || item.paymentCompletedAt),
+    approvedOn: <span className="whitespace-nowrap">{formatDate(item.approvedAt)}</span>,
+    paidOn: <span className="whitespace-nowrap">{item.paymentDate || item.paymentCompletedAt ? formatDate(item.paymentDate || item.paymentCompletedAt) : "—"}</span>,
     reference: <span className="font-mono text-xs text-gray-700">{item.paymentReference || "—"}</span>,
     status: <StatusBadge label={item.paymentRoutingStatus} size="sm" />,
     invoice: ["PENDING", "COMPLETED"].includes(item.invoiceHandoffStatus) ? (
@@ -113,10 +208,11 @@ export default function ApPaymentQueuePage() {
     action: (
       <Button
         size="small"
-        variant={activeTab === "APPROVED_FOR_PAYMENT" ? "primary" : "outline"}
-        onClick={() => setReviewingReport(item)}
+        variant={item.paymentRoutingStatus === "APPROVED_FOR_PAYMENT" ? "primary" : "outline"}
+        // A supplementary payment is recorded on its own AP page (bank reference, method, date).
+        onClick={() => (item.__supp ? navigate(SUPP_PAYMENTS_PATH) : setReviewingReport(item))}
       >
-        {activeTab === "APPROVED_FOR_PAYMENT" ? "Review & pay" : "View"}
+        {item.paymentRoutingStatus === "APPROVED_FOR_PAYMENT" ? "Review & pay" : "View"}
       </Button>
     ),
   }));
@@ -174,7 +270,7 @@ export default function ApPaymentQueuePage() {
           {TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
-              <span className="ml-1.5 text-xs text-slate-400">({queriesByTab[tab.value].data?.totalElements ?? 0})</span>
+              <span className="ml-1.5 text-xs text-slate-400">({tabCount(tab.value)})</span>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -218,10 +314,10 @@ export default function ApPaymentQueuePage() {
           )}
           <div className="mt-4 flex justify-center">
             <Pagination
-              currentPage={pageFor(activeTab) + 1}
-              totalPages={data?.totalPages ?? 0}
-              onPrevious={() => setPageFor(activeTab, Math.max(pageFor(activeTab) - 1, 0))}
-              onNext={() => setPageFor(activeTab, Math.min(pageFor(activeTab) + 1, (data?.totalPages ?? 0) - 1))}
+              currentPage={listPage + 1}
+              totalPages={totalPages}
+              onPrevious={() => setPageFor(activeTab, Math.max(listPage - 1, 0))}
+              onNext={() => setPageFor(activeTab, Math.min(listPage + 1, totalPages - 1))}
             />
           </div>
         </div>
