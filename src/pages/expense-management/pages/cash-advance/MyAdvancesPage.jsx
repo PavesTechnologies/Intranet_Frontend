@@ -17,17 +17,12 @@ import {
   AlertCircle,
   CheckCircle,
   ChevronRight,
-  SlidersHorizontal,
   ChevronDown,
   ArrowUpDown,
-  RotateCcw,
-  Check,
-  X,
 } from "lucide-react";
 import { formatMoney, formatDate, formatTripDates, getCostCenterValue, getStatusBadge, activeLinkedReport, linkedExpensesPath } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
-import SearchInput from "@/components/filter/Searchbar";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -39,6 +34,14 @@ import { useAdvanceFigures } from "@/pages/expense-management/pages/cash-advance
 import { carryForwardRequest } from "@/pages/expense-management/pages/cash-advance/carryForwardRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 import { advanceMoney, advanceMovementLines } from "@/pages/expense-management/pages/cash-advance/advanceMovement";
+import TableFilterBar, {
+  KpiCards,
+  applyTableFilters,
+  distinctOptions,
+  emptyFilterValues,
+  inAmountRange,
+  inDateRange,
+} from "@/pages/expense-management/components/common/TableFilterBar";
 // Re-exported so existing imports from this page keep working.
 export { advanceMoney, advanceMovementLines };
 
@@ -142,11 +145,7 @@ const SORT_OPTIONS = [
   { label: "Outstanding: high to low", value: "OUTSTANDING_DESC" },
 ];
 
-const EMPTY_FILTERS = { tripFrom: "", tripTo: "", currency: "ALL", costCenter: "ALL", overdueOnly: false };
-
-const FILTER_LABEL = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500";
-
-// Native select styled to match SearchInput (h-10, same border/shadow), so every toolbar control lines up.
+// Native select styled like the filter inputs (h-10, same border/shadow), so the sort control lines up with them.
 const SelectControl = ({ value, onChange, options, icon: Icon, ariaLabel, className = "" }) => (
   <div className={`relative w-full ${className}`}>
     {Icon && <Icon size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />}
@@ -162,24 +161,6 @@ const SelectControl = ({ value, onChange, options, icon: Icon, ariaLabel, classN
     </select>
     <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
   </div>
-);
-
-const ToggleChip = ({ active, onClick, disabled, title, children }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    aria-pressed={active}
-    className={`flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-sm shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-      active
-        ? "border-[#0a0082]/30 bg-[#0a0082] text-white"
-        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
-    }`}
-  >
-    {active && <Check size={14} />}
-    {children}
-  </button>
 );
 
 // Only paid-out advances are owed. Drafts and requests awaiting approval are not, and the server does not count them.
@@ -241,6 +222,17 @@ export function advanceFilters(rows) {
       match: (a, v) => a.currencyCode === v,
     },
     { key: "amount", label: "Amount", type: "amountRange", match: (a, v) => inAmountRange(a.approvedAmount ?? a.amount, v) },
+    {
+      // Keeps advances whose trip overlaps the chosen range. Advances without trip dates drop out.
+      key: "trip", label: "Trip dates", type: "dateRange",
+      match: (a, { from, to }) => {
+        const start = tripStartTime(a);
+        const end = tripEndTime(a);
+        const f = toDayTime(from);
+        const t = toDayTime(to);
+        return start != null && (t == null || start <= t) && (f == null || end >= f);
+      },
+    },
     { key: "neededBy", label: "Needed by", type: "dateRange", match: (a, v) => inDateRange(getNeededByDateValue(a), v) },
     { key: "settleBy", label: "Settle by", type: "dateRange", match: (a, v) => inDateRange(getSettlementDueDate(a), v) },
   ];
@@ -318,33 +310,6 @@ export default function MyAdvancesPage() {
   // Which row's detail panel is open (one at a time).
   const [expandedId, setExpandedId] = useState(null);
   const [sortBy, setSortBy] = useState("CREATED_DESC");
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [showFilters, setShowFilters] = useState(false);
-  const setFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
-  const activeFilterCount =
-    (filters.tripFrom || filters.tripTo ? 1 : 0) +
-    (filters.currency !== "ALL" ? 1 : 0) +
-    (filters.costCenter !== "ALL" ? 1 : 0) +
-    (filters.overdueOnly ? 1 : 0) +
-    (showClosed ? 1 : 0);
-  const clearAllFilters = () => {
-    setFilters(EMPTY_FILTERS);
-    setShowClosed(false);
-  };
-  // Removable chips shown under the toolbar while the filter panel is closed.
-  const activeChips = [
-    (filters.tripFrom || filters.tripTo) && {
-      key: "trip",
-      label: filters.tripFrom && filters.tripTo
-        ? `Trip: ${formatDate(filters.tripFrom)} – ${formatDate(filters.tripTo)}`
-        : filters.tripFrom ? `Trip from ${formatDate(filters.tripFrom)}` : `Trip until ${formatDate(filters.tripTo)}`,
-      onRemove: () => setFilters((p) => ({ ...p, tripFrom: "", tripTo: "" })),
-    },
-    filters.currency !== "ALL" && { key: "cur", label: filters.currency, onRemove: () => setFilter("currency", "ALL") },
-    filters.costCenter !== "ALL" && { key: "cc", label: filters.costCenter, onRemove: () => setFilter("costCenter", "ALL") },
-    filters.overdueOnly && { key: "od", label: "Overdue only", onRemove: () => setFilter("overdueOnly", false) },
-    showClosed && { key: "closed", label: "Including closed", onRemove: () => setShowClosed(false) },
-  ].filter(Boolean);
 
   // Modals state
   const [editingAdvance, setEditingAdvance] = useState(null); // Edit modal
@@ -447,47 +412,12 @@ export default function MyAdvancesPage() {
   }, []);
 
   // Filtered Advances
-  const filteredAdvances = useMemo(() => {
-    return advances.filter((adv) => {
-      const matchSearch =
-        !searchTerm ||
-        (adv.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (adv.purpose || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (adv.advanceId || adv.id || "").toString().toLowerCase().includes(searchTerm.toLowerCase());
-
-      const advStatus = (adv.status || "").toUpperCase();
-      const matchStatus =
-        (statusFilter === "ALL" && (showClosed || !["CLOSED", "CANCELLED"].includes(advStatus))) ||
-        (statusFilter === "PENDING" && (advStatus === "SUBMITTED" || advStatus === "PENDING" || advStatus === "PENDING_APPROVAL")) ||
-        advStatus === statusFilter;
-
-      // Trip date range: keep advances whose trip overlaps the chosen range. Advances without trip dates drop out.
-      let matchTrip = true;
-      if (filters.tripFrom || filters.tripTo) {
-        const start = tripStartTime(adv);
-        const end = tripEndTime(adv);
-        const from = toDayTime(filters.tripFrom);
-        const to = toDayTime(filters.tripTo);
-        matchTrip = start != null && (to == null || start <= to) && (from == null || end >= from);
-      }
-
-      const matchCurrency = filters.currency === "ALL" || (adv.currencyCode || "INR") === filters.currency;
-      const matchCostCenter = filters.costCenter === "ALL" || getCostCenterValue(adv) === filters.costCenter;
-      const matchOverdue = !filters.overdueOnly || isOverdue(adv);
-
-      return matchSearch && matchStatus && matchTrip && matchCurrency && matchCostCenter && matchOverdue;
-    });
-  }, [advances, searchTerm, statusFilter, showClosed, filters]);
-
-  // Options for the currency / cost center filters, from the advances the user actually has.
-  const currencyOptions = useMemo(() => {
-    const codes = [...new Set(advances.map((a) => a.currencyCode || "INR"))].sort();
-    return [{ label: "All currencies", value: "ALL" }, ...codes.map((c) => ({ label: c, value: c }))];
-  }, [advances]);
-  const costCenterOptions = useMemo(() => {
-    const names = [...new Set(advances.map(getCostCenterValue).filter((v) => v && v !== "—"))].sort();
-    return [{ label: "All cost centers", value: "ALL" }, ...names.map((n) => ({ label: n, value: n }))];
-  }, [advances]);
+  // Filter definitions take their select options from the advances the user actually has.
+  const filterDefs = useMemo(() => advanceFilters(advances), [advances]);
+  const filteredAdvances = useMemo(
+    () => applyTableFilters(advances, filterDefs, filterValues),
+    [advances, filterDefs, filterValues]
+  );
 
   const sortedAdvances = useMemo(
     () => [...filteredAdvances].sort(SORTERS[sortBy] || SORTERS.CREATED_DESC),
@@ -506,18 +436,7 @@ export default function MyAdvancesPage() {
   // Go back to page 1 whenever a filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, filters, sortBy, showClosed]);
-
-  // Statistics
-  const stats = useMemo(() => {
-    const totalCount = advances.length;
-    const pendingCount = advances.filter((a) =>
-      ["SUBMITTED", "PENDING", "PENDING_APPROVAL"].includes((a.status || "").toUpperCase())
-    ).length;
-
-    const totalDisbursed = advances
-      .filter((a) => ["DISBURSED", "SETTLED"].includes((a.status || "").toUpperCase()))
-      .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+  }, [filterValues, sortBy]);
 
   // KPI cards: the same filtered advances the table shows.
   const kpiCards = useMemo(() => advanceKpiCards(filteredAdvances), [filteredAdvances]);
@@ -640,7 +559,7 @@ export default function MyAdvancesPage() {
       <KpiCards cards={kpiCards} />
 
       <TableFilterBar
-        filters={filters}
+        filters={filterDefs}
         values={filterValues}
         onChange={setFilterValues}
         onReset={() => setFilterValues(initialAdvanceFilters())}
@@ -651,149 +570,17 @@ export default function MyAdvancesPage() {
 
       {/* Table card with the filter toolbar on top */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex flex-col gap-2 border-b border-gray-100 p-3 lg:flex-row lg:items-center">
-          <div className="relative flex-1">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <SearchInput
-              value={searchTerm}
-              onSearch={(val) => setSearchTerm(val || "")}
-              placeholder="Search by title, purpose, or advance ID..."
-              className="!pl-9"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-            <SelectControl
-              ariaLabel="Filter by status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={statusOptions}
-              className="sm:w-48"
-            />
-            <SelectControl
-              ariaLabel="Sort advances"
-              icon={ArrowUpDown}
-              value={sortBy}
-              onChange={setSortBy}
-              options={SORT_OPTIONS}
-              className="sm:w-52"
-            />
-            <button
-              type="button"
-              onClick={() => setShowFilters((v) => !v)}
-              aria-expanded={showFilters}
-              className={`col-span-2 flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 text-sm font-medium shadow-sm transition ${
-                showFilters || activeFilterCount > 0
-                  ? "border-[#0a0082]/30 bg-[#0a0082]/5 text-[#0a0082]"
-                  : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
-              }`}
-            >
-              <SlidersHorizontal size={15} />
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0a0082] px-1.5 text-[10px] font-semibold text-white">
-                  {activeFilterCount}
-                </span>
-              )}
-              <ChevronDown size={14} className={`transition-transform ${showFilters ? "rotate-180" : ""}`} />
-            </button>
-          </div>
+        {/* Filtering is done by the TableFilterBar above; the table header only carries the sort order. */}
+        <div className="flex items-center justify-end gap-2 border-b border-gray-100 p-3">
+          <SelectControl
+            ariaLabel="Sort advances"
+            icon={ArrowUpDown}
+            value={sortBy}
+            onChange={setSortBy}
+            options={SORT_OPTIONS}
+            className="sm:w-52"
+          />
         </div>
-
-        {showFilters && (
-          <div className="border-b border-gray-100 bg-[#F8F9FE] px-3 py-3">
-            <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-              <div className="w-full sm:w-auto">
-                <span className={FILTER_LABEL}>Trip dates</span>
-                <div className="flex h-10 items-center rounded-lg border border-gray-300 bg-white shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                  <Calendar size={15} className="ml-3 shrink-0 text-gray-400" />
-                  <input
-                    type="date"
-                    aria-label="Trip from"
-                    value={filters.tripFrom}
-                    max={filters.tripTo || undefined}
-                    onChange={(e) => setFilter("tripFrom", e.target.value)}
-                    className="h-full min-w-0 flex-1 bg-transparent px-2 text-sm text-gray-700 outline-none"
-                  />
-                  <span className="text-xs text-gray-400">to</span>
-                  <input
-                    type="date"
-                    aria-label="Trip to"
-                    value={filters.tripTo}
-                    min={filters.tripFrom || undefined}
-                    onChange={(e) => setFilter("tripTo", e.target.value)}
-                    className="h-full min-w-0 flex-1 bg-transparent px-2 text-sm text-gray-700 outline-none"
-                  />
-                </div>
-              </div>
-              <div className="w-[calc(50%-0.5rem)] sm:w-40">
-                <span className={FILTER_LABEL}>Currency</span>
-                <SelectControl
-                  ariaLabel="Filter by currency"
-                  value={filters.currency}
-                  onChange={(v) => setFilter("currency", v)}
-                  options={currencyOptions}
-                />
-              </div>
-              <div className="w-[calc(50%-0.5rem)] sm:w-52">
-                <span className={FILTER_LABEL}>Cost center</span>
-                <SelectControl
-                  ariaLabel="Filter by cost center"
-                  value={filters.costCenter}
-                  onChange={(v) => setFilter("costCenter", v)}
-                  options={costCenterOptions}
-                />
-              </div>
-              <div>
-                <span className={FILTER_LABEL}>Show</span>
-                <div className="flex h-10 items-center gap-2">
-                  <ToggleChip active={filters.overdueOnly} onClick={() => setFilter("overdueOnly", !filters.overdueOnly)}>
-                    Overdue only
-                  </ToggleChip>
-                  <ToggleChip
-                    active={showClosed}
-                    onClick={() => setShowClosed((v) => !v)}
-                    disabled={statusFilter !== "ALL"}
-                    title={statusFilter !== "ALL" ? "Applies when status is \"All Statuses\"" : undefined}
-                  >
-                    Include closed
-                  </ToggleChip>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                disabled={activeFilterCount === 0}
-                className="ml-auto flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-[#0a0082] transition hover:bg-[#0a0082]/5 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
-              >
-                <RotateCcw size={14} /> Reset
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!showFilters && activeChips.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-3 py-2">
-            {activeChips.map((chip) => (
-              <span
-                key={chip.key}
-                className="inline-flex items-center gap-1 rounded-full border border-[#0a0082]/20 bg-[#0a0082]/5 py-1 pl-3 pr-1.5 text-xs font-medium text-[#0a0082]"
-              >
-                {chip.label}
-                <button
-                  type="button"
-                  onClick={chip.onRemove}
-                  aria-label={`Remove ${chip.label}`}
-                  className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-[#0a0082]/10"
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-            <button type="button" onClick={clearAllFilters} className="text-xs font-medium text-gray-500 hover:text-[#0a0082]">
-              Clear all
-            </button>
-          </div>
-        )}
         {loading ? (
           <div className="p-12 flex flex-col items-center justify-center text-gray-500">
             <LoadingSpinner size="lg" className="mb-2" />
@@ -804,11 +591,11 @@ export default function MyAdvancesPage() {
             <DollarSign className="mx-auto h-10 w-10 text-gray-300 mb-2" />
             <p className="text-sm font-semibold text-gray-700">No cash advances found</p>
             <p className="text-xs text-gray-400 mt-1">
-              {searchTerm || statusFilter !== "ALL" || activeFilterCount > 0
-                ? "Try adjusting your search or status filter."
+              {advances.length > 0
+                ? "Try adjusting or clearing the filters."
                 : "You haven't requested any cash advances yet."}
             </p>
-            {!searchTerm && statusFilter === "ALL" && activeFilterCount === 0 && (
+            {advances.length === 0 && (
               <Button
                 variant="primary"
                 onClick={() => navigate("/expense-management/cash-advance/request")}
@@ -840,6 +627,10 @@ export default function MyAdvancesPage() {
                   const f = figuresOf(adv);
                   const cur = adv.currencyCode || "INR";
                   const loading = !isLoaded(adv);
+                  // Figures that exist only once cash is paid out show "—" before that, and "…" while loading.
+                  const paidCell = (value) =>
+                    loading ? <span className="text-gray-300">…</span> : !f.paidOut ? <span className="text-gray-300">—</span> : formatMoney(value, cur);
+
                   const amountLabel = f.approvedKnown ? "Approved" : "Requested";
                   // A Carry Forward request covers new cash + the carried-forward balance. Show the total, and how it is made.
                   const cf = carryForwardRequest(adv);

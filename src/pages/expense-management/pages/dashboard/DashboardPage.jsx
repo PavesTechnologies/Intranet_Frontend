@@ -59,9 +59,10 @@ const VIEWS = [
             minus: ["caAwaitingApproval", "caReducedOnApproval"],
           },
           {
-            label: "Received = Used on bills + Returned + Carried forward + Still to settle",
+            label: "Received = Used on bills + Returned + Carried forward + Still to settle − Carried in",
             total: "caDisbursed",
             parts: ["caUsedOnBills", "caReturned", "caCarriedForward", "caOutstanding"],
+            minus: ["caCarriedInReceived"],
           },
         ],
       },
