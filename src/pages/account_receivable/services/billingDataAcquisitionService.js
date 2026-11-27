@@ -617,6 +617,225 @@ export async function fetchActiveBillingConfigurations() {
 }
 
 /**
+ * Paged Billing Data Acquisition list — the single source for the acquisition
+ * console at /account-receivable/billing-data-acquisition/workspace.
+ *
+ * Endpoint: GET /api/billing-data-acquisition?billingType=…&page=…&size=…
+ *
+ * Response envelope → UI shape:
+ *   data.content[].billingConfigurationId → billingConfigurationId  (the row's identity)
+ *   data.content[].clientName             → clientName
+ *   data.content[].projectName            → projectName
+ *   data.content[].projectCode            → projectCode   (nullable — "—" when not set)
+ *   data.content[].billingType            → billingType   (master display name, e.g. "Timesheet Based")
+ *                                         → billingTypeCode (normalised: TIME_MATERIAL, …)
+ *   data.content[].status                 → status        (BillingAcquisitionStatus enum name)
+ *   data.page/size/totalElements/totalPages/first/last → pagination block
+ *
+ * Note on page indexing: the API is 0-based on both sides — page=0 is the first
+ * page, and the response reports a 0-based `page`. The UI counts pages from 1,
+ * so this function is the only place the two conventions meet: it subtracts one
+ * on the way out and adds one on the way back. Callers pass and keep 1-based.
+ *
+ * Never throws — on failure it returns an empty page plus `error`, so the console
+ * renders an empty state with a message rather than crashing.
+ */
+export async function fetchBillingDataAcquisitionPage({
+  billingType = "TIME_AND_MATERIAL",
+  page = 1,
+  size = 10,
+} = {}) {
+  // 1-based UI page → 0-based API page. Math.max guards a caller passing 0 or a
+  // negative page, which would otherwise request page=-1.
+  const apiPage = Math.max(Number(page) || 1, 1) - 1;
+  const params = new URLSearchParams({
+    billingType,
+    page: String(apiPage),
+    size: String(size),
+  });
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition?${params.toString()}`;
+
+  try {
+    const response = await api.get(endpoint);
+    const body = response?.data ?? {};
+    // Tolerates the documented envelope ({success, data:{content}}) and a bare page object.
+    const pageData = body?.data ?? body ?? {};
+    const content = Array.isArray(pageData?.content)
+      ? pageData.content
+      : Array.isArray(pageData)
+        ? pageData
+        : [];
+
+    const rows = content.map((row, index) => {
+      const configurationId = row?.billingConfigurationId ?? null;
+      return {
+        // Identity — this list has no projectId, so the configuration id is the key
+        // and the value the detail route is opened with.
+        id: configurationId ? String(configurationId) : `row-${page}-${index}`,
+        billingConfigurationId: configurationId,
+
+        clientName: row?.clientName ?? "",
+        projectName: row?.projectName ?? "",
+        // projectCode is a real nullable column — keep "" and let the UI print the dash.
+        projectCode: row?.projectCode ?? "",
+
+        billingType: row?.billingType ?? "",
+        billingTypeCode: normalizeBillingTypeName(row?.billingType),
+
+        status: String(row?.status ?? "").trim().toUpperCase(),
+      };
+    });
+
+    const size0 = Number(pageData?.size) || size;
+    const totalElements = Number(pageData?.totalElements) || 0;
+    const totalPages =
+      Number(pageData?.totalPages) || (size0 > 0 ? Math.ceil(totalElements / size0) : 0);
+
+    return {
+      rows,
+      pagination: {
+        // Normalised to 1-based regardless of which convention the server reports.
+        page: Number.isFinite(Number(pageData?.page)) ? Number(pageData.page) + 1 : page,
+        size: size0,
+        totalElements,
+        totalPages: Math.max(totalPages, 1),
+        first: pageData?.first ?? page <= 1,
+        last: pageData?.last ?? page >= Math.max(totalPages, 1),
+      },
+      message: body?.message ?? "",
+      error: null,
+    };
+  } catch (error) {
+    console.error("[BillingDataAcquisition] fetchBillingDataAcquisitionPage failed:", error);
+    return {
+      rows: [],
+      pagination: { page, size, totalElements: 0, totalPages: 1, first: true, last: true },
+      message: "",
+      error: getSafeBackendErrorMessage(
+        error,
+        "We couldn't load the billing data acquisition list. Please try again."
+      ),
+    };
+  }
+}
+
+/**
+ * One billing configuration, in full — the data the Period Billing workspace
+ * opens a row with.
+ *
+ * Endpoint: GET /api/billing-configurations/{billingConfigurationId}
+ *
+ * Response → UI shape:
+ *   billingConfigurationId  → billingConfigurationId
+ *   projectId               → projectId
+ *   billingType             → billingTypeCode   ("TIME_AND_MATERIAL" → TIME_MATERIAL)
+ *   billingTypeName         → billingType       (display name, e.g. "Timesheet Based")
+ *   billingFrequencyName    → billingFrequency  (drives the period schedule)
+ *   currencyCode            → currency / currencyCode
+ *   paymentTermName         → paymentTerms
+ *   taxRegionId / Code      → taxRegionId / taxRegionCode
+ *   hourlyRate              → hourlyRate
+ *   pricingModel            → pricingModel      (STANDARD | ROLE_BASED)
+ *   invoiceGenerationType   → invoiceGeneration (AUTOMATIC | MANUAL)
+ *   expenseEligible         → expenseBillingEligible
+ *   approved                → approved
+ *   effectiveFrom           → projectStartDate  (schedule start)
+ *   effectiveTo             → projectEndDate    (schedule end)
+ *
+ * effectiveFrom/effectiveTo are the project duration the period schedule is
+ * generated across, and arrive as plain yyyy-mm-dd. The older spellings are kept
+ * in the fallback chains below so a configuration saved before this DTO gained
+ * those two fields still produces a schedule. When no start date is found at
+ * all, projectStartDate is "" and the workspace shows its "no schedule" state
+ * rather than inventing periods.
+ *
+ * The DTO carries no project name, client name or project code: `fallback` is
+ * the list row the user clicked, and supplies those for the page header.
+ *
+ * Throws on failure so the caller can route back to the queue with a message.
+ */
+export async function fetchBillingConfigurationById(billingConfigurationId, fallback = {}) {
+  const id = String(billingConfigurationId || "").trim();
+  if (!id) throw new Error("Missing billingConfigurationId.");
+
+  let record;
+  try {
+    const response = await api.get(`${AR_BASE_URL}/api/billing-configurations/${encodeURIComponent(id)}`);
+    const body = response?.data ?? {};
+    // Tolerates both a bare DTO and a {success, data:{…}} envelope.
+    record = body?.data && typeof body.data === "object" && !Array.isArray(body.data) ? body.data : body;
+  } catch (error) {
+    console.error("[BillingDataAcquisition] fetchBillingConfigurationById failed:", error);
+    throw new Error(
+      getSafeBackendErrorMessage(error, "We couldn't load this billing configuration. Please try again.")
+    );
+  }
+
+  if (!record || !record.billingConfigurationId) {
+    throw new Error("This billing configuration could not be found.");
+  }
+
+  const projectStartDate = toIsoDateOnly(
+    record.effectiveFrom ?? record.projectStartDate ?? record.startDate ?? record.billingStartDate ?? null
+  );
+  const projectEndDate = toIsoDateOnly(
+    record.effectiveTo ?? record.projectEndDate ?? record.endDate ?? record.billingEndDate ?? null
+  );
+
+  const billingTypeName = record.billingTypeName ?? record.billingType ?? "";
+  const currencyCode = record.currencyCode ?? record.currency ?? "USD";
+
+  return {
+    // Identity
+    billingConfigurationId: record.billingConfigurationId,
+    projectId: record.projectId ?? fallback.projectId ?? null,
+    id: String(record.billingConfigurationId),
+
+    // Header text — not on this DTO, so it comes from the clicked list row.
+    projectName: fallback.projectName ?? record.projectName ?? "",
+    projectCode: fallback.projectCode ?? record.projectCode ?? "",
+    client: fallback.clientName ?? fallback.client ?? record.clientName ?? "",
+    clientName: fallback.clientName ?? record.clientName ?? "",
+
+    // Billing type — display name for the UI, normalised code for logic.
+    billingType: billingTypeName,
+    billingTypeId: record.billingTypeId ?? null,
+    // normalizeBillingTypeName maps TIME_AND_MATERIAL and "Timesheet Based" alike.
+    billingTypeCode: normalizeBillingTypeName(record.billingType || billingTypeName),
+
+    // Frequency — the name is what buildPeriodSchedule resolves (Weekly / Bi-Weekly / Monthly / …).
+    billingFrequencyId: record.billingFrequencyId ?? null,
+    billingFrequency: record.billingFrequencyName ?? record.billingFrequency ?? "",
+
+    // Project duration — drives the period schedule; "" when the DTO omits it.
+    projectStartDate,
+    projectEndDate,
+    effectiveFrom: projectStartDate,
+    effectiveTo: projectEndDate,
+    projectDuration: projectStartDate && projectEndDate ? formatBillingPeriod(projectStartDate, projectEndDate) : "—",
+
+    // Commercials
+    currency: currencyCode,
+    currencyCode,
+    currencyId: record.currencyId ?? null,
+    hourlyRate: record.hourlyRate ?? null,
+    pricingModel: record.pricingModel ?? "STANDARD",
+
+    // Terms & tax
+    paymentTermId: record.paymentTermId ?? null,
+    paymentTermCode: record.paymentTermCode ?? "",
+    paymentTerms: record.paymentTermName ?? record.paymentTermCode ?? "",
+    taxRegionId: record.taxRegionId ?? null,
+    taxRegionCode: record.taxRegionCode ?? "",
+
+    // Flags
+    invoiceGeneration: record.invoiceGenerationType ?? "MANUAL",
+    expenseBillingEligible: Boolean(record.expenseEligible ?? record.expenseBillingEligible ?? false),
+    approved: Boolean(record.approved),
+  };
+}
+
+/**
  * Maps a BillingSnapshot / acquisition execution result to a valid backend BillingAcquisitionStatus.
  *
  * Backend BillingAcquisitionStatus enum values:

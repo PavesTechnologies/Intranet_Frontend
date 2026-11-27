@@ -11,6 +11,7 @@ import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
+import CreateSprintModal from "../../manager/Sprint/CreateSprintModal";
 
 const Backlog = ({ projectId, projectName }) => {
   const [showIssueForm, setShowIssueForm] = useState(false);
@@ -134,10 +135,13 @@ const Backlog = ({ projectId, projectName }) => {
 
         {/* ✅ Modal: Create Issue */}
 
-        {/* ✅ Modal: Create Sprint */}
-        <Modal isOpen={showSprintForm} onClose={handleCloseForms} title="Create Sprint">
-          <CreateSprint onClose={handleCloseForms} projectId={projectId} />
-        </Modal>
+        {/* ✅ Modal: Create Sprint — CreateSprintModal renders its own Modal shell. */}
+        <CreateSprintModal
+          isOpen={showSprintForm}
+          projectId={projectId}
+          onClose={handleCloseForms}
+          onCreated={(newSprint) => setSprints((prev) => [...prev, newSprint])}
+        />
 
         {/* ✅ Unassigned (Backlog) Stories Section */}
         <div className="bg-white border p-4 rounded-lg shadow-sm min-h-[120px]">
