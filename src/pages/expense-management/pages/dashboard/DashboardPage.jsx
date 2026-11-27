@@ -53,9 +53,16 @@ const VIEWS = [
         caption: "The advance you received, and the bills settled against it",
         checks: [
           {
-            label: "Received = Used on bills + Returned + Carried forward + Still to settle",
+            label: "Approved = Requested − Awaiting approval + Carried in − Reduced + Increased",
+            total: "caApproved",
+            parts: ["caRequested", "caCarriedIn", "caIncreasedOnApproval"],
+            minus: ["caAwaitingApproval", "caReducedOnApproval"],
+          },
+          {
+            label: "Received = Used on bills + Returned + Carried forward + Still to settle − Carried in",
             total: "caDisbursed",
             parts: ["caUsedOnBills", "caReturned", "caCarriedForward", "caOutstanding"],
+            minus: ["caCarriedInReceived"],
           },
         ],
       },

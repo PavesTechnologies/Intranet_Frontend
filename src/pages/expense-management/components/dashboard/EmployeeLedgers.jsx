@@ -1,5 +1,5 @@
-import React from "react";
-import { AlertTriangle, CheckCircle2, ReceiptText, Sigma, Wallet } from "lucide-react";
+import React, { useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ReceiptText, Sigma, Wallet } from "lucide-react";
 import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 import { ANCHOR_CLASS, SECTION, anchorProps } from "./sectionAnchors";
 
@@ -27,9 +27,12 @@ function Amount({ value, currency, minus = false, plus = false, className = "" }
 }
 
 // A footer check: total = sum of parts. Says "Balanced" or by how much it is off; never hides a difference.
-function Check({ id, total, parts, label, byKey, currency }) {
+// `minus` lists parts that are taken away rather than added.
+function Check({ id, total, parts, minus = [], label, byKey, currency }) {
   const t = byKey[total] ? Number(byKey[total].value) : null;
-  const s = sumOf(byKey, parts);
+  const added = sumOf(byKey, parts);
+  const taken = sumOf(byKey, minus);
+  const s = added === null || taken === null ? null : added - taken;
   const difference = t === null || s === null ? null : t - s;
   const ok = difference !== null && !differs(difference, 0);
   const Icon = ok ? CheckCircle2 : AlertTriangle;
@@ -167,6 +170,22 @@ function Legend({ parts, base }) {
   );
 }
 
+// A small link that opens or closes the detail rows of a block. The block's closing line is always shown.
+function FoldToggle({ open, onToggle, label, controls }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={controls}
+      className="mb-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-[#0A0082] hover:bg-[#0A0082]/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082]/30"
+    >
+      {open ? "Hide" : label}
+      <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+    </button>
+  );
+}
+
 const SectionLabel = ({ children }) => <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{children}</p>;
 
 // Where the money payable to the bank is now: not yet with AP, waiting for AP, paid. `px` is "dr", "av" or "er".
@@ -237,6 +256,17 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
   const used = num(byKey, "caUsedOnBills");
   const returned = num(byKey, "caReturned");
   const carried = num(byKey, "caCarriedForward");
+  const carriedIn = num(byKey, "caCarriedIn");
+  // Carried-in balance inside advances already paid out: held by you, but never new cash, so not in "received".
+  const carriedInReceived = num(byKey, "caCarriedInReceived");
+  const awaiting = num(byKey, "caAwaitingApproval");
+  const reduced = num(byKey, "caReducedOnApproval");
+  const increased = num(byKey, "caIncreasedOnApproval");
+  // The request form's total already includes the earlier balance (new cash + carried in), and the backend's "approved"
+  // includes it too. So "Requested" shows that same total as one figure: never below approved unless increased.
+  const requestedTotal = byKey.caRequested ? num(byKey, "caRequested") + carriedIn : null;
+  // Approved new cash not yet paid out (approved advances awaiting disbursement, or paid out short).
+  const notPaidOut = byKey.caApproved && byKey.caDisbursed ? num(byKey, "caApproved") - carriedIn - received : 0;
   const outstanding = num(byKey, "caOutstanding");
   const fromAdvance = num(byKey, "avAdvanceOffset");
   const extra = num(byKey, "avPayable");
@@ -244,6 +274,10 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
   // Carried in with no matching carry-out on the records (0 when the backend does not send it).
   const unmatched = num(byKey, "caCarryUnmatched");
   const shared = { byKey, currency };
+  // The approval steps and the bills against the advance fold away, so the card leads with where the money went.
+  // Folded rows stay in the page (hidden); each block's closing line, the checks and the warnings are always shown.
+  const [showApproval, setShowApproval] = useState(false);
+  const [showBills, setShowBills] = useState(false);
   const parts = [
     { label: "Used on bills", value: used, color: COLOR.done },
     { label: "Returned", value: returned, color: COLOR.returned },
@@ -280,27 +314,50 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
           label="Still to settle"
           value={outstanding}
           currency={currency}
-          note={held > 0 ? `${share(held - outstanding, held)}% of what you held is accounted for` : "No advance received yet"}
+          note={received > 0 ? `${share(received + carriedInReceived - outstanding, received + carriedInReceived)}% of received is accounted for` : "No advance received yet"}
         />
       }
     >
       <div className="mt-3">
         <SectionLabel>Advance money, where it went</SectionLabel>
         <div className="mt-2">
-          <Bar base={held} parts={parts} />
-          <Legend parts={parts} base={held} />
+          <Bar base={received + carriedInReceived} parts={parts} />
+          <Legend parts={parts} base={received + carriedInReceived} />
         </div>
       </div>
 
       <div className="mt-3 divide-y divide-dashed divide-slate-200">
         <div>
-          <Line kpi="caRequested" label="Requested" note="Cash you asked for" muted {...shared} />
-          {cut > 0 && <Line kpi="caCut" label="Cut off" note="Reduced by the approvers" minus muted {...shared} />}
-          <Line kpi="caApproved" label="Approved" note="Cash approved by your manager and Finance" muted {...shared} />
+          <div id="ca-approval-steps" hidden={!showApproval}>
+            <Line
+              kpi="caRequested"
+              label="Requested"
+              note={carriedIn > 0 ? `What you asked for, including ${formatMoney(carriedIn, currency)} from your earlier advance` : "What you asked for"}
+              value={requestedTotal}
+              muted
+              {...shared}
+            />
+            {awaiting > 0 && (
+              <Line kpi="caAwaitingApproval" label="Awaiting approval" note="Still with your manager or Finance" minus muted {...shared} />
+            )}
+            {reduced > 0 && (
+              <Line kpi="caReducedOnApproval" label="Reduced on approval" note="Approver approved less than you asked" minus muted {...shared} />
+            )}
+            {increased > 0 && (
+              <Line kpi="caIncreasedOnApproval" label="Increased on approval" note="Approved more than you asked" plus muted {...shared} />
+            )}
+          </div>
+          <Line kpi="caApproved" label="Approved" note="Manager and Finance approved" muted {...shared} />
+          <FoldToggle open={showApproval} onToggle={() => setShowApproval((v) => !v)} label="How was this approved?" controls="ca-approval-steps" />
         </div>
         <div className="pt-1">
-          <Line kpi="caDisbursed" label="Received" note="Cash paid out to you" strong {...shared} />
-          {carriedIn > 0 && <Line kpi="caCarriedIn" label="Carried in" note="Balance moved in from an earlier advance" plus {...shared} />}
+          {differs(notPaidOut, 0) && notPaidOut > 0 && (
+            <Line kpi="caNotPaidOut" label="Not yet paid out" note="Approved, still to be paid to you" value={notPaidOut} minus muted {...shared} />
+          )}
+          <Line kpi="caDisbursed" label="Received" note="Advance paid out to you" strong {...shared} />
+          {carriedInReceived > 0 && (
+            <Line kpi="caCarriedInReceived" label="Carried in" note="Balance moved over from your earlier advance" plus {...shared} />
+          )}
           <Line kpi="caUsedOnBills" label="Used on bills" note="Approved bills paid from it" minus dot={COLOR.done} {...shared} />
           <Line kpi="caReturned" label="Returned by you" note="Cash you paid back" minus dot={COLOR.returned} {...shared} />
           {carried > 0 && <Line kpi="caCarriedForward" label="Carried forward" note="Moved to your next advance" minus dot={COLOR.idle} {...shared} />}
@@ -313,7 +370,7 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
       <div className="mt-4">
         <SectionLabel>Bills against your advance</SectionLabel>
         <div className="mt-1 divide-y divide-dashed divide-slate-200">
-          <div>
+          <div id="ca-bill-lines" hidden={!showBills}>
             <Line kpi="avClaimed" label="Claimed" note="Bills linked to an advance" muted {...shared} />
             <Line kpi="avApproved" label="Approved" note="Approved bills" strong {...shared} />
             <Line kpi="avAdvanceOffset" label="Paid from advance" note="Not paid to your bank" minus {...shared} />
@@ -322,7 +379,17 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
             <Line kpi="avPayable" label="Extra, to your bank" note="Bills above your advance" result {...shared} />
           </div>
         </div>
-        {extra > 0 && <BankSplit px="av" {...shared} />}
+        {extra > 0 && (
+          <div id="ca-bill-split" hidden={!showBills}>
+            <BankSplit px="av" {...shared} />
+          </div>
+        )}
+        <FoldToggle
+          open={showBills}
+          onToggle={() => setShowBills((v) => !v)}
+          label="Show bills"
+          controls={extra > 0 ? "ca-bill-lines ca-bill-split" : "ca-bill-lines"}
+        />
       </div>
 
       {/* Carried-in money must come from another of your advances. A gap means the records do not show where it came

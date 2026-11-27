@@ -18,17 +18,12 @@ import {
   AlertCircle,
   CheckCircle,
   ChevronRight,
-  SlidersHorizontal,
   ChevronDown,
   ArrowUpDown,
-  RotateCcw,
-  Check,
-  X,
 } from "lucide-react";
 import { formatMoney, formatDate, formatTripDates, getCostCenterValue, getStatusBadge, activeLinkedReport, linkedExpensesPath } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
-import SearchInput from "@/components/filter/Searchbar";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -40,6 +35,17 @@ import { useAdvanceFigures } from "@/pages/expense-management/pages/cash-advance
 import AdvanceMoneyTracker from "@/pages/expense-management/pages/cash-advance/components/AdvanceMoneyTracker";
 import { carryForwardRequest } from "@/pages/expense-management/pages/cash-advance/carryForwardRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
+import { advanceMoney, advanceMovementLines } from "@/pages/expense-management/pages/cash-advance/advanceMovement";
+import TableFilterBar, {
+  KpiCards,
+  applyTableFilters,
+  distinctOptions,
+  emptyFilterValues,
+  inAmountRange,
+  inDateRange,
+} from "@/pages/expense-management/components/common/TableFilterBar";
+// Re-exported so existing imports from this page keep working.
+export { advanceMoney, advanceMovementLines };
 
 // Statuses in which an expense report can be linked to the advance (same list as the detail page).
 const LINKABLE_EXPENSE_STATUSES = [
@@ -141,11 +147,7 @@ const SORT_OPTIONS = [
   { label: "Outstanding: high to low", value: "OUTSTANDING_DESC" },
 ];
 
-const EMPTY_FILTERS = { tripFrom: "", tripTo: "", currency: "ALL", costCenter: "ALL", overdueOnly: false };
-
-const FILTER_LABEL = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500";
-
-// Native select styled to match SearchInput (h-10, same border/shadow), so every toolbar control lines up.
+// Native select styled like the filter inputs (h-10, same border/shadow), so the sort control lines up with them.
 const SelectControl = ({ value, onChange, options, icon: Icon, ariaLabel, className = "" }) => (
   <div className={`relative w-full ${className}`}>
     {Icon && <Icon size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />}
@@ -163,27 +165,134 @@ const SelectControl = ({ value, onChange, options, icon: Icon, ariaLabel, classN
   </div>
 );
 
-const ToggleChip = ({ active, onClick, disabled, title, children }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    aria-pressed={active}
-    className={`flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-sm shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-      active
-        ? "border-[#0a0082]/30 bg-[#0a0082] text-white"
-        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
-    }`}
-  >
-    {active && <Check size={14} />}
-    {children}
-  </button>
-);
-
 // Only paid-out advances are owed. Drafts and requests awaiting approval are not, and the server does not count them.
 const OWED_STATUSES = ["DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "SETTLEMENT_PENDING",
   "PARTIALLY_SETTLED", "PARTIALLY_ADJUSTED", "ADJUSTED", "AWAITING_REIMBURSEMENT", "OVERDUE"];
+
+// ---------------------------------------------------------------- figures, filters and KPI cards (from the real records)
+
+const PENDING_STATUSES = ["SUBMITTED", "PENDING", "PENDING_APPROVAL", "PENDING_MANAGER_APPROVAL", "PENDING_COST_CENTER_APPROVAL", "PENDING_FINANCE_APPROVAL"];
+const CLOSED_STATUSES = ["CLOSED", "CANCELLED"];
+const OPEN_ONLY = "__OPEN__";
+const statusOf = (adv) => (isOverdue(adv) ? "OVERDUE" : String(adv.status || "").toUpperCase());
+const prettyStatus = (s) => s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
+const daysUntilDue = (adv) => {
+  const due = getSettlementDueDate(adv);
+  if (!due) return null;
+  const d = new Date(String(due).slice(0, 10) + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+};
+
+const ADVANCE_MONEY_STATES = [
+  { value: "OUTSTANDING", label: "Outstanding to settle", match: (m) => m && m.outstanding > 0 },
+  { value: "SETTLED", label: "Fully settled", match: (m) => m && m.outstanding <= 0 },
+  { value: "NOT_PAID", label: "Not paid out yet", match: (m) => !m },
+];
+
+/** One filter per table column. Status defaults to open advances, as the page always did (closed ones on request). */
+export function advanceFilters(rows) {
+  const statuses = [...new Set(rows.map(statusOf))].filter(Boolean).sort();
+  return [
+    {
+      key: "search", label: "Search", type: "search", placeholder: "Title, purpose or advance ID",
+      match: (a, q) => `${a.title || ""} ${a.purpose || ""} ${a.advanceId || a.id || ""}`.toLowerCase().includes(q.trim().toLowerCase()),
+    },
+    {
+      key: "status", label: "Status", type: "select",
+      options: [
+        { label: "Open (hide closed & cancelled)", value: OPEN_ONLY },
+        { label: "All statuses", value: "" },
+        ...statuses.map((s) => ({ label: prettyStatus(s), value: s })),
+      ],
+      match: (a, v) => (v === OPEN_ONLY ? !CLOSED_STATUSES.includes(String(a.status || "").toUpperCase()) : statusOf(a) === v),
+    },
+    {
+      key: "money", label: "Balance", type: "select",
+      options: [{ label: "Any", value: "" }, ...ADVANCE_MONEY_STATES.map(({ value, label }) => ({ value, label }))],
+      match: (a, v) => Boolean(ADVANCE_MONEY_STATES.find((m) => m.value === v)?.match(advanceMoney(a))),
+    },
+    {
+      key: "costCenter", label: "Cost center", type: "select",
+      options: distinctOptions(rows, (a) => (getCostCenterValue(a) === "—" ? null : getCostCenterValue(a)), "All cost centers"),
+      match: (a, v) => getCostCenterValue(a) === v,
+    },
+    {
+      key: "currency", label: "Currency", type: "select",
+      options: distinctOptions(rows, (a) => a.currencyCode, "All currencies"),
+      match: (a, v) => a.currencyCode === v,
+    },
+    { key: "amount", label: "Amount", type: "amountRange", match: (a, v) => inAmountRange(a.approvedAmount ?? a.amount, v) },
+    {
+      // Keeps advances whose trip overlaps the chosen range. Advances without trip dates drop out.
+      key: "trip", label: "Trip dates", type: "dateRange",
+      match: (a, { from, to }) => {
+        const start = tripStartTime(a);
+        const end = tripEndTime(a);
+        const f = toDayTime(from);
+        const t = toDayTime(to);
+        return start != null && (t == null || start <= t) && (f == null || end >= f);
+      },
+    },
+    { key: "neededBy", label: "Needed by", type: "dateRange", match: (a, v) => inDateRange(getNeededByDateValue(a), v) },
+    { key: "settleBy", label: "Settle by", type: "dateRange", match: (a, v) => inDateRange(getSettlementDueDate(a), v) },
+  ];
+}
+
+const ADVANCE_FILTERS_SHAPE = advanceFilters([]);
+const initialAdvanceFilters = () => ({ ...emptyFilterValues(ADVANCE_FILTERS_SHAPE), status: OPEN_ONLY });
+
+/**
+ * The cards a General employee needs on their advances, from the filtered rows: requests waiting for approval, cash
+ * received, how much of what they held is settled, what is still with them (and overdue), and what is due within 7 days.
+ */
+export function advanceKpiCards(rows) {
+  const currencies = [...new Set(rows.map((a) => a.currencyCode).filter(Boolean))];
+  const cur = currencies.length === 1 ? currencies[0] : "INR";
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const money = rows.map(advanceMoney).filter(Boolean);
+  const sum = (list, f) => list.reduce((acc, x) => acc + f(x), 0);
+  const pending = rows.filter((a) => PENDING_STATUSES.includes(String(a.status || "").toUpperCase()));
+  const carried = sum(money, (m) => m.carriedIn);
+  const owing = rows.filter((a) => (advanceMoney(a)?.outstanding || 0) > 0);
+  const overdue = owing.filter(isOverdue).length;
+  const dueSoon = owing.filter((a) => {
+    const d = daysUntilDue(a);
+    return d !== null && d >= 0 && d <= 7;
+  });
+  const held = sum(money, (m) => m.held);
+  const settled = sum(money, (m) => m.settled);
+
+  return [
+    { key: "pending", label: "Awaiting approval", value: formatMoney(sum(pending, (a) => Number(a.requestedAmount ?? a.amount) || 0), cur), hint: plural(pending.length, "request"), icon: Clock, tone: "bg-amber-50 text-amber-600" },
+    { key: "received", label: "Received", value: formatMoney(sum(money, (m) => m.cash), cur), hint: carried > 0 ? `+ ${formatMoney(carried, cur)} carried in` : `${plural(money.length, "advance")} paid out`, icon: DollarSign, tone: "bg-indigo-50 text-indigo-600" },
+    { key: "settled", label: "Settled", value: formatMoney(settled, cur), hint: held > 0 ? `${Math.round((settled / held) * 100)}% of what you held` : "Nothing held yet", icon: CheckCircle2, tone: "bg-emerald-50 text-emerald-600" },
+    { key: "outstanding", label: "Outstanding", value: formatMoney(sum(owing, (a) => advanceMoney(a).outstanding), cur), hint: overdue > 0 ? `${overdue} overdue` : `${plural(owing.length, "advance")} to settle`, icon: AlertCircle, tone: overdue > 0 ? "bg-rose-50 text-rose-600" : "bg-orange-50 text-orange-600" },
+    { key: "dueSoon", label: "Due in 7 days", value: formatMoney(sum(dueSoon, (a) => advanceMoney(a).outstanding), cur), hint: dueSoon.length ? plural(dueSoon.length, "advance") : "Nothing due this week", icon: Calendar, tone: "bg-sky-50 text-sky-600" },
+  ];
+}
+
+function AdvanceMovementCell({ f, cur, loading, overdue, serverOutstanding }) {
+  if (loading) return <span className="text-gray-300">…</span>;
+  const lines = advanceMovementLines(f, serverOutstanding);
+  if (!lines) return <span className="text-[11px] text-gray-400" title="Not paid out yet, so no money has moved">—</span>;
+  return (
+    <div className="flex flex-col items-end gap-0.5" data-advance-movement>
+      {lines.map((l) => (
+        <span
+          key={l.key}
+          title={l.note}
+          className={`text-[11px] leading-tight ${l.key === "remaining" || l.key === "owedToYou" ? "mt-0.5 border-t border-dashed border-gray-200 pt-0.5" : ""}`}
+        >
+          <span className="text-gray-500">{l.label} </span>
+          <span className={`font-semibold ${l.key === "remaining" && overdue ? "text-rose-600" : l.tone}`}>{formatMoney(l.value, cur)}</span>
+          {l.key === "remaining" && overdue && <span className="ml-1 text-[10px] font-semibold text-rose-600">overdue</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function MyAdvancesPage() {
   const navigate = useNavigate();
@@ -201,33 +310,6 @@ export default function MyAdvancesPage() {
   // Which row's detail panel is open (one at a time).
   const [expandedId, setExpandedId] = useState(null);
   const [sortBy, setSortBy] = useState("CREATED_DESC");
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [showFilters, setShowFilters] = useState(false);
-  const setFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
-  const activeFilterCount =
-    (filters.tripFrom || filters.tripTo ? 1 : 0) +
-    (filters.currency !== "ALL" ? 1 : 0) +
-    (filters.costCenter !== "ALL" ? 1 : 0) +
-    (filters.overdueOnly ? 1 : 0) +
-    (showClosed ? 1 : 0);
-  const clearAllFilters = () => {
-    setFilters(EMPTY_FILTERS);
-    setShowClosed(false);
-  };
-  // Removable chips shown under the toolbar while the filter panel is closed.
-  const activeChips = [
-    (filters.tripFrom || filters.tripTo) && {
-      key: "trip",
-      label: filters.tripFrom && filters.tripTo
-        ? `Trip: ${formatDate(filters.tripFrom)} – ${formatDate(filters.tripTo)}`
-        : filters.tripFrom ? `Trip from ${formatDate(filters.tripFrom)}` : `Trip until ${formatDate(filters.tripTo)}`,
-      onRemove: () => setFilters((p) => ({ ...p, tripFrom: "", tripTo: "" })),
-    },
-    filters.currency !== "ALL" && { key: "cur", label: filters.currency, onRemove: () => setFilter("currency", "ALL") },
-    filters.costCenter !== "ALL" && { key: "cc", label: filters.costCenter, onRemove: () => setFilter("costCenter", "ALL") },
-    filters.overdueOnly && { key: "od", label: "Overdue only", onRemove: () => setFilter("overdueOnly", false) },
-    showClosed && { key: "closed", label: "Including closed", onRemove: () => setShowClosed(false) },
-  ].filter(Boolean);
 
   // Modals state
   const [editingAdvance, setEditingAdvance] = useState(null); // Edit modal
@@ -330,47 +412,12 @@ export default function MyAdvancesPage() {
   }, []);
 
   // Filtered Advances
-  const filteredAdvances = useMemo(() => {
-    return advances.filter((adv) => {
-      const matchSearch =
-        !searchTerm ||
-        (adv.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (adv.purpose || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (adv.advanceId || adv.id || "").toString().toLowerCase().includes(searchTerm.toLowerCase());
-
-      const advStatus = (adv.status || "").toUpperCase();
-      const matchStatus =
-        (statusFilter === "ALL" && (showClosed || !["CLOSED", "CANCELLED"].includes(advStatus))) ||
-        (statusFilter === "PENDING" && (advStatus === "SUBMITTED" || advStatus === "PENDING" || advStatus === "PENDING_APPROVAL")) ||
-        advStatus === statusFilter;
-
-      // Trip date range: keep advances whose trip overlaps the chosen range. Advances without trip dates drop out.
-      let matchTrip = true;
-      if (filters.tripFrom || filters.tripTo) {
-        const start = tripStartTime(adv);
-        const end = tripEndTime(adv);
-        const from = toDayTime(filters.tripFrom);
-        const to = toDayTime(filters.tripTo);
-        matchTrip = start != null && (to == null || start <= to) && (from == null || end >= from);
-      }
-
-      const matchCurrency = filters.currency === "ALL" || (adv.currencyCode || "INR") === filters.currency;
-      const matchCostCenter = filters.costCenter === "ALL" || getCostCenterValue(adv) === filters.costCenter;
-      const matchOverdue = !filters.overdueOnly || isOverdue(adv);
-
-      return matchSearch && matchStatus && matchTrip && matchCurrency && matchCostCenter && matchOverdue;
-    });
-  }, [advances, searchTerm, statusFilter, showClosed, filters]);
-
-  // Options for the currency / cost center filters, from the advances the user actually has.
-  const currencyOptions = useMemo(() => {
-    const codes = [...new Set(advances.map((a) => a.currencyCode || "INR"))].sort();
-    return [{ label: "All currencies", value: "ALL" }, ...codes.map((c) => ({ label: c, value: c }))];
-  }, [advances]);
-  const costCenterOptions = useMemo(() => {
-    const names = [...new Set(advances.map(getCostCenterValue).filter((v) => v && v !== "—"))].sort();
-    return [{ label: "All cost centers", value: "ALL" }, ...names.map((n) => ({ label: n, value: n }))];
-  }, [advances]);
+  // Filter definitions take their select options from the advances the user actually has.
+  const filterDefs = useMemo(() => advanceFilters(advances), [advances]);
+  const filteredAdvances = useMemo(
+    () => applyTableFilters(advances, filterDefs, filterValues),
+    [advances, filterDefs, filterValues]
+  );
 
   const sortedAdvances = useMemo(
     () => [...filteredAdvances].sort(SORTERS[sortBy] || SORTERS.CREATED_DESC),
@@ -389,23 +436,7 @@ export default function MyAdvancesPage() {
   // Go back to page 1 whenever the search or status filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, filters, sortBy, showClosed]);
-
-  // Statistics
-  const stats = useMemo(() => {
-    const totalCount = advances.length;
-    const pendingCount = advances.filter((a) =>
-      ["SUBMITTED", "PENDING", "PENDING_APPROVAL"].includes((a.status || "").toUpperCase())
-    ).length;
-
-    // Cash actually paid out (carried-in balances are not new cash), whatever the advance's status now.
-    const totalDisbursed = advances.reduce((sum, a) => sum + (Number(a.disbursedAmount) || 0), 0);
-
-    // Settled = what was held (cash paid out + carried in) less what is still outstanding, on paid-out advances: the
-    // same figure as the dashboard's "Settled" (used on bills, returned, salary deduction or carried forward).
-    const totalSettled = advances
-      .filter((a) => Number(a.disbursedAmount) > 0)
-      .reduce((sum, a) => sum + Math.max(0, (Number(a.disbursedAmount) || 0) + (Number(a.carriedInAmount) || 0) - (Number(a.outstandingBalance) || 0)), 0);
+  }, [filterValues, sortBy]);
 
     const outstandingBalance = advances
       .filter((a) => OWED_STATUSES.includes((a.status || "").toUpperCase()))
@@ -552,189 +583,31 @@ export default function MyAdvancesPage() {
         </div>
       </div>
 
-      {/* Summary strip: all six figures in one row */}
-      <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm sm:grid-cols-3 lg:grid-cols-6 [&>*]:border-gray-100 lg:divide-x lg:divide-gray-100">
-        {[
-          { label: "Total Requests", value: stats.totalCount, icon: FileText, tone: "text-[#263383] bg-[#263383]/10", valueTone: "text-gray-900" },
-          {
-            label: "Total Requested",
-            value: formatMoney(stats.totalRequested),
-            icon: Receipt,
-            tone: "text-[#0A0082] bg-[#0A0082]/10",
-            valueTone: "text-[#0a174e]",
-            hint: `${stats.requestedCount} live request${stats.requestedCount === 1 ? "" : "s"}`,
-          },
-          { label: "Pending Approval", value: stats.pendingCount, icon: Clock, tone: "text-amber-600 bg-amber-50", valueTone: "text-amber-600" },
-          { label: "Disbursed", value: formatMoney(stats.totalDisbursed), icon: DollarSign, tone: "text-indigo-600 bg-indigo-50", valueTone: "text-indigo-700" },
-          { label: "Settled", value: formatMoney(stats.totalSettled), icon: CheckCircle2, tone: "text-emerald-600 bg-emerald-50", valueTone: "text-emerald-700" },
-          {
-            label: "Outstanding",
-            value: formatMoney(stats.outstandingBalance),
-            icon: AlertCircle,
-            tone: stats.overdueCount > 0 ? "text-rose-600 bg-rose-50" : "text-orange-600 bg-orange-50",
-            valueTone: stats.overdueCount > 0 ? "text-rose-600" : "text-orange-600",
-            note: stats.overdueCount > 0 ? `${stats.overdueCount} overdue` : null,
-          },
-        ].map(({ label, value, icon: Icon, tone, valueTone, note, hint }) => (
-          <div key={label} className="flex items-center gap-3 border-b p-4 lg:border-b-0">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tone}`}>
-              <Icon size={18} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
-              <p className={`mt-0.5 truncate text-lg font-bold ${valueTone}`}>{value}</p>
-              {note && <p className="text-[11px] font-medium text-rose-600">{note}</p>}
-              {hint && <p className="truncate text-[11px] text-gray-400">{hint}</p>}
-            </div>
-          </div>
-        ))}
-      </div>
+      <KpiCards cards={kpiCards} />
+
+      <TableFilterBar
+        filters={filterDefs}
+        values={filterValues}
+        onChange={setFilterValues}
+        onReset={() => setFilterValues(initialAdvanceFilters())}
+        resultCount={filteredAdvances.length}
+        totalCount={advances.length}
+        noun="advances"
+      />
 
       {/* Table card with the filter toolbar on top */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex flex-col gap-2 border-b border-gray-100 p-3 lg:flex-row lg:items-center">
-          <div className="relative flex-1">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <SearchInput
-              value={searchTerm}
-              onSearch={(val) => setSearchTerm(val || "")}
-              placeholder="Search by title, purpose, or advance ID..."
-              className="!pl-9"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-            <SelectControl
-              ariaLabel="Filter by status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={statusOptions}
-              className="sm:w-48"
-            />
-            <SelectControl
-              ariaLabel="Sort advances"
-              icon={ArrowUpDown}
-              value={sortBy}
-              onChange={setSortBy}
-              options={SORT_OPTIONS}
-              className="sm:w-52"
-            />
-            <button
-              type="button"
-              onClick={() => setShowFilters((v) => !v)}
-              aria-expanded={showFilters}
-              className={`col-span-2 flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 text-sm font-medium shadow-sm transition ${
-                showFilters || activeFilterCount > 0
-                  ? "border-[#0a0082]/30 bg-[#0a0082]/5 text-[#0a0082]"
-                  : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
-              }`}
-            >
-              <SlidersHorizontal size={15} />
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0a0082] px-1.5 text-[10px] font-semibold text-white">
-                  {activeFilterCount}
-                </span>
-              )}
-              <ChevronDown size={14} className={`transition-transform ${showFilters ? "rotate-180" : ""}`} />
-            </button>
-          </div>
+        {/* Filtering is done by the TableFilterBar above; the table header only carries the sort order. */}
+        <div className="flex items-center justify-end gap-2 border-b border-gray-100 p-3">
+          <SelectControl
+            ariaLabel="Sort advances"
+            icon={ArrowUpDown}
+            value={sortBy}
+            onChange={setSortBy}
+            options={SORT_OPTIONS}
+            className="sm:w-52"
+          />
         </div>
-
-        {showFilters && (
-          <div className="border-b border-gray-100 bg-[#F8F9FE] px-3 py-3">
-            <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-              <div className="w-full sm:w-auto">
-                <span className={FILTER_LABEL}>Trip dates</span>
-                <div className="flex h-10 items-center rounded-lg border border-gray-300 bg-white shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                  <Calendar size={15} className="ml-3 shrink-0 text-gray-400" />
-                  <input
-                    type="date"
-                    aria-label="Trip from"
-                    value={filters.tripFrom}
-                    max={filters.tripTo || undefined}
-                    onChange={(e) => setFilter("tripFrom", e.target.value)}
-                    className="h-full min-w-0 flex-1 bg-transparent px-2 text-sm text-gray-700 outline-none"
-                  />
-                  <span className="text-xs text-gray-400">to</span>
-                  <input
-                    type="date"
-                    aria-label="Trip to"
-                    value={filters.tripTo}
-                    min={filters.tripFrom || undefined}
-                    onChange={(e) => setFilter("tripTo", e.target.value)}
-                    className="h-full min-w-0 flex-1 bg-transparent px-2 text-sm text-gray-700 outline-none"
-                  />
-                </div>
-              </div>
-              <div className="w-[calc(50%-0.5rem)] sm:w-40">
-                <span className={FILTER_LABEL}>Currency</span>
-                <SelectControl
-                  ariaLabel="Filter by currency"
-                  value={filters.currency}
-                  onChange={(v) => setFilter("currency", v)}
-                  options={currencyOptions}
-                />
-              </div>
-              <div className="w-[calc(50%-0.5rem)] sm:w-52">
-                <span className={FILTER_LABEL}>Cost center</span>
-                <SelectControl
-                  ariaLabel="Filter by cost center"
-                  value={filters.costCenter}
-                  onChange={(v) => setFilter("costCenter", v)}
-                  options={costCenterOptions}
-                />
-              </div>
-              <div>
-                <span className={FILTER_LABEL}>Show</span>
-                <div className="flex h-10 items-center gap-2">
-                  <ToggleChip active={filters.overdueOnly} onClick={() => setFilter("overdueOnly", !filters.overdueOnly)}>
-                    Overdue only
-                  </ToggleChip>
-                  <ToggleChip
-                    active={showClosed}
-                    onClick={() => setShowClosed((v) => !v)}
-                    disabled={statusFilter !== "ALL"}
-                    title={statusFilter !== "ALL" ? "Applies when status is \"All Statuses\"" : undefined}
-                  >
-                    Include closed
-                  </ToggleChip>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                disabled={activeFilterCount === 0}
-                className="ml-auto flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-[#0a0082] transition hover:bg-[#0a0082]/5 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
-              >
-                <RotateCcw size={14} /> Reset
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!showFilters && activeChips.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-3 py-2">
-            {activeChips.map((chip) => (
-              <span
-                key={chip.key}
-                className="inline-flex items-center gap-1 rounded-full border border-[#0a0082]/20 bg-[#0a0082]/5 py-1 pl-3 pr-1.5 text-xs font-medium text-[#0a0082]"
-              >
-                {chip.label}
-                <button
-                  type="button"
-                  onClick={chip.onRemove}
-                  aria-label={`Remove ${chip.label}`}
-                  className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-[#0a0082]/10"
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-            <button type="button" onClick={clearAllFilters} className="text-xs font-medium text-gray-500 hover:text-[#0a0082]">
-              Clear all
-            </button>
-          </div>
-        )}
         {loading ? (
           <div className="p-12 flex flex-col items-center justify-center text-gray-500">
             <LoadingSpinner size="lg" className="mb-2" />
@@ -745,11 +618,11 @@ export default function MyAdvancesPage() {
             <DollarSign className="mx-auto h-10 w-10 text-gray-300 mb-2" />
             <p className="text-sm font-semibold text-gray-700">No cash advances found</p>
             <p className="text-xs text-gray-400 mt-1">
-              {searchTerm || statusFilter !== "ALL" || activeFilterCount > 0
-                ? "Try adjusting your search or status filter."
+              {advances.length > 0
+                ? "Try adjusting or clearing the filters."
                 : "You haven't requested any cash advances yet."}
             </p>
-            {!searchTerm && statusFilter === "ALL" && activeFilterCount === 0 && (
+            {advances.length === 0 && (
               <Button
                 variant="primary"
                 onClick={() => navigate("/expense-management/cash-advance/request")}
@@ -781,6 +654,9 @@ export default function MyAdvancesPage() {
                   const f = figuresOf(adv);
                   const cur = adv.currencyCode || "INR";
                   const loading = !isLoaded(adv);
+                  // Figures that exist only once cash is paid out show "—" before that, and "…" while loading.
+                  const paidCell = (value) =>
+                    loading ? <span className="text-gray-300">…</span> : !f.paidOut ? <span className="text-gray-300">—</span> : formatMoney(value, cur);
 
                   const amountLabel = f.approvedKnown ? "Approved" : "Requested";
                   // A Carry Forward request covers new cash + the carried-forward balance. Show the total, and how it is made.

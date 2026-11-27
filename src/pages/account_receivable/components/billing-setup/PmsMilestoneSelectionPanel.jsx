@@ -37,11 +37,6 @@ const todayDateOnly = () => {
   return `${now.getFullYear()}-${month}-${day}`;
 };
 
-// A milestone already saved with a past billing date must stay selectable, so
-// the floor is relaxed to that date rather than rejecting what is stored.
-const earliestSelectableDate = (currentValue, today) =>
-  currentValue && currentValue < today ? currentValue : today;
-
 const addDays = (dateOnly, days) => {
   const date = new Date(`${dateOnly}T00:00:00`);
   date.setDate(date.getDate() + days);
@@ -50,11 +45,11 @@ const addDays = (dateOnly, days) => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
-// A Milestone Plan must give every milestone its own billing date (the backend
-// opens one occurrence per date, and the form blocks saving on a duplicate).
-// Defaults therefore start at today and step to the next free day, so a plan
-// with several milestones is saveable as it stands instead of starting out in
-// error. The user can still move any date, as long as it is not in the past.
+// A milestone bills on its PMS planned due date. Only when PMS reports no due
+// date does a plan need a stand-in: a Milestone Plan must give every milestone
+// its own billing date (the backend opens one occurrence per date, and the form
+// blocks saving on a duplicate), so the fallback starts at today and steps to
+// the next free day rather than colliding with a date already in use.
 const nextFreeDate = (today, taken) => {
   let candidate = today;
   while (taken.has(candidate)) candidate = addDays(candidate, 1);
@@ -65,9 +60,6 @@ const isMilestoneEligible = (milestone) =>
   milestone.eligibleForBilling !== undefined
     ? Boolean(milestone.eligibleForBilling)
     : !getMilestoneIneligibilityReason(milestone);
-
-const fieldInput =
-  "h-9 w-full rounded-lg border px-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20";
 
 function ReadinessBadge({ readiness }) {
   if (!readiness) return <span className="text-slate-400">—</span>;
@@ -90,10 +82,11 @@ const hasValue = (value) => value !== "" && value !== null && value !== undefine
 // loading state; the plan's entries ({ pmsMilestoneId, percentage, billingDate,
 // remarks, ... }) are owned by the parent form.
 //
-// There is no per-row selection: every milestone PMS reports as eligible is
-// billed, and its AR billing % IS the PMS allocationPercentage, shown read-only
-// rather than typed. The billing date is the only editable field — it defaults
-// to today and cannot be moved into the past.
+// There is no per-row selection and nothing on a row is typed: every milestone
+// PMS reports as eligible is billed, its AR billing % IS the PMS
+// allocationPercentage, and its billing date IS the PMS planned due date. Both
+// are shown read-only. An entry whose billing has already started keeps the
+// date it was frozen with, since that is what AR is actually billing on.
 export default function PmsMilestoneSelectionPanel({
   pmsProjectId,
   milestonesState,
@@ -113,6 +106,7 @@ export default function PmsMilestoneSelectionPanel({
     return map;
   }, [entries]);
 
+  const milestoneById = useMemo(() => new Map(milestones.map((m) => [m.pmsMilestoneId, m])), [milestones]);
   const listedIds = useMemo(() => new Set(milestones.map((m) => m.pmsMilestoneId)), [milestones]);
   // Saved entries whose milestone the backend no longer lists (deleted in PMS,
   // or not part of this project). Only meaningful once a list has really loaded.
@@ -134,16 +128,28 @@ export default function PmsMilestoneSelectionPanel({
   // milestone turned ineligible is surfaced rather than silently dropped.
   useEffect(() => {
     if (status !== "success") return;
-    const missing = milestones.filter(
-      (milestone) => isMilestoneEligible(milestone) && !entryByMilestone.has(milestone.pmsMilestoneId),
-    );
-    if (missing.length === 0) return;
     const currentEntries = entriesRef.current;
-    const takenDates = new Set(currentEntries.map((entry) => entry.billingDate).filter(Boolean));
-    onEntriesChange([
-      ...currentEntries,
-      ...missing.map((milestone) => {
-        const billingDate = nextFreeDate(today, takenDates);
+    const takenDates = new Set();
+    let changed = false;
+
+    // Entries already in the plan follow the milestone's planned due date, so what the
+    // table shows is what the plan saves. A locked entry is left exactly as it is: its
+    // occurrence exists and the date it was frozen with is the one AR bills on.
+    const syncedEntries = currentEntries.map((entry) => {
+      const plannedDate = milestoneById.get(entry.pmsMilestoneId)?.plannedCompletionDate || "";
+      if (!plannedDate || entry.billingDate === plannedDate || isMilestoneEntryLocked(entry)) {
+        if (entry.billingDate) takenDates.add(entry.billingDate);
+        return entry;
+      }
+      takenDates.add(plannedDate);
+      changed = true;
+      return { ...entry, billingDate: plannedDate };
+    });
+
+    const newEntries = milestones
+      .filter((milestone) => isMilestoneEligible(milestone) && !entryByMilestone.has(milestone.pmsMilestoneId))
+      .map((milestone) => {
+        const billingDate = milestone.plannedCompletionDate || nextFreeDate(today, takenDates);
         takenDates.add(billingDate);
         return {
           clientKey: `pms-milestone-${milestone.pmsMilestoneId}`,
@@ -152,16 +158,11 @@ export default function PmsMilestoneSelectionPanel({
           billingDate,
           remarks: milestone.name,
         };
-      }),
-    ]);
-  }, [status, milestones, entries, entryByMilestone, onEntriesChange, today]);
+      });
 
-  const patchEntry = (pmsMilestoneId, patch) => {
-    if (isMilestoneEntryLocked(entryByMilestone.get(pmsMilestoneId))) {
-      return;
-    }
-    onEntriesChange(entries.map((e) => (e.pmsMilestoneId === pmsMilestoneId ? { ...e, ...patch } : e)));
-  };
+    if (!changed && newEntries.length === 0) return;
+    onEntriesChange([...syncedEntries, ...newEntries]);
+  }, [status, milestones, entries, entryByMilestone, milestoneById, onEntriesChange, today]);
 
   const removeEntry = (pmsMilestoneId) => {
     if (isMilestoneEntryLocked(entryByMilestone.get(pmsMilestoneId))) {
@@ -257,6 +258,18 @@ export default function PmsMilestoneSelectionPanel({
                   const isFrozen = entryState === MILESTONE_ENTRY_STATE.FROZEN;
                   const isStateUnknown = entryState === MILESTONE_ENTRY_STATE.UNKNOWN;
                   const isLocked = isFrozen || isStateUnknown;
+
+                  // The billing date IS the PMS planned due date — shown for every milestone,
+                  // billed or not. A locked entry shows the date its occurrence was opened on,
+                  // which is what AR bills, even if PMS has since moved the due date.
+                  const billingDate =
+                    selected && isLocked
+                      ? entry.billingDate || milestone.plannedCompletionDate
+                      : milestone.plannedCompletionDate;
+                  const billingDateTitle =
+                    selected && isLocked && entry.billingDate && entry.billingDate !== milestone.plannedCompletionDate
+                      ? "Billing has started on this date; the PMS planned due date has changed since."
+                      : "From the PMS planned due date.";
 
                   const billingStateUpper = milestone.billingState ? String(milestone.billingState).toUpperCase() : "";
                   const isAlreadyBilled = Boolean(
@@ -387,24 +400,19 @@ export default function PmsMilestoneSelectionPanel({
                           </span>
                         )}
                       </td>
-                      <td className="px-3.5 py-3">
-                        {selected ? (
-                          <input
-                            type="date"
-                            aria-label={`Billing date for ${milestone.code || milestone.pmsMilestoneId}`}
-                            value={entry.billingDate || today}
-                            min={earliestSelectableDate(entry.billingDate, today)}
-                            disabled={isLocked}
-                            onChange={(event) => {
-                              const nextDate = event.target.value;
-                              // The picker's min is advisory, so a typed-in past date is rejected here too.
-                              if (nextDate && nextDate < earliestSelectableDate(entry.billingDate, today)) return;
-                              patchEntry(milestone.pmsMilestoneId, { billingDate: nextDate });
-                            }}
-                            className={`${fieldInput} w-40 border-slate-300 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed`}
-                          />
+                      <td className="whitespace-nowrap px-3.5 py-3 tabular-nums">
+                        {billingDate ? (
+                          <span data-testid={`billing-date-${rowKey}`} title={billingDateTitle}>
+                            {formatDisplayDate(billingDate)}
+                          </span>
                         ) : (
-                          <span className="text-slate-300">—</span>
+                          <span
+                            className="text-[11px] font-medium text-amber-700"
+                            data-testid={`billing-date-unavailable-${rowKey}`}
+                            title="PMS did not report a planned due date for this milestone."
+                          >
+                            No due date
+                          </span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3.5 py-3 text-right font-semibold tabular-nums text-slate-900">

@@ -294,6 +294,7 @@ export default function SupplementaryClaimsPage() {
                 label: `${r.reportNumber || r.reportId} — ${r.title || "Expense report"} (${settledHow(r)})`,
               }))}
               placeholder="Select a report"
+              maxVisibleOptions={6}
             />
             {checking && <p className="text-sm text-gray-500">Checking eligibility…</p>}
             {eligibility && !checking && (

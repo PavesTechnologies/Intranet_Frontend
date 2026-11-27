@@ -167,6 +167,9 @@ const row = (code) => screen.getByTestId(`milestone-row-${code}`);
 const expectBilled = (code) => expect(row(code)).toHaveAttribute("data-billed", "yes");
 const expectNotBilled = (code) => expect(row(code)).toHaveAttribute("data-billed", "no");
 const arPercent = (code) => screen.getByTestId(`ar-percentage-${code}`);
+// The billing date is the PMS planned due date, rendered as text: no row field is editable.
+const billingDateCell = (code) => screen.getByTestId(`billing-date-${code}`);
+const expectNoDateFields = () => expect(screen.queryByLabelText(/Billing date for/)).not.toBeInTheDocument();
 
 const dateOnly = (date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -243,8 +246,8 @@ describe("MilestonePlanForm — PMS milestones", () => {
     expect(configId).toBe("cfg-1");
     expect(payload.paymentStructure).toBe("MILESTONES");
     expect(payload.entries).toEqual([
-      { sequence: 1, percentage: 60, billingDate: dayFromToday(0), remarks: "Milestone M-1", pmsMilestoneId: 11 },
-      { sequence: 2, percentage: 40, billingDate: dayFromToday(1), remarks: "Milestone M-2", pmsMilestoneId: 12 },
+      { sequence: 1, percentage: 60, billingDate: "2026-12-15", remarks: "Milestone M-1", pmsMilestoneId: 11 },
+      { sequence: 2, percentage: 40, billingDate: "2027-01-20", remarks: "Milestone M-2", pmsMilestoneId: 12 },
     ]);
     payload.entries.forEach((e) => expect(typeof e.pmsMilestoneId).toBe("number"));
   });
@@ -266,7 +269,7 @@ describe("MilestonePlanForm — PMS milestones", () => {
     const [, payload] = createMilestonePlanConfiguration.mock.calls[0];
     expect(payload.paymentStructure).toBe("MILESTONES");
     expect(payload.entries).toEqual([
-      { sequence: 1, percentage: 70, billingDate: dayFromToday(0), remarks: "Milestone M-1", pmsMilestoneId: 11 },
+      { sequence: 1, percentage: 70, billingDate: "2026-12-15", remarks: "Milestone M-1", pmsMilestoneId: 11 },
     ]);
   });
 
@@ -313,20 +316,41 @@ describe("MilestonePlanForm — PMS milestones", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /save milestone plan/i })).not.toBeDisabled());
   });
 
-  it("defaults each milestone to its own date from today on, and blocks saving if two are made to collide", async () => {
+  it("bills each milestone on its PMS planned due date, shown as read-only text", async () => {
     render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
     await chooseMilestonesPlan();
 
-    // Defaults: today, then the next free day - never a duplicate, and never in the past.
-    await waitFor(() => expect(screen.getByLabelText("Billing date for M-1")).toHaveValue(dayFromToday(0)));
-    expect(screen.getByLabelText("Billing date for M-2")).toHaveValue(dayFromToday(1));
-    expect(screen.getByLabelText("Billing date for M-2")).toHaveAttribute("min", dayFromToday(0));
+    await waitFor(() => expect(billingDateCell("M-1")).toHaveTextContent("15 Dec 2026"));
+    expect(billingDateCell("M-2")).toHaveTextContent("20 Jan 2027");
+    expectNoDateFields();
     expect(screen.getByRole("button", { name: /save milestone plan/i })).not.toBeDisabled();
+  });
 
-    fireEvent.change(screen.getByLabelText("Billing date for M-2"), { target: { value: dayFromToday(0) } });
+  it("blocks saving when two milestones share a planned due date", async () => {
+    getProjectMilestones.mockResolvedValue([
+      milestone(11, "M-1", "2026-12-15"),
+      milestone(12, "M-2", "2026-12-15"),
+    ]);
+    render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
+    await chooseMilestonesPlan();
 
-    expect(screen.getByRole("button", { name: /save milestone plan/i })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: /save milestone plan/i })).toBeDisabled());
     expect(screen.getByText(/Each milestone must have a unique billing date/i)).toBeInTheDocument();
+  });
+
+  it("falls back to a free date for a milestone PMS gave no due date", async () => {
+    getProjectMilestones.mockResolvedValue([milestone(11, "M-1", "")]);
+    render(<Harness initial={{ paymentStructure: "FULL_PAYMENT", entries: [{ billingDate: "2026-12-15", percentage: 100 }] }} />);
+    await chooseMilestonesPlan();
+
+    await waitFor(() => expect(screen.getByTestId("billing-date-unavailable-M-1")).toBeInTheDocument());
+    const save = screen.getByRole("button", { name: /save milestone plan/i });
+    await waitFor(() => expect(save).not.toBeDisabled());
+    fireEvent.click(save);
+
+    await waitFor(() => expect(createMilestonePlanConfiguration).toHaveBeenCalledTimes(1));
+    const [, payload] = createMilestonePlanConfiguration.mock.calls[0];
+    expect(payload.entries[0].billingDate).toBe(dayFromToday(0));
   });
 
   it("shows the backend's claim-conflict message, keeps the selection, and does not report success", async () => {
@@ -360,9 +384,9 @@ describe("MilestonePlanForm — PMS milestones", () => {
 
     await waitFor(() => expectBilled("M-1"));
     expectBilled("M-2");
-    // the saved percentage and date are kept as stored, not overwritten by the PMS allocation or today
+    // the saved percentage is kept as stored, not overwritten by the PMS allocation
     expect(arPercent("M-1")).toHaveTextContent("60%");
-    expect(screen.getByLabelText("Billing date for M-2")).toHaveValue("2027-01-20");
+    expect(billingDateCell("M-2")).toHaveTextContent("20 Jan 2027");
 
     const update = screen.getByRole("button", { name: /update milestone plan/i });
     await waitFor(() => expect(update).not.toBeDisabled());
@@ -624,14 +648,10 @@ describe("MilestonePlanForm — PMS milestones", () => {
     render(<Harness initial={{}} />);
     await waitFor(() => expectBilled("M-1"));
 
-    // M-1 is frozen: its date is locked and the Billed / Locked indicator is visible
+    // M-1 is frozen: the Billed / Locked indicator is visible and it keeps its own date
     expect(screen.getByTestId("frozen-indicator-11")).toBeInTheDocument();
-    expect(screen.getByLabelText("Billing date for M-1")).toBeDisabled();
-
-    // M-2 is not frozen: its date can still be changed
-    const m2Date = screen.getByLabelText("Billing date for M-2");
-    expect(m2Date).not.toBeDisabled();
-    fireEvent.change(m2Date, { target: { value: "2027-02-20" } });
+    expect(billingDateCell("M-1")).toHaveTextContent("15 Dec 2026");
+    expectNoDateFields();
 
     // Save/update plan: frozen entry remains unchanged in payload
     const updateBtn = screen.getByRole("button", { name: /update milestone plan/i });
@@ -649,8 +669,8 @@ describe("MilestonePlanForm — PMS milestones", () => {
       remarks: "Milestone M-1",
       pmsMilestoneId: 11,
     });
-    expect(payload.entries[1].percentage).toBe(40); // read-only: unchanged by the date edit
-    expect(payload.entries[1].billingDate).toBe("2027-02-20");
+    expect(payload.entries[1].percentage).toBe(40); // read-only: the PMS allocation stands
+    expect(payload.entries[1].billingDate).toBe("2027-01-20"); // M-2's PMS planned due date
   });
 
   it("does not treat a RESERVED milestone as frozen: its entry in the current plan stays editable", async () => {
@@ -669,8 +689,8 @@ describe("MilestonePlanForm — PMS milestones", () => {
     render(<Harness initial={{}} />);
     await waitFor(() => expectBilled("M-1"));
 
-    // M-1 is RESERVED, but NOT frozen! Its date is still editable and it carries no lock.
-    expect(screen.getByLabelText("Billing date for M-1")).not.toBeDisabled();
+    // M-1 is RESERVED, but NOT frozen! It carries no lock and tracks the PMS due date.
+    expect(billingDateCell("M-1")).toHaveTextContent("15 Dec 2026");
     expect(screen.queryByTestId("frozen-indicator-11")).not.toBeInTheDocument();
     expect(screen.queryByTestId("unknown-state-indicator-11")).not.toBeInTheDocument();
     expect(arPercent("M-1")).toHaveTextContent("50%"); // the saved share, not the PMS allocation
@@ -727,14 +747,12 @@ describe("MilestonePlanForm — PMS milestones", () => {
     render(<Harness initial={{}} />);
     await waitFor(() => expectBilled("M-1"));
 
-    for (const code of ["M-1", "M-2"]) {
-      expectBilled(code);
-      expect(screen.getByLabelText(`Billing date for ${code}`)).not.toBeDisabled();
-    }
+    for (const code of ["M-1", "M-2"]) expectBilled(code);
     expect(screen.queryByTestId("frozen-indicator-11")).not.toBeInTheDocument();
     expect(screen.queryByTestId("unknown-state-indicator-11")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Billing date for M-1"), { target: { value: "2027-03-05" } });
-    expect(screen.getByLabelText("Billing date for M-1")).toHaveValue("2027-03-05");
+    // Unfrozen entries follow the PMS due date rather than whatever was saved before.
+    expect(billingDateCell("M-1")).toHaveTextContent("15 Dec 2026");
+    expect(billingDateCell("M-2")).toHaveTextContent("20 Jan 2027");
   });
 
   it("occurrenceStatus TAX_PENDING / TAX_CALCULATED / INVOICED or invoiced:true do not override an explicit frozen:false", async () => {
@@ -755,8 +773,7 @@ describe("MilestonePlanForm — PMS milestones", () => {
     render(<Harness initial={{}} />);
     await waitFor(() => expectBilled("M-1"));
 
-    expect(screen.getByLabelText("Billing date for M-1")).not.toBeDisabled();
-    expect(screen.getByLabelText("Billing date for M-2")).not.toBeDisabled();
+    expectNoDateFields();
     expect(screen.queryByTestId("frozen-indicator-11")).not.toBeInTheDocument();
     expect(screen.queryByTestId("frozen-indicator-12")).not.toBeInTheDocument();
   });
@@ -776,13 +793,12 @@ describe("MilestonePlanForm — PMS milestones", () => {
     await waitFor(() => expectBilled("M-1"));
 
     // locked although the milestone-level state says AVAILABLE: the entry's own field decides
-    expect(screen.getByLabelText("Billing date for M-1")).toBeDisabled();
     expect(screen.getByTestId("frozen-indicator-11")).toBeInTheDocument();
     expect(screen.getByTestId("frozen-occurrence-11")).toHaveTextContent("TAX_CALCULATED");
-    // a locked entry is never rewritten by the auto-fill: its saved share stands
+    // a locked entry is never rewritten by the auto-fill: its saved share and date stand
     expect(arPercent("M-1")).toHaveTextContent("30%");
-    fireEvent.change(screen.getByLabelText("Billing date for M-1"), { target: { value: "2027-06-06" } });
-    expect(screen.getByLabelText("Billing date for M-1")).toHaveValue("2026-12-15");
+    expect(billingDateCell("M-1")).toHaveTextContent("15 Dec 2026");
+    expectNoDateFields();
   });
 
   it("a saved entry without a frozen field is kept read-only as 'unknown' and is NOT resolved from the milestone billingState", async () => {
@@ -808,8 +824,10 @@ describe("MilestonePlanForm — PMS milestones", () => {
       expect(screen.queryByTestId(`frozen-indicator-${id}`)).not.toBeInTheDocument();
       expect(screen.getByTestId(`unknown-state-indicator-${id}`)).toBeInTheDocument();
     }
-    expect(screen.getByLabelText("Billing date for M-1")).toBeDisabled();
-    expect(screen.getByLabelText("Billing date for M-2")).toBeDisabled();
+    // read-only, and the saved dates stand: an unknown-state entry is never rewritten
+    expect(billingDateCell("M-1")).toHaveTextContent("15 Dec 2026");
+    expect(billingDateCell("M-2")).toHaveTextContent("20 Jan 2027");
+    expectNoDateFields();
   });
 
   it("a frozen entry stays protected and does not block saving when its PMS milestone is absent from the list", async () => {
@@ -902,7 +920,7 @@ describe("MilestonePlanForm — PMS milestones", () => {
 
     await waitFor(() => expect(showStatusToast).toHaveBeenCalledWith("Milestone plan configuration saved", "success"));
     expect(screen.queryByTestId("unknown-state-indicator-11")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Billing date for M-1")).not.toBeDisabled();
+    expect(billingDateCell("M-1")).toHaveTextContent("15 Dec 2026");
   });
 
   it("reloading the milestone list (Retry after a failed load) preserves all saved entries and never changes their frozen state from the milestone billingState", async () => {
@@ -936,9 +954,9 @@ describe("MilestonePlanForm — PMS milestones", () => {
     await screen.findByText("In Billing");
     expect(screen.queryByTestId("frozen-indicator-11")).not.toBeInTheDocument();
     expectBilled("M-1");
-    expect(screen.getByLabelText("Billing date for M-1")).not.toBeDisabled();
+    expect(billingDateCell("M-1")).toHaveTextContent("15 Dec 2026");
     expectBilled("M-2");
-    expect(screen.getByLabelText("Billing date for M-2")).not.toBeDisabled();
+    expect(billingDateCell("M-2")).toHaveTextContent("20 Jan 2027");
   });
 
   it("a failed milestone-list response does not silently remove saved entries and blocks saving", async () => {

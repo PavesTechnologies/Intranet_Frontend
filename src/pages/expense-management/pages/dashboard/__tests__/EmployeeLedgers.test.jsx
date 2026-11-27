@@ -8,7 +8,7 @@ import EmployeeLedgers from "@/pages/expense-management/components/dashboard/Emp
 // 1,200 from the advance, 300 extra to the bank. Total = direct + advance.
 const KPI = {
   drClaimed: 1000, drNotApproved: 0, drApproved: 1000, drPayable: 1000, drToSendAp: 0, drPendingAp: 0, drPaid: 1000,
-  caRequested: 12000, caApproved: 11000, caDisbursed: 9000, caUsedOnBills: 1200, caReturned: 4800, caCarriedForward: 0, caOutstanding: 3000, caRecordGap: 0,
+  caRequested: 12000, caAwaitingApproval: 0, caCarriedIn: 0, caReducedOnApproval: 1000, caIncreasedOnApproval: 0, caApproved: 11000, caDisbursed: 9000, caUsedOnBills: 1200, caReturned: 4800, caCarriedForward: 0, caCarriedInReceived: 0, caOutstanding: 3000, caRecordGap: 0,
   avClaimed: 1500, avApproved: 1500, avAdvanceOffset: 1200, avPayable: 300, avToSendAp: 0, avPendingAp: 300, avPaid: 0,
   erClaimed: 2500, erApproved: 2500, erAdvanceOffset: 1200, erPayable: 1300, erToSendAp: 0, erPendingAp: 300, erPaid: 1000,
 };
@@ -87,6 +87,29 @@ describe("employee ledgers", () => {
     const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={{ ...byKey, caCarryUnmatched: { key: "caCarryUnmatched", value: 0 } }} currency="INR" />);
     expect(container.querySelector('[data-kpi="caCarriedIn"]')).toBeNull();
     expect(container.querySelector("[data-carry-unmatched]")).toBeNull();
+  });
+
+  it("shows requested as one total that already includes the carried-in balance, never below approved", () => {
+    const carry = {
+      ...byKey,
+      ...toByKey({ caRequested: 70500, caCarriedIn: 3018, caReducedOnApproval: 1500, caApproved: 72018, caDisbursed: 65500 }),
+    };
+    const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={carry} currency="INR" />);
+    const advance = ledger(container, "em-advance-ledger");
+    expect(amount(advance, "caRequested")).toMatch(/73,518/);
+    expect(advance.querySelector('[data-kpi="caRequested"]').textContent).toMatch(/including INR 3,018.00 from your earlier advance/);
+    expect(advance.querySelector('[data-kpi="caCarriedIn"]')).toBeNull();
+    expect(advance.querySelector('[data-kpi="caRequestedTotal"]')).toBeNull();
+    expect(amount(advance, "caReducedOnApproval")).toMatch(/^−.*1,500/);
+    expect(amount(advance, "caApproved")).toMatch(/72,018/);
+    expect(amount(advance, "caNotPaidOut")).toMatch(/^−.*3,500/);
+  });
+
+  it("shows no not-yet-paid-out row when everything approved was paid out", () => {
+    const paid = { ...byKey, caDisbursed: { key: "caDisbursed", value: 11000 } };
+    const { container } = render(<EmployeeLedgers ledgers={ledgers} byKey={paid} currency="INR" />);
+    expect(container.querySelector('[data-kpi="caNotPaidOut"]')).toBeNull();
+    expect(amount(container, "caApproved")).toMatch(/11,000/);
   });
 
   it("shows a dash for a missing figure", () => {
