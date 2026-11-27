@@ -672,6 +672,307 @@ export async function acquireBillingRecord(billingConfigurationId, periodStart, 
   }
 }
 
+function toOptionalNumber(val) {
+  if (val === null || val === undefined || val === "") return null;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Maps the backend NextBillingPeriodResponseDto onto the shape the UI reads.
+ * Only reshapes fields — the period itself is passed through exactly as the
+ * backend computed it (the backend is the single source of truth for periods).
+ */
+export function normalizeNextBillingPeriod(dto, fallbackMessage = "") {
+  const d = dto && typeof dto === "object" ? dto : {};
+  const billingPeriodStart = toIsoDateOnly(d.billingPeriodStart) || null;
+  const billingPeriodEnd = toIsoDateOnly(d.billingPeriodEnd) || null;
+  const hasPeriod = Boolean(billingPeriodStart && billingPeriodEnd);
+  return {
+    projectId: d.projectId ?? null,
+    billingConfigurationId: d.billingConfigurationId ?? null,
+    billingFrequency: d.billingFrequency || null,
+    effectiveFrom: toIsoDateOnly(d.effectiveFrom) || null,
+    billingPeriodStart,
+    billingPeriodEnd,
+    hasPeriod,
+    partialPeriod: Boolean(d.partialPeriod),
+    periodEnded: Boolean(d.periodEnded),
+    // Acquisition can only ever be offered for a concrete period.
+    acquisitionAllowed: Boolean(d.acquisitionAllowed) && hasPeriod,
+    alreadyInvoiced: Boolean(d.alreadyInvoiced),
+    returnedRecordCount: toOptionalNumber(d.returnedRecordCount),
+    eligibleRecordCount: toOptionalNumber(d.eligibleRecordCount),
+    eligibleHours: toOptionalNumber(d.eligibleHours),
+    alreadyClaimedCount: toOptionalNumber(d.alreadyClaimedCount),
+    notApprovedCount: toOptionalNumber(d.notApprovedCount),
+    invalidHoursCount: toOptionalNumber(d.invalidHoursCount),
+    alreadyClaimedTimesheetIds: Array.isArray(d.alreadyClaimedTimesheetIds) ? d.alreadyClaimedTimesheetIds : [],
+    previousSnapshotId: d.previousSnapshotId ?? null,
+    previousPeriodStart: toIsoDateOnly(d.previousPeriodStart) || null,
+    previousPeriodEnd: toIsoDateOnly(d.previousPeriodEnd) || null,
+    previousSnapshotStatus: d.previousSnapshotStatus || null,
+    previousPeriodInvoiced: Boolean(d.previousPeriodInvoiced),
+    reason: (typeof d.reason === "string" && d.reason.trim()) || fallbackMessage || "",
+    // Earlier periods with unbilled records that cannot be acquired now. Informational only:
+    // they never affect acquisitionAllowed for this period. Absent on older backends.
+    warnings: Array.isArray(d.warnings)
+      ? d.warnings.filter((w) => typeof w === "string" && w.trim()).map((w) => w.trim())
+      : [],
+  };
+}
+
+/**
+ * Calls GET /api/billing-data-acquisition/configurations/{id}/next-period.
+ * Read-only on the backend: it creates no snapshot and claims no timesheet.
+ * A TMS outage is reported by the backend as acquisitionAllowed=false with a
+ * reason, not as an HTTP error; HTTP/network failures are thrown with a safe message.
+ */
+export async function fetchNextBillingPeriod(billingConfigurationId) {
+  if (!isValidUuid(billingConfigurationId)) {
+    const err = new Error("This project has no valid billing configuration ID, so its next billing period cannot be determined.");
+    err.status = 400;
+    throw err;
+  }
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition/configurations/${encodeURIComponent(
+    billingConfigurationId.trim()
+  )}/next-period`;
+  try {
+    const response = await api.get(endpoint);
+    const json = response?.data;
+    const dto = json && typeof json === "object" && "data" in json ? json.data : json;
+    return normalizeNextBillingPeriod(dto, json?.message);
+  } catch (err) {
+    const status = err?.response?.status || err?.status;
+    let message;
+    if (!err?.response) {
+      message = "The AR billing service could not be reached. Check your connection and try again.";
+    } else if (status === 401 || status === 403) {
+      message = "You do not have permission to view billing periods for this configuration.";
+    } else {
+      message = getSafeBackendErrorMessage(err, "The next billing period could not be loaded. Please try again.");
+    }
+    const wrapped = new Error(message);
+    wrapped.status = status;
+    wrapped.isNetworkError = !err?.response;
+    throw wrapped;
+  }
+}
+
+// ── Incremental Time & Material billing ─────────────────────────
+// Backend: BillingPeriodDiscoveryResponseDto / BillingPeriodAcquisitionDto /
+// ExistingBillingBatchDto (period discovery) and BillingSnapshotResponseDto
+// (batch creation). Field names below are the DTOs' JSON names; nothing is
+// derived except null-safe defaults.
+
+export const PERIOD_READINESS = Object.freeze({
+  READY: "READY",
+  NO_NEW_ITEMS: "NO_NEW_ITEMS",
+  BLOCKED: "BLOCKED",
+  SOURCE_UNAVAILABLE: "SOURCE_UNAVAILABLE",
+});
+
+function toBackendErrorMessage(err, fallback) {
+  const status = err?.response?.status || err?.status;
+  if (!err?.response) {
+    return "The AR billing service could not be reached. Check your connection and try again.";
+  }
+  if (status === 403) {
+    return "You do not have permission to perform billing acquisition for this configuration.";
+  }
+  if (status === 401) {
+    return "Your session has expired. Please sign in again.";
+  }
+  return getSafeBackendErrorMessage(err, fallback);
+}
+
+function wrapBackendError(err, fallback) {
+  const wrapped = new Error(toBackendErrorMessage(err, fallback));
+  wrapped.status = err?.response?.status || err?.status;
+  wrapped.isNetworkError = !err?.response;
+  return wrapped;
+}
+
+function requireConfigurationId(billingConfigurationId) {
+  if (!isValidUuid(billingConfigurationId)) {
+    const err = new Error("This project has no valid billing configuration ID.");
+    err.status = 400;
+    throw err;
+  }
+  return billingConfigurationId.trim();
+}
+
+function normalizeExistingBatch(b) {
+  return {
+    snapshotId: b?.snapshotId ?? null,
+    // The snapshot's own period; differs from the billing period for a non-aligned snapshot.
+    billingPeriodStart: toIsoDateOnly(b?.billingPeriodStart) || null,
+    billingPeriodEnd: toIsoDateOnly(b?.billingPeriodEnd) || null,
+    // null when an older backend does not send the flag.
+    periodAligned: typeof b?.periodAligned === "boolean" ? b.periodAligned : null,
+    snapshotNumber: b?.snapshotNumber || null,
+    batchSequence: toOptionalNumber(b?.batchSequence),
+    snapshotStatus: b?.snapshotStatus || null,
+    totalAmount: toOptionalNumber(b?.totalAmount),
+    timesheetCount: toOptionalNumber(b?.timesheetCount) ?? 0,
+    expenseCount: toOptionalNumber(b?.expenseCount) ?? 0,
+    createdDate: b?.createdDate || null,
+    invoiceId: b?.invoiceId ?? null,
+    invoiceNumber: b?.invoiceNumber || null,
+    invoiceStatus: b?.invoiceStatus || null,
+  };
+}
+
+function normalizeAcquisitionPeriod(p) {
+  const billingPeriodStart = toIsoDateOnly(p?.billingPeriodStart) || null;
+  const billingPeriodEnd = toIsoDateOnly(p?.billingPeriodEnd) || null;
+  return {
+    key: `${billingPeriodStart}..${billingPeriodEnd}`,
+    periodNumber: toOptionalNumber(p?.periodNumber),
+    billingPeriodStart,
+    billingPeriodEnd,
+    billingDate: toIsoDateOnly(p?.billingDate) || null,
+    partialPeriod: Boolean(p?.partialPeriod),
+    periodEnded: Boolean(p?.periodEnded),
+    newTimesheetCount: toOptionalNumber(p?.newTimesheetCount),
+    newBillableHours: toOptionalNumber(p?.newBillableHours),
+    estimatedTimesheetAmount: toOptionalNumber(p?.estimatedTimesheetAmount),
+    newExpenseCount: toOptionalNumber(p?.newExpenseCount),
+    newExpenseAmount: toOptionalNumber(p?.newExpenseAmount),
+    hasNewItems: Boolean(p?.hasNewItems),
+    previouslyAcquired: Boolean(p?.previouslyAcquired),
+    rateValidationPassed: p?.rateValidationPassed ?? null,
+    readiness: p?.readiness || null,
+    blockingReasons: Array.isArray(p?.blockingReasons) ? p.blockingReasons.filter(Boolean) : [],
+    batches: Array.isArray(p?.batches) ? p.batches.map(normalizeExistingBatch) : [],
+    // Display only: snapshots whose own period overlaps this one but is not a configured billing
+    // period (e.g. a legacy calendar-month snapshot on a weekly schedule). Never batches of this period.
+    overlappingSnapshots: Array.isArray(p?.overlappingSnapshots)
+      ? p.overlappingSnapshots.map(normalizeExistingBatch)
+      : [],
+  };
+}
+
+export function normalizeBillingPeriodDiscovery(dto) {
+  const d = dto && typeof dto === "object" ? dto : {};
+  return {
+    billingConfigurationId: d.billingConfigurationId ?? null,
+    projectId: d.projectId ?? null,
+    billingFrequency: d.billingFrequency || null,
+    scheduleStart: toIsoDateOnly(d.scheduleStart) || null,
+    scheduleEnd: toIsoDateOnly(d.scheduleEnd) || null,
+    expenseBillingEnabled: Boolean(d.expenseBillingEnabled),
+    asOf: toIsoDateOnly(d.asOf) || null,
+    warnings: Array.isArray(d.warnings) ? d.warnings.filter(Boolean) : [],
+    periods: Array.isArray(d.periods) ? d.periods.map(normalizeAcquisitionPeriod) : [],
+  };
+}
+
+/**
+ * GET /api/billing-data-acquisition/configurations/{id}/periods?onlyWithNewItems=…
+ * Read-only: every started billing period with its newly eligible records,
+ * readiness, blocking reasons and existing batches/invoices.
+ */
+export async function fetchBillingPeriods(billingConfigurationId, { onlyWithNewItems = false } = {}) {
+  const id = requireConfigurationId(billingConfigurationId);
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition/configurations/${encodeURIComponent(id)}/periods`;
+  try {
+    const response = await api.get(endpoint, { params: { onlyWithNewItems: Boolean(onlyWithNewItems) } });
+    const json = response?.data;
+    if (json && json.success === false) {
+      const err = new Error(json.message || "Billing periods could not be loaded.");
+      err.status = 200;
+      throw err;
+    }
+    const dto = json && typeof json === "object" && "data" in json ? json.data : json;
+    return normalizeBillingPeriodDiscovery(dto);
+  } catch (err) {
+    if (err?.status === 200) throw err;
+    throw wrapBackendError(err, "Billing periods could not be loaded. Please try again.");
+  }
+}
+
+/** One key per user acquisition action; a retry after an unknown outcome reuses it. */
+export function generateIdempotencyKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // RFC 4122 v4 fallback for browsers without crypto.randomUUID (non-secure contexts).
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+// Backend wording for "nothing new" (BillingSnapshotServiceImpl: no batch is created).
+const NO_NEW_ITEMS_MESSAGE = /^no new approved, billable timesheets or eligible expenses/i;
+
+/**
+ * POST /api/billing-data-acquisition/configurations/{id}/batches
+ * Body: { billingPeriodStart, billingPeriodEnd, idempotencyKey }.
+ * Returns { success, message, noNewItems, snapshot } where snapshot is the raw
+ * BillingSnapshotResponseDto. success=false arrives as HTTP 200 and creates nothing.
+ * HTTP failures throw with a safe message; err.outcomeUnknown marks failures
+ * where the batch may still have been created (network / 5xx).
+ */
+export async function createIncrementalBatch(billingConfigurationId, { billingPeriodStart, billingPeriodEnd, idempotencyKey }) {
+  const id = requireConfigurationId(billingConfigurationId);
+  const start = toIsoDateOnly(billingPeriodStart);
+  const end = toIsoDateOnly(billingPeriodEnd);
+  if (!start || !end) {
+    throw new Error("Billing period start and end are required.");
+  }
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition/configurations/${encodeURIComponent(id)}/batches`;
+  try {
+    const response = await api.post(endpoint, {
+      billingPeriodStart: start,
+      billingPeriodEnd: end,
+      idempotencyKey: idempotencyKey || null,
+    });
+    const json = response?.data || {};
+    const message = typeof json.message === "string" ? json.message : "";
+    if (json.success === false) {
+      return { success: false, message, noNewItems: NO_NEW_ITEMS_MESSAGE.test(message), snapshot: null };
+    }
+    const snapshot = json.data && typeof json.data === "object" ? json.data : null;
+    return { success: Boolean(snapshot), message, noNewItems: false, snapshot };
+  } catch (err) {
+    const wrapped = wrapBackendError(err, "The billing batch could not be created. Please try again.");
+    wrapped.outcomeUnknown = !err?.response || (err.response.status >= 500);
+    throw wrapped;
+  }
+}
+
+/**
+ * GET /api/v1/billing-snapshots?billingConfigurationId=… — every batch
+ * (snapshot) of the configuration as full BillingSnapshotResponseDto objects.
+ */
+export async function fetchBillingSnapshotsByConfiguration(billingConfigurationId) {
+  const id = requireConfigurationId(billingConfigurationId);
+  try {
+    const response = await api.get(`${AR_BASE_URL}/api/v1/billing-snapshots`, {
+      params: { billingConfigurationId: id },
+    });
+    const json = response?.data;
+    if (json && json.success === false) {
+      const err = new Error(json.message || "Billing snapshots could not be loaded.");
+      err.status = 200;
+      throw err;
+    }
+    const list = json && typeof json === "object" && "data" in json ? json.data : json;
+    return Array.isArray(list) ? list : [];
+  } catch (err) {
+    if (err?.status === 200) throw err;
+    throw wrapBackendError(err, "Billing snapshots could not be loaded. Please try again.");
+  }
+}
+
 export function fetchBillingContext(configId) {
   return delay(BILLING_CONTEXTS[configId] || null);
 }
@@ -935,8 +1236,65 @@ export async function getBillingSnapshotByPeriod(
       return null;
     }
 
-    const snapStart = toIsoDateOnly(snapshot.billingPeriodStart) || cleanStart;
-    const snapEnd = toIsoDateOnly(snapshot.billingPeriodEnd) || cleanEnd;
+    const result = mapBillingSnapshotResponse(snapshot, {
+      projectId: numericId,
+      billingConfigurationId: numericConfigId,
+      fallbackStart: cleanStart,
+      fallbackEnd: cleanEnd,
+      message: json.message || "Existing snapshot loaded",
+    });
+
+    saveAcquiredSnapshotMetadata(numericId, {
+      projectId: numericId,
+      billingConfigurationId: result.billingConfigurationId,
+      snapshotId: result.snapshotId,
+      snapshotNumber: result.snapshotNumber,
+      status: result.status,
+      billingPeriodStart: result.billingPeriodStart,
+      billingPeriodEnd: result.billingPeriodEnd,
+      billingPeriod: result.billingPeriod,
+      subtotal: result.subtotal,
+      totalAmount: result.totalAmount,
+      expenseAmount: result.expenseAmount,
+      expenseCount: result.expenseRecords.length,
+    });
+
+    return result;
+  } catch (err) {
+    const status = err.response?.status;
+    if (status === 404 || status === 204) {
+      // Legitimate NOT_FOUND from backend
+      return null;
+    }
+    console.warn(
+      "[billingDataAcquisitionService] getBillingSnapshotByPeriod request failed:",
+      status,
+      err.response?.data?.message || err.message
+    );
+    // Network / server failure: re-throw so callers can distinguish not-found from network failure
+    const error = new Error(
+      err.response?.data?.message || err.message || "Failed to retrieve billing snapshot"
+    );
+    error.status = status;
+    error.isNetworkError = !status || status >= 500;
+    error.response = err.response;
+    throw error;
+  }
+}
+
+/**
+ * Maps one backend BillingSnapshotResponseDto onto the snapshot shape the
+ * acquisition workspace reads. Shared by the by-period lookup and the
+ * incremental batch views so every snapshot is presented the same way.
+ */
+export function mapBillingSnapshotResponse(
+  snapshot,
+  { projectId = null, billingConfigurationId = null, fallbackStart = "", fallbackEnd = "", message = "" } = {}
+) {
+    const numericId = projectId ?? (snapshot?.projectId != null ? Number(snapshot.projectId) : null);
+    const numericConfigId = billingConfigurationId;
+    const snapStart = toIsoDateOnly(snapshot.billingPeriodStart) || fallbackStart;
+    const snapEnd = toIsoDateOnly(snapshot.billingPeriodEnd) || fallbackEnd;
     const formattedPeriod = formatBillingPeriod(snapStart, snapEnd);
 
     const timesheetList = snapshot.timesheets || snapshot.laborRecords || [];
@@ -1032,45 +1390,9 @@ export async function getBillingSnapshotByPeriod(
       readiness,
       isExisting: true,
       existingSnapshot: true,
-      message: json.message || "Existing snapshot loaded",
+      message,
     };
-
-    saveAcquiredSnapshotMetadata(numericId, {
-      projectId: numericId,
-      billingConfigurationId: snapshot.billingConfigurationId || numericConfigId,
-      snapshotId: result.snapshotId,
-      snapshotNumber: result.snapshotNumber,
-      status: result.status,
-      billingPeriodStart: snapStart,
-      billingPeriodEnd: snapEnd,
-      billingPeriod: formattedPeriod,
-      subtotal: result.subtotal,
-      totalAmount: result.totalAmount,
-      expenseAmount,
-      expenseCount: expenseRecords.length,
-    });
-
     return result;
-  } catch (err) {
-    const status = err.response?.status;
-    if (status === 404 || status === 204) {
-      // Legitimate NOT_FOUND from backend
-      return null;
-    }
-    console.warn(
-      "[billingDataAcquisitionService] getBillingSnapshotByPeriod request failed:",
-      status,
-      err.response?.data?.message || err.message
-    );
-    // Network / server failure: re-throw so callers can distinguish not-found from network failure
-    const error = new Error(
-      err.response?.data?.message || err.message || "Failed to retrieve billing snapshot"
-    );
-    error.status = status;
-    error.isNetworkError = !status || status >= 500;
-    error.response = err.response;
-    throw error;
-  }
 }
 
 /**
