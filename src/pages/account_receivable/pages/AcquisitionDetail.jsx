@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Sparkles,
@@ -560,6 +560,47 @@ export default function AcquisitionDetail() {
     };
   }, [projectId]);
  
+  // Project duration bounds — the billing period can never fall outside the
+  // project's own start/end dates, so they drive both the date pickers' min/max
+  // and the guard below.
+  const projectBounds = useMemo(() => {
+    const start = toIsoDateOnly(
+      config?.projectStartDate || config?.effectiveFrom || config?.startDate
+    );
+    const end = toIsoDateOnly(
+      config?.projectEndDate || config?.effectiveTo || config?.endDate
+    );
+    return { start: start || "", end: end || "" };
+  }, [config]);
+
+  const projectDurationLabel =
+    projectBounds.start && projectBounds.end
+      ? formatBillingPeriod(projectBounds.start, projectBounds.end)
+      : config?.projectDuration && config.projectDuration !== "—"
+      ? config.projectDuration
+      : "";
+
+  // Returns a user-facing message when the chosen period is invalid, else null.
+  const getPeriodValidationError = (start, end) => {
+    if (!start || !end) return "Please select both start date and end date.";
+    if (start > end) return "End date must be on or after start date.";
+
+    const { start: projStart, end: projEnd } = projectBounds;
+    if (projStart && start < projStart) {
+      return `Billing period start date cannot be before the project start date (${projStart}).`;
+    }
+    if (projEnd && end > projEnd) {
+      return `Billing period end date cannot be after the project end date (${projEnd}).`;
+    }
+    if (projStart && end < projStart) {
+      return `Billing period end date cannot be before the project start date (${projStart}).`;
+    }
+    if (projEnd && start > projEnd) {
+      return `Billing period start date cannot be after the project end date (${projEnd}).`;
+    }
+    return null;
+  };
+
   const handleTriggerAcquire = (cfg) => {
     if (acquiring) return;
     const currentConfig = cfg || config;
@@ -573,11 +614,14 @@ export default function AcquisitionDetail() {
       return;
     }
  
-    if (start > end) {
-      showStatusToast("End date must be on or after start date.", "warning");
+    const validationError = getPeriodValidationError(start, end);
+    if (validationError) {
+      // Let the user correct the period instead of silently failing.
+      setShowPeriodModal(true);
+      showStatusToast(validationError, "warning");
       return;
     }
- 
+
     executeAcquisition(currentConfig, start, end);
   };
  
@@ -591,12 +635,9 @@ export default function AcquisitionDetail() {
  
   const handleModalProceed = () => {
     if (acquiring) return;
-    if (!periodStart || !periodEnd) {
-      showStatusToast("Please select both start date and end date.", "warning");
-      return;
-    }
-    if (periodStart > periodEnd) {
-      showStatusToast("End date must be on or after start date.", "warning");
+    const validationError = getPeriodValidationError(periodStart, periodEnd);
+    if (validationError) {
+      showStatusToast(validationError, "warning");
       return;
     }
     setShowPeriodModal(false);
@@ -1301,12 +1342,24 @@ export default function AcquisitionDetail() {
         }
       >
         <div className="space-y-4">
+          {projectDurationLabel && (
+            <div className="flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs font-medium text-indigo-800">
+              <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <span>
+                Billing period must fall within the project duration:{" "}
+                <span className="font-semibold">{projectDurationLabel}</span>
+              </span>
+            </div>
+          )}
           <FormInput
             label="Billing Period Start Date *"
             aria-label="Billing Period Start Date"
             name="periodStart"
             type="date"
             value={periodStart}
+            // Days outside the project duration are disabled in the calendar.
+            min={projectBounds.start || undefined}
+            max={periodEnd || projectBounds.end || undefined}
             onChange={(e) => setPeriodStart(e.target.value)}
           />
           <FormInput
@@ -1315,6 +1368,8 @@ export default function AcquisitionDetail() {
             name="periodEnd"
             type="date"
             value={periodEnd}
+            min={periodStart || projectBounds.start || undefined}
+            max={projectBounds.end || undefined}
             onChange={(e) => setPeriodEnd(e.target.value)}
           />
         </div>
