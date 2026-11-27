@@ -256,7 +256,6 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
   const used = num(byKey, "caUsedOnBills");
   const returned = num(byKey, "caReturned");
   const carried = num(byKey, "caCarriedForward");
-  const carriedIn = num(byKey, "caCarriedIn");
   // Carried-in balance inside advances already paid out: held by you, but never new cash, so not in "received".
   const carriedInReceived = num(byKey, "caCarriedInReceived");
   const awaiting = num(byKey, "caAwaitingApproval");

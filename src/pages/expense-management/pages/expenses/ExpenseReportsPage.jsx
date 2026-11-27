@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, CheckCircle2, Download, FileStack, Hourglass, Landmark, ListChecks, Users, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, FileStack, Hourglass, Landmark, ListChecks, Scale, Users, Wallet } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import StatCard from "@/components/Cards/StatCard";
@@ -107,7 +107,8 @@ export default function ExpenseReportsPage() {
     { title: "Claimed", value: money(summary?.claimedAmount), icon: Wallet, subtitle: "Excludes rejected & cancelled" },
     { title: "In Progress", value: money(summary?.inProgressAmount), icon: Hourglass, textColor: "text-amber-600", subtitle: "With approvers, Finance or employee" },
     { title: "Approved", value: money(summary?.approvedAmount), icon: CheckCircle2, textColor: "text-indigo-600", subtitle: "Awaiting payment" },
-    { title: "Reimbursed", value: money(summary?.reimbursedAmount), icon: Landmark, textColor: "text-emerald-600", subtitle: "Paid out" },
+    { title: "Reimbursed", value: money(summary?.reimbursedAmount), icon: Landmark, textColor: "text-emerald-600", subtitle: "Cash paid out" },
+    { title: "Settled", value: money(summary?.settledAmount), icon: Scale, textColor: "text-sky-600", subtitle: "Paid reports, not paid in cash (e.g. advance offset)" },
   ];
 
   const tableRows = pageItems.map((m) => ({
@@ -199,7 +200,7 @@ export default function ExpenseReportsPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
             {kpis.map((k) => (
               <StatCard key={k.title} {...k} />
             ))}
