@@ -40,6 +40,15 @@ describe("employee summary banner", () => {
     expect(line(container, "erPayable")).toMatch(/To your bank.*1,300/);
   });
 
+  it("nets out carry-forward so Received = Used on bills + returned + Still to settle", () => {
+    // 65,500 cash received; 3,018 carried in from an earlier advance sits inside the outstanding balance.
+    const carry = toByKey({ caDisbursed: 65500, caUsedOnBills: 21514, caReturned: 0, caCarriedForward: 1518, caCarriedInReceived: 3018, caOutstanding: 45486 });
+    const { container } = render(<EmployeeOverview byKey={carry} currency="INR" />);
+    expect(line(container, "caDisbursed")).toMatch(/65,500/);
+    expect(line(container, "caAccounted")).toMatch(/20,014/);
+    expect(main(container, "advance")).toMatch(/45,486/);
+  });
+
   it("shows a dash for a figure that has not loaded, never NaN", () => {
     const { container } = render(<EmployeeOverview byKey={{}} currency="INR" />);
     expect(main(container, "direct")).toBe("-");

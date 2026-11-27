@@ -467,9 +467,9 @@ const customCSS = `
 .login-page-container .ws-line:nth-child(2) > span{animation-delay:120ms,1.9s;background-image:linear-gradient(100deg,var(--pink) 0%,var(--pink) 42%,#FF8AAA 50%,var(--pink) 58%,var(--pink) 100%)}
 .login-page-container .svc-tile{width:38px;height:38px;border-radius:9px;background:#fff;border:1px solid var(--neutral-200);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(12,10,9,.05);color:var(--neutral-600);position:relative;overflow:hidden;transition:all 380ms cubic-bezier(.16,1,.3,1)}
 .login-page-container .lp-text{container-type:inline-size}
-.login-page-container .svc-grid{display:grid;grid-template-columns:repeat(4,84px);gap:16px 4px;justify-content:start}
-.login-page-container .svc-grid .svc-item{align-items:flex-start !important}
-@container (max-width:520px){.login-page-container .svc-grid{grid-template-columns:repeat(4,minmax(0,84px))}}
+.login-page-container .svc-grid{display:grid;grid-template-columns:repeat(4,92px);gap:16px 8px;justify-content:start}
+.login-page-container .svc-grid .svc-item{align-items:center !important;min-width:0}
+@container (max-width:520px){.login-page-container .svc-grid{grid-template-columns:repeat(4,minmax(0,1fr));column-gap:4px;max-width:392px}.login-page-container .svc-label{font-size:9px;letter-spacing:.03em}}
 .login-page-container .svc-label{white-space:nowrap;text-align:center;font-size:10px;font-weight:500;color:var(--neutral-500);letter-spacing:.06em;text-transform:uppercase;transition:color 380ms ease}
 .login-page-container .svc-item .svc-tile,.login-page-container .svc-item .svc-label{opacity:.55;transition:opacity 380ms ease,all 380ms cubic-bezier(.16,1,.3,1)}
 .login-page-container .svc-item.active .svc-tile{opacity:1;transform:translateY(-3px);border-color:var(--accent-600);color:var(--accent-600);box-shadow:0 0 0 4px rgba(10,0,130,.08),0 8px 18px -8px rgba(10,0,130,.4)}
