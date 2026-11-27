@@ -36,7 +36,9 @@ const teamFeedsFor = (token) => {
 export const useApprovalWebSocket = () => useContext(ApprovalWebSocketContext);
 
 export default function ApprovalWebSocketProvider({ children }) {
-  const BASE_URL = (XMS_BASE_URL || "http://localhost:8080");
+  // No fallback host: without EXPENSE_MANAGEMENT_URL the socket would be opened against whichever service
+  // happens to run on that port (e.g. the AR backend on :8080), which rejects /xms/ws/info with 401.
+  const BASE_URL = XMS_BASE_URL;
 
   const clientRef = useRef(null);
   const listeners = useRef({});
@@ -66,7 +68,7 @@ export default function ApprovalWebSocketProvider({ children }) {
   };
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !BASE_URL) {
       if (clientRef.current?.active) {
         clientRef.current.deactivate();
         clientRef.current = null;

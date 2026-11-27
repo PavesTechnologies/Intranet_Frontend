@@ -37,7 +37,7 @@ import DashboardPage from "../DashboardPage";
 // 300 from the advance, 1,200 extra to the bank (700 not yet with AP + 500 waiting). Total = direct + advance.
 const KPI_VALUES = {
   drClaimed: 400, drNotApproved: 0, drApproved: 400, drPayable: 400, drToSendAp: 0, drPendingAp: 0, drPaid: 400,
-  caRequested: 12000, caAwaitingApproval: 0, caCarriedIn: 0, caReducedOnApproval: 1000, caIncreasedOnApproval: 0, caApproved: 11000, caDisbursed: 9000, caSettled: 6000, caUsedOnBills: 300, caReturned: 5700, caCarriedForward: 0, caOutstanding: 3000, caRecordGap: 0,
+  caRequested: 12000, caAwaitingApproval: 0, caCarriedIn: 0, caReducedOnApproval: 1000, caIncreasedOnApproval: 0, caApproved: 11000, caDisbursed: 9000, caSettled: 6000, caUsedOnBills: 300, caReturned: 5700, caCarriedForward: 0, caCarriedInReceived: 0, caOutstanding: 3000, caRecordGap: 0,
   avClaimed: 1500, avNotApproved: 0, avApproved: 1500, avAdvanceOffset: 300, avPayable: 1200, avToSendAp: 700, avPendingAp: 500, avPaid: 0,
   erClaimed: 1900, erNotApproved: 0, erApproved: 1900, erAdvanceOffset: 300, erPayable: 1600,
   erToSendAp: 700, erPendingAp: 500, erPaid: 400,
@@ -102,7 +102,7 @@ describe("employee dashboard: two ledgers", () => {
   it("cash advance ledger reconciles: received = used + returned + carried + still to settle", async () => {
     renderPage();
     await waitFor(() => expect(document.querySelector('[data-check^="Cash advance ledger: Received"]')).not.toBeNull());
-    expect(document.querySelector('[data-check^="Cash advance ledger: Received"]').textContent).toMatch(/Received = Used on bills \+ Returned \+ Carried forward \+ Still to settle/);
+    expect(document.querySelector('[data-check^="Cash advance ledger: Received"]').textContent).toMatch(/Received = Used on bills \+ Returned \+ Carried forward \+ Still to settle − Carried in/);
     expect(document.querySelector('[data-check^="Cash advance ledger: Received"]').textContent).toMatch(/Balanced/);
   });
 

@@ -11,8 +11,9 @@ import { HeroQuickActions } from "./DashboardHero";
 // A column scrolls to its ledger for the detail. Every figure is the backend's; a few lines add two of them together.
 
 const num = (byKey, key) => (byKey[key] ? Number(byKey[key].value) || 0 : 0);
-// Sum of backend figures, or null (shown as "-") until any of them has loaded.
-const sumOf = (byKey, keys) => (keys.some((k) => byKey[k]) ? keys.reduce((a, k) => a + num(byKey, k), 0) : null);
+// Sum of backend figures less the `minus` ones, or null (shown as "-") until any of the added figures has loaded.
+const sumOf = (byKey, keys, minus = []) =>
+  keys.some((k) => byKey[k]) ? keys.reduce((a, k) => a + num(byKey, k), 0) - minus.reduce((a, k) => a + num(byKey, k), 0) : null;
 
 const COLUMNS = [
   {
@@ -34,7 +35,9 @@ const COLUMNS = [
     main: { label: "Still to settle", keys: ["caOutstanding"] },
     lines: [
       { key: "caDisbursed", label: "Received", keys: ["caDisbursed"] },
-      { key: "caAccounted", label: "Used on bills + returned", keys: ["caUsedOnBills", "caReturned", "caCarriedForward"] },
+      // Carry-forward moves money between your own advances: carried forward out of one, carried in to the next.
+      // Netting it out keeps Received = this line + Still to settle.
+      { key: "caAccounted", label: "Used on bills + returned", keys: ["caUsedOnBills", "caReturned", "caCarriedForward"], minus: ["caCarriedInReceived"] },
     ],
   },
   {
@@ -82,7 +85,7 @@ export default function EmployeeOverview({ byKey, currency, quickActions = [] })
                 {c.lines.map((l) => (
                   <div key={l.key} data-money-line={l.key} className="flex justify-between gap-3">
                     <dt className="truncate text-white/60">{l.label}</dt>
-                    <dd className="whitespace-nowrap tabular-nums text-white/90">{money(sumOf(byKey, l.keys), currency)}</dd>
+                    <dd className="whitespace-nowrap tabular-nums text-white/90">{money(sumOf(byKey, l.keys, l.minus), currency)}</dd>
                   </div>
                 ))}
               </dl>

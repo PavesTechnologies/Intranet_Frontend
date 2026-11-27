@@ -258,8 +258,9 @@ export default function SupplementaryClaimsPage() {
       </header>
 
       {/* Raise a new claim against a settled report, in a dialog opened from the page. */}
-      <Modal isOpen={raiseOpen} onClose={closeRaise} title="Raise a new claim" subtitle="Choose the paid or settled report that is missing an expense or receipt." size="lg">
-        <div className="flex flex-col gap-4">
+      <Modal isOpen={raiseOpen} onClose={closeRaise} title="Raise a new claim" subtitle="Choose the paid or settled report that is missing an expense or receipt." size="3xl">
+        {/* min-h leaves room for the report dropdown (label + button + 6 rows) inside the scrolling body, so it is not clipped. */}
+        <div className="flex min-h-[20rem] flex-col gap-4">
         {!checkingAll && notReadyReports.length > 0 && (
           <details className="order-last rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900" data-not-ready-reports>
             <summary className="cursor-pointer font-semibold">
@@ -293,6 +294,7 @@ export default function SupplementaryClaimsPage() {
                 label: `${r.reportNumber || r.reportId} — ${r.title || "Expense report"} (${settledHow(r)})`,
               }))}
               placeholder="Select a report"
+              maxVisibleOptions={6}
             />
             {checking && <p className="text-sm text-gray-500">Checking eligibility…</p>}
             {eligibility && !checking && (
