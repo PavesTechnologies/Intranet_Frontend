@@ -32,10 +32,13 @@ import { dashboardService, expenseReportService } from "@/pages/expense-manageme
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import DashboardPage from "../DashboardPage";
 
-// Advance: 12,000 requested; 9,000 received; 6,000 settled; 3,000 outstanding (9,000 = 6,000 + 3,000).
-// Reimbursement: 1,900 claimed, 1,900 approved, 300 covered by advance, payable 1,600 = 700 + 500 + 400.
+// Direct: 400 approved and paid to the bank.
+// Advance: 9,000 received = 300 used on bills + 5,700 returned + 3,000 still to settle; bills 1,500 approved,
+// 300 from the advance, 1,200 extra to the bank (700 not yet with AP + 500 waiting). Total = direct + advance.
 const KPI_VALUES = {
-  caRequested: 12000, caApproved: 11000, caDisbursed: 9000, caSettled: 6000, caOutstanding: 3000,
+  drClaimed: 400, drNotApproved: 0, drApproved: 400, drPayable: 400, drToSendAp: 0, drPendingAp: 0, drPaid: 400,
+  caRequested: 12000, caAwaitingApproval: 0, caCarriedIn: 0, caReducedOnApproval: 1000, caIncreasedOnApproval: 0, caApproved: 11000, caDisbursed: 9000, caSettled: 6000, caUsedOnBills: 300, caReturned: 5700, caCarriedForward: 0, caOutstanding: 3000, caRecordGap: 0,
+  avClaimed: 1500, avNotApproved: 0, avApproved: 1500, avAdvanceOffset: 300, avPayable: 1200, avToSendAp: 700, avPendingAp: 500, avPaid: 0,
   erClaimed: 1900, erNotApproved: 0, erApproved: 1900, erAdvanceOffset: 300, erPayable: 1600,
   erToSendAp: 700, erPendingAp: 500, erPaid: 400,
 };
@@ -90,37 +93,36 @@ describe("employee dashboard: two ledgers", () => {
     expect(screen.getByText("Cash advance ledger")).toBeInTheDocument();
     expect(rowAmount("caRequested")).toMatch(/12,000/);
     expect(rowAmount("caDisbursed")).toMatch(/9,000/);
-    expect(rowAmount("caSettled")).toMatch(/^−/);
-    expect(rowAmount("caSettled")).toMatch(/6,000/);
+    expect(rowAmount("caUsedOnBills")).toMatch(/^−.*300/);
+    expect(rowAmount("caReturned")).toMatch(/^−.*5,700/);
     expect(rowAmount("caOutstanding")).toMatch(/3,000/);
     expect(rowAmount("caRequested")).not.toMatch(/^−/);
   });
 
-  it("cash advance ledger reconciles: received = settled + outstanding", async () => {
+  it("cash advance ledger reconciles: received = used + returned + carried + still to settle", async () => {
     renderPage();
-    await waitFor(() => expect(document.querySelector('[data-check="Cash advance ledger"]')).not.toBeNull());
-    expect(document.querySelector('[data-check="Cash advance ledger"]').textContent).toMatch(/Received = Settled \+ Outstanding/);
-    expect(document.querySelector('[data-check="Cash advance ledger"]').textContent).toMatch(/Balanced/);
+    await waitFor(() => expect(document.querySelector('[data-check^="Cash advance ledger: Received"]')).not.toBeNull());
+    expect(document.querySelector('[data-check^="Cash advance ledger: Received"]').textContent).toMatch(/Received = Used on bills \+ Returned \+ Carried forward \+ Still to settle/);
+    expect(document.querySelector('[data-check^="Cash advance ledger: Received"]').textContent).toMatch(/Balanced/);
   });
 
-  it("reimbursement ledger: claimed, approved, covered by advance and payable with the three payable parts", async () => {
+  it("direct expense ledger is separate from the advance: claimed, approved and paid to the bank", async () => {
     renderPage();
-    await waitFor(() => expect(rowAmount("erClaimed")).not.toBe(""));
-
-    expect(screen.getByText("Reimbursement ledger")).toBeInTheDocument();
-    expect(rowAmount("erClaimed")).toMatch(/1,900/);
-    expect(rowAmount("erAdvanceOffset")).toMatch(/^−/);
-    expect(rowAmount("erAdvanceOffset")).toMatch(/300/);
-    expect(rowAmount("erPayable")).toMatch(/1,600/);
-    expect(rowAmount("erToSendAp")).toMatch(/700/);
-    expect(rowAmount("erPendingAp")).toMatch(/500/);
-    expect(rowAmount("erPaid")).toMatch(/400/);
+    await waitFor(() => expect(rowAmount("drClaimed")).not.toBe(""));
+    const direct = document.querySelector('[data-ledger="em-direct-ledger"]');
+    expect(screen.getByText("Direct expense ledger")).toBeInTheDocument();
+    expect(direct.querySelector('[data-kpi="drClaimed"] [data-amount]').textContent).toMatch(/400/);
+    expect(direct.querySelector('[data-kpi="drPaid"] [data-amount]').textContent).toMatch(/400/);
+    expect(direct.querySelector('[data-kpi="caDisbursed"]')).toBeNull();
   });
 
-  it("reimbursement ledger reconciles: payable = not yet with AP + waiting + paid", async () => {
+  it("total ledger adds the two flows and reconciles", async () => {
     renderPage();
-    await waitFor(() => expect(document.querySelector('[data-check="Reimbursement ledger"]')).not.toBeNull());
-    expect(document.querySelector('[data-check="Reimbursement ledger"]').textContent).toMatch(/Balanced/);
+    await waitFor(() => expect(document.querySelector('[data-ledger="em-total-ledger"]')).not.toBeNull());
+    const total = document.querySelector('[data-ledger="em-total-ledger"]');
+    expect(total.querySelector('[data-kpi="erApproved"] [data-amount]').textContent).toMatch(/1,900/);
+    expect(total.querySelector('[data-kpi="erPending"] [data-amount]').textContent).toMatch(/1,200/);
+    total.querySelectorAll("[data-check]").forEach((c) => expect(c.textContent).toMatch(/Balanced/));
   });
 
   it("a ledger that does not add up is flagged, not hidden", async () => {
@@ -128,8 +130,8 @@ describe("employee dashboard: two ledgers", () => {
       data: { data: { ...payload.data.data, kpis: payload.data.data.kpis.map((k) => (k.key === "erPaid" ? { ...k, value: 0 } : k)) } },
     });
     renderPage();
-    await waitFor(() => expect(document.querySelector('[data-check="Reimbursement ledger"]')).not.toBeNull());
-    expect(document.querySelector('[data-check="Reimbursement ledger"]').textContent).toMatch(/Off by/);
+    await waitFor(() => expect(document.querySelector('[data-check^="Total: Paid to your bank"]')).not.toBeNull());
+    expect(document.querySelector('[data-check^="Total: Paid to your bank"]').textContent).toMatch(/Off by/);
   });
 
   it("the category donut lists each category with its amount, and the total equals claimed", async () => {

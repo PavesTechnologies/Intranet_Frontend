@@ -5,7 +5,7 @@ import { usageShares } from "@/pages/expense-management/pages/cash-advance/settl
 
 /**
  * "Where the advance money went" for a list of advances, read in three parts:
- *  1. the pipeline the cash moved through (requested → approved → disbursed → owed),
+ *  1. the pipeline the cash moved through (requested → cut off → approved → disbursed → owed),
  *  2. how the owed amount was used, as one stacked bar with a legend,
  *  3. the total still outstanding, highlighted on the right.
  * {@code totals} is the summed figures the Settlement page already computes; nothing is recalculated here
@@ -17,12 +17,29 @@ export default function AdvanceMoneyOverview({ totals, loading = false, scopeLab
   const share = (v) => (owed > 0 ? Math.round((Math.max(0, v) / owed) * 100) : 0);
   const s = usageShares(totals);
   const recovered = totals.salaryDeducted + totals.otherRepaid;
-  const reduced = totals.requested - totals.approved;
+  // Cut at approval: from the per-advance figures when present, else asked minus approved overall.
+  const reduced = totals.cut ?? Math.max(0, totals.requested - totals.approved);
+  const awaiting = totals.awaitingDisbursement || 0;
 
   const pipeline = [
     { label: "Requested", value: totals.requested, note: "Asked for by employees" },
-    { label: "Approved", value: totals.approved, note: reduced > 0 ? `${money(reduced)} less than asked` : "By Finance" },
-    { label: "Disbursed", value: totals.disbursed, note: "Cash paid out" },
+    {
+      // Reduced at approval: asked for, but not approved.
+      label: "Cut off",
+      value: reduced,
+      note: reduced > 0
+        ? `Reduced by approvers${totals.cutCount ? ` on ${totals.cutCount} advance${totals.cutCount === 1 ? "" : "s"}` : ""}`
+        : "Nothing reduced",
+      valueTone: reduced > 0 ? "text-rose-600" : "text-gray-400",
+      sign: reduced > 0 ? "− " : "",
+    },
+    { label: "Approved", value: totals.approved, note: "Requested − cut off" },
+    {
+      label: "Disbursed",
+      value: totals.disbursed,
+      note: awaiting > 0 ? `${money(awaiting)} approved, not paid yet` : "Cash paid out",
+      tone: awaiting > 0 ? "text-amber-700" : null,
+    },
     { label: "Owed", value: owed, note: totals.carriedIn > 0 ? `incl. ${money(totals.carriedIn)} brought in` : "Disbursed + brought in", strong: true },
   ];
 
@@ -65,7 +82,7 @@ export default function AdvanceMoneyOverview({ totals, loading = false, scopeLab
       </div>
 
       {/* 1. Pipeline: how much moved through each step */}
-      <ol className="grid grid-cols-2 border-b border-gray-100 bg-[#F8F9FD] md:grid-cols-4">
+      <ol className="grid grid-cols-2 border-b border-gray-100 bg-[#F8F9FD] md:grid-cols-5">
         {pipeline.map((step, i) => (
           <li key={step.label} className="relative px-5 py-3.5">
             {i > 0 && (
@@ -76,10 +93,13 @@ export default function AdvanceMoneyOverview({ totals, loading = false, scopeLab
               />
             )}
             <p className="text-[11px] font-medium text-gray-500">{step.label}</p>
-            <p className={`mt-0.5 tabular-nums ${step.strong ? "text-lg font-bold text-[#0a174e]" : "text-base font-semibold text-gray-900"}`}>
-              {money(step.value)}
+            <p
+              className={`mt-0.5 tabular-nums ${step.strong ? "text-lg font-bold text-[#0a174e]" : `text-base font-semibold ${step.valueTone || "text-gray-900"}`}`}
+              data-pipeline-value={step.label}
+            >
+              {step.sign || ""}{money(step.value)}
             </p>
-            <p className="mt-0.5 truncate text-[11px] text-gray-400" title={step.note}>{step.note}</p>
+            <p className={`mt-0.5 truncate text-[11px] ${step.tone || "text-gray-400"}`} title={step.note} data-pipeline-note={step.label}>{step.note}</p>
           </li>
         ))}
       </ol>

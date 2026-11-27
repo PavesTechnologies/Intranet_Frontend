@@ -17,22 +17,29 @@ const MS_LOGO = () => (
 );
 
 const SERVICE_DESC = {
-  Dashboard: "See your day at a glance: tasks, approvals and updates.",
   Leave: "Apply for leave and track your balances in seconds.",
   Timesheets: "Log hours and submit weekly timesheets with ease.",
   Projects: "Follow project progress and team allocations.",
   Resources: "Find people, skills and availability across teams.",
   Onboarding: "Guide new joiners through every first-week step.",
+  Expenses: "Claim expenses and cash advances, and track every reimbursement.",
+  Payables: "Process vendor invoices from arrival to payment, with TDS and GST.",
+  Receivables: "Bill clients, raise invoices and follow up on collections.",
 };
 const SVC_CYCLE_MS = 2800;
 
 const SERVICES = [
-  { label: "Dashboard", d: "M3 3h5v5H3zM9 3h5v5H9zM3 9h5v5H3zM9 9h5v5H9z" },
   { label: "Leave", d: "M3 6h10M3 10h10M8 3v10M5 3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3z" },
   { label: "Timesheets", d: "M12 7a5 5 0 1 1-10 0 5 5 0 0 1 10 0zM7 5v3l2 1" },
   { label: "Projects", d: "M3 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5zM9 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5zM3 11a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3z" },
   { label: "Resources", d: "M5 7a3 3 0 1 1 6 0 3 3 0 0 1-6 0zM2 14a5 5 0 0 1 10 0M13 5a2 2 0 0 1 0 4M16 14a4 4 0 0 0-4-4" },
   { label: "Onboarding", d: "M4 5h1v2H4V5zM4 9h1v2H4V9zM7 5h6M7 9h6M2 3a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3z" },
+  // Receipt
+  { label: "Expenses", d: "M4 2h8v12l-2-1.2L8 14l-2-1.2L4 14V2zM6 5h4M6 8h4M6 11h2" },
+  // Card with an arrow going out (money paid to vendors)
+  { label: "Payables", d: "M2 6h12v8H2V6zM5 10h2M8 1v3M6.5 2.5L8 1l1.5 1.5" },
+  // Card with an arrow coming in (money received from clients)
+  { label: "Receivables", d: "M2 6h12v8H2V6zM5 10h2M8 1v3M6.5 2.5L8 4l1.5-1.5" },
 ];
 
 function SvcIcon({ d }) {
@@ -460,9 +467,9 @@ const customCSS = `
 .login-page-container .ws-line:nth-child(2) > span{animation-delay:120ms,1.9s;background-image:linear-gradient(100deg,var(--pink) 0%,var(--pink) 42%,#FF8AAA 50%,var(--pink) 58%,var(--pink) 100%)}
 .login-page-container .svc-tile{width:38px;height:38px;border-radius:9px;background:#fff;border:1px solid var(--neutral-200);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(12,10,9,.05);color:var(--neutral-600);position:relative;overflow:hidden;transition:all 380ms cubic-bezier(.16,1,.3,1)}
 .login-page-container .lp-text{container-type:inline-size}
-.login-page-container .svc-grid{display:grid;grid-template-columns:repeat(6,84px);gap:16px 4px;justify-content:start}
+.login-page-container .svc-grid{display:grid;grid-template-columns:repeat(4,84px);gap:16px 4px;justify-content:start}
 .login-page-container .svc-grid .svc-item{align-items:flex-start !important}
-@container (max-width:520px){.login-page-container .svc-grid{grid-template-columns:repeat(3,96px)}}
+@container (max-width:520px){.login-page-container .svc-grid{grid-template-columns:repeat(4,minmax(0,84px))}}
 .login-page-container .svc-label{white-space:nowrap;text-align:center;font-size:10px;font-weight:500;color:var(--neutral-500);letter-spacing:.06em;text-transform:uppercase;transition:color 380ms ease}
 .login-page-container .svc-item .svc-tile,.login-page-container .svc-item .svc-label{opacity:.55;transition:opacity 380ms ease,all 380ms cubic-bezier(.16,1,.3,1)}
 .login-page-container .svc-item.active .svc-tile{opacity:1;transform:translateY(-3px);border-color:var(--accent-600);color:var(--accent-600);box-shadow:0 0 0 4px rgba(10,0,130,.08),0 8px 18px -8px rgba(10,0,130,.4)}
@@ -486,6 +493,8 @@ const customCSS = `
 .login-page-container .svc-item:nth-child(4){animation-delay:685ms}
 .login-page-container .svc-item:nth-child(5){animation-delay:720ms}
 .login-page-container .svc-item:nth-child(6){animation-delay:750ms}
+.login-page-container .svc-item:nth-child(7){animation-delay:775ms}
+.login-page-container .svc-item:nth-child(8){animation-delay:795ms}
 .login-page-container .svc-item{cursor:pointer}
 .login-page-container .shake{animation:shake 380ms cubic-bezier(0.4,0,0.2,1) both !important}
 .login-page-container .btn-ms{width:100%;height:48px;background:var(--navy);color:#fff;border:none;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14px;font-weight:500;font-family:var(--ff);letter-spacing:.005em;cursor:pointer;transition:transform 140ms cubic-bezier(.34,1.56,.64,1),box-shadow 140ms ease,background 120ms ease}
@@ -858,7 +867,7 @@ export default function LoginPage() {
               <span className="ws-line"><span>Space</span></span>
             </div>
             <h1 className="head-font lp-h1" style={{ fontSize: "24px", fontWeight: 600, color: "var(--navy)", letterSpacing: "-0.015em", lineHeight: 1.3, marginBottom: "14px" }}>Your organization's<br />operational hub</h1>
-            <p className="lp-hero-p" style={{ fontSize: "14px", color: "#5B6479", lineHeight: 1.7, maxWidth: "420px", marginBottom: "32px" }}>Leave, timesheets, projects and all your internal tools in one secure place.</p>
+            <p className="lp-hero-p" style={{ fontSize: "14px", color: "#5B6479", lineHeight: 1.7, maxWidth: "420px", marginBottom: "32px" }}>Leave, timesheets, projects, expenses, finance and all your internal tools in one secure place.</p>
             <div className="svc-grid" onMouseLeave={() => setSvcPaused(false)}>
               {SERVICES.map(({ label, d }, i) => (
                 <div key={label} className={`svc-item${i === activeSvc ? " active" : ""}`}

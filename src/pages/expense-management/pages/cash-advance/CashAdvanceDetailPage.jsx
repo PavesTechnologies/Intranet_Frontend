@@ -26,7 +26,8 @@ import {
   formatTripDates,
   getCostCenterValue,
   getStatusBadge,
-  hasSubmittedLinkedReport,
+  activeLinkedReport,
+  linkedExpensesPath,
 } from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 
 const APPROVALS_PATH = "/expense-management/approvals";
@@ -414,14 +415,21 @@ export default function CashAdvanceDetailPage() {
 
           {!isApprovalView && !isSettlementView && ["DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "SETTLEMENT_PENDING", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED"].includes(status) && Number(outstanding) > 0 && (
             <div>
+              {/* An advance gets one expense report: open it to add expenses, or create it the first time. */}
               <Button
                 variant="primary"
-                onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${advance.advanceId || advance.id}`)}
-                disabled={hasSubmittedLinkedReport(advance)}
-                title={hasSubmittedLinkedReport(advance) ? "An expense report is already submitted for this advance" : undefined}
+                onClick={() => navigate(linkedExpensesPath(advance, utilization?.linkedReports))}
+                title={
+                  activeLinkedReport(advance, utilization?.linkedReports)
+                    ? "Open the expense report linked to this advance to add expenses"
+                    : "Create an expense report for this advance"
+                }
                 className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
               >
-                <Send size={13} className="mr-1.5" /> Stage 4: Submit Linked Expenses
+                <Send size={13} className="mr-1.5" />
+                {activeLinkedReport(advance, utilization?.linkedReports)
+                  ? "Stage 4: Add Expenses to Linked Report"
+                  : "Stage 4: Submit Linked Expenses"}
               </Button>
             </div>
           )}

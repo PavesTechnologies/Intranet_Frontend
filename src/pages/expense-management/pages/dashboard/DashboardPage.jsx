@@ -9,13 +9,22 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { dashboardService } from "@/pages/expense-management/api/expenseReportsApi";
 import { useApprovalWebSocket } from "@/pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
-import SupplementaryWaitingCard from "@/pages/expense-management/pages/dashboard/SupplementaryWaitingCard";
 import EmployeeMoneyFlow from "@/pages/expense-management/components/dashboard/EmployeeMoneyFlow";
 import RoleDashboard from "@/pages/expense-management/components/dashboard/RoleDashboard";
 import ApprovalsPanel from "@/pages/expense-management/components/dashboard/ApprovalsPanel";
 import FinanceDashboard from "@/pages/expense-management/components/dashboard/FinanceDashboard";
 import ApDashboard from "@/pages/expense-management/components/dashboard/ApDashboard";
 import AdminDashboard from "@/pages/expense-management/components/dashboard/AdminDashboard";
+import TeamDashboard from "@/pages/expense-management/components/dashboard/TeamDashboard";
+import SegmentedControl from "@/components/ui/SegmentedControl";
+
+// Managers can switch "My money" between their own figures and their whole team's.
+const SCOPES = [
+  { key: "mine", label: "My dashboard" },
+  { key: "team", label: "My team" },
+];
+const scopeStorageKey = (user) =>
+  `xms.dashboard.scope.${user?.employeeId || user?.email || user?.id || "anonymous"}`;
 
 // Each role sees one simple money flow: four steps, left to right, showing where the money is now.
 // Each step names the figure, says what it means in one line, and points to the records behind it.
@@ -31,35 +40,38 @@ const VIEWS = [
       { key: "payment", label: "Waiting for payment", help: "Approved. AP is paying this to you.", tone: "blue" },
       { key: "paid", label: "Paid to you", help: "Reimbursement already received.", tone: "emerald" },
     ],
-    // The employee's two ledgers. Each row is one line of the ledger; "kind" sets how it reads:
-    // memo = for information, total = a running total, minus = taken away, result = the closing line, sub = part of the line above.
+    // The employee's ledgers: one per money flow (direct expenses, cash advance), then the total of both.
+    // The lines themselves are laid out in EmployeeLedgers; each ledger's checks say which figures must add up.
     ledgers: {
+      direct: {
+        title: "Direct expense ledger",
+        caption: "Bills you paid yourself, paid back to your bank",
+        checks: [{ label: "To your bank = Not yet with AP + Waiting for AP + Paid", total: "drPayable", parts: ["drToSendAp", "drPendingAp", "drPaid"] }],
+      },
       advance: {
         title: "Cash advance ledger",
-        caption: "Where every rupee you received has gone",
-        rows: [
-          { key: "caRequested", label: "Requested", kind: "memo", note: "What you asked for" },
-          { key: "caApproved", label: "Approved", kind: "memo", note: "What your manager and Finance approved" },
-          { key: "caDisbursed", label: "Received", kind: "total", note: "Paid out to you" },
-          { key: "caSettled", label: "Settled", kind: "minus", note: "Verified expenses and refunds against your advances" },
-          { key: "caOutstanding", label: "Outstanding", kind: "result", note: "Still to account for" },
+        caption: "The advance you received, and the bills settled against it",
+        checks: [
+          {
+            label: "Approved = Requested − Awaiting approval + Carried in − Reduced + Increased",
+            total: "caApproved",
+            parts: ["caRequested", "caCarriedIn", "caIncreasedOnApproval"],
+            minus: ["caAwaitingApproval", "caReducedOnApproval"],
+          },
+          {
+            label: "Received = Used on bills + Returned + Carried forward + Still to settle",
+            total: "caDisbursed",
+            parts: ["caUsedOnBills", "caReturned", "caCarriedForward", "caOutstanding"],
+          },
         ],
-        check: { label: "Received = Settled + Outstanding", total: "caDisbursed", parts: ["caSettled", "caOutstanding"] },
       },
-      reimbursement: {
-        title: "Reimbursement ledger",
-        caption: "From what you claimed to what AP pays you",
-        rows: [
-          { key: "erClaimed", label: "Claimed", kind: "total", note: "Everything you submitted" },
-          { key: "erNotApproved", label: "Not approved yet", kind: "minus", note: "Pending, returned or rejected" },
-          { key: "erApproved", label: "Approved", kind: "total", note: "Approved for reimbursement" },
-          { key: "erAdvanceOffset", label: "Covered by advance", kind: "minus", note: "Verified expenses settled against your advance" },
-          { key: "erPayable", label: "Payable to you", kind: "result", note: "What AP still has to pay you, or has paid" },
-          { key: "erToSendAp", label: "Not yet with AP", kind: "sub", note: "Approved, waiting to be sent to AP" },
-          { key: "erPendingAp", label: "Waiting for AP", kind: "sub", note: "Sent to AP, not paid yet" },
-          { key: "erPaid", label: "Paid to you", kind: "sub", note: "Already paid" },
+      total: {
+        title: "Total",
+        caption: "Direct expenses and cash advance together",
+        checks: [
+          { label: "Total approved = Direct + Against advance", total: "erApproved", parts: ["drApproved", "avApproved"] },
+          { label: "Paid to your bank = Direct + Extra above advance", total: "erPaid", parts: ["drPaid", "avPaid"] },
         ],
-        check: { label: "Payable = Not yet with AP + Waiting for AP + Paid", total: "erPayable", parts: ["erToSendAp", "erPendingAp", "erPaid"] },
       },
     },
     // Quick actions on the employee dashboard. Each one reuses an existing route; `roles` mirrors that route's guard in App.jsx.
@@ -69,6 +81,8 @@ const VIEWS = [
       { key: "reports", label: "My expense reports", hint: "Track submitted reports", icon: "FileText", to: "/expense-management/expenses/my", roles: ["GENERAL", "MANAGER"] },
       { key: "supplementary", label: "Supplementary claims", hint: "Claim expenses missed on a settled report", icon: "FileText", to: "/expense-management/expenses/supplementary", roles: ["GENERAL", "MANAGER"] },
       { key: "advances", label: "My advances", hint: "Balances and settlements", icon: "Wallet", to: "/expense-management/cash-advance/my", roles: ["GENERAL"] },
+      // Approvers only: the same route and roles as the manager panel's "Open approvals".
+      { key: "approvals", label: "Approvals", hint: "Requests and reports waiting for your decision", icon: "ClipboardCheck", to: "/expense-management/approvals", roles: ["MANAGER", "REPORTING_MANAGER"] },
     ],
     attentionTitle: "Needs your action",
     attentionEmpty: "Nothing needs you right now.",
@@ -100,7 +114,7 @@ const VIEWS = [
     quickActions: [
       { key: "approvals", label: "Open approvals", hint: "Requests and reports waiting for you", icon: "ClipboardCheck", to: "/expense-management/approvals", roles: ["MANAGER", "REPORTING_MANAGER"], primary: true },
       { key: "ca-approvals", label: "Cash advance approvals", hint: "Advance requests for your decision", icon: "Banknote", to: "/expense-management/cash-advance/approvals", roles: ["MANAGER"] },
-      { key: "team", label: "Team expenses", hint: "Expense reports from your team", icon: "FileText", to: "/expense-management/expenses/all", roles: ["MANAGER"] },
+      { key: "team", label: "Team expenses", hint: "Expense reports from your team", icon: "FileText", to: "/expense-management/expenses/all", roles: ["MANAGER", "REPORTING_MANAGER"] },
     ],
     actions: [],
   },
@@ -124,9 +138,12 @@ const VIEWS = [
     attentionSubtitle: "Oldest reports first, so the longest waits are seen first",
     activitySubtitle: "Reports you verified most recently",
     quickActions: [
-      { key: "finance", label: "Finance verification", hint: "Reports waiting to be verified", icon: "ClipboardCheck", to: "/expense-management/finance", roles: ["FINANCE_EXECUTIVE"], primary: true },
-      { key: "settlement", label: "Cash advance settlement", hint: "Settle advances and review balances", icon: "Banknote", to: "/expense-management/cash-advance/settlement", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "finance", label: "Verify reports", hint: "Reports waiting for Finance verification", icon: "ClipboardCheck", to: "/expense-management/finance", roles: ["FINANCE", "FINANCE_EXECUTIVE"], primary: true },
+      { key: "approvals", label: "Open approvals", hint: "Cash advances and supplementary claims waiting for you", icon: "Inbox", to: "/expense-management/approvals", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "settlement", label: "Settlement", hint: "Settle cash advance balances", icon: "Banknote", to: "/expense-management/cash-advance/settlement", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
       { key: "reports", label: "Expense reports", hint: "All reports, with their status", icon: "FileText", to: "/expense-management/reports", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "itcRegister", label: "ITC register", hint: "GST you can claim back, for the GST return", icon: "Receipt", to: "/expense-management/finance/itc-register", roles: ["FINANCE", "FINANCE_EXECUTIVE"] },
+      { key: "clientBilling", label: "Client billing", hint: "Client-billable expenses to invoice", icon: "ReceiptText", to: "/expense-management/client-billing", roles: ["FINANCE_EXECUTIVE"] },
     ],
     actions: [],
   },
@@ -221,8 +238,25 @@ export default function DashboardPage() {
     }
   }, [active.view]);
 
-  const { data, isLoading, isError, error, refetch } = useDashboard(active.view);
-  const showApprovals = canApprove && active.view === "employee";
+  const [scope, setScope] = useState(() => {
+    try {
+      return localStorage.getItem(scopeStorageKey(user)) === "team" ? "team" : "mine";
+    } catch {
+      return "mine";
+    }
+  });
+  const showTeam = canApprove && active.view === "employee" && scope === "team";
+  const changeScope = (next) => {
+    setScope(next);
+    try {
+      localStorage.setItem(scopeStorageKey(user), next);
+    } catch {
+      /* private mode: the choice is simply not remembered */
+    }
+  };
+
+  const { data, isLoading, isError, error, refetch } = useDashboard(active.view, !showTeam);
+  const showApprovals = canApprove && active.view === "employee" && !showTeam;
   const approvals = useDashboard("manager", showApprovals);
   const isFetching = useIsFetching({ queryKey: ["xmsDashboard"] }) > 0;
   const refreshAll = () => queryClient.invalidateQueries({ queryKey: ["xmsDashboard"] });
@@ -245,7 +279,9 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex items-baseline gap-3">
           <h1 className="text-xl font-semibold text-[#0a174e]">Expense Management</h1>
-          <p className="truncate text-sm text-slate-500">{active.subtitle}</p>
+          <p className="truncate text-sm text-slate-500">
+            {showTeam ? "What your team has claimed, who spent how much, and where it stands." : active.subtitle}
+          </p>
         </div>
         <Button variant="outline" size="small" onClick={refreshAll} disabled={isFetching}>
           <RefreshCw size={14} className={`mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
@@ -264,7 +300,15 @@ export default function DashboardPage() {
         </Tabs>
       )}
 
-      {isLoading ? (
+      {canApprove && active.view === "employee" && (
+        <div data-dashboard-scope>
+          <SegmentedControl label="Dashboard scope" options={SCOPES} value={scope} onChange={changeScope} />
+        </div>
+      )}
+
+      {showTeam ? (
+        <TeamDashboard currency={data?.baseCurrencyCode} />
+      ) : isLoading ? (
         <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-24">
           <LoadingSpinner text="Loading dashboard..." />
         </div>
@@ -279,7 +323,6 @@ export default function DashboardPage() {
         </div>
       ) : data ? (
         <>
-          {active.view === "finance" && <SupplementaryWaitingCard />}
           <DashboardBody
             data={data}
             config={active}

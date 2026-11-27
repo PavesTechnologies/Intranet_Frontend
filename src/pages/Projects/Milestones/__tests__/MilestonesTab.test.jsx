@@ -16,6 +16,7 @@ const hooks = vi.hoisted(() => ({
 vi.mock("../hooks/useMilestones", () => hooks);
 
 import MilestonesTab from "../index";
+import { formatMoney } from "../utils/milestoneUtils";
 
 // Planned dates must be today or later, so the form fixtures move with the clock.
 const isoInDays = (days) => {
@@ -187,8 +188,9 @@ describe("MilestonesTab", () => {
     await user.type(screen.getByLabelText(/allocation/i), "25");
 
     // 25% of the 400,000 still unallocated — not 25% of the 1,000,000 budget.
-    expect(screen.getByText("₹1,00,000.00")).toBeInTheDocument();
-    expect(screen.queryByText("₹2,50,000.00")).not.toBeInTheDocument();
+    // formatMoney follows the runtime locale (₹1,00,000.00 in en-IN, ₹100,000.00 in en-US).
+    expect(screen.getByText(formatMoney(100000, "INR"))).toBeInTheDocument();
+    expect(screen.queryByText(formatMoney(250000, "INR"))).not.toBeInTheDocument();
   });
 
   it("locks the planned start date once the milestone has started", async () => {
@@ -208,6 +210,21 @@ describe("MilestonesTab", () => {
     await user.click(screen.getByRole("button", { name: "Edit UAT sign-off" }));
     expect(screen.getByLabelText(/planned start/i)).toBeDisabled();
     expect(screen.getByLabelText(/planned due/i)).toBeEnabled();
+  });
+
+  it("blocks Add milestone once the project value is fully allocated", async () => {
+    hooks.useMilestoneSummary.mockReturnValue({
+      data: { ...summary, allocatedPercentage: 100, remainingPercentage: 0, allocationComplete: true },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hooks.useMilestoneList.mockReturnValue(listResult([milestone()]));
+    render(<MilestonesTab projectId={10} />);
+
+    const add = screen.getByRole("button", { name: /add milestone/i });
+    expect(add).toBeDisabled();
+    expect(add).toHaveAttribute("title", expect.stringMatching(/already allocated/i));
   });
 
   it("asks before discarding unsaved edits", async () => {

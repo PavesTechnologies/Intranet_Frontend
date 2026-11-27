@@ -70,11 +70,24 @@ describe("PmsMilestoneSelectionPanel", () => {
     expect(screen.getByText("Invoiced")).toBeInTheDocument();
   });
 
-  it("bills every eligible milestone automatically, with the PMS allocation and today's date", () => {
+  it("bills every eligible milestone automatically, with the PMS allocation and planned due date", () => {
     const { onEntriesChange } = renderPanel([ms(11, "M-1", { billingState: "AVAILABLE", eligibleForBilling: true })]);
     expect(onEntriesChange).toHaveBeenCalledWith([
-      expect.objectContaining({ pmsMilestoneId: 11, percentage: "25", billingDate: today(), remarks: "Milestone M-1" }),
+      expect.objectContaining({
+        pmsMilestoneId: 11,
+        percentage: "25",
+        billingDate: "2026-12-15",
+        remarks: "Milestone M-1",
+      }),
     ]);
+  });
+
+  it("falls back to a free date only when PMS reports no planned due date", () => {
+    const { onEntriesChange } = renderPanel([
+      ms(11, "M-1", { billingState: "AVAILABLE", eligibleForBilling: true, plannedCompletionDate: "" }),
+    ]);
+    expect(onEntriesChange).toHaveBeenCalledWith([expect.objectContaining({ billingDate: today() })]);
+    expect(screen.getByTestId("billing-date-unavailable-M-1")).toBeInTheDocument();
   });
 
   it("does not bill an ineligible milestone, but still shows its allocation and the backend reason", () => {
@@ -112,55 +125,57 @@ describe("PmsMilestoneSelectionPanel", () => {
     expect(screen.getAllByText(/40,000/).length).toBeGreaterThan(0); // row amount (and the cycle total in the header)
   });
 
-  it("defaults the billing date to today and refuses an earlier one", () => {
-    const { onEntriesChange } = renderPanel([ms(11, "M-1", { billingState: "AVAILABLE", eligibleForBilling: true })], {
-      entries: [{ pmsMilestoneId: 11, percentage: "25", billingDate: "" }],
-    });
-    const dateInput = screen.getByLabelText("Billing date for M-1");
-    expect(dateInput).toHaveValue(today());
-    expect(dateInput).toHaveAttribute("min", today());
-
-    fireEvent.change(dateInput, { target: { value: "2020-01-01" } });
-    expect(onEntriesChange).not.toHaveBeenCalled();
-
-    fireEvent.change(dateInput, { target: { value: "2099-01-01" } });
-    expect(onEntriesChange).toHaveBeenCalledWith([expect.objectContaining({ billingDate: "2099-01-01" })]);
-  });
-
-  it("keeps a saved past billing date selectable rather than rejecting what is stored", () => {
+  it("shows the billing date as read-only text, with no date input anywhere", () => {
     renderPanel([ms(11, "M-1", { billingState: "AVAILABLE", eligibleForBilling: true })], {
-      entries: [{ pmsMilestoneId: 11, percentage: "25", billingDate: "2020-05-05", frozen: false }],
+      entries: [{ pmsMilestoneId: 11, percentage: "25", billingDate: "2026-12-15" }],
     });
-    const dateInput = screen.getByLabelText("Billing date for M-1");
-    expect(dateInput).toHaveValue("2020-05-05");
-    expect(dateInput).toHaveAttribute("min", "2020-05-05");
+    expect(screen.getByTestId("billing-date-M-1")).toHaveTextContent("15 Dec 2026");
+    expect(document.querySelector('input[type="date"]')).toBeNull();
+    expect(screen.queryByLabelText(/Billing date for/)).not.toBeInTheDocument();
   });
 
-  it("locks a frozen saved entry (no edits, no removal) but lets an unfrozen one change", () => {
+  it("shows the planned due date as the billing date for a milestone that is not billed", () => {
+    renderPanel([
+      ms(12, "M-2", {
+        billingState: "AVAILABLE",
+        eligibleForBilling: false,
+        billingReadiness: "NOT_READY",
+        plannedCompletionDate: "2027-02-28",
+      }),
+    ]);
+    expect(screen.getByTestId("billing-date-M-2")).toHaveTextContent("28 Feb 2027");
+  });
+
+  it("re-points a saved entry at the milestone's planned due date", () => {
+    const { onEntriesChange } = renderPanel([ms(11, "M-1", { billingState: "AVAILABLE", eligibleForBilling: true })], {
+      entries: [{ paymentEntryId: "e1", pmsMilestoneId: 11, percentage: "25", billingDate: "2020-05-05", frozen: false }],
+    });
+    expect(onEntriesChange).toHaveBeenCalledWith([expect.objectContaining({ billingDate: "2026-12-15" })]);
+  });
+
+  it("leaves a frozen entry on the date its billing started, and says so", () => {
     const { onEntriesChange } = renderPanel(
-      [ms(11, "M-1", { billingState: "IN_BILLING" }), ms(12, "M-2", { billingState: "AVAILABLE" })],
+      [ms(11, "M-1", { billingState: "IN_BILLING", plannedCompletionDate: "2027-03-03" })],
       {
         entries: [
           { paymentEntryId: "e1", pmsMilestoneId: 11, percentage: "60", billingDate: "2026-12-15", frozen: true },
-          { paymentEntryId: "e2", pmsMilestoneId: 12, percentage: "40", billingDate: "2027-01-20", frozen: false },
         ],
       },
     );
     expect(screen.getByTestId("frozen-indicator-11")).toBeInTheDocument();
-    expect(screen.getByLabelText("Billing date for M-1")).toBeDisabled();
-    expect(screen.getByLabelText("Billing date for M-2")).not.toBeDisabled();
-    fireEvent.change(screen.getByLabelText("Billing date for M-2"), { target: { value: "2099-01-20" } });
-    expect(onEntriesChange).toHaveBeenCalledTimes(1);
-    expect(onEntriesChange.mock.calls[0][0].find((e) => e.pmsMilestoneId === 12).billingDate).toBe("2099-01-20");
-    expect(onEntriesChange.mock.calls[0][0].find((e) => e.pmsMilestoneId === 11).billingDate).toBe("2026-12-15");
+    expect(onEntriesChange).not.toHaveBeenCalled();
+    const cell = screen.getByTestId("billing-date-M-1");
+    expect(cell).toHaveTextContent("15 Dec 2026");
+    expect(cell).toHaveAttribute("title", expect.stringMatching(/billing has started/i));
   });
 
   it("keeps a saved entry read-only as 'unknown' when the backend gave no frozen flag", () => {
-    renderPanel([ms(11, "M-1", { billingState: "AVAILABLE" })], {
-      entries: [{ paymentEntryId: "e1", pmsMilestoneId: 11, percentage: "60", billingDate: "2026-12-15" }],
+    const { onEntriesChange } = renderPanel([ms(11, "M-1", { billingState: "AVAILABLE" })], {
+      entries: [{ paymentEntryId: "e1", pmsMilestoneId: 11, percentage: "60", billingDate: "2026-11-01" }],
     });
     expect(screen.getByTestId("unknown-state-indicator-11")).toBeInTheDocument();
-    expect(screen.getByLabelText("Billing date for M-1")).toBeDisabled();
+    expect(onEntriesChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId("billing-date-M-1")).toHaveTextContent("01 Nov 2026");
   });
 
   it("shows loading, error with Retry, and empty states", () => {

@@ -19,8 +19,10 @@ export const isPaidOut = (advance) =>
  */
 export function figuresForAdvance(advance, utilization, salaryDeducted = 0) {
   const f = settlementFiguresFor(advance, utilization, salaryDeducted);
+  // Cut by the approvers: asked for minus approved, once the approved amount is known.
+  const cutOf = (approved) => Math.max(0, Math.round((f.requested - approved) * 100) / 100);
   if (isPaidOut(advance)) {
-    return { ...f, paidOut: true, approvedKnown: true };
+    return { ...f, paidOut: true, approvedKnown: true, cut: cutOf(f.approved), awaitingDisbursement: 0 };
   }
   const approvedKnown =
     advance?.approvedAmount != null || String(advance?.status || "").toUpperCase() === "APPROVED";
@@ -29,6 +31,9 @@ export function figuresForAdvance(advance, utilization, salaryDeducted = 0) {
     paidOut: false,
     approvedKnown,
     approved: approvedKnown ? f.approved : 0,
+    cut: approvedKnown ? cutOf(f.approved) : 0,
+    // Approved but not paid out yet: money the company still has to pay.
+    awaitingDisbursement: approvedKnown ? f.approved : 0,
     disbursed: 0, carriedIn: 0, owed: 0, consumed: 0, approvedConsumed: null, remaining: 0, owedToEmployee: 0,
     carriedForward: 0, held: 0, moved: 0, salaryDeducted: 0, otherRepaid: 0, outstanding: 0, reports: [],
   };
@@ -62,7 +67,22 @@ export function useAdvanceFigures(advances) {
                 .reduce((sum, r) => sum + Number(r.actualAmountDeducted || 0), 0)
             )
             .catch(() => 0),
-        ]).then(([utilization, salaryDeducted]) => [id, { utilization, salaryDeducted }])
+          // A payroll deduction can also be posted straight as a repayment with method PAYROLL (not through the
+          // recovery workflow). Those repayments are salary deductions too, not money the employee refunded.
+          Promise.resolve()
+            .then(() => cashAdvanceApi.getSettlement(id))
+            .then((r) => r?.data?.data ?? r?.data ?? null)
+            .then((s) =>
+              (s?.repayments || [])
+                .filter((p) => [p.paymentMethod, p.paymentMode].some((m) => String(m || "").toUpperCase() === "PAYROLL"))
+                .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+            )
+            .catch(() => 0),
+        ]).then(([utilization, confirmedRecovery, payrollRepayments]) => [
+          id,
+          // The two sources describe the same deductions when both exist, so take the larger, never the sum.
+          { utilization, salaryDeducted: Math.max(confirmedRecovery, payrollRepayments) },
+        ])
       )
     ).then((pairs) => {
       if (!cancelled) setUsageById(Object.fromEntries(pairs));

@@ -191,6 +191,54 @@ describe("My Supplementary Claims page", () => {
     expect(screen.queryByText("Raise a new claim")).not.toBeInTheDocument();
     fireEvent.click((await screen.findAllByRole("button", { name: "Raise a claim" }))[0]);
     expect(await screen.findByText("Raise a new claim")).toBeInTheDocument();
-    expect(screen.getByText(/no settled reports/)).toBeInTheDocument();
+    expect(screen.getByText(/None of your reports is paid or settled yet/)).toBeInTheDocument();
+  });
+
+  it("lists only paid or settled reports, and says why the other approved ones are not ready", async () => {
+    supplementaryClaimService.listMine.mockResolvedValue(listResponse([]));
+    expenseReportService.getAll.mockResolvedValue({ data: { data: [
+      { reportId: "r-paid", reportNumber: "EXP-1", title: "Delhi visit", reportStatus: "REIMBURSED" },
+      { reportId: "r-wait", reportNumber: "EXP-2", title: "Pune visit", reportStatus: "APPROVED" },
+    ] } });
+    supplementaryClaimService.eligibility.mockImplementation((id) => Promise.resolve({ data: { data:
+      id === "r-paid"
+        ? { eligible: true, hasCashAdvance: false }
+        : { eligible: false, reason: "The report's payment through AP is not complete yet." } } }));
+    renderPage();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Raise a claim" }))[0]);
+    const notReady = await waitFor(() => {
+      const el = document.querySelector("[data-not-ready-reports]");
+      expect(el).not.toBeNull();
+      return el;
+    });
+    expect(notReady.textContent).toMatch(/1 approved report is not paid or settled yet/);
+    expect(notReady.textContent).toMatch(/EXP-2: The report's payment through AP is not complete yet\./);
+    fireEvent.click(screen.getByRole("button", { name: "Select a report" }));
+    expect(await screen.findByRole("option", { name: /EXP-1 — Delhi visit \(paid by AP\)/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /EXP-2/ })).toBeNull();
+  });
+
+  it("after a carry-forward, says the claim is set against the next advance and how much it holds", async () => {
+    supplementaryClaimService.listMine.mockResolvedValue(listResponse([]));
+    expenseReportService.getAll.mockResolvedValue({ data: { data: [
+      { reportId: "r-carry", reportNumber: "EXP-3", title: "Chennai visit", reportStatus: "APPROVED" },
+    ] } });
+    supplementaryClaimService.eligibility.mockResolvedValue({ data: { data: {
+      eligible: true, hasCashAdvance: true, settleAgainstAdvanceId: "a2", settleAgainstAdvanceTitle: "Advance 2", settleAgainstRemaining: 1500,
+    } } });
+    renderPage();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Raise a claim" }))[0]);
+    fireEvent.click(await screen.findByRole("button", { name: "Select a report" }));
+    fireEvent.click(await screen.findByRole("option", { name: /EXP-3 — Chennai visit \(balance carried to Advance 2\)/ }));
+    const note = await waitFor(() => {
+      const el = document.querySelector("[data-settle-against]");
+      expect(el).not.toBeNull();
+      return el;
+    });
+    expect(note.textContent).toMatch(/carried forward to Advance 2/);
+    expect(note.textContent).toMatch(/1,500\.00/);
+    expect(note.textContent).toMatch(/Anything above it is paid by AP/);
   });
 });

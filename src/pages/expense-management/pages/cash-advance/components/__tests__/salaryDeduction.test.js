@@ -56,3 +56,19 @@ describe("shortfallOf", () => {
     expect(shortfallOf(4163, 0)).toBe(4163);
   });
 });
+
+describe("amount change reason", () => {
+  it("needs no reason when the full balance is requested", async () => {
+    const { isAmountChanged, validateAmountChangeReason } = await import("../salaryDeduction");
+    expect(isAmountChanged("1500.00", 1500)).toBe(false);
+    expect(validateAmountChangeReason("1500", 1500, "")).toBe("");
+  });
+
+  it("needs a reason when the amount is changed", async () => {
+    const { isAmountChanged, validateAmountChangeReason } = await import("../salaryDeduction");
+    expect(isAmountChanged("1000", 1500)).toBe(true);
+    expect(validateAmountChangeReason("1000", 1500, "  ")).toMatch(/reason/);
+    expect(validateAmountChangeReason("1000", 1500, "Two instalments")).toBe("");
+    expect(validateAmountChangeReason("1000", 1500, "x".repeat(501))).toMatch(/500/);
+  });
+});

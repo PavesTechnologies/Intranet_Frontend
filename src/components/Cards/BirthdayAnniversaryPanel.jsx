@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { celebrations } from "../../services/dashboard";
-import LoadingSpinner from "../LoadingSpinner";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -40,9 +39,20 @@ function daysUntil(dateStr) {
 
 function relativeLabel(days) {
   if (days === null) return "";
+  if (days === 0) return "Today";
   if (days === 1) return "Tomorrow";
-  if (days < 7) return `in ${days} days`;
-  return "";
+  return `in ${days} days`;
+}
+
+const AVATAR_TONES = [
+  "bg-[#E6E5F7] text-[#0A0082]", "bg-[#FFE4EC] text-[#D6245A]", "bg-emerald-50 text-emerald-700",
+  "bg-amber-50 text-amber-700", "bg-sky-50 text-sky-700", "bg-violet-50 text-violet-700",
+];
+
+function toneFor(name = "") {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_TONES[Math.abs(hash) % AVATAR_TONES.length];
 }
 
 const TABS = [
@@ -100,24 +110,48 @@ function TodayCelebrants({ items, meta }) {
   );
 }
 
-function PersonRow({ item, highlight }) {
-  const rel = highlight ? "Today" : relativeLabel(item.daysUntil);
+function PersonRow({ item }) {
+  const rel = relativeLabel(item.daysUntil);
+  const soon = item.daysUntil !== null && item.daysUntil <= 7;
   return (
-    <li className="flex items-center gap-3 py-2.5">
-      <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${highlight ? "bg-[#0A0082] text-white" : "bg-[#F1F2F8] text-[#4B5275]"}`}
-      >
+    <li className="flex items-center gap-3 rounded-lg px-1.5 py-2 transition hover:bg-[#F7F8FC]">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${toneFor(item.name)}`}>
         {item.initials}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-gray-800">{item.name}</p>
-        {item.years ? <p className="text-xs text-gray-400">{item.years} year{item.years > 1 ? "s" : ""}</p> : null}
+        <p className="truncate text-[13px] font-semibold text-[#0A174E]">{item.name}</p>
+        <p className="text-[11px] text-[#A8A29E]">
+          {item.date}
+          {item.years ? ` · ${item.years} year${item.years > 1 ? "s" : ""}` : ""}
+        </p>
       </div>
-      <div className="shrink-0 text-right leading-tight">
-        <p className="text-xs font-medium text-gray-600">{item.date}</p>
-        {rel && <p className={`text-[11px] ${highlight ? "text-[#0A0082] font-medium" : "text-gray-400"}`}>{rel}</p>}
-      </div>
+      {rel && (
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
+            soon ? "bg-[#FFE4EC] text-[#D6245A]" : "bg-[#F1F2F8] text-[#4B5275]"
+          }`}
+        >
+          {rel}
+        </span>
+      )}
     </li>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <ul className="space-y-1 py-2 animate-pulse">
+      {[0, 1, 2].map((i) => (
+        <li key={i} className="flex items-center gap-3 px-1.5 py-2">
+          <div className="h-9 w-9 rounded-full bg-[#EEF0F7]" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-32 rounded bg-[#EEF0F7]" />
+            <div className="h-2.5 w-16 rounded bg-[#EEF0F7]" />
+          </div>
+          <div className="h-5 w-16 rounded-full bg-[#EEF0F7]" />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -216,22 +250,24 @@ export default function BirthdayAnniversaryPanel() {
       </div>
 
       {loading ? (
-        <div className="px-4 py-8 flex items-center justify-center">
-          <LoadingSpinner text="Loading Celebrations..." />
+        <div className="px-4 pb-3">
+          <SkeletonRows />
         </div>
       ) : (
         <div className="px-4 pb-3">
           {todayItems.length > 0 ? (
             <TodayCelebrants items={todayItems} meta={tab} />
           ) : (
-            <p className="py-3 text-xs text-gray-400">{tab.empty}</p>
+            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#F4F6FC] px-2.5 py-1 text-[11px] text-[#78716C]">
+              <span aria-hidden="true">{tab.emoji}</span> {tab.empty}
+            </p>
           )}
 
-          <p className={`${todayItems.length > 0 ? "mt-4" : "mt-1"} text-[10.5px] font-semibold uppercase tracking-wider text-gray-400`}>Upcoming</p>
+          <p className="mt-4 mb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#A8A29E]">Coming up</p>
           {upcomingItems.length === 0 ? (
             <p className="py-3 text-xs text-gray-400">Nothing coming up</p>
           ) : (
-            <ul className="max-h-60 divide-y divide-gray-50 overflow-y-auto">
+            <ul className="-mx-1.5 max-h-64 overflow-y-auto">
               {upcomingItems.map((item) => (
                 <PersonRow key={`u-${item.id}`} item={item} />
               ))}

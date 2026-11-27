@@ -1,11 +1,11 @@
-import React, { useState } from "react";
-import { CheckCircle2, Circle, Clock, Landmark, XCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, Circle, Clock, Landmark, MinusCircle, XCircle } from "lucide-react";
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 import ManagerDecisionSummary, { payoutOf } from "@/pages/expense-management/pages/cash-advance/components/ManagerDecisionSummary";
-import { formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
+import { formatDateTime, formatMoney } from "@/pages/expense-management/approval-engine/constants/approvalLabels";
 
 const MANAGER_STAGE = ["SUBMITTED", "PENDING", "PENDING_APPROVAL", "PENDING_MANAGER_APPROVAL"];
 const COST_CENTER_STAGE = ["PENDING_COST_CENTER_APPROVAL", "PENDING_COST_CENTER"];
@@ -26,6 +26,8 @@ const NODE_META = {
   done: { Icon: CheckCircle2, dot: "bg-emerald-500 text-white", line: "bg-emerald-200", title: "text-emerald-800", note: "text-emerald-700" },
   current: { Icon: Clock, dot: "bg-[#0A0082] text-white ring-4 ring-[#0A0082]/15", line: "bg-gray-200", title: "text-[#0A0082]", note: "text-[#0A0082]" },
   upcoming: { Icon: Circle, dot: "bg-gray-200 text-gray-400", line: "bg-gray-200", title: "text-gray-500", note: "text-gray-400" },
+  skipped: { Icon: MinusCircle, dot: "bg-gray-200 text-gray-400", line: "bg-emerald-200", title: "text-gray-400", note: "text-gray-400" },
+  attention: { Icon: AlertTriangle, dot: "bg-orange-500 text-white", line: "bg-gray-200", title: "text-orange-800", note: "text-orange-700" },
   rejected: { Icon: XCircle, dot: "bg-rose-600 text-white", line: "bg-gray-200", title: "text-rose-700", note: "text-rose-700" },
 };
 
@@ -35,11 +37,52 @@ const LEVELS = [
   { levelOrder: 3, roleLabel: "Finance Executive" },
 ];
 
-function LevelNode({ level, state, isLast, managerId }) {
+// Statuses an advance can only reach after Finance's final approval.
+const PRE_APPROVAL_OR_CLOSED_EARLY = ["DRAFT", "REJECTED", "DEFERRED", "CANCELLED", ...MANAGER_STAGE, ...COST_CENTER_STAGE, ...FINANCE_STAGE];
+
+const DECISION_VERB = { APPROVED: "Approved", REJECTED: "Rejected", DEFERRED: "Deferred" };
+
+/** Latest decision recorded at one level, from the approval trail (the level is the status the advance was in). */
+const decisionAt = (trail, levelOrder) =>
+  [...trail]
+    .reverse()
+    .find((step) => DECISION_VERB[step.action] && stageIndexOf(step.fromStatus) === levelOrder) || null;
+
+/**
+ * Each level's real state. A decision recorded in the audit trail wins; a level the advance went past without a
+ * decision was not needed (the cost center step is skipped when the owner is the employee, manager or the approver).
+ * Advances older than the trail (no records at all) fall back to the status alone.
+ */
+const levelStateOf = ({ levelOrder, decision, current, status, hasTrail }) => {
+  if (decision) {
+    if (decision.action === "APPROVED") return "done";
+    if (decision.action === "REJECTED") return "rejected";
+    return "attention";
+  }
+  if (["REJECTED", "DEFERRED", "CANCELLED"].includes(status)) return "upcoming";
+  if (current === levelOrder) return "current";
+  if (current > levelOrder) return hasTrail ? "skipped" : "done";
+  return "upcoming";
+};
+
+function LevelNode({ level, state, isLast, approverId, decision }) {
   const meta = NODE_META[state] || NODE_META.upcoming;
   const { Icon } = meta;
-  const note =
-    state === "done" ? "Approved" : state === "current" ? "Awaiting decision" : "Not reached yet";
+
+  let note;
+  if (decision) {
+    note = [DECISION_VERB[decision.action], decision.performedAt && `· ${formatDateTime(decision.performedAt)}`]
+      .filter(Boolean)
+      .join(" ");
+  } else if (state === "done") {
+    note = "Approved";
+  } else if (state === "current") {
+    note = "Awaiting decision";
+  } else if (state === "skipped") {
+    note = "Not needed for this request";
+  } else {
+    note = "Not reached yet";
+  }
 
   return (
     <li className="flex gap-3">
@@ -56,10 +99,20 @@ function LevelNode({ level, state, isLast, managerId }) {
             Level {level.levelOrder}
           </span>
         </div>
-        {level.levelOrder === 1 && managerId && (
+        {decision?.performedBy ? (
           <p className="mt-0.5 break-words text-xs text-gray-600">
-            Approver: <span className="font-medium text-gray-800"><EmployeeLabel employeeId={managerId} /></span>
+            {DECISION_VERB[decision.action]} by:{" "}
+            <span className="font-medium text-gray-800"><EmployeeLabel employeeId={decision.performedBy} /></span>
           </p>
+        ) : (
+          approverId && state !== "skipped" && (
+            <p className="mt-0.5 break-words text-xs text-gray-600">
+              Approver: <span className="font-medium text-gray-800"><EmployeeLabel employeeId={approverId} /></span>
+            </p>
+          )
+        )}
+        {decision?.reason && decision.action !== "APPROVED" && (
+          <p className="mt-0.5 break-words text-xs text-gray-500">Reason: {decision.reason}</p>
         )}
         <p className={`mt-0.5 text-xs ${meta.note}`}>{note}</p>
       </div>
@@ -76,17 +129,42 @@ export default function CashAdvanceApprovalPanel({ advance, canAct, onChanged })
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const [trail, setTrail] = useState([]);
+
   const status = (advance.status || "").toUpperCase();
   const rejected = status === "REJECTED";
   const current = stageIndexOf(status);
-  const approved = !rejected && current === 4;
+  const hasTrail = trail.length > 0;
 
-  const stateOf = (index) => {
-    if (rejected || current === 0) return "upcoming";
-    if (current > index) return "done";
-    if (current === index) return "current";
-    return "upcoming";
-  };
+  // Reload the recorded decisions whenever the advance moves (an approval here or elsewhere changes its status).
+  useEffect(() => {
+    if (!advance.advanceId) return undefined;
+    let cancelled = false;
+    cashAdvanceApi
+      .getApprovalTrail(advance.advanceId)
+      .then((res) => {
+        if (!cancelled) setTrail(Array.isArray(res?.data?.data) ? res.data.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setTrail([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [advance.advanceId, advance.status]);
+
+  const levels = LEVELS.map((level) => {
+    const decision = decisionAt(trail, level.levelOrder);
+    return {
+      level,
+      decision,
+      state: levelStateOf({ levelOrder: level.levelOrder, decision, current, status, hasTrail }),
+      // Only the manager is known up front; the other levels name whoever actually decided.
+      approverId: level.levelOrder === 1 ? advance.managerId : null,
+    };
+  });
+  const financeApproved = levels[2].decision?.action === "APPROVED";
+  const approved = hasTrail ? financeApproved && !rejected : current === 4 && !PRE_APPROVAL_OR_CLOSED_EARLY.includes(status);
 
   const approve = async () => {
     setBusy(true);
@@ -136,13 +214,14 @@ export default function CashAdvanceApprovalPanel({ advance, canAct, onChanged })
           Approval Progress
         </div>
         <ul>
-          {LEVELS.map((level, idx) => (
+          {levels.map(({ level, decision, state, approverId }, idx) => (
             <LevelNode
               key={level.levelOrder}
               level={level}
-              state={stateOf(level.levelOrder)}
-              isLast={!finalNode && idx === LEVELS.length - 1}
-              managerId={advance.managerId}
+              state={state}
+              decision={decision}
+              approverId={approverId}
+              isLast={!finalNode && idx === levels.length - 1}
             />
           ))}
           {finalNode && (

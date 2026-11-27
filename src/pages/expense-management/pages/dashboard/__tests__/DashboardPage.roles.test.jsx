@@ -95,9 +95,12 @@ describe("role dashboards: one simple money flow per role", () => {
     expect(screen.queryByRole("tab", { name: "Approvals" })).toBeNull();
     expect(document.querySelector('[data-kpi="pending"]')).toBeNull();
 
-    // opened, it adds the rate and the lists without repeating the header's figures
+    // the header shows pending next to approved and sent back
+    expect(document.querySelector("[data-approvals-toggle]").textContent).toMatch(/Pending\s*4/);
+
+    // opened, it adds the lists without repeating the header's figures
     fireEvent.click(document.querySelector("[data-approvals-toggle]"));
-    expect(document.querySelector("[data-decision-mix]").textContent).toMatch(/92% approved/);
+    expect(document.querySelector("[data-decision-mix]")).toBeNull();
     expect(document.querySelector("[data-approvals-panel]").querySelectorAll("[data-kpi]")).toHaveLength(0);
     expect(document.querySelector("[data-approvals-panel]").textContent.match(/18,500/g)).toHaveLength(1);
   });
@@ -114,7 +117,6 @@ describe("role dashboards: one simple money flow per role", () => {
 
     await waitFor(() => expect(document.querySelector("[data-finance-headline]")).not.toBeNull());
     expect(dashboardService.get).toHaveBeenCalledWith("finance");
-    expect(screen.getByText(/Verified this month/)).toBeInTheDocument();
     expect(document.querySelector("[data-finance-headline]").textContent).toMatch(/7 reports worth .*64,000 waiting/);
     // the headline's figures are not repeated as cards
     expect(document.querySelector('[data-kpi="toVerify"]')).toBeNull();
@@ -123,17 +125,14 @@ describe("role dashboards: one simple money flow per role", () => {
     expect(document.body.textContent).not.toMatch(/undefined|NaN/);
   });
 
-  it("finance works its approvals from the same dashboard", async () => {
+  it("finance dashboard has no embedded work area: approvals and verification live on their own pages", async () => {
     dashboardService.get.mockResolvedValue(payload("finance", [["toVerify", "To verify", 0, "count"]]));
 
     renderAs(["FINANCE_EXECUTIVE"]);
 
-    // expense-report queue (1) + cash advances (2) routed to this user
-    await waitFor(() => expect(document.querySelector('[data-kpi="approvals"]').textContent).toMatch(/3/));
+    await waitFor(() => expect(document.querySelector("[data-finance-headline]")).not.toBeNull());
     expect(screen.queryByTestId("approvals-page")).toBeNull();
-
-    fireEvent.click(document.querySelector('[data-finance-tab="approvals"]'));
-    expect(screen.getByTestId("approvals-page").dataset.embedded).toBe("true");
+    expect(document.querySelector("[data-finance-tab]")).toBeNull();
   });
 
   it("AP sees the payments flow and never shows an undefined amount", async () => {

@@ -9,7 +9,9 @@ import {
   EVIDENCE_TYPE_OPTIONS,
   SALARY_STATUS_LABEL,
   buildResultFormData,
+  isAmountChanged,
   shortfallOf,
+  validateAmountChangeReason,
   validateRequestAmount,
   validateResult,
 } from "@/pages/expense-management/pages/cash-advance/components/salaryDeduction";
@@ -35,6 +37,7 @@ export default function SalaryDeductionPanel({ advanceId, outstanding, currencyC
   const [requests, setRequests] = useState([]);
   const [amount, setAmount] = useState(String(outstanding ?? ""));
   const [payrollMonth, setPayrollMonth] = useState("");
+  const [amountChangeReason, setAmountChangeReason] = useState("");
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [openResultId, setOpenResultId] = useState(null);
@@ -74,19 +77,28 @@ export default function SalaryDeductionPanel({ advanceId, outstanding, currencyC
     onChanged?.();
   };
 
+  const amountChanged = isAmountChanged(amount, outstanding);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     if (submitting) return;
     const next = {};
     const amountError = validateRequestAmount(amount, outstanding);
     if (amountError) next.amount = amountError;
+    const reasonError = amountError ? "" : validateAmountChangeReason(amount, outstanding, amountChangeReason);
+    if (reasonError) next.amountChangeReason = reasonError;
     if (!payrollMonth) next.payrollMonth = "Select the payroll month.";
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
     setSubmitting(true);
     try {
-      const created = await recoveryApi.createSalaryDeduction(advanceId, { amount: Number(amount), payrollMonth });
+      const created = await recoveryApi.createSalaryDeduction(advanceId, {
+        amount: Number(amount),
+        payrollMonth,
+        amountChangeReason: amountChanged ? amountChangeReason.trim() : null,
+      });
+      setAmountChangeReason("");
       await notify(`Salary deduction ${created?.payrollRequestId || ""} created. Payroll has been emailed.`);
     } catch (err) {
       showStatusToast(err.response?.data?.message || "Could not create the salary deduction", "error");
@@ -146,6 +158,7 @@ export default function SalaryDeductionPanel({ advanceId, outstanding, currencyC
             id="salary-amount"
             type="number"
             min="0"
+            max={outstanding ?? undefined}
             step="0.01"
             className={confirmationInputClass}
             value={amount}
@@ -161,6 +174,25 @@ export default function SalaryDeductionPanel({ advanceId, outstanding, currencyC
             ))}
           </select>
         </Field>
+        {amountChanged && (
+          <div className="md:col-span-2">
+            <Field
+              id="salary-amount-reason"
+              label={`Reason for changing the amount from ${formatMoney(outstanding, currencyCode)}`}
+              error={errors.amountChangeReason}
+            >
+              <textarea
+                id="salary-amount-reason"
+                rows={2}
+                maxLength={500}
+                className={confirmationInputClass}
+                placeholder="For example: employee asked to recover in two instalments"
+                value={amountChangeReason}
+                onChange={(e) => setAmountChangeReason(e.target.value)}
+              />
+            </Field>
+          </div>
+        )}
         <div className="flex items-end justify-end md:col-span-2">
           <Button type="submit" variant="success" disabled={submitting} loading={submitting}>
             Send to Payroll
@@ -187,6 +219,10 @@ export default function SalaryDeductionPanel({ advanceId, outstanding, currencyC
                 {request.sentAt ? ` · delivered ${new Date(request.sentAt).toLocaleString("en-IN")}` : ""}
                 {request.requestedBy === "SYSTEM" ? " · raised automatically when payment was not received" : ""}
               </p>
+
+              {request.amountChangeReason && (
+                <p className="mt-1 text-gray-600">Reason for amount: {request.amountChangeReason}</p>
+              )}
 
               {request.outcomeRecorded && (
                 <p className="mt-1 text-emerald-800">

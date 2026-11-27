@@ -50,8 +50,8 @@ const GenericTable = ({
           {/* TABLE BODY */}
           <tbody>
             {rows.map((row, rowIndex) => (
+              <React.Fragment key={rowIndex}>
               <tr
-                key={rowIndex}
                 onClick={row.onRowClick}
                 className={`transition ${
                   row.rowClass
@@ -74,6 +74,15 @@ const GenericTable = ({
                   </td>
                 ))}
               </tr>
+              {/* Optional detail under a row (e.g. an expanded money flow). Rows without it render exactly as before. */}
+              {row.expandedContent && (
+                <tr className="bg-slate-50/70">
+                  <td colSpan={columns.length} className="px-4 pb-3 pt-1 text-left">
+                    {row.expandedContent}
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
             ))}
           </tbody>
 

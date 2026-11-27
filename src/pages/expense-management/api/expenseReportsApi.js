@@ -74,6 +74,13 @@ export const lineItemService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // Policy warnings the line-item form would raise right now. Saves nothing; the same rules run again on save.
+  previewPolicy: (reportId, payload, config = {}) =>
+    api.post(`/xms/employee/expense-reports/${reportId}/line-items/policy-preview`, payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+      ...config,
+    }),
   create: (reportId, payload) =>
     api.post(`/xms/employee/expense-reports/${reportId}/line-items`, payload, {
       baseURL: EXPENSE_API_BASE,

@@ -274,6 +274,7 @@ const XmsSeverityThresholdPage = lazy(() => import("./pages/expense-management/p
 const XmsPolicyVersionsPage = lazy(() => import("./pages/expense-management/pages/PolicyVersions.jsx"));
 import { POLICY_VIEW_ROLES } from "./pages/expense-management/components/policy/common/policyEnums.js";
 const XmsReportsPage = lazy(() => import("./pages/expense-management/pages/reports/ReportsPage.jsx"));
+const XmsItcRegisterPage = lazy(() => import("./pages/expense-management/pages/reports/ItcRegisterPage.jsx"));
 const XmsNotificationsPage = lazy(() => import("./pages/expense-management/pages/activity/NotificationsPage.jsx"));
 const XmsAuditLogsPage = lazy(() => import("./pages/expense-management/pages/activity/AuditLogsPage.jsx"));
 const XmsSettingsPage = lazy(() => import("./pages/expense-management/pages/settings/SettingsPage.jsx"));
@@ -1970,7 +1971,8 @@ const AppRoutes = () => {
           <Route path="/expense-management/expenses/supplementary/:claimId" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Finance_Executive", "Admin"]}><XmsSupplementaryClaimDetailPage mode="employee" /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports/:reportId" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsExpenseReportDetailPage /></ProtectedRoute>} />
-          <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
+          {/* Same roles as the backend's /xms/manager/team endpoints and the dashboard's "My team" tab. */}
+          <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager", "Reporting_Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsExpenseReportsPage /></ProtectedRoute>} />
 
 
@@ -2036,6 +2038,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/policy-engine/severity-thresholds" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsSeverityThresholdPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/versions" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyVersionsPage /></ProtectedRoute>} />
           <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Finance_Executive", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/itc-register" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive", "Admin", "Super_Admin"]}><XmsItcRegisterPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
           <Route path="/expense-management/activity/audit-logs" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsAuditLogsPage /></ProtectedRoute>} />
