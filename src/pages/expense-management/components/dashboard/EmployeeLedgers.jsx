@@ -230,6 +230,10 @@ export function DirectExpenseCard({ ledger, byKey, currency }) {
 // ---- Cash advance: the advance money, then the bills settled against it.
 export function CashAdvanceCard({ ledger, byKey, currency }) {
   const received = num(byKey, "caDisbursed");
+  // Carried in from an earlier advance: held, but not cash paid out. What was held = received + carried in.
+  const carriedIn = num(byKey, "caCarriedIn");
+  const held = received + carriedIn;
+  const cut = num(byKey, "caCut");
   const used = num(byKey, "caUsedOnBills");
   const returned = num(byKey, "caReturned");
   const carried = num(byKey, "caCarriedForward");
@@ -276,25 +280,27 @@ export function CashAdvanceCard({ ledger, byKey, currency }) {
           label="Still to settle"
           value={outstanding}
           currency={currency}
-          note={received > 0 ? `${share(received - outstanding, received)}% of received is accounted for` : "No advance received yet"}
+          note={held > 0 ? `${share(held - outstanding, held)}% of what you held is accounted for` : "No advance received yet"}
         />
       }
     >
       <div className="mt-3">
         <SectionLabel>Advance money, where it went</SectionLabel>
         <div className="mt-2">
-          <Bar base={received} parts={parts} />
-          <Legend parts={parts} base={received} />
+          <Bar base={held} parts={parts} />
+          <Legend parts={parts} base={held} />
         </div>
       </div>
 
       <div className="mt-3 divide-y divide-dashed divide-slate-200">
         <div>
-          <Line kpi="caRequested" label="Requested" note="What you asked for" muted {...shared} />
-          <Line kpi="caApproved" label="Approved" note="Manager and Finance approved" muted {...shared} />
+          <Line kpi="caRequested" label="Requested" note="Cash you asked for" muted {...shared} />
+          {cut > 0 && <Line kpi="caCut" label="Cut off" note="Reduced by the approvers" minus muted {...shared} />}
+          <Line kpi="caApproved" label="Approved" note="Cash approved by your manager and Finance" muted {...shared} />
         </div>
         <div className="pt-1">
-          <Line kpi="caDisbursed" label="Received" note="Advance paid out to you" strong {...shared} />
+          <Line kpi="caDisbursed" label="Received" note="Cash paid out to you" strong {...shared} />
+          {carriedIn > 0 && <Line kpi="caCarriedIn" label="Carried in" note="Balance moved in from an earlier advance" plus {...shared} />}
           <Line kpi="caUsedOnBills" label="Used on bills" note="Approved bills paid from it" minus dot={COLOR.done} {...shared} />
           <Line kpi="caReturned" label="Returned by you" note="Cash you paid back" minus dot={COLOR.returned} {...shared} />
           {carried > 0 && <Line kpi="caCarriedForward" label="Carried forward" note="Moved to your next advance" minus dot={COLOR.idle} {...shared} />}

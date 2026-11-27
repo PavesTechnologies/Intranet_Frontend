@@ -9,6 +9,8 @@ const NOT_PAID_OUT = [
   "PENDING_COST_CENTER", "PENDING_FINANCE_APPROVAL", "PENDING_FINANCE", "APPROVED", "REJECTED", "DEFERRED", "CANCELLED",
 ];
 
+const NOT_LIVE = ["DRAFT", "REJECTED", "CANCELLED"];
+
 /** True once cash has gone out on the advance, so disbursed, owed, consumed and the rest have a value. */
 export const isPaidOut = (advance) =>
   Number(advance?.disbursedAmount) > 0 || !NOT_PAID_OUT.includes(String(advance?.status || "").toUpperCase());
@@ -18,7 +20,10 @@ export const isPaidOut = (advance) =>
  * once Finance has approved, are real figures; the rest are zero and shown as "—" ({@code paidOut} false).
  */
 export function figuresForAdvance(advance, utilization, salaryDeducted = 0) {
-  const f = settlementFiguresFor(advance, utilization, salaryDeducted);
+  const base = settlementFiguresFor(advance, utilization, salaryDeducted);
+  // A rejected, cancelled or draft request is not a live request: it adds nothing to Requested (as on the dashboard).
+  const live = !NOT_LIVE.includes(String(advance?.status || "").toUpperCase());
+  const f = live ? base : { ...base, requested: 0 };
   // Cut by the approvers: asked for minus approved, once the approved amount is known.
   const cutOf = (approved) => Math.max(0, Math.round((f.requested - approved) * 100) / 100);
   if (isPaidOut(advance)) {

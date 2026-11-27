@@ -24,6 +24,11 @@ export const REQUEST_TYPES = {
     description: "Cash advance request - money paid to the employee before the trip",
     className: "bg-emerald-100 text-emerald-800",
   },
+  SUPPLEMENTARY: {
+    label: "Supplementary claim",
+    description: "Supplementary claim - a missing or late bill added to a report that is already paid or settled",
+    className: "bg-violet-100 text-violet-800",
+  },
 };
 
 /** Type of an expense report: a settlement when it is linked to a cash advance, otherwise a plain expense. */

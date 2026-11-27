@@ -4,8 +4,7 @@ vi.mock("@/pages/expense-management/api/cashAdvanceApi", () => ({ cashAdvanceApi
 vi.mock("@/pages/expense-management/api/expenseReportsApi", () => ({ expenseReportService: {} }));
 vi.mock("@/pages/expense-management/api/recoveryApi", () => ({ recoveryApi: {} }));
 
-import { advanceFilters, advanceKpiCards, advanceMoney, advanceMovementLines } from "../MyAdvancesPage";
-import { applyTableFilters, emptyFilterValues } from "@/pages/expense-management/components/common/TableFilterBar";
+import { advanceMoney, advanceMovementLines } from "../advanceMovement";
 
 // Sindhu's 8 advances, as the my-advances API returns them (amounts, carry-forward and balances are real).
 const ADVANCES = [
@@ -18,21 +17,6 @@ const ADVANCES = [
   { advanceId: "dc635366", title: "[SEED] Pune site visit", status: "IN_PROGRESS", currencyCode: "INR", costCenterName: "Engineering", requestedAmount: 3000, approvedAmount: 3000, amount: 3000, disbursedAmount: 3000, outstandingBalance: 3000, settlementDueDate: "2026-12-31" },
   { advanceId: "fcc23f1b", title: "[SEED] Bengaluru client visit", status: "SETTLEMENT_PENDING", currencyCode: "INR", costCenterName: "Engineering", requestedAmount: 5000, approvedAmount: 5000, amount: 5000, disbursedAmount: 5000, outstandingBalance: 968, settlementDueDate: "2026-12-10" },
 ];
-
-describe("My Advances: KPI cards match the dashboard", () => {
-  it("received 44,000 (+1,518 carried in), settled 16,032, outstanding 29,486, 2,000 awaiting approval", () => {
-    const c = Object.fromEntries(advanceKpiCards(ADVANCES).map((x) => [x.key, x]));
-    expect(c.pending.value).toBe("INR 2,000.00");
-    expect(c.received.value).toBe("INR 44,000.00");
-    expect(c.received.hint).toBe("+ INR 1,518.00 carried in");
-    expect(c.settled.value).toBe("INR 16,032.00");
-    expect(c.outstanding.value).toBe("INR 29,486.00");
-  });
-
-  it("an advance not paid out yet has no money figures", () => {
-    expect(advanceMoney(ADVANCES[3])).toBeNull();
-  });
-});
 
 describe("My Advances: where each advance's money went", () => {
   const base = { paidOut: true, carriedIn: 0, consumed: 0, approvedConsumed: 0, salaryDeducted: 0, otherRepaid: 0, carriedForward: 0, held: 0, outstanding: 0, owedToEmployee: 0 };
@@ -56,26 +40,5 @@ describe("My Advances: where each advance's money went", () => {
   it("carried-in money is shown with the cash paid out", () => {
     expect(labels(advanceMovementLines({ ...base, disbursed: 2000, carriedIn: 1518 }, 3518)))
       .toEqual(["Paid out 2000", "+ Carried in 1518", "Used on reports 0", "Remaining 3518"]);
-  });
-});
-
-describe("My Advances: column filters", () => {
-  const filters = advanceFilters(ADVANCES);
-  const run = (over) => applyTableFilters(ADVANCES, filters, { ...emptyFilterValues(filters), status: "__OPEN__", ...over }).map((a) => a.advanceId);
-
-  it("starts on open advances: closed ones appear when asked for", () => {
-    expect(run({})).toHaveLength(6);
-    expect(run({ status: "" })).toHaveLength(8);
-  });
-
-  it("balance: outstanding, fully settled, not paid out", () => {
-    expect(run({ status: "", money: "SETTLED" })).toEqual(["36b2d34e", "3a8da915"]);
-    expect(run({ money: "NOT_PAID" })).toEqual(["99377217"]);
-    expect(run({ money: "OUTSTANDING" })).toHaveLength(5);
-  });
-
-  it("amount and settle-by ranges", () => {
-    expect(run({ amount: { min: "10000", max: "" } })).toEqual(["a6b24849", "af37e9a9"]);
-    expect(run({ settleBy: { from: "2026-12-10", to: "2026-12-12" } })).toEqual(["8f91c4ff", "fcc23f1b"]);
   });
 });

@@ -48,10 +48,20 @@ const FIGURES = [
   { key: "claimedAmount", label: "Total claimed", help: "Everything the team has submitted, not rejected.", tone: "indigo", icon: Wallet },
   { key: "inProgressAmount", label: "In approval", help: "With approvers or Finance, or sent back for changes.", tone: "amber", icon: Clock },
   { key: "approvedAmount", label: "Approved, unpaid", help: "Approved and waiting for payment.", tone: "blue", icon: Banknote },
-  { key: "reimbursedAmount", label: "Reimbursed", help: "Already paid out to the team.", tone: "emerald", icon: BadgeCheck },
+  { key: "reimbursedAmount", label: "Reimbursed", help: "Settled: paid out to the team.", tone: "emerald", icon: BadgeCheck },
 ];
 
 const num = (v) => Number(v) || 0;
+
+/**
+ * How the Reimbursed amount was settled: cash from AP and, when a report used a cash advance, the part the advance
+ * already covered. Reimbursed counts the claimed total, so In approval + Approved, unpaid + Reimbursed = Total claimed.
+ */
+export const settledHow = (row, currency) => {
+  const advance = num(row?.advanceCoveredAmount);
+  if (advance <= 0) return null;
+  return `${formatMoney(num(row.paidAmount), currency)} paid by AP + ${formatMoney(advance, currency)} covered by cash advance`;
+};
 
 export default function TeamDashboard({ currency: fallbackCurrency }) {
   const navigate = useNavigate();
@@ -102,9 +112,18 @@ export default function TeamDashboard({ currency: fallbackCurrency }) {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {FIGURES.map((f) => (
-          <FigureCard key={f.key} step={f} icon={f.icon} currency={currency} kpi={{ key: f.key, value: team[f.key], format: "money" }} />
-        ))}
+        {FIGURES.map((f) => {
+          const how = f.key === "reimbursedAmount" ? settledHow(team, currency) : null;
+          return (
+            <FigureCard
+              key={f.key}
+              step={how ? { ...f, help: how } : f}
+              icon={f.icon}
+              currency={currency}
+              kpi={{ key: f.key, value: team[f.key], format: "money" }}
+            />
+          );
+        })}
       </div>
 
       <MemberTable members={members} total={num(team.claimedAmount)} currency={currency} onOpen={viewReports} />
@@ -254,7 +273,14 @@ function MemberRows({ members, total, currency, onOpen }) {
                   {num(m.inProgressCount) > 0 && <span className="block text-[10px] text-amber-600">{m.inProgressCount} open</span>}
                 </td>
                 <td className="px-2 py-2.5 text-right tabular-nums text-slate-700">{formatMoney(m.approvedAmount, currency)}</td>
-                <td className="px-2 py-2.5 text-right tabular-nums text-emerald-700">{formatMoney(m.reimbursedAmount, currency)}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums text-emerald-700" title={settledHow(m, currency) || undefined}>
+                  {formatMoney(m.reimbursedAmount, currency)}
+                  {num(m.advanceCoveredAmount) > 0 && (
+                    <span className="block text-[10px] text-slate-500" data-advance-covered>
+                      {formatMoney(m.advanceCoveredAmount, currency)} by advance
+                    </span>
+                  )}
+                </td>
                 <td className="px-2 py-2.5 text-right text-slate-500">{m.lastSubmittedAt ? timeAgo(m.lastSubmittedAt) : "—"}</td>
                 <td className="px-1 text-slate-300"><ChevronRight size={14} /></td>
               </tr>

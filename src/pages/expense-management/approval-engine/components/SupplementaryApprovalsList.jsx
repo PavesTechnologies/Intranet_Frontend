@@ -19,6 +19,59 @@ import {
 
 const MIN_REASON = 5;
 
+const APPROVED_STATUSES = ["APPROVED", "PAYMENT_PENDING", "SETTLED"];
+const REJECTED_STATUSES = ["MANAGER_REJECTED", "FINANCE_REJECTED"];
+const num = (v) => Number(v) || 0;
+
+/** Approved column: the claim total once approved (claims are approved in full), otherwise where the decision stands. */
+export const claimApprovedCell = (c) => {
+  const status = String(c.status || "").toUpperCase();
+  if (APPROVED_STATUSES.includes(status)) {
+    return (
+      <>
+        <span className="font-semibold text-emerald-700">{formatMoney(c.totalAmount, c.currencyCode)}</span>
+        <span className="block text-[10px] text-gray-500">In full</span>
+      </>
+    );
+  }
+  if (REJECTED_STATUSES.includes(status)) return <span className="text-rose-600">Rejected</span>;
+  if (status === "CANCELLED") return <span className="text-gray-400">Cancelled</span>;
+  return <span className="text-gray-400">Awaiting decision</span>;
+};
+
+/**
+ * Paid column: what AP paid, and any part set against a carried-forward cash advance instead of being paid out.
+ * Before Finance approves, nothing is paid.
+ */
+export const claimPaidCell = (c) => {
+  const offset = num(c.advanceOffsetAmount);
+  const cashPart = Math.max(0, num(c.totalAmount) - offset);
+  const payment = String(c.paymentStatus || "").toUpperCase();
+  const advanceNote = offset > 0 && (
+    <span className="block text-[10px] text-violet-700">{formatMoney(offset, c.currencyCode)} set against advance</span>
+  );
+  if (payment === "PAID") {
+    return (
+      <>
+        <span className="font-semibold text-gray-900">{formatMoney(cashPart, c.currencyCode)}</span>
+        {advanceNote}
+      </>
+    );
+  }
+  if (payment === "REQUESTED") {
+    return (
+      <>
+        <span className="text-amber-700">With AP</span>
+        {advanceNote}
+      </>
+    );
+  }
+  if (String(c.status || "").toUpperCase() === "SETTLED" && offset > 0) {
+    return <span className="text-violet-700">Set against advance</span>;
+  }
+  return <span className="text-gray-400">Not paid</span>;
+};
+
 /** Says why a review queue could not load. A 403 names the missing permission, so the cause is clear to the user. */
 function queueFailureMessage({ err, role }) {
   const status = err?.response?.status;
@@ -180,15 +233,21 @@ export default function SupplementaryApprovalsList({
               <p className="font-semibold text-gray-900 truncate text-xs">{c.reportNumber ? `For ${c.reportNumber}` : "Supplementary claim"}</p>
               <p className="text-[11px] text-gray-500 truncate mt-0.5">{c.lateReasonText || c.creationReason || "Missed expenses"}</p>
             </td>
-            <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate">—</td>
+            <td className="px-2.5 py-1.5 text-left text-xs text-gray-600 truncate" title="Cost center of the original report">
+              {c.costCenterName || "—"}
+            </td>
             <td className="px-2.5 py-1.5 text-left whitespace-nowrap">
               <ApprovalStatusBadge statusKey={suppStatusKey(c.status)} />
             </td>
             <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap text-xs">
               {formatMoney(c.totalAmount, c.currencyCode)}
             </td>
-            <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
-            <td className="px-2.5 py-1.5 text-right text-xs text-gray-300" title="Shown for cash advances only">—</td>
+            <td className="px-2.5 py-1.5 text-right whitespace-nowrap text-xs" data-supp-approved>
+              {claimApprovedCell(c)}
+            </td>
+            <td className="px-2.5 py-1.5 text-right whitespace-nowrap text-xs" data-supp-paid>
+              {claimPaidCell(c)}
+            </td>
             <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
               <RowActions>
                 <RowActionButton tone="view" icon={Eye} label={`View ${c.claimNumber}`} title="View the claim" onClick={() => openClaim(c)} />

@@ -66,7 +66,8 @@ const GenericTable = ({
                 {columns.map((col, colIndex) => (
                   <td
                     key={colIndex}
-                    className={`p-2 px-2 text-gray-700 font-medium ${colIndex === 0 ? "text-left" : "text-center"} align-middle relative overflow-visible`}
+                    // One body size for every table (13px, like the Approvals and Finance tables); dates and amounts stay on one line.
+                    className={`p-2 px-2 text-[13px] leading-snug text-gray-700 font-medium ${colIndex === 0 ? "text-left" : "text-center"} align-middle relative overflow-visible`}
                   >
                     <div className={`flex ${colIndex === 0 ? "justify-start" : "justify-center"} items-center w-full`}>
                       {row[col]}

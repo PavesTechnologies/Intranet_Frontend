@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
+  Search,
   Eye,
   Edit2,
   Trash2,
@@ -36,11 +37,9 @@ import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { useAdvanceFigures } from "@/pages/expense-management/pages/cash-advance/useAdvanceFigures";
+import AdvanceMoneyTracker from "@/pages/expense-management/pages/cash-advance/components/AdvanceMoneyTracker";
 import { carryForwardRequest } from "@/pages/expense-management/pages/cash-advance/carryForwardRequest";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
-import { advanceMoney, advanceMovementLines } from "@/pages/expense-management/pages/cash-advance/advanceMovement";
-// Re-exported so existing imports from this page keep working.
-export { advanceMoney, advanceMovementLines };
 
 // Statuses in which an expense report can be linked to the advance (same list as the detail page).
 const LINKABLE_EXPENSE_STATUSES = [
@@ -186,134 +185,18 @@ const ToggleChip = ({ active, onClick, disabled, title, children }) => (
 const OWED_STATUSES = ["DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "SETTLEMENT_PENDING",
   "PARTIALLY_SETTLED", "PARTIALLY_ADJUSTED", "ADJUSTED", "AWAITING_REIMBURSEMENT", "OVERDUE"];
 
-// ---------------------------------------------------------------- figures, filters and KPI cards (from the real records)
-
-const PENDING_STATUSES = ["SUBMITTED", "PENDING", "PENDING_APPROVAL", "PENDING_MANAGER_APPROVAL", "PENDING_COST_CENTER_APPROVAL", "PENDING_FINANCE_APPROVAL"];
-const CLOSED_STATUSES = ["CLOSED", "CANCELLED"];
-const OPEN_ONLY = "__OPEN__";
-const statusOf = (adv) => (isOverdue(adv) ? "OVERDUE" : String(adv.status || "").toUpperCase());
-const prettyStatus = (s) => s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
-const daysUntilDue = (adv) => {
-  const due = getSettlementDueDate(adv);
-  if (!due) return null;
-  const d = new Date(String(due).slice(0, 10) + "T00:00:00");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((d - today) / 86400000);
-};
-
-const ADVANCE_MONEY_STATES = [
-  { value: "OUTSTANDING", label: "Outstanding to settle", match: (m) => m && m.outstanding > 0 },
-  { value: "SETTLED", label: "Fully settled", match: (m) => m && m.outstanding <= 0 },
-  { value: "NOT_PAID", label: "Not paid out yet", match: (m) => !m },
-];
-
-/** One filter per table column. Status defaults to open advances, as the page always did (closed ones on request). */
-export function advanceFilters(rows) {
-  const statuses = [...new Set(rows.map(statusOf))].filter(Boolean).sort();
-  return [
-    {
-      key: "search", label: "Search", type: "search", placeholder: "Title, purpose or advance ID",
-      match: (a, q) => `${a.title || ""} ${a.purpose || ""} ${a.advanceId || a.id || ""}`.toLowerCase().includes(q.trim().toLowerCase()),
-    },
-    {
-      key: "status", label: "Status", type: "select",
-      options: [
-        { label: "Open (hide closed & cancelled)", value: OPEN_ONLY },
-        { label: "All statuses", value: "" },
-        ...statuses.map((s) => ({ label: prettyStatus(s), value: s })),
-      ],
-      match: (a, v) => (v === OPEN_ONLY ? !CLOSED_STATUSES.includes(String(a.status || "").toUpperCase()) : statusOf(a) === v),
-    },
-    {
-      key: "money", label: "Balance", type: "select",
-      options: [{ label: "Any", value: "" }, ...ADVANCE_MONEY_STATES.map(({ value, label }) => ({ value, label }))],
-      match: (a, v) => Boolean(ADVANCE_MONEY_STATES.find((m) => m.value === v)?.match(advanceMoney(a))),
-    },
-    {
-      key: "costCenter", label: "Cost center", type: "select",
-      options: distinctOptions(rows, (a) => (getCostCenterValue(a) === "—" ? null : getCostCenterValue(a)), "All cost centers"),
-      match: (a, v) => getCostCenterValue(a) === v,
-    },
-    {
-      key: "currency", label: "Currency", type: "select",
-      options: distinctOptions(rows, (a) => a.currencyCode, "All currencies"),
-      match: (a, v) => a.currencyCode === v,
-    },
-    { key: "amount", label: "Amount", type: "amountRange", match: (a, v) => inAmountRange(a.approvedAmount ?? a.amount, v) },
-    { key: "neededBy", label: "Needed by", type: "dateRange", match: (a, v) => inDateRange(getNeededByDateValue(a), v) },
-    { key: "settleBy", label: "Settle by", type: "dateRange", match: (a, v) => inDateRange(getSettlementDueDate(a), v) },
-  ];
-}
-
-const ADVANCE_FILTERS_SHAPE = advanceFilters([]);
-const initialAdvanceFilters = () => ({ ...emptyFilterValues(ADVANCE_FILTERS_SHAPE), status: OPEN_ONLY });
-
-/**
- * The cards a General employee needs on their advances, from the filtered rows: requests waiting for approval, cash
- * received, how much of what they held is settled, what is still with them (and overdue), and what is due within 7 days.
- */
-export function advanceKpiCards(rows) {
-  const currencies = [...new Set(rows.map((a) => a.currencyCode).filter(Boolean))];
-  const cur = currencies.length === 1 ? currencies[0] : "INR";
-  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  const money = rows.map(advanceMoney).filter(Boolean);
-  const sum = (list, f) => list.reduce((acc, x) => acc + f(x), 0);
-  const pending = rows.filter((a) => PENDING_STATUSES.includes(String(a.status || "").toUpperCase()));
-  const carried = sum(money, (m) => m.carriedIn);
-  const owing = rows.filter((a) => (advanceMoney(a)?.outstanding || 0) > 0);
-  const overdue = owing.filter(isOverdue).length;
-  const dueSoon = owing.filter((a) => {
-    const d = daysUntilDue(a);
-    return d !== null && d >= 0 && d <= 7;
-  });
-  const held = sum(money, (m) => m.held);
-  const settled = sum(money, (m) => m.settled);
-
-  return [
-    { key: "pending", label: "Awaiting approval", value: formatMoney(sum(pending, (a) => Number(a.requestedAmount ?? a.amount) || 0), cur), hint: plural(pending.length, "request"), icon: Clock, tone: "bg-amber-50 text-amber-600" },
-    { key: "received", label: "Received", value: formatMoney(sum(money, (m) => m.cash), cur), hint: carried > 0 ? `+ ${formatMoney(carried, cur)} carried in` : `${plural(money.length, "advance")} paid out`, icon: DollarSign, tone: "bg-indigo-50 text-indigo-600" },
-    { key: "settled", label: "Settled", value: formatMoney(settled, cur), hint: held > 0 ? `${Math.round((settled / held) * 100)}% of what you held` : "Nothing held yet", icon: CheckCircle2, tone: "bg-emerald-50 text-emerald-600" },
-    { key: "outstanding", label: "Outstanding", value: formatMoney(sum(owing, (a) => advanceMoney(a).outstanding), cur), hint: overdue > 0 ? `${overdue} overdue` : `${plural(owing.length, "advance")} to settle`, icon: AlertCircle, tone: overdue > 0 ? "bg-rose-50 text-rose-600" : "bg-orange-50 text-orange-600" },
-    { key: "dueSoon", label: "Due in 7 days", value: formatMoney(sum(dueSoon, (a) => advanceMoney(a).outstanding), cur), hint: dueSoon.length ? plural(dueSoon.length, "advance") : "Nothing due this week", icon: Calendar, tone: "bg-sky-50 text-sky-600" },
-  ];
-}
-
-function AdvanceMovementCell({ f, cur, loading, overdue, serverOutstanding }) {
-  if (loading) return <span className="text-gray-300">…</span>;
-  const lines = advanceMovementLines(f, serverOutstanding);
-  if (!lines) return <span className="text-[11px] text-gray-400" title="Not paid out yet, so no money has moved">—</span>;
-  return (
-    <div className="flex flex-col items-end gap-0.5" data-advance-movement>
-      {lines.map((l) => (
-        <span
-          key={l.key}
-          title={l.note}
-          className={`text-[11px] leading-tight ${l.key === "remaining" || l.key === "owedToYou" ? "mt-0.5 border-t border-dashed border-gray-200 pt-0.5" : ""}`}
-        >
-          <span className="text-gray-500">{l.label} </span>
-          <span className={`font-semibold ${l.key === "remaining" && overdue ? "text-rose-600" : l.tone}`}>{formatMoney(l.value, cur)}</span>
-          {l.key === "remaining" && overdue && <span className="ml-1 text-[10px] font-semibold text-rose-600">overdue</span>}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export default function MyAdvancesPage() {
   const navigate = useNavigate();
 
   const [advances, setAdvances] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Column filters. Status starts at "Open", so closed and cancelled advances are hidden until asked for.
+  // Opened for one advance (?advance=<id>, from My Expenses' "Open in My Advances"): show just that one, closed or not.
   const [searchParams] = useSearchParams();
   const focusAdvanceId = searchParams.get("advance");
-  const [filterValues, setFilterValues] = useState(() =>
-    focusAdvanceId
-      // Opened for one advance (from My Expenses): show just that one, whatever its status.
-      ? { ...initialAdvanceFilters(), status: "", search: focusAdvanceId }
-      : initialAdvanceFilters()
-  );
+  const [searchTerm, setSearchTerm] = useState(focusAdvanceId || "");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  // Closed and cancelled records are hidden under "All Statuses" unless this is ticked.
+  const [showClosed, setShowClosed] = useState(Boolean(focusAdvanceId));
   const [currentPage, setCurrentPage] = useState(1);
   // Which row's detail panel is open (one at a time).
   const [expandedId, setExpandedId] = useState(null);
@@ -503,7 +386,7 @@ export default function MyAdvancesPage() {
   // Money figures for the rows on this page, from the server (expenses added, salary deducted). See settlementFigures.js.
   const { figuresOf, isLoaded } = useAdvanceFigures(pagedAdvances);
 
-  // Go back to page 1 whenever a filter changes
+  // Go back to page 1 whenever the search or status filter changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, filters, sortBy, showClosed]);
@@ -515,12 +398,29 @@ export default function MyAdvancesPage() {
       ["SUBMITTED", "PENDING", "PENDING_APPROVAL"].includes((a.status || "").toUpperCase())
     ).length;
 
-    const totalDisbursed = advances
-      .filter((a) => ["DISBURSED", "SETTLED"].includes((a.status || "").toUpperCase()))
-      .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+    // Cash actually paid out (carried-in balances are not new cash), whatever the advance's status now.
+    const totalDisbursed = advances.reduce((sum, a) => sum + (Number(a.disbursedAmount) || 0), 0);
 
-  // KPI cards: the same filtered advances the table shows.
-  const kpiCards = useMemo(() => advanceKpiCards(filteredAdvances), [filteredAdvances]);
+    // Settled = what was held (cash paid out + carried in) less what is still outstanding, on paid-out advances: the
+    // same figure as the dashboard's "Settled" (used on bills, returned, salary deduction or carried forward).
+    const totalSettled = advances
+      .filter((a) => Number(a.disbursedAmount) > 0)
+      .reduce((sum, a) => sum + Math.max(0, (Number(a.disbursedAmount) || 0) + (Number(a.carriedInAmount) || 0) - (Number(a.outstandingBalance) || 0)), 0);
+
+    const outstandingBalance = advances
+      .filter((a) => OWED_STATUSES.includes((a.status || "").toUpperCase()))
+      .reduce((sum, a) => sum + (Number(a.outstandingBalance) || 0), 0);
+
+    const overdueCount = advances.filter(isOverdue).length;
+
+    // Everything asked for on live requests (drafts and cancelled ones are not requests yet / any more).
+    // Cash asked for on live requests: not drafts, rejected or cancelled ones (the same rule as the dashboard).
+    const requested = advances.filter((a) => !["DRAFT", "REJECTED", "CANCELLED"].includes((a.status || "").toUpperCase()));
+    const totalRequested = requested.reduce((sum, a) => sum + (Number(a.requestedAmount ?? a.amount) || 0), 0);
+    const requestedCount = requested.length;
+
+    return { totalCount, pendingCount, totalDisbursed, totalSettled, outstandingBalance, overdueCount, totalRequested, requestedCount };
+  }, [advances]);
 
   // Handle Actions
   const handleSubmit = (advance) => {
@@ -606,6 +506,21 @@ export default function MyAdvancesPage() {
     }
   };
 
+  const statusOptions = [
+    { label: "All Statuses", value: "ALL" },
+    { label: "Draft", value: "DRAFT" },
+    { label: "Pending Approval", value: "PENDING" },
+    { label: "Approved", value: "APPROVED" },
+    { label: "In Progress", value: "IN_PROGRESS" },
+    { label: "Reconciliation Pending", value: "RECONCILIATION_PENDING" },
+    { label: "Submitted for Review", value: "SUBMITTED_FOR_REVIEW" },
+    { label: "Under Review", value: "UNDER_REVIEW" },
+    { label: "Settlement Pending", value: "SETTLEMENT_PENDING" },
+    { label: "Closed", value: "CLOSED" },
+    { label: "Rejected", value: "REJECTED" },
+    { label: "Cancelled", value: "CANCELLED" },
+  ];
+
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <Breadcrumb items={breadcrumbs} />
@@ -637,17 +552,43 @@ export default function MyAdvancesPage() {
         </div>
       </div>
 
-      <KpiCards cards={kpiCards} />
-
-      <TableFilterBar
-        filters={filters}
-        values={filterValues}
-        onChange={setFilterValues}
-        onReset={() => setFilterValues(initialAdvanceFilters())}
-        resultCount={filteredAdvances.length}
-        totalCount={advances.length}
-        noun="advances"
-      />
+      {/* Summary strip: all six figures in one row */}
+      <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm sm:grid-cols-3 lg:grid-cols-6 [&>*]:border-gray-100 lg:divide-x lg:divide-gray-100">
+        {[
+          { label: "Total Requests", value: stats.totalCount, icon: FileText, tone: "text-[#263383] bg-[#263383]/10", valueTone: "text-gray-900" },
+          {
+            label: "Total Requested",
+            value: formatMoney(stats.totalRequested),
+            icon: Receipt,
+            tone: "text-[#0A0082] bg-[#0A0082]/10",
+            valueTone: "text-[#0a174e]",
+            hint: `${stats.requestedCount} live request${stats.requestedCount === 1 ? "" : "s"}`,
+          },
+          { label: "Pending Approval", value: stats.pendingCount, icon: Clock, tone: "text-amber-600 bg-amber-50", valueTone: "text-amber-600" },
+          { label: "Disbursed", value: formatMoney(stats.totalDisbursed), icon: DollarSign, tone: "text-indigo-600 bg-indigo-50", valueTone: "text-indigo-700" },
+          { label: "Settled", value: formatMoney(stats.totalSettled), icon: CheckCircle2, tone: "text-emerald-600 bg-emerald-50", valueTone: "text-emerald-700" },
+          {
+            label: "Outstanding",
+            value: formatMoney(stats.outstandingBalance),
+            icon: AlertCircle,
+            tone: stats.overdueCount > 0 ? "text-rose-600 bg-rose-50" : "text-orange-600 bg-orange-50",
+            valueTone: stats.overdueCount > 0 ? "text-rose-600" : "text-orange-600",
+            note: stats.overdueCount > 0 ? `${stats.overdueCount} overdue` : null,
+          },
+        ].map(({ label, value, icon: Icon, tone, valueTone, note, hint }) => (
+          <div key={label} className="flex items-center gap-3 border-b p-4 lg:border-b-0">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tone}`}>
+              <Icon size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
+              <p className={`mt-0.5 truncate text-lg font-bold ${valueTone}`}>{value}</p>
+              {note && <p className="text-[11px] font-medium text-rose-600">{note}</p>}
+              {hint && <p className="truncate text-[11px] text-gray-400">{hint}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Table card with the filter toolbar on top */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -821,7 +762,7 @@ export default function MyAdvancesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-gray-700">
-              <thead className="bg-[#F4F6FC] [&_th]:whitespace-nowrap text-[11px] font-semibold text-[#263383]/70 uppercase tracking-wider border-b border-gray-200">
+              <thead className="bg-[#F4F6FC] text-[11px] font-semibold text-[#263383]/70 uppercase tracking-wider border-b border-gray-200">
                 <tr>
                   <th className="w-10 py-3 pl-4 pr-0" aria-label="Expand" />
                   <th className="py-3 px-4">Advance</th>
@@ -840,6 +781,7 @@ export default function MyAdvancesPage() {
                   const f = figuresOf(adv);
                   const cur = adv.currencyCode || "INR";
                   const loading = !isLoaded(adv);
+
                   const amountLabel = f.approvedKnown ? "Approved" : "Requested";
                   // A Carry Forward request covers new cash + the carried-forward balance. Show the total, and how it is made.
                   const cf = carryForwardRequest(adv);
@@ -962,6 +904,19 @@ export default function MyAdvancesPage() {
                         <td />
                         <td colSpan={5} className="px-4 pb-4 pt-0">
                           <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-3 lg:grid-cols-4">
+                            {/* Where the money went, as steps, above the details */}
+                            <div className="col-span-full border-b border-gray-100 pb-3" data-advance-detail-tracker>
+                              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Where the money went</p>
+                              {["DRAFT", "REJECTED", "CANCELLED"].includes(statusUpper) ? (
+                                <p className="text-xs text-slate-500">
+                                  {statusUpper === "DRAFT"
+                                    ? `Draft for ${formatMoney(Number(adv.requestedAmount ?? adv.amount) || 0, cur)}, not submitted yet, so no money has moved.`
+                                    : `${statusUpper === "REJECTED" ? "Rejected" : "Cancelled"}: ${formatMoney(Number(adv.requestedAmount ?? adv.amount) || 0, cur)} was asked for, nothing was paid out.`}
+                                </p>
+                              ) : (
+                                <AdvanceMoneyTracker withRequest figures={f} serverOutstanding={adv.outstandingBalance != null ? Number(adv.outstandingBalance) : undefined} currency={cur} loading={loading} />
+                              )}
+                            </div>
                             {[
                               { label: "Advance ID", value: advId },
                               { label: "Cost Center", value: getCostCenterValue(adv) },
@@ -969,18 +924,10 @@ export default function MyAdvancesPage() {
                               { label: "Needed By", value: formatDate(getNeededByDateValue(adv)) },
                               { label: "Trip Dates", value: formatTripDates(adv) },
                               { label: "Settlement Due", value: formatDate(getSettlementDueDate(adv)), tone: overdue ? "text-rose-600" : "" },
-                              { label: "Requested", value: formatMoney(f.requested, cur) },
-                              { label: "Approved", value: f.approvedKnown ? formatMoney(f.approved, cur) : "—" },
-                              { label: "Disbursed", value: paidCell(f.disbursed) },
-                              { label: "Consumed", value: paidCell(f.consumed), tone: "text-sky-700" },
-                              {
-                                label: "Outstanding",
-                                value: paidCell(f.outstanding),
-                                tone: overdue ? "text-rose-600" : f.outstanding > 0 ? "text-amber-600" : "",
-                              },
-                              cf && cf.carry > 0 && {
+                              // The money (requested, approved, paid out, carried in, used, remaining) is in the steps above.
+                              cf && cf.carry > 0 && !cf.moved && {
                                 label: "Carry Forward",
-                                value: `${formatMoney(cf.newCash, cur)} new + ${formatMoney(cf.carry, cur)} carried${cf.moved ? "" : " (on approval)"}`,
+                                value: `${formatMoney(cf.carry, cur)} moves in on approval`,
                                 tone: "text-violet-700",
                               },
                             ]

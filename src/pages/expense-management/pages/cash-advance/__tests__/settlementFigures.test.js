@@ -46,7 +46,8 @@ describe("settlementFiguresFor", () => {
       { claimedAmount: 3200, totalRepaidAmount: 0 },
       0,
     );
-    expect(f).toMatchObject({ approved: 3500, disbursed: 3000, carriedIn: 500, owed: 3500, consumed: 3200, remaining: 300, outstanding: 300 });
+    // Approved is cash, like requested: the 500 carried in is shown as carried in, not as newly approved money.
+    expect(f).toMatchObject({ requested: 3000, approved: 3000, disbursed: 3000, carriedIn: 500, owed: 3500, consumed: 3200, remaining: 300, outstanding: 300 });
   });
 
   it("carried forward leaves the advance: held money is outstanding for the employee, not on the advance", () => {
@@ -80,10 +81,12 @@ describe("settlementTotals and usageShares", () => {
   it("adds the rows up", () => {
     const rows = [
       settlementFiguresFor({ amount: 1000 }, { claimedAmount: 0, totalRepaidAmount: 0 }, 0),
-      settlementFiguresFor({ amount: 5000 }, { claimedAmount: 2000, totalRepaidAmount: 1000 }, 1000),
+      settlementFiguresFor({ amount: 5000 }, { claimedAmount: 2000, approvedAmount: 1500, totalRepaidAmount: 1000 }, 1000),
     ];
+    // Used counts approved expenses only (as on the dashboard); the 500 on a report not approved yet is counted apart.
     expect(settlementTotals(rows)).toMatchObject({
-      count: 2, disbursed: 6000, consumed: 2000, remaining: 4000, salaryDeducted: 1000, otherRepaid: 0, outstanding: 3000,
+      count: 2, disbursed: 6000, consumed: 1500, claimed: 2000, pendingInReports: 500, remaining: 4000, salaryDeducted: 1000,
+      otherRepaid: 0, outstanding: 3000,
     });
   });
 

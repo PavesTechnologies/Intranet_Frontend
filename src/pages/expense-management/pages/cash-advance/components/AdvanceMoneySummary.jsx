@@ -33,7 +33,8 @@ export default function AdvanceMoneySummary({ advance, figures: f }) {
   const cf = carryForwardRequest(advance);
   // For a Carry Forward request the approved amount includes the carried part, so the cash approved is compared with the
   // new cash asked for, not with the total.
-  const cashApproved = cf ? f.approved - cf.carry : f.approved - f.carriedIn;
+  // figures.approved is already cash only (carried-in balance taken out in settlementFiguresFor).
+  const cashApproved = f.approved;
   const cashAsked = cf ? cf.newCash : f.requested;
   const owing = f.paidOut && f.outstanding > 0;
   // Expenses still in approval are counted in "Spent" and held against the advance, so Outstanding is what is left to

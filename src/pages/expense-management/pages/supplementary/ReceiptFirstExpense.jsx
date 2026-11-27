@@ -80,10 +80,15 @@ const Label = ({ children, required }) => (
  * right every field filled from what the scan read (category, date, merchant, payment, description, amount, GST). The
  * employee checks them and saves. The receipt is attached to the expense.
  */
-export default function ReceiptFirstExpense({ claimId, periodStart, periodEnd, categories = [], currencyCode = "INR", onClaimChanged }) {
+export default function ReceiptFirstExpense({ claimId, periodStart, periodEnd, categories = [], currencyCode = "INR", onClaimChanged, onPhaseChange }) {
   const [receiptId, setReceiptId] = useState(null);
   const [file, setFile] = useState(null);
   const [phase, setPhase] = useState("idle"); // idle | reading | ready
+  // Lets the dialog stay narrow for the upload and widen once the receipt sits beside the form.
+  useEffect(() => {
+    onPhaseChange?.(phase);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
   const [attempt, setAttempt] = useState(0);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
@@ -225,15 +230,21 @@ export default function ReceiptFirstExpense({ claimId, periodStart, periodEnd, c
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-5" data-receipt-review>
       {/* Left: the receipt itself, so every field can be checked against it */}
       <div className="lg:col-span-2">
-        <div className="flex h-full min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 lg:sticky lg:top-0 lg:h-[calc(100vh-11rem)]">
+        {/* Sized to the full-screen dialog (less its header), so the whole receipt, total included, is always in view. */}
+        <div className="flex h-[70vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 lg:sticky lg:top-0 lg:h-[calc(100vh-10rem)]" data-receipt-preview>
           <p className="flex items-center gap-1.5 border-b border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
-            <Receipt size={13} aria-hidden="true" /> <span className="truncate">{file?.name || "Receipt"}</span>
+            <Receipt size={13} aria-hidden="true" /> <span className="min-w-0 flex-1 truncate">{file?.name || "Receipt"}</span>
+            {previewUrl && (
+              <a href={previewUrl} target="_blank" rel="noreferrer" className="shrink-0 font-medium text-[#0A0082] hover:underline">
+                Open full size
+              </a>
+            )}
           </p>
-          <div className="flex flex-1 items-center justify-center p-3">
+          <div className="flex min-h-0 flex-1 items-center justify-center p-3">
             {previewUrl && file?.type === "application/pdf" ? (
-              <iframe title="Receipt preview" src={previewUrl} className="h-[26rem] w-full rounded-lg bg-white lg:h-full" />
+              <iframe title="Receipt preview" src={previewUrl} className="h-full w-full rounded-lg bg-white" />
             ) : previewUrl ? (
-              <img src={previewUrl} alt="Receipt preview" className="max-h-[26rem] w-auto rounded-lg object-contain shadow-sm lg:max-h-full" />
+              <img src={previewUrl} alt="Receipt preview" className="h-full max-h-full w-full rounded-lg object-contain" />
             ) : (
               <span className="flex flex-col items-center gap-1 text-xs text-slate-400"><FileText size={22} aria-hidden="true" /> No preview</span>
             )}
