@@ -1,12 +1,34 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Bell, LogOut, User, Menu, X, Eye, EyeOff, KeyRound, ChevronDown, Building2, Landmark, Check } from "lucide-react";
+
+import { useLocation, useNavigate } from "react-router-dom";
+
+import {
+  LogOut,
+  User,
+  Menu,
+  X,
+  Eye,
+  EyeOff,
+  KeyRound,
+  ChevronDown,
+  Building2,
+  Landmark,
+  Check,
+} from "lucide-react";
+
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { FINANCE_ALL_ROLES } from "../../config/sidebarConfig";
 import { APPLICATIONS, isFinanceEnabled } from "../../utils/applicationRoutes";
 
 import Modal from "../Modal/modal";
+import TourCenter from "../Tour/TourCenter";
+import GlobalSearch from "../GlobalSearch/GlobalSearch";
+
+import ExpenseNotificationBell from "../../pages/expense-management/components/notifications/NotificationBell";
+
+import AccountsPayableNotificationBell from "../../pages/accounts-payable/notifications/components/NotificationBell";
+
 import api from "../../api/axiosInstance";
 import { showStatusToast } from "../toastfy/toast";
 
@@ -15,6 +37,8 @@ const EMPTY_SHOW_PW = { current: false, new: false, confirm: false };
 
 const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
   const navigate = useNavigate();
+  // The notification bell belongs to Expense Management only.
+  const isExpenseManagement = useLocation().pathname.startsWith("/expense-management");
   const { user, logout, hasRole } = useAuth();
 
   const [employeeProfile, setEmployeeProfile] = useState(null);
@@ -42,7 +66,22 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
     : "";
   const name = liveName || user?.name || user?.email || "User";
   const firstName = name.split(" ")[0];
-  //  const role = user?.roles?.join(", ") || "User";
+  // Roles arrive as codes (e.g. "FINANCE_ADMIN"), either an array or a comma-separated
+  // string — turn them into readable labels ("Finance Admin") for display under the name.
+  const rawRoles = user?.roles || user?.role || [];
+  const role =
+    (Array.isArray(rawRoles) ? rawRoles : String(rawRoles).split(","))
+      .map((r) =>
+        String(r)
+          .trim()
+          .replace(/^ROLE_/i, "")
+          .split(/[_\s]+/)
+          .filter(Boolean)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(" ")
+      )
+      .filter(Boolean)
+      .join(", ") || "User";
 
 
   const iconVariants = {
@@ -190,13 +229,14 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
   return (
     <>
       <header className="bg-white border-b border-gray-200 px-5 py-2 sticky top-0 z-[50]">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-6">
 
           {/* ── Left: sidebar toggle + welcome ── */}
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 flex-shrink items-center gap-4">
             <button
+              data-tour="header-toggle"
               onClick={onToggleSidebar}
-              className="flex items-center justify-center p-2 rounded-md hover:bg-gray-100 transition-colors"
+              className="flex flex-shrink-0 items-center justify-center p-2 rounded-md hover:bg-gray-100 transition-colors"
               title="Toggle Sidebar"
             >
               <AnimatePresence mode="wait" initial={true}>
@@ -212,24 +252,37 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
               </AnimatePresence>
             </button>
 
-            <div>
-              <h2 className="text-1.5xl font-bold text-gray-900">Welcome back, {firstName}</h2>
-              <p className="text-sm text-gray-600">
+            <div data-tour="header-welcome" className="min-w-0">
+              <h2 className="truncate text-1.5xl font-bold text-gray-900">Welcome back, {firstName}</h2>
+              <p className="hidden truncate text-sm text-gray-600 2xl:block">
                 Here's what's happening with your organization today.
               </p>
             </div>
           </div>
 
+          {/* ── Global search icon (expands on click / Ctrl+Cmd+K), sits just left of the right-hand actions ── */}
+          <div className="flex min-w-0 flex-1 justify-end">
+            <GlobalSearch />
+          </div>
+
           {/* ── Right: application switcher + notifications + profile ── */}
-          <div className="flex items-center space-x-4">
-            {/* <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-[#ff3d72] rounded-full" />
-            </button> */}
+          <div className="flex flex-shrink-0 items-center space-x-4">
+            {/* Expense Management notifications - unread badge, dropdown, live updates */}
+            {isExpenseManagement && (
+              <span data-tour="header-notifications" className="inline-flex">
+                <ExpenseNotificationBell />
+              </span>
+            )}
+            {/* Notification bell. Renders itself only inside Accounts Payable, where the
+                notifications come from — see NotificationBell. */}
+            <AccountsPayableNotificationBell />
 
             {/* Application Switcher — fully hidden when FINANCE_TOGGLE is off (public/config.js) */}
+            {/* Guided tours — Tour Center (components/Tour) */}
+            <TourCenter />
+
             {financeEnabled && (
-            <div className="relative" ref={appSwitcherRef}>
+            <div className="relative" ref={appSwitcherRef} data-tour="header-app-switcher">
               <button
                 onClick={() => setAppSwitcherOpen((prev) => !prev)}
                 className="flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-gray-100 transition-colors"
@@ -290,7 +343,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
             )}
 
             {/* Profile dropdown */}
-            <div className="relative pl-4 border-l border-gray-200" ref={dropdownRef}>
+            <div className="relative pl-4 border-l border-gray-200" ref={dropdownRef} data-tour="header-profile">
               <button
                 onClick={() => setDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-gray-100 transition-colors"
@@ -298,9 +351,10 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
                 <div className="h-8 w-8 bg-[#263383] rounded-full flex items-center justify-center flex-shrink-0">
                   <User className="h-4 w-4 text-white" />
                 </div>
-                <span className="hidden md:block text-sm font-medium text-gray-900 max-w-[140px] truncate">
-                  {name}
-                </span>
+                <div className="hidden md:block text-left max-w-[160px]">
+                  <p className="text-sm font-medium text-gray-900 leading-tight truncate">{name}</p>
+                  <p className="text-xs text-gray-500 leading-tight truncate" title={role}>{role}</p>
+                </div>
                 <ChevronDown
                   className={`h-4 w-4 text-gray-400 hidden md:block transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""
                     }`}

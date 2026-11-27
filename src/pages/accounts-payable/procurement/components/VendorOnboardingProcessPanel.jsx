@@ -39,7 +39,7 @@ export default function VendorOnboardingProcessPanel({ request, onCompleted }) {
   const [hasRunPreScreen, setHasRunPreScreen] = useState(false);
 
   const preScreenMutation = useRunOnboardingPreScreen(request?.id, request?.pr_id);
-  const completeMutation = useCompleteOnboarding(request?.id, request?.pr_id);
+  const completeMutation = useCompleteOnboarding(request?.id, request?.pr_id, request?.vendor_id);
 
   const {
     data: engagement,

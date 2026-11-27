@@ -21,7 +21,7 @@ function inPeriod(dateValue, periodFrom, periodTo) {
   return Boolean(dateValue) && dateValue >= periodFrom && dateValue <= periodTo;
 }
 
-function sumAmount(records) {
+export function sumAmount(records) {
   return records.reduce((total, record) => total + (Number(record.amount) || 0), 0);
 }
 
@@ -57,6 +57,86 @@ export function toIsoDateOnly(val) {
   if (str === "null" || str === "undefined" || str === "NaN") return "";
   if (str.includes("T")) return str.split("T")[0];
   return str;
+}
+
+/**
+ * Validates whether a value is a standard RFC 4122 UUID string.
+ */
+export function isValidUuid(val) {
+  if (typeof val !== "string") return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+}
+
+/**
+ * Extracts a safe, meaningful error message from backend API error responses.
+ * Prevents exposing stack traces, internal URLs, credentials, or sensitive server details to users.
+ * Returns appropriate, helpful fallbacks when the message is absent or unsafe.
+ */
+export function getSafeBackendErrorMessage(
+  error,
+  defaultFallback = "We couldn't retrieve billing data at this time. Please try again."
+) {
+  const status = error?.response?.status || error?.status;
+  const data = error?.response?.data;
+
+  let candidate = "";
+  if (typeof data === "string" && data.trim()) {
+    candidate = data.trim();
+  } else if (data && typeof data === "object") {
+    if (data.errorCode === "FX_POLICY_NOT_CONFIGURED" || data.errorCode === "CURRENCY_CONVERSION_ERROR") {
+      const missing = Array.isArray(data.missingSettings) && data.missingSettings.length > 0
+        ? ` Missing backend settings: ${data.missingSettings.join(", ")}.`
+        : "";
+      candidate = `${data.message || "Currency-conversion policy has not been approved/configured."}${missing}`;
+    } else {
+      candidate = data.message || data.detail || (typeof data.error === "string" ? data.error : "") || "";
+    }
+  }
+
+  if (!candidate && error?.message && typeof error.message === "string") {
+    candidate = error.message;
+  }
+
+  // If candidate contains a quoted message from Spring ResponseStatusException, extract it safely
+  const quotedMatch = candidate.match(/"([^"]{10,})"/);
+  if (quotedMatch && !/at\s+[\w$.]+\([\w$.]+:\d+\)/.test(quotedMatch[1])) {
+    candidate = quotedMatch[1];
+  }
+
+  // Strip Java class prefix from message if present (e.g. "com.paves.ar.CurrencyException: Currency-conversion...")
+  if (/^[a-zA-Z0-9_.]+(?:Exception|Error):\s+/.test(candidate) && !/at\s+[\w$.]+\([\w$.]+:\d+\)/.test(candidate)) {
+    candidate = candidate.replace(/^[a-zA-Z0-9_.]+(?:Exception|Error):\s+/, "");
+  }
+
+  // Safety checks: do not expose stack traces, internal URLs, credentials, or sensitive server details
+  const isHtml = /<!DOCTYPE|<html/i.test(candidate);
+  const hasStackTrace = /at\s+[\w$.]+\([\w$.]+:\d+\)|\b(?:java\.lang|org\.springframework)\.[a-zA-Z0-9_.]*Exception/i.test(candidate);
+  const hasInternalUrl = /https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|internal)/i.test(candidate);
+  const hasSensitiveData = /password|secret|bearer\s+[a-z0-9]|jwt|credential|jdbc:/i.test(candidate);
+
+  if (isHtml || hasStackTrace || hasInternalUrl || hasSensitiveData || !candidate) {
+    if (status === 400) {
+      return "Billing snapshot creation could not be completed. Please review project billing parameters and try again.";
+    }
+    if (status === 401 || status === 403) {
+      return "XMS authorization failure. Please verify API service credentials and permissions.";
+    }
+    if (status === 504) {
+      return "XMS expense integration timed out. Please try again later.";
+    }
+    if (status === 503 || status === 502) {
+      return "The billing acquisition service is temporarily unavailable. Please try again later.";
+    }
+    if (status === 404) {
+      return "The requested billing snapshot or project could not be found.";
+    }
+    if (status === 409) {
+      return "A billing snapshot already exists for this project and billing period.";
+    }
+    return defaultFallback;
+  }
+
+  return candidate.trim();
 }
 
 const MONTH_NAMES = [
@@ -100,37 +180,166 @@ export function formatBillingPeriod(startIso, endIso) {
   return `${s} - ${e}`;
 }
 
+/**
+ * Normalizes billing frequency name or object into durationValue and durationUnit.
+ */
+export function getFrequencyDuration(frequency) {
+  if (!frequency) return { durationValue: 1, durationUnit: "MONTHS" };
+  if (typeof frequency === "object") {
+    const val = Number(frequency.durationValue || frequency.value || 1);
+    const unit = String(frequency.durationUnit || frequency.unit || "MONTHS").trim().toUpperCase();
+    return { durationValue: isNaN(val) || val <= 0 ? 1 : val, durationUnit: unit || "MONTHS" };
+  }
+  const norm = String(frequency).trim().toUpperCase();
+  if (norm.includes("DAY")) {
+    const match = norm.match(/\d+/);
+    return { durationValue: match ? parseInt(match[0], 10) : 1, durationUnit: "DAYS" };
+  }
+  if (norm.includes("WEEK") && !norm.includes("BI")) return { durationValue: 1, durationUnit: "WEEKS" };
+  if (norm.includes("BI_WEEK") || norm.includes("BI-WEEK") || norm.includes("FORTNIGHT")) return { durationValue: 2, durationUnit: "WEEKS" };
+  if (norm.includes("QUARTER")) return { durationValue: 3, durationUnit: "MONTHS" };
+  if (norm.includes("HALF") || norm.includes("SEMI")) return { durationValue: 6, durationUnit: "MONTHS" };
+  if (norm.includes("ANNUAL") || norm.includes("YEAR")) return { durationValue: 1, durationUnit: "YEARS" };
+  return { durationValue: 1, durationUnit: "MONTHS" };
+}
+
+/**
+ * Calculates natural end date for a billing period stepping forward by duration.
+ */
+export function calculatePeriodEnd(startDateStr, durationValue = 1, durationUnit = "MONTHS", maxEndDateStr = null) {
+  const cleanStart = toIsoDateOnly(startDateStr);
+  if (!cleanStart) return "";
+  const parts = cleanStart.split("-").map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return "";
+  const [year, month, day] = parts;
+  const start = new Date(year, month - 1, day);
+
+  const unit = String(durationUnit || "").trim().toUpperCase();
+  const next = new Date(start.getTime());
+  const count = Number(durationValue) || 1;
+
+  if (unit === "MONTHS") {
+    next.setMonth(next.getMonth() + count);
+  } else if (unit === "YEARS") {
+    next.setFullYear(next.getFullYear() + count);
+  } else if (unit === "WEEKS") {
+    next.setDate(next.getDate() + count * 7);
+  } else if (unit === "DAYS") {
+    next.setDate(next.getDate() + count);
+  } else {
+    next.setMonth(next.getMonth() + 1);
+  }
+
+  next.setDate(next.getDate() - 1);
+  const endIso = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+
+  const cleanMax = toIsoDateOnly(maxEndDateStr);
+  if (cleanMax && endIso > cleanMax) {
+    return cleanMax;
+  }
+  return endIso;
+}
+
+/**
+ * Generates available billing periods across project duration aligned with billing frequency rules.
+ */
+export function generateProjectBillingPeriods(config) {
+  if (!config) return [];
+  const { durationValue, durationUnit } = getFrequencyDuration(config.billingFrequency);
+
+  const projStart = toIsoDateOnly(
+    config.billingPeriodStart ||
+    config.effectiveFrom ||
+    config.projectStartDate ||
+    config.startDate
+  );
+
+  const projEnd = toIsoDateOnly(
+    config.effectiveTo ||
+    config.projectEndDate ||
+    config.endDate
+  );
+
+  if (!projStart) return [];
+
+  const periods = [];
+  let cursor = projStart;
+  let guard = 0;
+
+  while (guard < 24) {
+    guard++;
+    const pEnd = calculatePeriodEnd(cursor, durationValue, durationUnit, projEnd);
+    if (!pEnd || pEnd < cursor) break;
+
+    periods.push({
+      id: `period-${guard}`,
+      startDate: cursor,
+      endDate: pEnd,
+      label: formatBillingPeriod(cursor, pEnd),
+    });
+
+    if (projEnd && pEnd >= projEnd) break;
+
+    const parts = pEnd.split("-").map(Number);
+    const nextStart = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+    const nextCursor = `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, "0")}-${String(nextStart.getDate()).padStart(2, "0")}`;
+    if (nextCursor <= cursor) break;
+    cursor = nextCursor;
+    if (projEnd && cursor > projEnd) break;
+  }
+
+  return periods;
+}
+
 const SNAPSHOT_STORAGE_PREFIX = "ar_snapshot_period_";
 
 /**
- * Persists acquired snapshot metadata (including its actual billing period) to localStorage.
+ * Builds a deterministic storage key scoped to project ID, configuration ID, and billing period.
+ */
+export function buildSnapshotStorageKey(projectId, billingConfigurationId = null, periodStart = null, periodEnd = null) {
+  const pId = Number(projectId);
+  const cfgPart = billingConfigurationId ? `_cfg_${billingConfigurationId}` : "";
+  const cleanStart = toIsoDateOnly(periodStart);
+  const cleanEnd = toIsoDateOnly(periodEnd);
+  const datePart = cleanStart && cleanEnd ? `_${cleanStart}_${cleanEnd}` : "";
+  return `${SNAPSHOT_STORAGE_PREFIX}${pId}${cfgPart}${datePart}`;
+}
+
+/**
+ * Persists acquired snapshot metadata (scoped to configuration and billing period) to localStorage.
  */
 export function saveAcquiredSnapshotMetadata(projectId, metadata) {
   if (!projectId || !metadata) return null;
   const numId = Number(projectId);
+  const cfgId = metadata.billingConfigurationId || null;
+  const cleanStart = toIsoDateOnly(
+    metadata.billingPeriodStart || metadata.periodStart
+  );
+  const cleanEnd = toIsoDateOnly(
+    metadata.billingPeriodEnd || metadata.periodEnd
+  );
+
   try {
-    const key = `${SNAPSHOT_STORAGE_PREFIX}${numId}`;
-    const rawExisting = localStorage.getItem(key);
-    const existing = rawExisting ? JSON.parse(rawExisting) : {};
-
-    const cleanStart = toIsoDateOnly(
-      metadata.billingPeriodStart || metadata.periodStart || existing.billingPeriodStart
-    );
-    const cleanEnd = toIsoDateOnly(
-      metadata.billingPeriodEnd || metadata.periodEnd || existing.billingPeriodEnd
-    );
-
     const updated = {
-      ...existing,
       ...metadata,
       projectId: numId,
+      billingConfigurationId: cfgId,
       billingPeriodStart: cleanStart,
       billingPeriodEnd: cleanEnd,
       billingPeriod: formatBillingPeriod(cleanStart, cleanEnd),
       updatedAt: new Date().toISOString(),
     };
 
-    localStorage.setItem(key, JSON.stringify(updated));
+    // 1. Save with scoped key (bound to project, configuration, and period)
+    if (cfgId && cleanStart && cleanEnd) {
+      const scopedKey = buildSnapshotStorageKey(numId, cfgId, cleanStart, cleanEnd);
+      localStorage.setItem(scopedKey, JSON.stringify(updated));
+    }
+
+    // 2. Also keep project-level key for backward compatibility
+    const legacyKey = `${SNAPSHOT_STORAGE_PREFIX}${numId}`;
+    localStorage.setItem(legacyKey, JSON.stringify(updated));
+
     return updated;
   } catch (e) {
     console.warn("[billingDataAcquisitionService] Failed to save snapshot metadata to localStorage:", e);
@@ -139,16 +348,71 @@ export function saveAcquiredSnapshotMetadata(projectId, metadata) {
 }
 
 /**
- * Retrieves persisted snapshot metadata for a project.
+ * Retrieves persisted snapshot metadata for a project, safely scoped to configuration and period.
  */
-export function getAcquiredSnapshotMetadata(projectId) {
+export function getAcquiredSnapshotMetadata(
+  projectId,
+  billingConfigurationId = null,
+  periodStart = null,
+  periodEnd = null
+) {
   if (!projectId) return null;
   const numId = Number(projectId);
+  const cleanStart = toIsoDateOnly(periodStart);
+  const cleanEnd = toIsoDateOnly(periodEnd);
+
   try {
-    const key = `${SNAPSHOT_STORAGE_PREFIX}${numId}`;
-    const raw = localStorage.getItem(key);
+    // 1. Try exact scoped key first
+    if (billingConfigurationId && cleanStart && cleanEnd) {
+      const exactKey = buildSnapshotStorageKey(numId, billingConfigurationId, cleanStart, cleanEnd);
+      const rawExact = localStorage.getItem(exactKey);
+      if (rawExact) {
+        return JSON.parse(rawExact);
+      }
+    }
+
+    // 2. Try configuration-scoped keys for this project
+    if (billingConfigurationId) {
+      const prefix = `${SNAPSHOT_STORAGE_PREFIX}${numId}_cfg_${billingConfigurationId}`;
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (cleanStart && cleanEnd) {
+              if (parsed.billingPeriodStart === cleanStart && parsed.billingPeriodEnd === cleanEnd) {
+                return parsed;
+              }
+            } else {
+              return parsed;
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Fall back to legacy project-level key
+    const legacyKey = `${SNAPSHOT_STORAGE_PREFIX}${numId}`;
+    const raw = localStorage.getItem(legacyKey);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // Validate configuration ID match: when caller specifies billingConfigurationId,
+      // the cached entry must match that exact configuration ID. Stale entries with
+      // missing or mismatched billingConfigurationId are not valid.
+      if (billingConfigurationId) {
+        if (!parsed.billingConfigurationId || String(parsed.billingConfigurationId) !== String(billingConfigurationId)) {
+          return null;
+        }
+      }
+      // Validate period match if requested
+      if (cleanStart && parsed.billingPeriodStart && parsed.billingPeriodStart !== cleanStart) {
+        return null;
+      }
+      if (cleanEnd && parsed.billingPeriodEnd && parsed.billingPeriodEnd !== cleanEnd) {
+        return null;
+      }
+      return parsed;
     }
   } catch (e) {
     // Ignore storage parse errors
@@ -158,14 +422,62 @@ export function getAcquiredSnapshotMetadata(projectId) {
 }
 
 /**
- * Clears persisted snapshot metadata from localStorage for a project.
+ * Clears persisted snapshot metadata from localStorage, preserving metadata belonging to other configurations.
  */
-export function clearAcquiredSnapshotMetadata(projectId) {
+export function clearAcquiredSnapshotMetadata(
+  projectId,
+  billingConfigurationId = null,
+  periodStart = null,
+  periodEnd = null
+) {
   if (!projectId) return;
   const numId = Number(projectId);
+  const cleanStart = toIsoDateOnly(periodStart);
+  const cleanEnd = toIsoDateOnly(periodEnd);
+
   try {
-    const key = `${SNAPSHOT_STORAGE_PREFIX}${numId}`;
-    localStorage.removeItem(key);
+    // 1. Remove exact scoped key if known
+    if (billingConfigurationId && cleanStart && cleanEnd) {
+      const exactKey = buildSnapshotStorageKey(numId, billingConfigurationId, cleanStart, cleanEnd);
+      localStorage.removeItem(exactKey);
+    }
+
+    // 2. Remove configuration-scoped keys matching this configuration
+    if (billingConfigurationId) {
+      const prefix = `${SNAPSHOT_STORAGE_PREFIX}${numId}_cfg_${billingConfigurationId}`;
+      const toRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) {
+          if (cleanStart && cleanEnd) {
+            if (k.includes(cleanStart) && k.includes(cleanEnd)) {
+              toRemove.push(k);
+            }
+          } else {
+            toRemove.push(k);
+          }
+        }
+      }
+      toRemove.forEach((k) => localStorage.removeItem(k));
+    }
+
+    // 3. Clean legacy key ONLY if it matches the requested configuration (do not clear other configurations)
+    const legacyKey = `${SNAPSHOT_STORAGE_PREFIX}${numId}`;
+    const raw = localStorage.getItem(legacyKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const matchesConfig =
+        !billingConfigurationId ||
+        !parsed.billingConfigurationId ||
+        String(parsed.billingConfigurationId) === String(billingConfigurationId);
+      const matchesPeriod =
+        (!cleanStart || !parsed.billingPeriodStart || parsed.billingPeriodStart === cleanStart) &&
+        (!cleanEnd || !parsed.billingPeriodEnd || parsed.billingPeriodEnd === cleanEnd);
+
+      if (matchesConfig && matchesPeriod) {
+        localStorage.removeItem(legacyKey);
+      }
+    }
   } catch (e) {
     // Ignore storage parse errors
   }
@@ -212,14 +524,14 @@ export async function fetchActiveBillingConfigurations() {
     return configs.map((cfg) => {
       const isNotAcquired = String(cfg.status || "").trim().toUpperCase() === "NOT_ACQUIRED";
 
-      // Authoritative backend rule: If status is NOT_ACQUIRED, expunge any stale localStorage metadata
-      if (isNotAcquired) {
-        clearAcquiredSnapshotMetadata(cfg.projectId);
-      }
-
-      const cleanStart = toIsoDateOnly(cfg.billingPeriodStart);
-      const cleanEnd = toIsoDateOnly(cfg.billingPeriodEnd);
-      const hasPeriod = Boolean(cleanStart && cleanEnd) && !isNotAcquired;
+      const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId, cfg.billingConfigurationId);
+      const isMatchingConfig = cfg.billingConfigurationId && savedMeta?.billingConfigurationId
+        ? String(savedMeta.billingConfigurationId) === String(cfg.billingConfigurationId)
+        : !cfg.billingConfigurationId && Boolean(savedMeta);
+      const validMeta = isMatchingConfig ? savedMeta : null;
+      const cleanStart = isNotAcquired ? null : toIsoDateOnly(cfg.billingPeriodStart || (validMeta ? validMeta.billingPeriodStart : null));
+      const cleanEnd = isNotAcquired ? null : toIsoDateOnly(cfg.billingPeriodEnd || (validMeta ? validMeta.billingPeriodEnd : null));
+      const hasPeriod = Boolean(!isNotAcquired && cleanStart && cleanEnd);
 
       // Project Duration (overall project/configuration duration, independent of billing period)
       const fullConfig = configMap.get(String(cfg.billingConfigurationId)) || configMap.get(String(cfg.projectId));
@@ -233,8 +545,21 @@ export async function fetchActiveBillingConfigurations() {
         id: `BC-${cfg.projectId}`,
         billingConfigurationId: cfg.billingConfigurationId,
         projectId: cfg.projectId,
+        pmsProjectId: (cfg.pmsProjectId !== undefined && cfg.pmsProjectId !== null && !isNaN(Number(cfg.pmsProjectId)))
+          ? Number(cfg.pmsProjectId)
+          : (fullConfig?.pmsProjectId !== undefined && fullConfig?.pmsProjectId !== null && !isNaN(Number(fullConfig.pmsProjectId)))
+          ? Number(fullConfig.pmsProjectId)
+          : null,
+        hasPmsProjectMapping: (cfg.pmsProjectId !== undefined && cfg.pmsProjectId !== null && !isNaN(Number(cfg.pmsProjectId)))
+          ? true
+          : (fullConfig?.pmsProjectId !== undefined && fullConfig?.pmsProjectId !== null && !isNaN(Number(fullConfig.pmsProjectId)))
+          ? true
+          : false,
+        clientId: cfg.clientId || fullConfig?.clientId || null,
         projectCode: cfg.projectCode ?? `PRJ-${cfg.projectId}`,
         projectName: cfg.projectName ?? "\u2014",
+        snapshotId: cfg.snapshotId || validMeta?.snapshotId || null,
+        snapshotNumber: cfg.snapshotNumber || validMeta?.snapshotNumber || null,
 
         // Client
         client: cfg.clientName ?? "\u2014",
@@ -277,6 +602,11 @@ export async function fetchActiveBillingConfigurations() {
         currencyId: cfg.currencyId ?? cfg.currency_id ?? cfg.currencyMasterId ?? 1,
         currency_id: cfg.currency_id ?? cfg.currencyId ?? 1,
         currencyCode: cfg.currencyCode ?? cfg.currency ?? fullConfig?.currencyCode ?? "USD",
+
+        // Expense Management Eligibility (reused from Project Billing Setup)
+        expenseBillingEligible: Boolean(
+          fullConfig?.expenseBillingEligible ?? cfg.expenseBillingEligible ?? false
+        ),
       };
     });
   } catch (error) {
@@ -331,7 +661,7 @@ export async function acquireBillingRecord(billingConfigurationId, periodStart, 
       status,
       currencyId: currencyId,
     });
-    return response.data;
+    return response?.data;
   } catch (err) {
     console.error("[BillingDataAcquisition] acquire POST error:", err);
     const errorMsg =
@@ -342,21 +672,498 @@ export async function acquireBillingRecord(billingConfigurationId, periodStart, 
   }
 }
 
+function toOptionalNumber(val) {
+  if (val === null || val === undefined || val === "") return null;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Maps the backend NextBillingPeriodResponseDto onto the shape the UI reads.
+ * Only reshapes fields — the period itself is passed through exactly as the
+ * backend computed it (the backend is the single source of truth for periods).
+ */
+export function normalizeNextBillingPeriod(dto, fallbackMessage = "") {
+  const d = dto && typeof dto === "object" ? dto : {};
+  const billingPeriodStart = toIsoDateOnly(d.billingPeriodStart) || null;
+  const billingPeriodEnd = toIsoDateOnly(d.billingPeriodEnd) || null;
+  const hasPeriod = Boolean(billingPeriodStart && billingPeriodEnd);
+  return {
+    projectId: d.projectId ?? null,
+    billingConfigurationId: d.billingConfigurationId ?? null,
+    billingFrequency: d.billingFrequency || null,
+    effectiveFrom: toIsoDateOnly(d.effectiveFrom) || null,
+    billingPeriodStart,
+    billingPeriodEnd,
+    hasPeriod,
+    partialPeriod: Boolean(d.partialPeriod),
+    periodEnded: Boolean(d.periodEnded),
+    // Acquisition can only ever be offered for a concrete period.
+    acquisitionAllowed: Boolean(d.acquisitionAllowed) && hasPeriod,
+    alreadyInvoiced: Boolean(d.alreadyInvoiced),
+    returnedRecordCount: toOptionalNumber(d.returnedRecordCount),
+    eligibleRecordCount: toOptionalNumber(d.eligibleRecordCount),
+    eligibleHours: toOptionalNumber(d.eligibleHours),
+    alreadyClaimedCount: toOptionalNumber(d.alreadyClaimedCount),
+    notApprovedCount: toOptionalNumber(d.notApprovedCount),
+    invalidHoursCount: toOptionalNumber(d.invalidHoursCount),
+    alreadyClaimedTimesheetIds: Array.isArray(d.alreadyClaimedTimesheetIds) ? d.alreadyClaimedTimesheetIds : [],
+    previousSnapshotId: d.previousSnapshotId ?? null,
+    previousPeriodStart: toIsoDateOnly(d.previousPeriodStart) || null,
+    previousPeriodEnd: toIsoDateOnly(d.previousPeriodEnd) || null,
+    previousSnapshotStatus: d.previousSnapshotStatus || null,
+    previousPeriodInvoiced: Boolean(d.previousPeriodInvoiced),
+    reason: (typeof d.reason === "string" && d.reason.trim()) || fallbackMessage || "",
+    // Earlier periods with unbilled records that cannot be acquired now. Informational only:
+    // they never affect acquisitionAllowed for this period. Absent on older backends.
+    warnings: Array.isArray(d.warnings)
+      ? d.warnings.filter((w) => typeof w === "string" && w.trim()).map((w) => w.trim())
+      : [],
+  };
+}
+
+/**
+ * Calls GET /api/billing-data-acquisition/configurations/{id}/next-period.
+ * Read-only on the backend: it creates no snapshot and claims no timesheet.
+ * A TMS outage is reported by the backend as acquisitionAllowed=false with a
+ * reason, not as an HTTP error; HTTP/network failures are thrown with a safe message.
+ */
+export async function fetchNextBillingPeriod(billingConfigurationId) {
+  if (!isValidUuid(billingConfigurationId)) {
+    const err = new Error("This project has no valid billing configuration ID, so its next billing period cannot be determined.");
+    err.status = 400;
+    throw err;
+  }
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition/configurations/${encodeURIComponent(
+    billingConfigurationId.trim()
+  )}/next-period`;
+  try {
+    const response = await api.get(endpoint);
+    const json = response?.data;
+    const dto = json && typeof json === "object" && "data" in json ? json.data : json;
+    return normalizeNextBillingPeriod(dto, json?.message);
+  } catch (err) {
+    const status = err?.response?.status || err?.status;
+    let message;
+    if (!err?.response) {
+      message = "The AR billing service could not be reached. Check your connection and try again.";
+    } else if (status === 401 || status === 403) {
+      message = "You do not have permission to view billing periods for this configuration.";
+    } else {
+      message = getSafeBackendErrorMessage(err, "The next billing period could not be loaded. Please try again.");
+    }
+    const wrapped = new Error(message);
+    wrapped.status = status;
+    wrapped.isNetworkError = !err?.response;
+    throw wrapped;
+  }
+}
+
+// ── Incremental Time & Material billing ─────────────────────────
+// Backend: BillingPeriodDiscoveryResponseDto / BillingPeriodAcquisitionDto /
+// ExistingBillingBatchDto (period discovery) and BillingSnapshotResponseDto
+// (batch creation). Field names below are the DTOs' JSON names; nothing is
+// derived except null-safe defaults.
+
+export const PERIOD_READINESS = Object.freeze({
+  READY: "READY",
+  NO_NEW_ITEMS: "NO_NEW_ITEMS",
+  BLOCKED: "BLOCKED",
+  SOURCE_UNAVAILABLE: "SOURCE_UNAVAILABLE",
+});
+
+function toBackendErrorMessage(err, fallback) {
+  const status = err?.response?.status || err?.status;
+  if (!err?.response) {
+    return "The AR billing service could not be reached. Check your connection and try again.";
+  }
+  if (status === 403) {
+    return "You do not have permission to perform billing acquisition for this configuration.";
+  }
+  if (status === 401) {
+    return "Your session has expired. Please sign in again.";
+  }
+  return getSafeBackendErrorMessage(err, fallback);
+}
+
+function wrapBackendError(err, fallback) {
+  const wrapped = new Error(toBackendErrorMessage(err, fallback));
+  wrapped.status = err?.response?.status || err?.status;
+  wrapped.isNetworkError = !err?.response;
+  return wrapped;
+}
+
+function requireConfigurationId(billingConfigurationId) {
+  if (!isValidUuid(billingConfigurationId)) {
+    const err = new Error("This project has no valid billing configuration ID.");
+    err.status = 400;
+    throw err;
+  }
+  return billingConfigurationId.trim();
+}
+
+function normalizeExistingBatch(b) {
+  return {
+    snapshotId: b?.snapshotId ?? null,
+    // The snapshot's own period; differs from the billing period for a non-aligned snapshot.
+    billingPeriodStart: toIsoDateOnly(b?.billingPeriodStart) || null,
+    billingPeriodEnd: toIsoDateOnly(b?.billingPeriodEnd) || null,
+    // null when an older backend does not send the flag.
+    periodAligned: typeof b?.periodAligned === "boolean" ? b.periodAligned : null,
+    snapshotNumber: b?.snapshotNumber || null,
+    batchSequence: toOptionalNumber(b?.batchSequence),
+    snapshotStatus: b?.snapshotStatus || null,
+    totalAmount: toOptionalNumber(b?.totalAmount),
+    timesheetCount: toOptionalNumber(b?.timesheetCount) ?? 0,
+    expenseCount: toOptionalNumber(b?.expenseCount) ?? 0,
+    createdDate: b?.createdDate || null,
+    invoiceId: b?.invoiceId ?? null,
+    invoiceNumber: b?.invoiceNumber || null,
+    invoiceStatus: b?.invoiceStatus || null,
+  };
+}
+
+function normalizeAcquisitionPeriod(p) {
+  const billingPeriodStart = toIsoDateOnly(p?.billingPeriodStart) || null;
+  const billingPeriodEnd = toIsoDateOnly(p?.billingPeriodEnd) || null;
+  return {
+    key: `${billingPeriodStart}..${billingPeriodEnd}`,
+    periodNumber: toOptionalNumber(p?.periodNumber),
+    billingPeriodStart,
+    billingPeriodEnd,
+    billingDate: toIsoDateOnly(p?.billingDate) || null,
+    partialPeriod: Boolean(p?.partialPeriod),
+    periodEnded: Boolean(p?.periodEnded),
+    newTimesheetCount: toOptionalNumber(p?.newTimesheetCount),
+    newBillableHours: toOptionalNumber(p?.newBillableHours),
+    estimatedTimesheetAmount: toOptionalNumber(p?.estimatedTimesheetAmount),
+    newExpenseCount: toOptionalNumber(p?.newExpenseCount),
+    newExpenseAmount: toOptionalNumber(p?.newExpenseAmount),
+    hasNewItems: Boolean(p?.hasNewItems),
+    previouslyAcquired: Boolean(p?.previouslyAcquired),
+    rateValidationPassed: p?.rateValidationPassed ?? null,
+    readiness: p?.readiness || null,
+    blockingReasons: Array.isArray(p?.blockingReasons) ? p.blockingReasons.filter(Boolean) : [],
+    batches: Array.isArray(p?.batches) ? p.batches.map(normalizeExistingBatch) : [],
+    // Display only: snapshots whose own period overlaps this one but is not a configured billing
+    // period (e.g. a legacy calendar-month snapshot on a weekly schedule). Never batches of this period.
+    overlappingSnapshots: Array.isArray(p?.overlappingSnapshots)
+      ? p.overlappingSnapshots.map(normalizeExistingBatch)
+      : [],
+  };
+}
+
+export function normalizeBillingPeriodDiscovery(dto) {
+  const d = dto && typeof dto === "object" ? dto : {};
+  return {
+    billingConfigurationId: d.billingConfigurationId ?? null,
+    projectId: d.projectId ?? null,
+    billingFrequency: d.billingFrequency || null,
+    scheduleStart: toIsoDateOnly(d.scheduleStart) || null,
+    scheduleEnd: toIsoDateOnly(d.scheduleEnd) || null,
+    expenseBillingEnabled: Boolean(d.expenseBillingEnabled),
+    asOf: toIsoDateOnly(d.asOf) || null,
+    warnings: Array.isArray(d.warnings) ? d.warnings.filter(Boolean) : [],
+    periods: Array.isArray(d.periods) ? d.periods.map(normalizeAcquisitionPeriod) : [],
+  };
+}
+
+/**
+ * GET /api/billing-data-acquisition/configurations/{id}/periods?onlyWithNewItems=…
+ * Read-only: every started billing period with its newly eligible records,
+ * readiness, blocking reasons and existing batches/invoices.
+ */
+export async function fetchBillingPeriods(billingConfigurationId, { onlyWithNewItems = false } = {}) {
+  const id = requireConfigurationId(billingConfigurationId);
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition/configurations/${encodeURIComponent(id)}/periods`;
+  try {
+    const response = await api.get(endpoint, { params: { onlyWithNewItems: Boolean(onlyWithNewItems) } });
+    const json = response?.data;
+    if (json && json.success === false) {
+      const err = new Error(json.message || "Billing periods could not be loaded.");
+      err.status = 200;
+      throw err;
+    }
+    const dto = json && typeof json === "object" && "data" in json ? json.data : json;
+    return normalizeBillingPeriodDiscovery(dto);
+  } catch (err) {
+    if (err?.status === 200) throw err;
+    throw wrapBackendError(err, "Billing periods could not be loaded. Please try again.");
+  }
+}
+
+/** One key per user acquisition action; a retry after an unknown outcome reuses it. */
+export function generateIdempotencyKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // RFC 4122 v4 fallback for browsers without crypto.randomUUID (non-secure contexts).
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+// Backend wording for "nothing new" (BillingSnapshotServiceImpl: no batch is created).
+const NO_NEW_ITEMS_MESSAGE = /^no new approved, billable timesheets or eligible expenses/i;
+
+/**
+ * POST /api/billing-data-acquisition/configurations/{id}/batches
+ * Body: { billingPeriodStart, billingPeriodEnd, idempotencyKey }.
+ * Returns { success, message, noNewItems, snapshot } where snapshot is the raw
+ * BillingSnapshotResponseDto. success=false arrives as HTTP 200 and creates nothing.
+ * HTTP failures throw with a safe message; err.outcomeUnknown marks failures
+ * where the batch may still have been created (network / 5xx).
+ */
+export async function createIncrementalBatch(billingConfigurationId, { billingPeriodStart, billingPeriodEnd, idempotencyKey }) {
+  const id = requireConfigurationId(billingConfigurationId);
+  const start = toIsoDateOnly(billingPeriodStart);
+  const end = toIsoDateOnly(billingPeriodEnd);
+  if (!start || !end) {
+    throw new Error("Billing period start and end are required.");
+  }
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition/configurations/${encodeURIComponent(id)}/batches`;
+  try {
+    const response = await api.post(endpoint, {
+      billingPeriodStart: start,
+      billingPeriodEnd: end,
+      idempotencyKey: idempotencyKey || null,
+    });
+    const json = response?.data || {};
+    const message = typeof json.message === "string" ? json.message : "";
+    if (json.success === false) {
+      return { success: false, message, noNewItems: NO_NEW_ITEMS_MESSAGE.test(message), snapshot: null };
+    }
+    const snapshot = json.data && typeof json.data === "object" ? json.data : null;
+    return { success: Boolean(snapshot), message, noNewItems: false, snapshot };
+  } catch (err) {
+    const wrapped = wrapBackendError(err, "The billing batch could not be created. Please try again.");
+    wrapped.outcomeUnknown = !err?.response || (err.response.status >= 500);
+    throw wrapped;
+  }
+}
+
+/**
+ * GET /api/v1/billing-snapshots?billingConfigurationId=… — every batch
+ * (snapshot) of the configuration as full BillingSnapshotResponseDto objects.
+ */
+export async function fetchBillingSnapshotsByConfiguration(billingConfigurationId) {
+  const id = requireConfigurationId(billingConfigurationId);
+  try {
+    const response = await api.get(`${AR_BASE_URL}/api/v1/billing-snapshots`, {
+      params: { billingConfigurationId: id },
+    });
+    const json = response?.data;
+    if (json && json.success === false) {
+      const err = new Error(json.message || "Billing snapshots could not be loaded.");
+      err.status = 200;
+      throw err;
+    }
+    const list = json && typeof json === "object" && "data" in json ? json.data : json;
+    return Array.isArray(list) ? list : [];
+  } catch (err) {
+    if (err?.status === 200) throw err;
+    throw wrapBackendError(err, "Billing snapshots could not be loaded. Please try again.");
+  }
+}
+
 export function fetchBillingContext(configId) {
   return delay(BILLING_CONTEXTS[configId] || null);
 }
 
-// A billing type only ever surfaces its own primary charge category — Expense is always
-// acquired independently, and Tool charges only ride along when Tool Billing is enabled.
-export function getApplicableChargeTypes(billingType, toolBillingEnabled) {
+// A billing type only ever surfaces its own primary charge category — Expense is only
+// acquired when the project configuration has Expense Management billing enabled,
+// and Tool charges only ride along when Tool Billing is enabled.
+export function getApplicableChargeTypes(billingType, toolBillingEnabled = false, expenseBillingEligible = false) {
+  const norm = normalizeBillingTypeName(billingType);
   return {
-    labor: billingType === "TIME_MATERIAL",
-    contract: billingType === "FIXED_PRICE",
-    milestone: billingType === "MILESTONE",
-    recurring: billingType === "RECURRING",
-    expense: true,
+    labor: norm === "TIME_MATERIAL",
+    contract: norm === "FIXED_PRICE",
+    milestone: norm === "MILESTONE",
+    recurring: norm === "RECURRING",
+    expense: Boolean(expenseBillingEligible),
     tool: Boolean(toolBillingEnabled),
   };
+}
+
+/**
+ * Normalizes an expense line item record from the AR backend (including XMS handed-off expenses).
+ * Displays costBasis directly as the authoritative billable amount per contract.
+ * Does NOT recalculate the billable amount or subtract recoverable tax in React.
+ */
+export function normalizeExpenseRecord(rec, currency = "USD", idx = 0) {
+  if (!rec) return null;
+  const costBasis =
+    rec.costBasis !== undefined && rec.costBasis !== null
+      ? Number(rec.costBasis)
+      : Number(rec.amount ?? 0);
+
+  const lineItemId = rec.lineItemId || rec.sourceReferenceId || `exp-${idx}`;
+  const syncId = rec.syncId || null;
+  const sourceReferenceId = rec.sourceReferenceId || lineItemId;
+
+  const originalAmount =
+    rec.originalAmount !== undefined && rec.originalAmount !== null
+      ? Number(rec.originalAmount)
+      : null;
+  const originalCurrency = rec.originalCurrency || null;
+
+  // Currency conversion audit fields (only when conversion was applied and persisted by backend)
+  const conversionApplied = Boolean(
+    rec.conversionApplied ||
+    (rec.exchangeRate !== null && rec.exchangeRate !== undefined && (rec.exchangeRateSource || rec.exchangeRateDate))
+  );
+  const exchangeRate =
+    rec.exchangeRate !== undefined && rec.exchangeRate !== null
+      ? Number(rec.exchangeRate)
+      : null;
+  const exchangeRateDate = toIsoDateOnly(rec.exchangeRateDate || rec.rateDate || null);
+  const exchangeRateSource = rec.exchangeRateSource || rec.rateSource || null;
+  const sourceAmount =
+    rec.sourceAmount !== undefined && rec.sourceAmount !== null
+      ? Number(rec.sourceAmount)
+      : (originalAmount !== null ? originalAmount : null);
+  const sourceCurrency = rec.sourceCurrency || originalCurrency || null;
+
+  // Check currency alignment between source currency and billing configuration currency
+  const targetBillingCurrency = rec.currency || currency || null;
+  const hasCurrencyMismatch = Boolean(
+    sourceCurrency &&
+    targetBillingCurrency &&
+    sourceCurrency.trim().toUpperCase() !== targetBillingCurrency.trim().toUpperCase()
+  );
+
+  // If there is a currency mismatch and conversion was NOT applied:
+  // The costBasis is in the source currency and has NOT been converted to targetBillingCurrency.
+  // Never default or display targetBillingCurrency as its currency!
+  const isConversionMissing = Boolean(hasCurrencyMismatch && !conversionApplied);
+
+  const resolvedCurrency = isConversionMissing
+    ? (rec.currency && rec.currency.toUpperCase() === sourceCurrency.toUpperCase() ? rec.currency : sourceCurrency)
+    : (rec.currency || currency || null);
+
+  // Correction and superseded handoff audit fields (confirmed backend ExpenseLineItemDto)
+  const supersededSyncIds = Array.isArray(rec.supersededSyncIds)
+    ? rec.supersededSyncIds
+    : [];
+  const handoffRemarks = rec.handoffRemarks || rec.correctionRemarks || null;
+  const handedOffAt = rec.handedOffAt ? String(rec.handedOffAt) : null;
+  const handedOffDate = handedOffAt
+    ? toIsoDateOnly(handedOffAt)
+    : rec.handedOffDate
+    ? toIsoDateOnly(rec.handedOffDate)
+    : null;
+  const isHandedOff = Boolean(
+    rec.isHandedOff ||
+    rec.handedOff ||
+    rec.handoffStatus === "HANDED_OFF" ||
+    rec.status === "HANDED_OFF" ||
+    rec.handedOffAt ||
+    rec.handedOffDate ||
+    rec.syncId
+  );
+  const handoffStatus = rec.handoffStatus || (isHandedOff ? "HANDED_OFF" : "ELIGIBLE");
+  const handoffReference = rec.handoffReference || null;
+  const grossAmount = (rec.grossAmount !== undefined && rec.grossAmount !== null)
+    ? Number(rec.grossAmount)
+    : null;
+  const isCorrection = Boolean(
+    (Array.isArray(supersededSyncIds) && supersededSyncIds.length > 0) ||
+    rec.isCorrection
+  );
+
+  return {
+    id: lineItemId,
+    lineItemId,
+    syncId,
+    sourceReferenceId,
+    reportNumber: rec.reportNumber || rec.reportNo || "—",
+    category: rec.category || rec.categoryName || "—",
+    description: rec.description || "—",
+    merchant: rec.merchant || rec.vendor || rec.merchantName || "—",
+    employee: rec.employeeName || rec.employee || (rec.employeeId ? `Employee ${rec.employeeId}` : "—"),
+    employeeId: rec.employeeId || null,
+    expenseDate: toIsoDateOnly(rec.expenseDate || rec.date) || "—",
+    handedOffAt,
+    handedOffDate,
+    costBasis,
+    amount: costBasis, // Authoritative billable amount in billing currency
+    baseAmount: rec.baseAmount !== undefined ? Number(rec.baseAmount) : costBasis,
+    grossAmount,
+    currency: resolvedCurrency,
+    originalAmount,
+    originalCurrency,
+    conversionApplied,
+    isConversionMissing,
+    sourceAmount,
+    sourceCurrency,
+    exchangeRate,
+    exchangeRateDate,
+    exchangeRateSource,
+    rateDate: exchangeRateDate,
+    rateSource: exchangeRateSource,
+    sourceSystem: rec.sourceSystem || "XMS",
+    receiptCount:
+      rec.receiptCount !== undefined
+        ? Number(rec.receiptCount)
+        : Array.isArray(rec.receiptIds)
+        ? rec.receiptIds.length
+        : Array.isArray(rec.receipts)
+        ? rec.receipts.length
+        : 0,
+    receiptIds: rec.receiptIds || (Array.isArray(rec.receipts) ? rec.receipts : []),
+    isHandedOff,
+    handoffStatus,
+    handoffReference,
+    supersededSyncIds,
+    handoffRemarks,
+    isCorrection,
+    approvalStatus: isCorrection ? "Corrected" : isHandedOff ? "Handed Off" : (rec.approvalStatus || "Approved"),
+  };
+}
+
+/**
+ * Deduplicates raw expense records by lineItemId for presentation safety.
+ * The backend is authoritative for selecting and validating correction events;
+ * the frontend preserves the backend's selected lines as returned.
+ */
+export function deduplicateExpenseRecords(rawExpenses = []) {
+  if (!Array.isArray(rawExpenses)) return [];
+  const seen = new Set();
+  const result = [];
+  for (const e of rawExpenses) {
+    const key = e?.lineItemId || e?.sourceReferenceId || e?.id;
+    if (key) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    result.push(e);
+  }
+  return result;
+}
+
+/**
+ * Sums the billable costBasis amounts across an array of expense records.
+ * Uses a Set of lineItemId/id to prevent double-counting if duplicate records exist.
+ */
+export function sumCostBasis(records = []) {
+  const seen = new Set();
+  return records.reduce((total, r) => {
+    const key = r?.lineItemId || r?.sourceReferenceId || r?.id || null;
+    if (key) {
+      if (seen.has(key)) return total;
+      seen.add(key);
+    }
+    // Never sum unconverted records with missing FX conversion into the billing currency total
+    if (r?.isConversionMissing) return total;
+    return total + (Number(r?.costBasis ?? r?.amount) || 0);
+  }, 0);
 }
 
 function resolveCurrencyId(currency) {
@@ -372,88 +1179,220 @@ function resolveCurrencyId(currency) {
 }
 
 /**
- * Calls GET /api/v1/billing-snapshots/by-period to retrieve an existing snapshot by project and period.
+ * Calls GET /api/v1/billing-snapshots/by-period to retrieve an existing snapshot by project, period, and configuration.
  */
-export async function getBillingSnapshotByPeriod(projectId, billingPeriodStart, billingPeriodEnd) {
+export async function getBillingSnapshotByPeriod(
+  projectId,
+  billingPeriodStart,
+  billingPeriodEnd,
+  billingConfigurationId = null
+) {
   const cleanStart = toIsoDateOnly(billingPeriodStart);
   const cleanEnd = toIsoDateOnly(billingPeriodEnd);
   const numericId = Number(projectId);
+  const numericConfigId = billingConfigurationId ? Number(billingConfigurationId) : null;
 
   if (!numericId || isNaN(numericId) || !cleanStart || !cleanEnd) return null;
 
   const endpoint = `${AR_BASE_URL}/api/v1/billing-snapshots/by-period`;
+  const params = {
+    projectId: numericId,
+    billingPeriodStart: cleanStart,
+    billingPeriodEnd: cleanEnd,
+  };
+  if (numericConfigId && !isNaN(numericConfigId)) {
+    params.billingConfigurationId = numericConfigId;
+  }
 
   try {
-    const response = await api.get(endpoint, {
-      params: {
-        projectId: numericId,
-        billingPeriodStart: cleanStart,
-        billingPeriodEnd: cleanEnd,
-      },
-    });
+    const response = await api.get(endpoint, { params });
 
     const json = response.data;
-    if (!json || json.success === false || !json.data) {
+    if (!json || json.success === false) {
       return null;
     }
 
-    const snapshot = json.data;
-    if (!snapshot || !snapshot.snapshotId) {
+    // Support both wrapped response: { success: true, data: { ...snapshot } }
+    // and unwrapped response: { snapshotId: "...", status: "...", ... }
+    const snapshot = (json.data && typeof json.data === "object" && !Array.isArray(json.data))
+      ? json.data
+      : (json.snapshotId || json.id)
+        ? json
+        : null;
+
+    if (!snapshot) {
       return null;
     }
 
-    const snapStart = toIsoDateOnly(snapshot.billingPeriodStart) || cleanStart;
-    const snapEnd = toIsoDateOnly(snapshot.billingPeriodEnd) || cleanEnd;
+    // If a configuration ID was requested, verify that the snapshot belongs to this configuration
+    if (
+      numericConfigId &&
+      snapshot.billingConfigurationId &&
+      String(snapshot.billingConfigurationId) !== String(numericConfigId)
+    ) {
+      console.warn(
+        `[getBillingSnapshotByPeriod] Snapshot belongs to config ${snapshot.billingConfigurationId}, but requested ${numericConfigId}`
+      );
+      return null;
+    }
+
+    const result = mapBillingSnapshotResponse(snapshot, {
+      projectId: numericId,
+      billingConfigurationId: numericConfigId,
+      fallbackStart: cleanStart,
+      fallbackEnd: cleanEnd,
+      message: json.message || "Existing snapshot loaded",
+    });
+
+    saveAcquiredSnapshotMetadata(numericId, {
+      projectId: numericId,
+      billingConfigurationId: result.billingConfigurationId,
+      snapshotId: result.snapshotId,
+      snapshotNumber: result.snapshotNumber,
+      status: result.status,
+      billingPeriodStart: result.billingPeriodStart,
+      billingPeriodEnd: result.billingPeriodEnd,
+      billingPeriod: result.billingPeriod,
+      subtotal: result.subtotal,
+      totalAmount: result.totalAmount,
+      expenseAmount: result.expenseAmount,
+      expenseCount: result.expenseRecords.length,
+    });
+
+    return result;
+  } catch (err) {
+    const status = err.response?.status;
+    if (status === 404 || status === 204) {
+      // Legitimate NOT_FOUND from backend
+      return null;
+    }
+    console.warn(
+      "[billingDataAcquisitionService] getBillingSnapshotByPeriod request failed:",
+      status,
+      err.response?.data?.message || err.message
+    );
+    // Network / server failure: re-throw so callers can distinguish not-found from network failure
+    const error = new Error(
+      err.response?.data?.message || err.message || "Failed to retrieve billing snapshot"
+    );
+    error.status = status;
+    error.isNetworkError = !status || status >= 500;
+    error.response = err.response;
+    throw error;
+  }
+}
+
+/**
+ * Maps one backend BillingSnapshotResponseDto onto the snapshot shape the
+ * acquisition workspace reads. Shared by the by-period lookup and the
+ * incremental batch views so every snapshot is presented the same way.
+ */
+export function mapBillingSnapshotResponse(
+  snapshot,
+  { projectId = null, billingConfigurationId = null, fallbackStart = "", fallbackEnd = "", message = "" } = {}
+) {
+    const numericId = projectId ?? (snapshot?.projectId != null ? Number(snapshot.projectId) : null);
+    const numericConfigId = billingConfigurationId;
+    const snapStart = toIsoDateOnly(snapshot.billingPeriodStart) || fallbackStart;
+    const snapEnd = toIsoDateOnly(snapshot.billingPeriodEnd) || fallbackEnd;
     const formattedPeriod = formatBillingPeriod(snapStart, snapEnd);
 
-    const laborRecords = (snapshot.timesheets || []).map((t, idx) => ({
-      id: t.sourceReferenceId || `labor-${idx}`,
-      employee: t.employee,
+    const timesheetList = snapshot.timesheets || snapshot.laborRecords || [];
+    const allLaborRecords = timesheetList.map((t, idx) => ({
+      id: t.sourceReferenceId || t.id || `labor-${idx}`,
+      employee: t.employee || t.employeeName || "—",
       workDate: toIsoDateOnly(t.workDate),
       hours: t.hours,
       rate: t.rate,
       amount: t.amount,
       approvalStatus: t.approvalStatus || "Approved",
-      role: t.role,
+      role: t.role || "—",
     }));
+
+    const approvedTimesheets = allLaborRecords.filter(
+      (r) => r.approvalStatus === "Approved" || r.approvalStatus === "APPROVED"
+    );
+    const pendingTimesheets = allLaborRecords.filter(
+      (r) => r.approvalStatus === "Pending Approval" || r.approvalStatus === "Pending" || r.approvalStatus === "PENDING"
+    );
+
+    const approvedCount = approvedTimesheets.length;
+    const pendingCount = pendingTimesheets.length;
+    const approvedHours = approvedTimesheets.reduce((acc, r) => acc + Number(r.hours || 0), 0);
+    const pendingHours = pendingTimesheets.reduce((acc, r) => acc + Number(r.hours || 0), 0);
+
+    const readiness = snapshot.readiness || {
+      requiredCount: allLaborRecords.length,
+      approvedCount,
+      pendingCount,
+      approvedHours,
+      pendingHours,
+      pendingTimesheets,
+      approvedTimesheets,
+    };
+
+    const rawExpenses = Array.isArray(snapshot.expenseRecords)
+      ? snapshot.expenseRecords
+      : Array.isArray(snapshot.expenses)
+      ? snapshot.expenses
+      : Array.isArray(snapshot.expenseLineItems)
+      ? snapshot.expenseLineItems
+      : Array.isArray(snapshot.expenseItems)
+      ? snapshot.expenseItems
+      : Array.isArray(snapshot.handedOffExpenses)
+      ? snapshot.handedOffExpenses
+      : [];
+
+    const expenseRecords = deduplicateExpenseRecords(rawExpenses)
+      .map((e, idx) => normalizeExpenseRecord(e, snapshot.currency, idx))
+      .filter(Boolean);
+    const expenseAmount = typeof snapshot.expenseAmount === "number"
+      ? snapshot.expenseAmount
+      : typeof snapshot.expenses === "number"
+      ? snapshot.expenses
+      : sumCostBasis(expenseRecords);
+
+    const calculatedLabor = sumAmount(approvedTimesheets.length > 0 ? approvedTimesheets : allLaborRecords);
+    const laborAmount = typeof snapshot.laborAmount === "number"
+      ? snapshot.laborAmount
+      : calculatedLabor;
+    const subtotal = typeof snapshot.subtotal === "number"
+      ? snapshot.subtotal
+      : laborAmount;
+    const totalAmount = typeof snapshot.totalAmount === "number"
+      ? snapshot.totalAmount
+      : (subtotal + expenseAmount);
+    const finalStatus = snapshot.status || "READY_FOR_TAX";
+    const acqStatus = snapshot.acquisitionStatus || mapToBillingAcquisitionStatus(finalStatus, false);
 
     const result = {
       success: true,
-      snapshotId: snapshot.snapshotId,
-      snapshotNumber: snapshot.snapshotNumber,
+      snapshotId: snapshot.snapshotId || snapshot.id,
+      snapshotNumber: snapshot.snapshotNumber || null,
+      projectId: numericId,
+      billingConfigurationId: snapshot.billingConfigurationId || numericConfigId,
       billingPeriodStart: snapStart,
       billingPeriodEnd: snapEnd,
       billingPeriod: formattedPeriod,
-      subtotal: snapshot.subtotal ?? snapshot.totalAmount ?? 0,
-      totalAmount: snapshot.totalAmount ?? snapshot.subtotal ?? 0,
-      status: snapshot.status || "READY",
-      acquisitionStatus: snapshot.acquisitionStatus || "READY",
-      laborRecords,
-      timesheets: laborRecords,
+      subtotal,
+      totalAmount,
+      laborAmount,
+      status: finalStatus,
+      snapshotLifecycleStatus: finalStatus,
+      billingStatus: finalStatus,
+      acquisitionStatus: acqStatus,
+      laborRecords: approvedTimesheets.length > 0 ? approvedTimesheets : allLaborRecords,
+      timesheets: approvedTimesheets.length > 0 ? approvedTimesheets : allLaborRecords,
+      allRecords: allLaborRecords,
+      expenseRecords,
+      expenses: expenseRecords,
+      expenseAmount,
+      readiness,
       isExisting: true,
-      message: json.message || "Existing snapshot loaded",
+      existingSnapshot: true,
+      message,
     };
-
-    saveAcquiredSnapshotMetadata(numericId, {
-      snapshotId: snapshot.snapshotId,
-      snapshotNumber: snapshot.snapshotNumber,
-      status: snapshot.status || "READY",
-      billingPeriodStart: snapStart,
-      billingPeriodEnd: snapEnd,
-      billingPeriod: formattedPeriod,
-      subtotal: result.subtotal,
-      totalAmount: result.totalAmount,
-    });
-
     return result;
-  } catch (err) {
-    console.warn(
-      "[billingDataAcquisitionService] getBillingSnapshotByPeriod request failed:",
-      err.response?.status,
-      err.response?.data?.message || err.message
-    );
-    return null;
-  }
 }
 
 /**
@@ -469,17 +1408,26 @@ export async function getBillingSnapshotByPeriod(projectId, billingPeriodStart, 
  */
 export async function createBillingSnapshot(projectId, periodFrom, periodTo, billingConfigurationId = null) {
   const numericId = Number(projectId);
-  const finalProjectId = (isNaN(numericId) || !numericId) ? 9 : numericId;
+  const finalProjectId = (!isNaN(numericId) && numericId > 0) ? numericId : null;
+  if (!finalProjectId) {
+    const err = new Error("Missing or invalid project mapping. Cannot initiate snapshot acquisition without a valid project ID.");
+    err.status = 400;
+    throw err;
+  }
   const endpoint = `${AR_BASE_URL}/api/v1/billing-snapshots`;
 
   const cleanStart = toIsoDateOnly(periodFrom);
   const cleanEnd = toIsoDateOnly(periodTo);
+  const cleanBillingConfigId =
+    isValidUuid(billingConfigurationId)
+      ? billingConfigurationId.trim()
+      : null;
 
-  console.log(`[AR Integration] Calling POST ${endpoint} for projectId=${finalProjectId}, billingConfigurationId=${billingConfigurationId}, periodStart=${cleanStart}, periodEnd=${cleanEnd}`);
+  console.log(`[AR Integration] Calling POST ${endpoint} for projectId=${finalProjectId}, billingConfigurationId=${cleanBillingConfigId}, periodStart=${cleanStart}, periodEnd=${cleanEnd}`);
 
   const payload = {
     projectId: finalProjectId,
-    billingConfigurationId: billingConfigurationId,
+    billingConfigurationId: cleanBillingConfigId,
     billingPeriodStart: cleanStart,
     billingPeriodEnd: cleanEnd,
   };
@@ -524,7 +1472,18 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       role: t.role,
     }));
 
-    if (!allLaborRecords || allLaborRecords.length === 0) {
+    const isExisting = Boolean(
+      snapshot?.existingSnapshot ||
+      json?.existingSnapshot ||
+      /already\s*exists/i.test(json?.message || "")
+    );
+
+    const hasSnapshotIdentity = Boolean(snapshot?.snapshotId || snapshot?.id);
+    const isCompletedStatus = ["INVOICED", "ALREADY_BILLED", "TAX_COMPLETED", "READY_FOR_TAX", "READY"].includes(
+      String(snapshot?.status || snapshot?.acquisitionStatus || "").toUpperCase()
+    );
+
+    if ((!allLaborRecords || allLaborRecords.length === 0) && !isExisting && !hasSnapshotIdentity && !isCompletedStatus) {
       return {
         success: false,
         status: "NO_BILLABLE_DATA",
@@ -561,7 +1520,7 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       approvedTimesheets,
     };
 
-    if (approvedCount === 0 && pendingCount > 0) {
+    if (approvedCount === 0 && pendingCount > 0 && !isExisting && !isCompletedStatus) {
       return {
         success: false,
         status: "PENDING_APPROVAL",
@@ -582,7 +1541,7 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       };
     }
 
-    if (pendingCount > 0) {
+    if (pendingCount > 0 && !isExisting && !isCompletedStatus) {
       return {
         success: false,
         status: "PARTIALLY_READY",
@@ -603,26 +1562,68 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       };
     }
 
-    const subtotalVal = snapshot?.subtotal || sumAmount(approvedTimesheets);
-    const totalVal = snapshot?.totalAmount || sumAmount(approvedTimesheets);
+    const hasRawExpenses =
+      Array.isArray(snapshot?.expenseRecords) ||
+      Array.isArray(snapshot?.expenses) ||
+      Array.isArray(snapshot?.expenseLineItems) ||
+      Array.isArray(snapshot?.expenseItems) ||
+      Array.isArray(snapshot?.handedOffExpenses);
+
+    const rawExpenses = hasRawExpenses
+      ? (snapshot?.expenseRecords ??
+         snapshot?.expenses ??
+         snapshot?.expenseLineItems ??
+         snapshot?.expenseItems ??
+         snapshot?.handedOffExpenses)
+      : null;
+
+    const expenseRecords = rawExpenses
+      ? deduplicateExpenseRecords(rawExpenses)
+          .map((e, idx) => normalizeExpenseRecord(e, snapshot?.currency, idx))
+          .filter(Boolean)
+      : [];
+    const expenseAmount = typeof snapshot?.expenseAmount === "number"
+      ? snapshot.expenseAmount
+      : typeof snapshot?.expenses === "number"
+      ? snapshot.expenses
+      : sumCostBasis(expenseRecords);
+
+    const calculatedLabor = sumAmount(approvedTimesheets.length > 0 ? approvedTimesheets : allLaborRecords);
+    const laborAmount = typeof snapshot?.laborAmount === "number"
+      ? snapshot.laborAmount
+      : calculatedLabor;
+    const subtotalVal = typeof snapshot?.subtotal === "number"
+      ? snapshot.subtotal
+      : laborAmount;
+    const totalVal = typeof snapshot?.totalAmount === "number"
+      ? snapshot.totalAmount
+      : (subtotalVal + (hasRawExpenses ? expenseAmount : 0));
     const finalStatus = snapshot?.status || "READY_FOR_TAX";
+    const acqStatus = snapshot?.acquisitionStatus || mapToBillingAcquisitionStatus(finalStatus, false);
 
     const result = {
       success: true,
-      snapshotId: snapshot?.snapshotId || null,
+      snapshotId: snapshot?.snapshotId || snapshot?.id || null,
       snapshotNumber: snapshot?.snapshotNumber || null,
       billingPeriodStart: snapStart,
       billingPeriodEnd: snapEnd,
       billingPeriod: formattedPeriod,
       subtotal: subtotalVal,
       totalAmount: totalVal,
+      laborAmount,
       status: finalStatus,
+      snapshotLifecycleStatus: finalStatus,
       billingStatus: finalStatus,
-      laborRecords: approvedTimesheets,
-      timesheets: approvedTimesheets,
+      acquisitionStatus: acqStatus,
+      laborRecords: approvedTimesheets.length > 0 ? approvedTimesheets : allLaborRecords,
+      timesheets: approvedTimesheets.length > 0 ? approvedTimesheets : allLaborRecords,
       allRecords: allLaborRecords,
-      isExisting: Boolean(json?.message?.includes("already exists")),
-      message: json?.message || "Billing snapshot acquired successfully. All required timesheets are approved.",
+      ...(hasRawExpenses ? { expenseRecords, expenses: expenseRecords, expenseAmount } : {}),
+      expenseStatus: snapshot?.expenseStatus,
+      expenseError: snapshot?.expenseError,
+      isExisting: isExisting,
+      existingSnapshot: isExisting,
+      message: json?.message || (isExisting ? "Existing billing snapshot loaded successfully." : "Billing snapshot acquired successfully. All required timesheets are approved."),
       readiness,
     };
 
@@ -636,17 +1637,82 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
         billingPeriod: formattedPeriod,
         subtotal: subtotalVal,
         totalAmount: totalVal,
+        expenseAmount,
+        expenseCount: expenseRecords.length,
       });
     }
 
     return result;
   } catch (error) {
-    const errorBody = error?.response?.data || {};
-    if (errorBody?.message?.includes("already exists")) {
-      const existing = await getBillingSnapshotByPeriod(finalProjectId, cleanStart, cleanEnd);
-      if (existing && existing.snapshotId) return existing;
+    const status = error?.response?.status;
+    const errorBody = error?.response?.data;
+    const errorMessage = typeof errorBody === "string"
+      ? errorBody
+      : (errorBody?.message || errorBody?.detail || errorBody?.error || error?.message || "");
+
+    const isDuplicateError =
+      (status === 409 || status === 400) &&
+      (
+        /already\s*exists/i.test(errorMessage) ||
+        /snapshot.*exists/i.test(errorMessage) ||
+        /duplicate/i.test(errorMessage) ||
+        Boolean(errorBody?.existingSnapshot) ||
+        status === 409
+      );
+
+    if (isDuplicateError) {
+      // 1. Check if backend explicitly indicates conflict with another configuration
+      const isCrossConfigConflict =
+        /another\s*billing\s*configuration/i.test(errorMessage) ||
+        /different\s*configuration/i.test(errorMessage) ||
+        /belongs\s*to\s*another/i.test(errorMessage) ||
+        errorBody?.conflictType === "CROSS_CONFIGURATION";
+
+      if (isCrossConfigConflict) {
+        const conflictErr = new Error(
+          errorMessage || "A billing snapshot for this project and period already exists under another billing configuration."
+        );
+        conflictErr.status = 409;
+        conflictErr.isConflict = true;
+        conflictErr.response = error?.response;
+        throw conflictErr;
+      }
+
+      console.log(`[AR Integration] Duplicate snapshot detected for projectId=${finalProjectId}. Attempting recovery via getBillingSnapshotByPeriod...`);
+      try {
+        const existing = await getBillingSnapshotByPeriod(finalProjectId, cleanStart, cleanEnd, billingConfigurationId);
+        if (existing && (existing.snapshotId || existing.id)) {
+          // Verify snapshot matches requested configuration
+          if (!billingConfigurationId || !existing.billingConfigurationId || String(existing.billingConfigurationId) === String(billingConfigurationId)) {
+            return {
+              ...existing,
+              isExisting: true,
+              message: errorMessage || "Billing snapshot already exists for the selected project and billing period.",
+            };
+          }
+        }
+      } catch (hydrateErr) {
+        console.warn("[AR Integration] Failed to hydrate existing snapshot during duplicate recovery:", hydrateErr);
+      }
+
+      // If recovery failed or snapshot belongs to another configuration:
+      const conflictErr = new Error(
+        errorMessage || "A billing snapshot for this period already exists under another billing configuration."
+      );
+      conflictErr.status = status || 409;
+      conflictErr.isConflict = true;
+      conflictErr.response = error?.response;
+      throw conflictErr;
     }
-    throw new Error(errorBody?.message || error?.message || "We couldn't retrieve billing data at this time. Please try again.");
+    const safeErrorMsg = getSafeBackendErrorMessage(
+      error,
+      errorMessage || "We couldn't retrieve billing data at this time. Please try again."
+    );
+    const err = new Error(safeErrorMsg);
+    err.status = status;
+    err.response = error?.response;
+    err.data = error?.response?.data;
+    throw err;
   }
 }
 
@@ -698,22 +1764,212 @@ const PROVIDERS = {
   expense: (configId, from, to) => mockExpenseProvider(configId, from, to),
 };
 
+export async function fetchEligibleExpenses(
+  projectId,
+  periodStart,
+  periodEnd,
+  billingConfigurationId = null,
+  snapshot = null
+) {
+  const numericId = Number(projectId);
+  const cleanStart = toIsoDateOnly(periodStart);
+  const cleanEnd = toIsoDateOnly(periodEnd);
+
+  let snap = snapshot;
+
+  // 1. Check for explicit error or failed status on snapshot
+  if (snap?.status === "ACQUISITION_FAILED" || snap?.status === "FAILED" || snap?.status === "ERROR") {
+    return {
+      records: [],
+      amount: 0,
+      count: 0,
+      status: "error",
+      error: snap.message || "Billing snapshot acquisition failed.",
+    };
+  }
+
+  if (snap?.expenseError || snap?.expenseStatus === "FAILED" || snap?.expenseStatus === "ERROR" || snap?.expenseStatus === "error") {
+    return {
+      records: [],
+      amount: 0,
+      count: 0,
+      status: "error",
+      error: snap.expenseError || snap.expenseMessage || "Expense acquisition failed.",
+    };
+  }
+
+  // If snapshot is not provided, query AR backend
+  if (!snap && numericId && cleanStart && cleanEnd) {
+    try {
+      snap = await getBillingSnapshotByPeriod(numericId, cleanStart, cleanEnd, billingConfigurationId);
+    } catch (err) {
+      return {
+        records: [],
+        amount: 0,
+        count: 0,
+        status: "error",
+        error: getSafeBackendErrorMessage(err, "Expense service unavailable"),
+      };
+    }
+  }
+
+  if (!snap) {
+    return {
+      records: [],
+      amount: 0,
+      count: 0,
+      status: "incomplete",
+      error: "Expense data was not provided in the billing snapshot.",
+    };
+  }
+
+  // 2. Check for embedded expense line items from snapshot
+  const rawExpenses =
+    snap?.expenseRecords ??
+    snap?.expenses ??
+    snap?.expenseLineItems ??
+    snap?.expenseItems ??
+    snap?.handedOffExpenses;
+
+  if (Array.isArray(rawExpenses)) {
+    if (rawExpenses.length > 0) {
+      const records = deduplicateExpenseRecords(rawExpenses)
+        .map((r, idx) => normalizeExpenseRecord(r, snap.currency, idx))
+        .filter(Boolean);
+      const amount = typeof snap.expenseAmount === "number"
+        ? snap.expenseAmount
+        : sumCostBasis(records);
+      return {
+        records,
+        amount,
+        count: records.length,
+        status: "success",
+      };
+    } else {
+      // Backend explicitly returned an empty array of expenses []
+      return {
+        records: [],
+        amount: 0,
+        count: 0,
+        status: "empty",
+      };
+    }
+  }
+
+  // 3. Check for summary expense amount on the snapshot response
+  if (typeof snap?.expenseAmount === "number" || typeof snap?.expenses === "number") {
+    const summaryExpenseAmount =
+      typeof snap?.expenseAmount === "number"
+        ? snap.expenseAmount
+        : typeof snap?.expenses === "number"
+        ? snap.expenses
+        : 0;
+
+    if (summaryExpenseAmount > 0) {
+      return {
+        records: [],
+        amount: summaryExpenseAmount,
+        count: 0,
+        status: "success",
+      };
+    } else {
+      return {
+        records: [],
+        amount: 0,
+        count: 0,
+        status: "empty",
+      };
+    }
+  }
+
+  // 4. Neither expenses array nor expense amount was provided in snapshot response
+  return {
+    records: [],
+    amount: 0,
+    count: 0,
+    status: snap ? "incomplete" : "empty",
+    error: snap
+      ? "Expense data was not provided in the billing snapshot response."
+      : null,
+  };
+}
+
 export async function acquireBillingData(context, periodFrom, periodTo) {
-  const applicable = getApplicableChargeTypes(context.billingType, context.toolBillingEnabled);
+  const rawType = context?.billingType || context?.billingTypeCode || context?.billingTypeName || "";
+  const billingTypeUpper = normalizeBillingTypeName(rawType);
+  const isExpenseEligible = Boolean(context?.expenseBillingEligible);
+  const applicable = getApplicableChargeTypes(
+    billingTypeUpper,
+    context?.toolBillingEnabled,
+    isExpenseEligible
+  );
   const fetchedAt = new Date().toISOString();
   const results = {};
 
   let createdSnapshotId = null;
   let acquisitionStatus = "READY";
+  let primarySnapshot = null;
 
   const cleanPeriodFrom = toIsoDateOnly(periodFrom);
   const cleanPeriodTo = toIsoDateOnly(periodTo);
 
-  const billingTypeUpper = String(context.billingType || "").trim().toUpperCase().replace(/\s+/g, "_");
   const isTM = ["TIME_MATERIAL", "TIMESHEET_BASED", "TIME_AND_MATERIAL"].includes(billingTypeUpper);
   const isMilestone = ["MILESTONE", "MILESTONE_BASED"].includes(billingTypeUpper);
   const isRecurring = ["RECURRING", "SUBSCRIPTION", "SUBSCRIPTION_BASED"].includes(billingTypeUpper);
   const isFixed = ["FIXED_PRICE", "FIXED"].includes(billingTypeUpper);
+
+  // Validate authoritative PMS Project mapping for Expense-eligible configurations
+  const pmsId = context?.pmsProjectId !== undefined && context?.pmsProjectId !== null ? Number(context.pmsProjectId) : null;
+  const isPmsExplicitlyMissing =
+    context?.hasPmsProjectMapping === false ||
+    context?.pmsProjectMapping === false ||
+    context?.pmsProjectMapping === "MISSING" ||
+    Boolean(context?.pmsProjectMappingError);
+
+  if (isExpenseEligible && (isPmsExplicitlyMissing || (context?.pmsProjectId !== undefined && (pmsId === null || isNaN(pmsId) || pmsId <= 0)))) {
+    const pmsErrMsg =
+      context?.pmsProjectMappingError ||
+      "Missing or invalid PMS project mapping. Authoritative numeric PMS Project ID is required for Expense Management integration.";
+    console.error(`[BillingDataAcquisition] ${pmsErrMsg} (projectId=${context?.projectId})`);
+
+    const existingLaborRecords = context?.existingLaborRecords || context?.existingSnapshot?.timesheets || context?.laborRecords || [];
+    const existingLaborAmount = context?.existingLaborAmount ?? context?.existingSnapshot?.laborAmount ?? (existingLaborRecords.length > 0 ? sumAmount(existingLaborRecords) : 0);
+    const existingExpenseRecords = context?.existingExpenseRecords || context?.existingSnapshot?.expenses || [];
+    const existingExpenseAmount = context?.existingExpenseAmount ?? 0;
+
+    const errorResult = {
+      success: false,
+      billingStatus: "ACQUISITION_FAILED",
+      snapshotLifecycleStatus: "ACQUISITION_FAILED",
+      message: pmsErrMsg,
+      isRetryable: false,
+      snapshotId: null,
+      snapshotNumber: null,
+      billingPeriodStart: cleanPeriodFrom,
+      billingPeriodEnd: cleanPeriodTo,
+      billingPeriod: formatBillingPeriod(cleanPeriodFrom, cleanPeriodTo),
+      labor: {
+        applicable: isTM,
+        status: "error",
+        error: pmsErrMsg,
+        records: existingLaborRecords,
+        amount: existingLaborAmount,
+        lastFetchedAt: fetchedAt,
+      },
+      expense: {
+        applicable: true,
+        status: "error",
+        error: pmsErrMsg,
+        records: existingExpenseRecords,
+        amount: existingExpenseAmount,
+        lastFetchedAt: fetchedAt,
+      },
+    };
+    ["contract", "milestone", "recurring"].forEach((type) => {
+      errorResult[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
+    });
+    return errorResult;
+  }
 
   // ── TIME_MATERIAL: Real AR backend snapshot engine ──────────────
   if (isTM) {
@@ -725,6 +1981,7 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
         context.billingConfigurationId,
         context
       );
+      primarySnapshot = snapshot;
 
       const actualSnapStart = snapshot?.billingPeriodStart || cleanPeriodFrom;
       const actualSnapEnd = snapshot?.billingPeriodEnd || cleanPeriodTo;
@@ -732,22 +1989,31 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
 
       if (
         snapshot &&
-        snapshot.snapshotId &&
+        (snapshot.snapshotId || snapshot.id) &&
         (snapshot.status === "READY" ||
           snapshot.status === "READY_FOR_TAX" ||
           snapshot.status === "TAX_COMPLETED" ||
-          snapshot.success)
+          snapshot.status === "INVOICED" ||
+          snapshot.status === "ALREADY_BILLED" ||
+          snapshot.acquisitionStatus === "ALREADY_BILLED" ||
+          snapshot.success ||
+          snapshot.isExisting)
       ) {
-        createdSnapshotId = snapshot.snapshotId;
+        createdSnapshotId = snapshot.snapshotId || snapshot.id;
         const finalStatus = snapshot.status || "READY_FOR_TAX";
-        acquisitionStatus = mapToBillingAcquisitionStatus(finalStatus, false);
+        const acqStatus = snapshot.acquisitionStatus || mapToBillingAcquisitionStatus(finalStatus, false);
         results.labor = {
           applicable: true,
           status: "success",
           records: snapshot.laborRecords || [],
-          amount: snapshot.subtotal || sumAmount(snapshot.laborRecords || []),
+          amount:
+            typeof snapshot.laborAmount === "number"
+              ? snapshot.laborAmount
+              : snapshot.laborRecords?.length > 0
+              ? sumAmount(snapshot.laborRecords)
+              : (snapshot.subtotal ?? snapshot.totalAmount ?? 0),
           lastFetchedAt: fetchedAt,
-          snapshotId: snapshot.snapshotId,
+          snapshotId: snapshot.snapshotId || snapshot.id,
           snapshotNumber: snapshot.snapshotNumber,
           billingPeriodStart: actualSnapStart,
           billingPeriodEnd: actualSnapEnd,
@@ -755,13 +2021,17 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
           readiness: snapshot.readiness,
         };
         results.success = true;
-        results.snapshotId = snapshot.snapshotId;
+        results.isExisting = Boolean(snapshot.isExisting);
+        results.existingSnapshot = Boolean(snapshot.isExisting || snapshot.existingSnapshot);
+        results.snapshotId = snapshot.snapshotId || snapshot.id;
         results.snapshotNumber = snapshot.snapshotNumber;
         results.billingPeriodStart = actualSnapStart;
         results.billingPeriodEnd = actualSnapEnd;
         results.billingPeriod = actualSnapPeriod;
         results.billingStatus = finalStatus;
-        results.message = snapshot.message || "Billing snapshot acquired successfully. All required timesheets are approved.";
+        results.snapshotLifecycleStatus = finalStatus;
+        results.acquisitionStatus = acqStatus;
+        results.message = snapshot.message || (snapshot.isExisting ? "Existing billing snapshot loaded." : "Billing snapshot acquired successfully. All required timesheets are approved.");
       } else if (snapshot && snapshot.status === "PARTIALLY_READY") {
         results.labor = {
           applicable: true,
@@ -769,7 +2039,7 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
           records: snapshot.laborRecords || [],
           amount: snapshot.subtotal || sumAmount(snapshot.laborRecords || []),
           lastFetchedAt: fetchedAt,
-          snapshotId: snapshot.snapshotId,
+          snapshotId: snapshot.snapshotId || snapshot.id,
           snapshotNumber: snapshot.snapshotNumber,
           billingPeriodStart: actualSnapStart,
           billingPeriodEnd: actualSnapEnd,
@@ -820,20 +2090,45 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
       }
     } catch (error) {
       console.error("[BillingDataAcquisition] Snapshot acquisition failed:", error);
+      const errStatus = error?.response?.status || error?.status;
+      const errMsg = getSafeBackendErrorMessage(
+        error,
+        error?.message || "We couldn't retrieve billing data at this time. Please try again."
+      );
+      const isConflict = Boolean(
+        error?.isConflict ||
+        errStatus === 409 ||
+        /conflict|another\s+billing\s+configuration|different\s+configuration|already\s+exists\s+under\s+another/i.test(errMsg)
+      );
+
+      const isValidationFailure =
+        !isConflict &&
+        (/validation\s*failure|configuration\s*required|configuration\s*missing|missing\s*setup|rate\s*incomplete/i.test(errMsg) ||
+          errStatus === 422);
+
+      const isFxPolicyError =
+        /expense-fx|currency-conversion|conversion\s*policy|exchange-rate\s*policy|rounding-mode|rate-date-basis/i.test(errMsg);
+
+      const existingLaborRecords = context?.existingLaborRecords || context?.existingSnapshot?.timesheets || context?.laborRecords || [];
+      const existingLaborAmount = context?.existingLaborAmount ?? context?.existingSnapshot?.laborAmount ?? (existingLaborRecords.length > 0 ? sumAmount(existingLaborRecords) : 0);
+
       results.labor = {
         applicable: true,
-        status: "error",
-        error: error?.message || "We couldn't retrieve billing data at this time. Please try again.",
-        records: [],
-        amount: 0,
+        status: isFxPolicyError ? (existingLaborRecords.length > 0 ? "unpersisted" : "empty") : "error",
+        error: isFxPolicyError ? null : errMsg,
+        records: existingLaborRecords,
+        amount: existingLaborAmount,
         lastFetchedAt: fetchedAt,
       };
       results.success = false;
-      results.billingStatus = "ACQUISITION_FAILED";
-      results.message = error?.message || "We couldn't retrieve billing data at this time. Please try again.";
+      results.isConflict = isConflict;
+      results.isFxPolicyError = isFxPolicyError;
+      results.billingStatus = isValidationFailure ? "CONFIGURATION_REQUIRED" : "ACQUISITION_FAILED";
+      results.message = errMsg;
+      results.isRetryable = !isValidationFailure && !isConflict;
     }
 
-    ["contract", "milestone", "recurring", "expense"].forEach((type) => {
+    ["contract", "milestone", "recurring"].forEach((type) => {
       results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
     });
   } else if (isMilestone) {
@@ -847,7 +2142,7 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
     results.success = false;
     results.billingStatus = "NO_DATA";
     results.message = "No billable milestone records found for the selected billing period.";
-    ["labor", "contract", "recurring", "expense"].forEach((type) => {
+    ["labor", "contract", "recurring"].forEach((type) => {
       results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
     });
   } else if (isRecurring) {
@@ -861,7 +2156,7 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
     results.success = false;
     results.billingStatus = "NO_DATA";
     results.message = "No billable recurring charges found for the selected billing period.";
-    ["labor", "contract", "milestone", "expense"].forEach((type) => {
+    ["labor", "contract", "milestone"].forEach((type) => {
       results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
     });
   } else {
@@ -875,9 +2170,93 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
     results.success = false;
     results.billingStatus = "NO_DATA";
     results.message = "No billable contract records found for the selected billing period.";
-    ["labor", "milestone", "recurring", "expense"].forEach((type) => {
+    ["labor", "milestone", "recurring"].forEach((type) => {
       results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
     });
+  }
+
+  // Handle Expense Acquisition (independent source for expense-eligible projects only)
+  if (isExpenseEligible) {
+    if (!results.success || results.billingStatus === "ACQUISITION_FAILED") {
+      // Snapshot creation failed (e.g. backend aborted snapshot creation because XMS acquisition failed).
+      // DO NOT query backend getBillingSnapshotByPeriod which returns 404 and falsely marks expenses as "empty".
+      // Mark expense acquisition as failed with the actual backend error message, and zero out expense amounts.
+      results.expense = {
+        applicable: true,
+        status: "error",
+        error: results.message || results.labor?.error || "Expense acquisition failed because snapshot creation was aborted.",
+        records: [],
+        amount: 0,
+        lastFetchedAt: fetchedAt,
+      };
+      results.expenseAmount = 0;
+      results.totalAmount = Number(results.labor?.amount || 0);
+      results.subtotal = Number(results.labor?.amount || 0);
+    } else {
+      try {
+        const hasEmbeddedExpensesInSnapshot =
+          Array.isArray(primarySnapshot?.expenseRecords) ||
+          Array.isArray(primarySnapshot?.expenses) ||
+          Array.isArray(primarySnapshot?.expenseLineItems) ||
+          Array.isArray(primarySnapshot?.expenseItems) ||
+          Array.isArray(primarySnapshot?.handedOffExpenses) ||
+          typeof primarySnapshot?.expenseAmount === "number";
+
+        const expSnapshotToPass = hasEmbeddedExpensesInSnapshot
+          ? primarySnapshot
+          : null;
+
+        const expData = await fetchEligibleExpenses(
+          context.projectId || context.id,
+          cleanPeriodFrom,
+          cleanPeriodTo,
+          context.billingConfigurationId,
+          expSnapshotToPass
+        );
+        const expenseRecords = expData.records || [];
+        const expenseAmount = expData.amount || 0;
+        const isFailedOrIncomplete = expData.status === "error" || expData.status === "incomplete";
+        results.expense = {
+          applicable: true,
+          status: isFailedOrIncomplete
+            ? expData.status
+            : expenseRecords.length > 0 || expenseAmount > 0
+            ? "success"
+            : "empty",
+          records: expenseRecords,
+          amount: expenseAmount,
+          error: isFailedOrIncomplete ? (expData.error || "Expense data unavailable") : null,
+          lastFetchedAt: fetchedAt,
+        };
+
+        // When primary acquisition succeeded, integrate expense into commercial subtotal & total
+        if (results.success) {
+          const laborAmount = Number(results.labor?.amount || 0);
+          results.laborAmount = laborAmount;
+          results.subtotal = laborAmount + expenseAmount;
+          results.totalAmount = laborAmount + expenseAmount;
+          results.expenseAmount = expenseAmount;
+        }
+      } catch (expErr) {
+        console.warn("[BillingDataAcquisition] Expense acquisition error:", expErr);
+        results.expense = {
+          applicable: true,
+          status: "error",
+          error: expErr.message || "Failed to retrieve expense data",
+          records: context?.existingExpenseRecords || [],
+          amount: context?.existingExpenseAmount || 0,
+          lastFetchedAt: fetchedAt,
+        };
+      }
+    }
+  } else {
+    results.expense = {
+      applicable: false,
+      status: "not_applicable",
+      records: [],
+      amount: 0,
+      lastFetchedAt: null,
+    };
   }
 
   results.tool = {
@@ -893,17 +2272,21 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
   // 1. BillingSnapshot creation succeeds.
   // 2. BillingAcquisition record creation succeeds.
   if (results.success && context?.billingConfigurationId && createdSnapshotId) {
-    const isPartial = results.billingStatus === "PARTIALLY_READY" || results.labor?.status === "partially_ready";
-    const recordStatus = mapToBillingAcquisitionStatus(acquisitionStatus || results.billingStatus, isPartial);
+    try {
+      const isPartial = results.billingStatus === "PARTIALLY_READY" || results.labor?.status === "partially_ready";
+      const recordStatus = mapToBillingAcquisitionStatus(acquisitionStatus || results.billingStatus, isPartial);
 
-    await acquireBillingRecord(
-      context.billingConfigurationId,
-      cleanPeriodFrom,
-      cleanPeriodTo,
-      createdSnapshotId,
-      recordStatus,
-      context.currencyId || context.currency_id || 1
-    );
+      await acquireBillingRecord(
+        context.billingConfigurationId,
+        cleanPeriodFrom,
+        cleanPeriodTo,
+        createdSnapshotId,
+        recordStatus,
+        context.currencyId || context.currency_id || 1
+      );
+    } catch (recordErr) {
+      console.warn("[BillingDataAcquisition] acquireBillingRecord tracking call failed; preserving snapshot data:", recordErr?.message || recordErr);
+    }
   }
 
   return results;

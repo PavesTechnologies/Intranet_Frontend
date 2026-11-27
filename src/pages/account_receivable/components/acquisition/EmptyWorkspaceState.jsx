@@ -131,7 +131,7 @@ export default function EmptyWorkspaceState({ configs = [], onViewConfig }) {
             {steps.map((s) => (
               <div key={s.num} className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-indigo-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-indigo-600">
+                  <span className="rounded bg-indigo-100 px-1.5 py-0.5 tabular-nums text-[11px] font-bold text-indigo-600">
                     {s.num}
                   </span>
                   <s.icon className="h-3.5 w-3.5 text-slate-400" />

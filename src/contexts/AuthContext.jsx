@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from "react";
 import { jwtDecode } from "jwt-decode";
+import { QueryClientContext } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { showStatusToast } from "../components/toastfy/toast";
 import axios from "axios";
@@ -35,6 +36,16 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isfirsttlogin, setIsfirsttlogin] = useState(false);
   const isLoggingOut = useRef(false);
+  // Optional: the cached server data belongs to the signed-in user, so it is dropped on login and
+  // logout - otherwise the next user on this browser briefly sees (or reuses) the previous one's data.
+  const queryClient = React.useContext(QueryClientContext);
+  const clearCachedData = () => {
+    try {
+      queryClient?.clear();
+    } catch {
+      // best-effort
+    }
+  };
 
   const loadUser = (token) => {
     try {
@@ -49,6 +60,7 @@ export const AuthProvider = ({ children }) => {
 
   // ✅ stores access token + refresh token
   const login = (token, isFirstLogin = false) => {
+    clearCachedData();
     if (isFirstLogin) {
       localStorage.setItem("lastPath", "/change-password");
       setIsfirsttlogin(true);
@@ -70,24 +82,25 @@ export const AuthProvider = ({ children }) => {
   const logout = (expired = false) => {
     if (isLoggingOut.current) return;
     isLoggingOut.current = true;
+    clearCachedData();
 
     // Captured before any clearing: the websocket path can remove the token
     // first, which would otherwise silently skip the blacklist call below.
     const tokenAtLogout = localStorage.getItem("token");
 
-// blacklist both tokens on backend
+    // blacklist both tokens on backend
     if (tokenAtLogout) {
 
       axios.post(
-      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
-      {},
-      {
-        withCredentials: true,
-        headers: {
-          Authorization: `Bearer ${tokenAtLogout}`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
+        {},
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${tokenAtLogout}`,
+          },
         },
-      },
-    )
+      )
         .then((res) => {
           // console.log("Logout:", res.data)
         })

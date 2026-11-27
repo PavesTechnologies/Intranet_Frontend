@@ -1,4 +1,5 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Service layer for Finance Verification endpoints (/xms/finance-verification/*).
@@ -6,7 +7,7 @@ import api from "@/api/axiosInstance";
  * base URL overrides and auth headers configuration.
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -31,11 +32,29 @@ export const financeVerificationApi = {
   getStatus: (reportId) =>
     api.get(`/xms/finance-verification/${reportId}/status`, withBase()),
 
+  // PageResponse<FinanceHistoryItemResponse> - status must be "VERIFIED" or "QUERIED"
+  getHistory: (status, page = 0, size = 20) =>
+    api.get("/xms/finance-verification/history", withBase({ params: { status, page, size } })),
+
+  // FinancePaymentSummaryResponse: awaitingPaymentCount (with AP), paidCount
+  getPaymentSummary: () =>
+    api.get("/xms/finance-verification/payment-summary", withBase()),
+
   // ExpenseReportResponse
-  verifyLineItem: (reportId, lineItemId) =>
-    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/verify`, {}, withBase()),
+  verifyLineItem: (reportId, lineItemId, taxChecked) =>
+    // taxChecked: Finance confirms it checked a line whose tax is flagged (MISMATCH / REQUIRES_FINANCE_REVIEW).
+    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/verify`, { taxChecked: !!taxChecked }, withBase()),
+
+  // FINANCE_EXECUTIVE per-line tax correction: { taxCodeId?, taxAmount?, itcRecoverablePercent?, reason }.
+  adjustLineTax: (reportId, lineItemId, payload) =>
+    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/tax-adjustment`, payload, withBase()),
+
+  // FINANCE_EXECUTIVE: { supplierGstin (blank clears), reason }. Re-checks CGST + SGST vs IGST against the company's GST state.
+  setSupplierGstin: (reportId, lineItemId, payload) =>
+    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/supplier-gstin`, payload, withBase()),
 
   // ExpenseReportResponse - reason parameter required
-  queryLineItem: (reportId, lineItemId, reason) =>
-    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/query`, { reason }, withBase()),
+  // category: optional CorrectionCategory (TAX_MISMATCH, RECEIPT, AMOUNT, OTHER) - shown to the employee.
+  queryLineItem: (reportId, lineItemId, reason, category) =>
+    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/query`, { reason, category: category || null }, withBase()),
 };

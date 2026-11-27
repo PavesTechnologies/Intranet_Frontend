@@ -20,6 +20,9 @@ export const QUEUE_TYPES = {
   OCR_REVIEW: "ocr_review",
   VALIDATION: "validation",
   APPROVAL: "approval",
+  // Finance's TDS verification worklist: Approved invoices, shown with their TDS determination
+  // status. Same invoice set as APPROVED, but its own tab so verifying TDS is a visible step.
+  TDS_STATUS: "tds_status",
   ALL_INVOICES: "all_invoices",
   APPROVED: "approved",
   READY_FOR_PAYMENT: "ready_for_payment",
@@ -31,6 +34,7 @@ export const QUEUE_STATUS_FILTERS = {
   [QUEUE_TYPES.OCR_REVIEW]: OCR_REVIEW_QUEUE_STATUSES,
   [QUEUE_TYPES.VALIDATION]: VALIDATION_QUEUE_STATUSES,
   [QUEUE_TYPES.APPROVAL]: APPROVAL_QUEUE_STATUSES,
+  [QUEUE_TYPES.TDS_STATUS]: [INVOICE_STATUS.APPROVED],
   [QUEUE_TYPES.ALL_INVOICES]: null,
   [QUEUE_TYPES.APPROVED]: [INVOICE_STATUS.APPROVED],
   [QUEUE_TYPES.READY_FOR_PAYMENT]: PAYMENT_QUEUE_STATUSES,
@@ -38,9 +42,10 @@ export const QUEUE_STATUS_FILTERS = {
 };
 
 export const QUEUE_LABELS = {
-  [QUEUE_TYPES.OCR_REVIEW]: "OCR Review",
+  [QUEUE_TYPES.OCR_REVIEW]: "To review",
   [QUEUE_TYPES.VALIDATION]: "Validation",
   [QUEUE_TYPES.APPROVAL]: "Approval",
+  [QUEUE_TYPES.TDS_STATUS]: "TDS Status",
   [QUEUE_TYPES.ALL_INVOICES]: "All",
   [QUEUE_TYPES.APPROVED]: "Approved",
   [QUEUE_TYPES.READY_FOR_PAYMENT]: "Ready for Payment",
@@ -57,7 +62,7 @@ export const QUEUE_LABELS = {
  * @returns {string[]} QUEUE_TYPES values, in InvoiceStatusTabs' display order
  */
 export function getVisibleQueueTypes(permissions) {
-  const { canUploadInvoice, canReviewOcr, canViewInvoiceApproval, canApproveInvoice, canRejectInvoice, canSendBackInvoice, canSendForApproval, canMarkPaid, canViewPayment } = permissions;
+  const { canUploadInvoice, canReviewOcr, canViewInvoiceApproval, canApproveInvoice, canRejectInvoice, canSendBackInvoice, canSendForApproval, canMarkPaid, canViewPayment, canVerifyTds } = permissions;
 
   const canSeeAll = canUploadInvoice || canReviewOcr;
   const canSeeApproval = canViewInvoiceApproval || canApproveInvoice || canRejectInvoice || canSendBackInvoice || canSendForApproval;
@@ -66,6 +71,8 @@ export function getVisibleQueueTypes(permissions) {
   return [
     canSeeAll && QUEUE_TYPES.ALL_INVOICES,
     canReviewOcr && QUEUE_TYPES.OCR_REVIEW,
+    // TDS verification is Finance's step (INVOICE_TDS_VERIFY) — shown before Approval.
+    canVerifyTds && QUEUE_TYPES.TDS_STATUS,
     canSeeApproval && QUEUE_TYPES.APPROVAL,
     QUEUE_TYPES.APPROVED,
     canSeePayment && QUEUE_TYPES.READY_FOR_PAYMENT,

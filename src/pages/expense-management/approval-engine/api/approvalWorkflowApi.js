@@ -1,4 +1,5 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Service layer for the Approval Engine's action/read endpoints (/xms/approvals/*),
@@ -13,7 +14,7 @@ import api from "@/api/axiosInstance";
  *   { content: [...], page, size, totalElements, totalPages, first, last }
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -46,7 +47,9 @@ export const approvalWorkflowApi = {
   getLineItemReviews: (reportId) =>
     api.get(`/xms/approvals/${reportId}/line-item-reviews`, withBase()),
 
-  submit: (reportId) => api.post(`/xms/approvals/${reportId}/submit`, {}, withBase()),
+  // lateSubmissionReason: only for a report past its submission deadline - the employee's reason for the delay.
+  submit: (reportId, lateSubmissionReason) =>
+    api.post(`/xms/approvals/${reportId}/submit`, lateSubmissionReason ? { lateSubmissionReason } : {}, withBase()),
 
   recall: (reportId) => api.post(`/xms/approvals/${reportId}/recall`, {}, withBase()),
 
@@ -64,6 +67,17 @@ export const approvalWorkflowApi = {
 
   rejectReport: (reportId, comment) =>
     api.post(`/xms/approvals/${reportId}/reject`, { comment }, withBase()),
+
+  // A SEPARATE, approver-side authorization of a policy exception — distinct from the employee's
+  // own justify() on policyApi.js. Returns the updated PolicyWarningResponse (approverJustification,
+  // approverJustifiedBy, approverJustifiedAt now set). Rejects if this violation was already
+  // authorized once, or if the caller isn't an active approver/delegate at the report's current level.
+  approveException: (reportId, lineItemId, violationId, justification) =>
+    api.post(
+      `/xms/approvals/${reportId}/line-items/${lineItemId}/policy-warnings/${violationId}/approve-exception`,
+      { justification },
+      withBase()
+    ),
 
   bulkApprove: (reportId) => api.post(`/xms/approvals/${reportId}/bulk-approve`, {}, withBase()),
 };

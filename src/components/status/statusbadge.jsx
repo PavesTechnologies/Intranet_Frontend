@@ -12,7 +12,11 @@ const StatusBadge = ({ label, size = "md" }) => {
   let displayLabel = label;
   const rawUpper = (label || "").toString().trim().toUpperCase();
 
-  if (rawUpper === "READY_TO_TAX" || rawUpper === "READY_FOR_TAX" || rawUpper === "READY" || normalized === "ready" || normalized === "ready to tax" || normalized === "ready for tax") {
+  if (rawUpper === "READY_FOR_INVOICE" || normalized === "ready for invoice") {
+    displayLabel = "Ready for Invoice";
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
+  } else if (rawUpper === "READY_TO_TAX" || rawUpper === "READY_FOR_TAX" || rawUpper === "READY" || normalized === "ready" || normalized === "ready to tax" || normalized === "ready for tax") {
     displayLabel = "Ready for Tax";
     bgColor = "bg-emerald-100 border border-emerald-300";
     textColor = "text-emerald-800 font-bold";
@@ -46,7 +50,7 @@ const StatusBadge = ({ label, size = "md" }) => {
     bgColor = "bg-indigo-50 border border-indigo-200";
     textColor = "text-indigo-700 font-medium";
   } else if (rawUpper === "GENERATED" || normalized === "generated") {
-    displayLabel = "Invoice Generated";
+    displayLabel = "Generated";
     bgColor = "bg-emerald-100 border border-emerald-300";
     textColor = "text-emerald-800 font-bold";
   } else if (rawUpper === "PENDING_APPROVAL" || normalized === "pending approval") {
@@ -148,6 +152,14 @@ const StatusBadge = ({ label, size = "md" }) => {
   if (raw === "verified" || raw === "passed" || normalized.includes("pass")) {
     bgColor = "bg-green-100";
     textColor = "text-green-700";
+  }
+
+  // Finance Verification's "sent back for correction" outcome (§Query vs Reject - there is no
+  // terminal "rejected" state at this level).
+  if (raw === "queried") {
+    displayLabel = "Query Raised";
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
   }
 
   if (raw === "accepted") {

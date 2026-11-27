@@ -2,10 +2,15 @@ import React from "react";
 import { AlertTriangle } from "lucide-react";
 import { textOrDash } from "../../../../utils/candidateDataUtils";
 
+const IMPORTANCE = {
+  core: { label: "Core", tone: "bg-rose-100 text-rose-700 border-rose-200" },
+  supporting: { label: "Supporting", tone: "bg-slate-100 text-slate-600 border-slate-200" },
+};
+
 // Missing Mandatory Skills — deterministic_score_breakdown.missing_mandatory_skills.
 export default function MissingSkillsList({ items }) {
   if (!items || items.length === 0) {
-    return <p className="text-[11.5px] text-slate-400 py-2">No data available</p>;
+    return <p className="text-[11.5px] text-slate-400 py-2">No required skills are missing.</p>;
   }
 
   return (
@@ -18,8 +23,15 @@ export default function MissingSkillsList({ items }) {
               key={i}
               className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[12px] text-rose-700 bg-white/70 rounded-lg px-3 py-1.5"
             >
-              <span className="font-semibold">{textOrDash(r.skill ?? r.jd_skill ?? r.name)}</span>
-              <span className="italic">{textOrDash(r.reason ?? r.match_reason)}</span>
+              <span className="flex items-center gap-2 font-semibold">
+                {textOrDash(r.skill)}
+                {IMPORTANCE[r.importance] && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${IMPORTANCE[r.importance].tone}`}>
+                    {IMPORTANCE[r.importance].label}
+                  </span>
+                )}
+              </span>
+              <span className="italic">{textOrDash(r.reason)}</span>
             </div>
           ))}
         </div>

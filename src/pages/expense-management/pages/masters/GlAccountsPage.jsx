@@ -4,7 +4,6 @@ import { Plus, Pencil, Trash2, Layers } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
-import Pagination from "@/components/Pagination/pagination";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
@@ -18,7 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
 import api from "@/api/axiosInstance";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const glAccountService = {
   getAll: (params) => {
@@ -64,6 +63,8 @@ const glAccountService = {
   },
 };
 import { Fonts } from "@/components/Fonts/Fonts";
+import Pagination from "@/components/Pagination/pagination";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -230,14 +231,6 @@ export default function GlAccountsPage() {
     setSearchTerm(value || "");
     setCurrentPage(1);
   }, []);
-
-  const handlePreviousPage = useCallback(() => {
-    setCurrentPage((prev) => Math.max(prev - 1, 1));
-  }, []);
-
-  const handleNextPage = useCallback(() => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-  }, [totalPages]);
 
   // Form Handlers
   const handleInputChange = (e) => {
@@ -508,16 +501,14 @@ export default function GlAccountsPage() {
               />
             </div>
 
-            {totalPages > 1 && (
-              <div className="mt-4 flex justify-center">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPrevious={handlePreviousPage}
-                  onNext={handleNextPage}
-                />
-              </div>
-            )}
+            <div className="mt-4 flex justify-center">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+              />
+            </div>
           </>
         )}
       </div>

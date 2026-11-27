@@ -18,11 +18,20 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../../contexts/AuthContext";
-import { EO_SUBMENU, XMS_SUBMENU, AP_SUBMENU, AR_MAKER_ROLES, AR_CHECKER_ROLES } from "../../config/sidebarConfig";
+import { EO_SUBMENU, XMS_SUBMENU, AP_SUBMENU } from "../../config/sidebarConfig";
+import {
+  userManagementSubmenu,
+  getArSubmenu,
+  getAirsSubmenu,
+  getResourceManagementSubmenu,
+  canSeeAccountReceivable,
+  AIRS_ACCESS_ROLES,
+} from "../../config/navigationMenus";
 import { filterMenuByRole } from "../../utils/sidebarPermissions";
 import ArModuleIcon from "../icons/ArModuleIcon";
 import ApModuleIcon from "../icons/ApModuleIcon";
 import { AP_ALL_ROLES } from "../../pages/accounts-payable/constants/apRoles";
+import { AP_MANAGEMENT_ANY } from "../../pages/accounts-payable/constants/paymentTerms";
 import { APPLICATIONS } from "../../utils/applicationRoutes";
 // import AIRSLogo from "../icons/AIRSLogo";
 
@@ -31,162 +40,15 @@ const navigation = [
   {
     name: "Projects",
     href: "/projects",
+    tourId: "nav-projects",
     icon: FolderKanban,
     allowedRoles: ["Project_Manager", "General", "Tester"],
   },
-  { name: "Leave Management", href: "/leave-management", icon: PlaneTakeoff },
-  { name: "Timesheets", href: "/timesheets", icon: Clock },
+  { name: "Leave Management", href: "/leave-management", icon: PlaneTakeoff, tourId: "nav-leave" },
+  { name: "Timesheets", href: "/timesheets", icon: Clock, tourId: "nav-timesheets" },
   // { name: "Calendar", href: "/calendar", icon: Calendar },
   // { name: "Employee Exit", href: "/employee-exit", icon: AlertCircle },
 ];
-
-const userManagementSubmenu = [
-  { label: "User Manage", to: "/user-management/users" },
-  { label: "Role Manage", to: "/user-management/roles" },
-  { label: "Permission Manage", to: "/user-management/permissions" },
-  { label: "Group Manage", to: "/user-management/groups" },
-  { label: "Access Point Manage", to: "/user-management/access-points" },
-];
-
-// DATA FOR THE POP LABEL / SUBMENU
-const resourceManagementSubmenu = [
-  { label: "Client Management", to: "/resource-management" },
-  { label: "Resource Project Management", to: "/resource-management/projects" },
-  // { label: "Asset Categories", to: "/resource-management/asset-categories" },
-  // { label: "Asset Types", to: "/resource-management/asset-types" },
-  {
-    label: "Workforce Availability",
-    to: "/resource-management/workforce-availability",
-  },
-  { label: "Demand Management", to: "/resource-management/demand" },
-  { label: "Roll-Off Management", to: "/resource-management/roleoff" },
-  { label: "Bench Management", to: "/resource-management/bench" },
-  {
-    label: "Utilization & Performance",
-    to: "/resource-management/bench/utilization-performance",
-  },
-];
-
-const accountReceivableSubmenu = [
-  { label: "Dashboard", to: "/account-receivable/dashboard" },
-  {
-    label: "Project Billing Setup",
-    to: "/account-receivable/project-billing-setup/overview",
-    children: [
-      {
-        label: "Overview",
-        to: "/account-receivable/project-billing-setup/overview",
-      },
-      {
-        label: "Billing Config Workspace",
-        to: "/account-receivable/project-billing-setup/workspace",
-      },
-    ],
-  },
-  {
-    label: "Billing Approvals",
-    to: "/account-receivable/billing-approvals",
-  },
-  {
-    label: "Billing Data Acquisition",
-    to: "/account-receivable/billing-data-acquisition/workspace",
-  },
-  {
-    label: "Tax Calculation",
-    to: "/account-receivable/tax-calculation",
-  },
-  {
-    label: "Invoice Generation",
-    to: "/account-receivable/invoice-generation",
-  },
-  {
-    label: "Invoice Approval",
-    to: "/account-receivable/invoice-approval",
-  },
-  {
-    label: "Configurations",
-    to: "/account-receivable/master-data",
-    children: [
-      {
-        label: "Configurations Overview",
-        to: "/account-receivable/master-data",
-      },
-      {
-        label: "Seller Information / Company Profile",
-        to: "/account-receivable/master-data/company-profile",
-      },
-    ],
-  },
-];
-
-// Maker-Checker split of the AR submenu above. Super Admin keeps the full,
-// unchanged accountReceivableSubmenu (existing AR access must not change);
-// Finance Executive (Maker) only gets the create/draft items — no Billing
-// Approvals; Finance Manager (Checker) only gets Billing Approvals — no
-// create/draft/edit/submit items. Derived by filtering the same source array
-// rather than hand-duplicated, so the two variants can never drift from it.
-const accountReceivableMakerSubmenu = accountReceivableSubmenu.filter(
-  (item) => item.label !== "Billing Approvals",
-);
-const accountReceivableCheckerSubmenu = accountReceivableSubmenu.filter(
-  (item) => item.label === "Billing Approvals" || item.label === "Invoice Approval",
-);
-
-const airsSubmenu = [
-  { label: "Dashboard", to: "/ai-screening/dashboard" },
-  { label: "JD Management", to: "/ai-screening/jds" },
-  { label: "Campaigns", to: "/ai-screening/campaigns" },
-  { label: "Resume Intake", to: "/ai-screening/resume-intake" },
-  { label: "Pipeline", to: "/ai-screening/pipeline" },
-  { label: "Skill Ontology", to: "/ai-screening/skill-ontology" },
-  { label: "Talent Pool", to: "/ai-screening/talent-pool" },
-  // `roles` = only shown to users with one of these roles, whichever
-  // per-role menu below they get (enforced by the final filter in the
-  // component). /ai-screening/settings is HR_ADMIN-only in App.jsx.
-  { label: "Settings", to: "/ai-screening/settings", roles: ["HR_ADMIN"] },
-];
-
-// Interview Calendar (/ai-screening/interview-calendar) is HR_ADMIN/RECRUITER only
-// — same roles the tab it replaced was gated to — so like Prompt Templates
-// below, it's added directly to those two submenus rather than to the
-// shared airsSubmenu, which would leak it into the HIRING_MANAGER/HR
-// fallback menu further down.
-const interviewCalendarItem = { label: "Interview Calendar", to: "/ai-screening/interview-calendar" };
-
-// HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
-// Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu)
-// and Settings (/ai-screening/settings is HR_ADMIN-only in App.jsx).
-const hrAdminAirsSubmenu = [
-  ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Campaigns", "Pipeline"].includes(item.label)),
-  ...airsSubmenu.filter((item) => ["Talent Pool", "Skill Ontology"].includes(item.label)),
-  interviewCalendarItem,
-  { label: "Prompt Templates", to: "/ai-screening/prompt-templates" },
-  ...airsSubmenu.filter((item) => item.label === "Settings"),
-];
-
-// RECRUITER gets a trimmed-down AIRS menu — only these items.
-const recruiterAirsSubmenu = [
-  ...airsSubmenu.filter((item) =>
-    ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
-  ),
-  interviewCalendarItem,
-];
-
-// HIRING_MANAGER gets a trimmed-down AIRS menu — only these items.
-const hiringManagerAirsSubmenu = [
-  ...airsSubmenu.filter((item) => ["Campaigns", "Pipeline"].includes(item.label)),
-  interviewCalendarItem,
-  // /ai-screening/hm-review is HIRING_MANAGER-only (see App.jsx ProtectedRoute).
-  { label: "HM Review", to: "/ai-screening/hm-review" },
-];
-
-
-const deliveryManagerResourceManagementSubmenu =
-  resourceManagementSubmenu.filter(
-    (item) =>
-      item.label === "Demand Management" ||
-      item.label === "Roll-Off Management",
-  );
 
 // EO_SUBMENU is now config-driven from src/config/sidebarConfig.js.
 // filterMenuByRole() trims it to only the items allowed for the current user's roles.
@@ -234,22 +96,14 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   // Role checks
   const isAdmin = hasRole(["ADMIN"]);
   const isSuperAdmin = hasRole(["SUPER_ADMIN"]);
-  const isFinanceExecutive = hasRole(["Finance_Executive", "FINANCE_EXECUTIVE"]);
-  const canSeeArMaker = hasRole(AR_MAKER_ROLES);
-  const canSeeArChecker = hasRole(AR_CHECKER_ROLES) && !isFinanceExecutive;
-  const canSeeAr = canSeeArMaker || canSeeArChecker;
-  // Super Admin (who is not specifically a Finance Executive): full unchanged submenu.
-  // Finance Executive (Maker): create/draft items only — no Billing Approvals.
-  // Finance Manager (Checker): Billing Approvals only.
-  const arSubmenu = (isSuperAdmin && !isFinanceExecutive)
-    ? accountReceivableSubmenu
-    : canSeeArMaker
-      ? accountReceivableMakerSubmenu
-      : accountReceivableCheckerSubmenu;
+  // Account Receivable visibility + Maker-Checker submenu split: see config/navigationMenus.js.
+  const canSeeAr = canSeeAccountReceivable(hasRole);
+  const arSubmenu = getArSubmenu(hasRole);
   // Whole-module gate: unlike EO/XMS (which have no top-level gate because at least one of
   // their items has no allowedRoles), AP must stay fully invisible outside AP_ALL_ROLES —
   // same requirement as Account Receivable's isSuperAdmin gate below.
-  const isApUser = hasRole(AP_ALL_ROLES);
+  // Management users (CEO / Chief Product Officer) hold a management permission but no AP role.
+  const isApUser = hasRole(AP_ALL_ROLES) || hasAnyPermission(AP_MANAGEMENT_ANY);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);
@@ -257,25 +111,9 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   // Admin with no Resource Manager / Delivery Manager role — skip the
   // Resource Management submenu and jump straight to Client Management.
   const isAdminOnly = isAdmin && !isRM && !isDM;
-  const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
-  const isHrAdmin = hasRole(["HR_ADMIN"]);
-  const isRecruiter = hasRole(["RECRUITER"]);
-  const isHiringManager = hasRole(["HIRING_MANAGER"]);
-  // Everyone else (plain HR) falls through to the full menu, which must not
-  // offer Dashboard or Settings — /ai-screening/dashboard is HR_ADMIN/RECRUITER
-  // only and /ai-screening/settings is HR_ADMIN only, so either link would
-  // lead straight to the unauthorized page.
-  const roleAirsSubmenu = isHrAdmin
-    ? hrAdminAirsSubmenu
-    : isRecruiter
-      ? recruiterAirsSubmenu
-      : isHiringManager
-        ? hiringManagerAirsSubmenu
-        : airsSubmenu.filter((item) => item.label !== "Dashboard");
-  // Final guard: an item that declares `roles` (e.g. Settings -> HR_ADMIN)
-  // never appears for anyone without one of them, even if a per-role list
-  // above is edited to include it.
-  const filteredAirsSubmenu = roleAirsSubmenu.filter((item) => !item.roles || hasRole(item.roles));
+  const airsRBACAccess = hasRole(AIRS_ACCESS_ROLES);
+  // Per-role AI Screening menu (HR_ADMIN / RECRUITER / HIRING_MANAGER / plain HR): see config/navigationMenus.js.
+  const filteredAirsSubmenu = getAirsSubmenu(hasRole);
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
@@ -306,6 +144,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const [childMenu, setChildMenu] = useState(null);
   const [childMenuOwner, setChildMenuOwner] = useState(null);
   const [childTop, setChildTop] = useState(0);
+  const [childLeft, setChildLeft] = useState(null);
   const parentHoverRef = useRef(false);
   const childHoverRef = useRef(false);
   const closeTimerRef = useRef(null);
@@ -365,6 +204,8 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     if (item.children) {
       const rect = e.currentTarget.getBoundingClientRect();
       setChildTop(computeSubmenuTop(rect, item.children.length) + 4);
+      // Open right beside the hovered row so the pointer never crosses a gap between the two flyouts.
+      setChildLeft(rect.right + 4);
       setChildMenu(item.children);
       setChildMenuOwner(owner);
     } else {
@@ -398,6 +239,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
         setEoHovered(false);
         setArHovered(false);
         setXmsHovered(false);
+        setApHovered(false);
       }
     }, 260); // slightly higher = smoother
   };
@@ -471,7 +313,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     closeAllSubmenus();
     if (arRef.current) {
       const rect = arRef.current.getBoundingClientRect();
-      setSubmenuTop(computeSubmenuTop(rect, accountReceivableSubmenu.length));
+      setSubmenuTop(computeSubmenuTop(rect, arSubmenu.length));
     }
     setArHovered(true);
   };
@@ -487,22 +329,25 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     closeAllSubmenus();
     if (apRef.current) {
       const rect = apRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, filteredApSubmenu.length));
     }
     setApHovered(true);
   };
 
+  // Same close logic as AR: the flyout stays open while the pointer is on it or on a section's pages.
   const handleApMouseLeave = () => {
-    hoverTimeout.current = setTimeout(() => {
-      setApHovered(false);
-    }, 200);
+    parentHoverRef.current = false;
+    scheduleClose();
   };
 
-  const resourceManagementItems = isAdmin || isRM
-    ? resourceManagementSubmenu
-    : isDM
-      ? deliveryManagerResourceManagementSubmenu
-      : resourceManagementSubmenu;
+  // A section is highlighted while one of its pages is open.
+  const isApItemActive = (item) =>
+    (item.children || [item]).some((c) => location.pathname === c.to || location.pathname.startsWith(`${c.to}/`));
+
+  // Only shown while the flyout that opened it is open.
+  const childMenuOpen = { eo: eoHovered, ar: arHovered, xms: xmsHovered, ap: apHovered }[childMenuOwner] ?? Boolean(childMenuOwner);
+
+  const resourceManagementItems = getResourceManagementSubmenu(hasRole);
 
   useEffect(() => {
     setUserHovered(false);
@@ -512,18 +357,24 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     setArHovered(false);
     setXmsHovered(false);
     setApHovered(false);
+    // a second-level menu must close with its parent, or it is left floating over the new page
+    setChildMenu(null);
+    setChildMenuOwner(null);
+    parentHoverRef.current = false;
+    childHoverRef.current = false;
   }, [location.pathname]);
 
 
   return (
     <aside
+      data-tour="sidebar"
       className={`fixed top-0 left-0 h-screen bg-[#081534] text-white flex flex-col z-50 transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"
         } border-r border-[#0f1a3a]`}
     >
       {/* Branding */}
       <div className="p-6 border-b border-[#0f1a3a] flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <img src="logo.png" alt="Logo" className="h-10 w-10 shrink-0" />
+          <img src="/logo.png" alt="Logo" className="h-10 w-10 shrink-0" />
           {!isCollapsed && (
             <div>
               <h1 className="text-base font-bold leading-none">Paves Tech</h1>
@@ -545,9 +396,10 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           }
         `}</style>
 
-        <ul className="space-y-1">
+        {/* data-tour="..." attributes are anchors for the guided tours (components/Tour/tours.js). */}
+        <ul className="space-y-1" data-tour="sidebar-nav">
           {isIntranet && (
-            <li>
+            <li data-tour="nav-dashboard">
               <Link
                 to="/dashboard"
                 onMouseEnter={closeAllSubmenus}
@@ -564,7 +416,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           )}
 
           {isFinance && (
-            <li>
+            <li data-tour="nav-dashboard">
               <Link
                 to="/finance/dashboard"
                 onMouseEnter={closeAllSubmenus}
@@ -583,6 +435,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {/* AI Screening (AIRS) Menu */}
           {airsRBACAccess && (
             <li
+              data-tour="nav-airs"
               ref={airsRef}
               className="relative"
               onMouseEnter={handleAirsMouseEnter}
@@ -639,6 +492,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {/* Employee Onboarding (Non-General, Non-DM) */}
           {isIntranet && (
             <li
+              data-tour="nav-eo"
               ref={eoRef}
               className="relative"
               onMouseEnter={handleEoMouseEnter}
@@ -684,12 +538,13 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     <li
                       key={item.label}
                       onMouseEnter={(e) => handleParentHover(item, e)}
-                      onMouseDown={(e) => handleParentLeave()}
+                      onMouseDown={(e) => { if (!item.children) handleParentLeave(); }}
                       // onMouseLeave={handleParentLeave}
                       className="relative group"
                     >
                       <NavLink
                         to={item.to}
+                        onClick={(e) => { if (item.children && !item.to) e.preventDefault(); }}
                         className={({ isActive }) =>
                           `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                             ? "bg-blue-100 text-[#0a174e] font-semibold"
@@ -713,6 +568,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {/* User Management (Admin Only) */}
           {isIntranet && isAdmin && (
             <li
+              data-tour="nav-um"
               ref={userManagementRef}
               className="relative"
               onMouseEnter={handleUserMouseEnter}
@@ -772,6 +628,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {/* Resource Management (With Pop Label/Submenu) */}
           {isIntranet && (isAdmin || isRM || isDM) && (
             <li
+              data-tour="nav-rm"
               ref={rmRef}
               className="relative"
               onMouseEnter={isAdminOnly ? undefined : handleRmMouseEnter}
@@ -853,7 +710,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
           {isIntranet && filteredNavigation.slice(1).map((item) => {
             const isActive = location.pathname === item.href;
             return (
-              <li key={item.name}>
+              <li key={item.name} data-tour={item.tourId}>
                 <Link
                   to={item.href}
                   onMouseEnter={closeAllSubmenus}
@@ -874,6 +731,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
             <>
               {/* Expense Management (XMS) */}
               <li
+                data-tour="nav-xms"
                 ref={xmsRef}
                 className="relative"
                 onMouseEnter={handleXmsMouseEnter}
@@ -910,19 +768,20 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     }}
                     onMouseLeave={() => {
                       parentHoverRef.current = false;
-                      setChildMenuOwner(null);
                       scheduleClose();
                     }}
                   >
                     {filteredXmsSubmenu.map((item) => (
                       <li
                         key={item.label}
-                        onMouseEnter={(e) => handleParentHover(item, e)}
-                        onMouseDown={(e) => handleParentLeave()}
+                        onMouseEnter={(e) => handleParentHover(item, e, "xms")}
+                        onMouseDown={(e) => { if (!item.children) handleParentLeave(); }}
                         className="relative group"
                       >
                         <NavLink
                           to={item.to}
+                          end={Boolean(item.end)}
+                          onClick={(e) => { if (item.children) e.preventDefault(); }}
                           className={({ isActive }) =>
                             `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                               ? "bg-blue-100 text-[#0a174e] font-semibold"
@@ -944,6 +803,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
               {/* Accounts Payable (Admin, Vendor Intake, AP Executive, Finance Executive only) */}
               {isApUser && (
                 <li
+                  data-tour="nav-ap"
                   ref={apRef}
                   className="relative"
                   onMouseEnter={handleApMouseEnter}
@@ -974,15 +834,23 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                       className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
                         }`}
                       style={{ top: `${submenuTop}px` }}
-                      onMouseEnter={handleApMouseEnter}
+                      onMouseEnter={() => {
+                        parentHoverRef.current = true;
+                        cancelClose();
+                      }}
                       onMouseLeave={handleApMouseLeave}
                     >
                       {filteredApSubmenu.map((item) => (
-                        <li key={item.label} className="group relative">
+                        <li
+                          key={item.label}
+                          className="group relative"
+                          onMouseEnter={(e) => handleParentHover(item, e, "ap")}
+                          onMouseDown={() => handleParentLeave()}
+                        >
                           <NavLink
                             to={item.to}
                             className={({ isActive }) =>
-                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive || isApItemActive(item)
                                 ? "bg-blue-100 text-[#0a174e] font-semibold"
                                 : "hover:bg-[#263383] hover:text-white"
                               }`
@@ -1004,6 +872,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                   (Maker items only), Finance Manager (Billing Approvals only) */}
               {canSeeAr && (
                 <li
+                  data-tour="nav-ar"
                   ref={arRef}
                   className="relative"
                   onMouseEnter={handleArMouseEnter}
@@ -1075,11 +944,11 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
 
         </ul>
 
-        {childMenu && (
+        {childMenu && childMenuOpen && (
           <ul
-            className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
+            className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${childLeft != null ? "" : isCollapsed ? "left-[305px]" : "left-[480px]"
               }`}
-            style={{ top: `${childTop - 4}px` }}
+            style={{ top: `${childTop - 4}px`, ...(childLeft != null ? { left: `${childLeft}px` } : {}) }}
             onMouseEnter={() => {
               childHoverRef.current = true;
               cancelClose();

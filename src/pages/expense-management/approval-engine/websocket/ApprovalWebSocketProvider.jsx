@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { notifySessionExpired } from "../../../../api/sessionExpiry";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Same shape as the existing Leave Management WebSocketProvider
@@ -16,10 +17,28 @@ import { notifySessionExpired } from "../../../../api/sessionExpiry";
  * /user/queue/report-updates and /user/queue/approval-queue-updates).
  */
 const ApprovalWebSocketContext = createContext(null);
+
+// Team notification feeds this user may join (/topic/notifications.<ROLE>), from the JWT's roles.
+// The backend refuses any feed whose role the user doesn't hold, so this is only an optimisation.
+const TEAM_FEED_ROLES = ["FINANCE_EXECUTIVE", "AP_EXECUTIVE", "ADMIN"];
+const teamFeedsFor = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const roles = (Array.isArray(payload.roles) ? payload.roles : String(payload.roles || "").split(","))
+      .map((r) => String(r).trim().toUpperCase());
+    const feeds = new Set(roles.filter((r) => TEAM_FEED_ROLES.includes(r)));
+    if (roles.includes("SUPER_ADMIN")) feeds.add("ADMIN");
+    return [...feeds];
+  } catch {
+    return [];
+  }
+};
 export const useApprovalWebSocket = () => useContext(ApprovalWebSocketContext);
 
 export default function ApprovalWebSocketProvider({ children }) {
-  const BASE_URL = (window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "http://localhost:8080").replace(/\/+$/, "");
+  // No fallback host: without EXPENSE_MANAGEMENT_URL the socket would be opened against whichever service
+  // happens to run on that port (e.g. the AR backend on :8080), which rejects /xms/ws/info with 401.
+  const BASE_URL = XMS_BASE_URL;
 
   const clientRef = useRef(null);
   const listeners = useRef({});
@@ -49,7 +68,7 @@ export default function ApprovalWebSocketProvider({ children }) {
   };
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !BASE_URL) {
       if (clientRef.current?.active) {
         clientRef.current.deactivate();
         clientRef.current = null;
@@ -59,8 +78,7 @@ export default function ApprovalWebSocketProvider({ children }) {
 
     const client = new Client({
       webSocketFactory: () => {
-        const freshToken = localStorage.getItem("token");
-        return new SockJS(`${BASE_URL}/xms/ws?token=${freshToken}`);
+        return new SockJS(`${BASE_URL}/xms/ws`);
       },
       connectHeaders: {},
       beforeConnect: () => {
@@ -82,6 +100,16 @@ export default function ApprovalWebSocketProvider({ children }) {
         // Backend: messagingTemplate.convertAndSendToUser(approverId, "/queue/approval-queue-updates", event)
         client.subscribe("/user/queue/approval-queue-updates", (msg) => {
           emitEvent("queue-update", parseBody(msg.body));
+        });
+        // Notification Center: personal notifications + this user's team inboxes
+        // (NotificationServiceImpl.USER_QUEUE / ROLE_TOPIC_PREFIX).
+        client.subscribe("/user/queue/notifications", (msg) => {
+          emitEvent("notification", parseBody(msg.body));
+        });
+        teamFeedsFor(localStorage.getItem("token") || "").forEach((role) => {
+          client.subscribe(`/topic/notifications.${role}`, (msg) => {
+            emitEvent("notification", parseBody(msg.body));
+          });
         });
       },
 

@@ -9,6 +9,7 @@ export const AP_ROLES = {
   VENDOR_INTAKE: "Vendor_Intake",
   AP_EXECUTIVE: "AP_Executive",
   FINANCE_EXECUTIVE: "Finance_Executive",
+  INVOICE_APPROVER: "Invoice_Approver",
 };
 
 export const AP_ALL_ROLES = Object.values(AP_ROLES);

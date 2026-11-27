@@ -9,7 +9,7 @@ const ITEMS_PER_PAGE = 10;
 // Visually and behaviorally mirrors JdProcessingList.jsx (same expandable
 // card, stage-stepper, status-badge, and pagination pattern) — only the
 // stage set and per-card WS subscription (by task_id) differ.
-export default function InProcessingList({ files, isLoading, onRefresh }) {
+export default function InProcessingList({ files, isLoading, onRefresh, onCompleted }) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalPages = Math.max(1, Math.ceil(files.length / ITEMS_PER_PAGE));
@@ -40,7 +40,16 @@ export default function InProcessingList({ files, isLoading, onRefresh }) {
   return (
     <div>
       {paginatedFiles.map((f) => (
-        <ResumeProcessingCard key={f.id || f.resume_id} file={f} onTerminal={onRefresh} />
+        <ResumeProcessingCard
+          key={f.id || f.resume_id}
+          file={f}
+          onTerminal={(status) => {
+            // Failures stay in this list (they can be retried); a parsed
+            // resume moves the user to Upload History, where it now lives.
+            if (status === "SUCCESS" && onCompleted) onCompleted();
+            else onRefresh?.();
+          }}
+        />
       ))}
 
       <Pagination

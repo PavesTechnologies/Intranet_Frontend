@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import CandidateHeader from "../candidates/CandidateScore/components/CandidateHeader";
@@ -9,10 +9,16 @@ import CandidateOverridePanel from "../campaigns/components/CandidateOverridePan
 import CandidateNotesPanel from "../campaigns/components/CandidateNotesPanel";
 import { exportScorecard } from "../campaigns/services/exportService";
 import Button from "../../../components/Button/Button";
-import { Download } from "lucide-react";
+import { Download, FileSearch, RotateCcw } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../contexts/AuthContext";
 import { SCORE_LABELS } from "../constants/scoreLabels";
+import useCampaignPermissions from "../campaigns/hooks/useCampaignPermissions";
+import { replayDeadLetterTasks, formatApiError } from "../campaigns/services/campaignservice";
+import LayerDeadLetterBanner from "./components/LayerDeadLetterBanner";
+import ParseChangesPanel from "./components/ParseChangesPanel";
+import ReasonModal from "../campaigns/components/ReasonModal";
+import { reparseCandidateResume, rescoreCandidate } from "../candidates/services/candidateScoreService";
 // import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
 // import { mapMockCandidateForScorecard } from "./utils/mapMockCandidateForScorecard";
 
@@ -123,6 +129,127 @@ export default function PipelineCandidateScorecardPage({
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const [exporting, setExporting] = useState(false);
 
+  // Scoring layers stopped mid-pipeline (dead-lettered task, no result) -
+  // RECRUITER only, same audience as the Dead Letter Queue on
+  // CampaignDetails' Processing tab. Seeded from parsed-json's
+  // `failed_layers` (so the header flags it before any tab is opened), then
+  // kept current by each layer tab's own `failure` via onLayerFailure.
+  const { isRecruiter } = useCampaignPermissions();
+  const [layerFailures, setLayerFailures] = useState({});
+  const [replayingIds, setReplayingIds] = useState([]);
+  useEffect(() => {
+    const seeded = {};
+    for (const f of fetchedCandidate?.failedLayers || []) seeded[f.layer] = f;
+    setLayerFailures(seeded);
+  }, [fetchedCandidate]);
+  const handleLayerFailure = useCallback((layer, failure) => {
+    setLayerFailures((prev) => {
+      if ((prev[layer]?.dlq_id ?? null) === (failure?.dlq_id ?? null)) return prev;
+      const next = { ...prev };
+      if (failure) next[layer] = failure;
+      else delete next[layer];
+      return next;
+    });
+  }, []);
+  const retryLayers = useCallback(
+    async (failures) => {
+      const ids = failures.filter((f) => f.can_retry).map((f) => f.dlq_id);
+      if (!ids.length || !candidate?.campaignId) return;
+      setReplayingIds((prev) => [...prev, ...ids]);
+      try {
+        const res = await replayDeadLetterTasks(candidate.campaignId, ids);
+        const results = (res?.data ?? res)?.results || [];
+        const replayed = new Set(results.filter((r) => r.status === "REPLAYED").map((r) => String(r.dlq_id)));
+        const skipped = results.filter((r) => r.status !== "REPLAYED");
+        if (replayed.size) {
+          toast.success("Retry queued. Results will appear here once processing finishes.");
+          setLayerFailures((prev) => {
+            const next = { ...prev };
+            for (const [layer, f] of Object.entries(prev)) if (replayed.has(String(f.dlq_id))) delete next[layer];
+            return next;
+          });
+        }
+        if (skipped.length) {
+          toast.warn(skipped.map((r) => r.reason).filter(Boolean).join(" · ") || "Some steps could not be retried.");
+        }
+      } catch (err) {
+        toast.error(formatApiError(err, "Failed to retry the step."));
+      } finally {
+        setReplayingIds((prev) => prev.filter((id) => !ids.includes(id)));
+      }
+    },
+    [candidate?.campaignId]
+  );
+  const failedTabs = isRecruiter ? TABS.filter((t) => layerFailures[t.id]) : [];
+  const retryableFailures = failedTabs.map((t) => layerFailures[t.id]).filter((f) => f.can_retry);
+  const tabsWithFailureMarker = TABS.map((t) =>
+    failedTabs.includes(t)
+      ? {
+          ...t,
+          label: (
+            <span className="flex items-center gap-1.5">
+              {t.label}
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-600" title="This step failed" />
+            </span>
+          ),
+        }
+      : t
+  );
+  // Re-parse & re-score (RECRUITER / HR_ADMIN): fresh parse of the stored
+  // resume, replacing its current skills (the previous parse is kept and
+  // listed in Parse changes). A rejected candidate moves back to Screening
+  // only when a recruiter does it, with a reason.
+  const canReparse = isRecruiter || isHrAdmin;
+  const [reparseOpen, setReparseOpen] = useState(false);
+  const [parseChangesKey, setParseChangesKey] = useState(0);
+  const isRejected = String(candidate?.pipelineStage || "").toUpperCase() === "REJECTED";
+  const reparseMovesToScreening = isRejected && isRecruiter;
+  const submitReparse = useCallback(
+    async (reason) => {
+      try {
+        const res = await reparseCandidateResume(candidate.id, reason);
+        const result = res?.data ?? res;
+        const shared = result?.other_campaigns_sharing_resume
+          ? ` The resume is also in ${result.other_campaigns_sharing_resume} other campaign(s) - its skills update there too.`
+          : "";
+        toast.success(
+          (result?.moves_to_screening
+            ? "Re-parse started. The candidate moves back to Screening and is re-scored when it finishes."
+            : "Re-parse started. The candidate is re-scored when it finishes.") + shared
+        );
+        setReparseOpen(false);
+        setParseChangesKey((k) => k + 1);
+      } catch (err) {
+        toast.error(formatApiError(err, "Could not start the re-parse."));
+      }
+    },
+    [candidate?.id]
+  );
+
+  // Resume re-parsed from another campaign: this campaign's scores are out of
+  // date until a recruiter re-scores (stage never changes past Screening).
+  const [rescoring, setRescoring] = useState(false);
+  const [rescoreQueued, setRescoreQueued] = useState(false);
+  useEffect(() => { setRescoreQueued(false); }, [candidateId]);
+  const submitRescore = useCallback(async () => {
+    setRescoring(true);
+    try {
+      const res = await rescoreCandidate(candidate.id);
+      const result = res?.data ?? res;
+      toast.success(`Re-score queued: ${result?.rescore || "scores will update shortly"}.`);
+      setRescoreQueued(true);
+    } catch (err) {
+      toast.error(formatApiError(err, "Could not re-score the candidate."));
+    } finally {
+      setRescoring(false);
+    }
+  }, [candidate?.id]);
+
+  const retryableTabs = failedTabs.filter((t) => layerFailures[t.id].can_retry);
+  const headerRetryLabel =
+    retryableTabs.length === 1 ? `Retry ${retryableTabs[0].label}` : `Retry failed steps (${retryableTabs.length})`;
+  const headerRetrying = retryableFailures.some((f) => replayingIds.includes(f.dlq_id));
+
   // Prefer real browser "back" so this returns to wherever the user actually
   // came from — a specific Resume Intake tab (history/processing/bulk-batches),
   // the Pipeline Board, etc. — rather than a single hardcoded guess. Only fall
@@ -165,6 +292,7 @@ export default function PipelineCandidateScorecardPage({
   }
 
   const ActiveTabComponent = TABS.find((t) => t.id === activeTab).Component;
+  const activeTabLabel = TABS.find((t) => t.id === activeTab).label;
 
   return (
     <div className={isModal ? "text-slate-900 font-sans" : "p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans"}>
@@ -172,7 +300,34 @@ export default function PipelineCandidateScorecardPage({
         candidate={candidate}
         onBack={handleBack}
         actions={
-          !isModal && isHrAdmin && candidate.campaignId && (
+          (retryableFailures.length > 0 || (!isModal && (isHrAdmin || canReparse) && candidate.campaignId)) && (
+          <>
+          {retryableFailures.length > 0 && (
+            <Button
+              variant="danger"
+              size="small"
+              loading={headerRetrying}
+              loadingText="Retrying..."
+              title={`Failed: ${retryableTabs.map((t) => t.label).join(", ")}`}
+              onClick={() => {
+                if (retryableTabs.length === 1) setActiveTab(retryableTabs[0].id);
+                retryLayers(retryableFailures);
+              }}
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" /> {headerRetryLabel}
+            </Button>
+          )}
+          {!isModal && canReparse && candidate.campaignId && (
+            <Button
+              variant="outline"
+              size="small"
+              title="Parse the stored resume again and re-score this candidate"
+              onClick={() => setReparseOpen(true)}
+            >
+              <FileSearch className="h-3.5 w-3.5 mr-1" /> Re-parse &amp; re-score
+            </Button>
+          )}
+          {!isModal && isHrAdmin && candidate.campaignId && (
             <Button
               variant="outline"
               size="small"
@@ -192,16 +347,41 @@ export default function PipelineCandidateScorecardPage({
             >
               <Download className="h-3.5 w-3.5 mr-1" /> Export scorecard
             </Button>
+          )}
+          </>
           )
         }
       />
 
+      {candidate.scoreOutOfDateAt && !rescoreQueued && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3" role="status">
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">Re-parsed - score out of date.</span>{" "}
+            {candidate.scoreOutOfDateReason || "The resume was re-parsed in another campaign; these scores don't reflect its current skills."}
+          </p>
+          {isRecruiter && (
+            <Button variant="outline" size="small" loading={rescoring} loadingText="Queuing..." onClick={submitRescore}
+              title="Recompute this campaign's scores. A candidate past Screening keeps their stage.">
+              <RotateCcw className="h-3.5 w-3.5 mr-1" /> Re-score
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-        <CandidateTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+        <CandidateTabs tabs={tabsWithFailureMarker} activeTab={activeTab} onChange={setActiveTab} />
 
         <div className="p-5">
+          {isRecruiter && (
+            <LayerDeadLetterBanner
+              layerLabel={activeTabLabel}
+              failure={layerFailures[activeTab]}
+              onRetry={(f) => retryLayers([f])}
+              retrying={replayingIds.includes(layerFailures[activeTab]?.dlq_id)}
+            />
+          )}
           <Suspense fallback={<LoadingSpinner text="Loading tab..." />}>
-            <ActiveTabComponent candidate={candidate} onExpired={refetch} />
+            <ActiveTabComponent candidate={candidate} onExpired={refetch} onLayerFailure={handleLayerFailure} />
           </Suspense>
         </div>
       </div>
@@ -210,6 +390,32 @@ export default function PipelineCandidateScorecardPage({
           meaningful once this record is linked to a campaign (campaignId set
           by the parsed-json response). Skipped in the modal popup variant to
           keep it compact. */}
+      {!isModal && candidate.campaignId && (
+        <ParseChangesPanel campaignCandidateId={candidate.id} refreshKey={parseChangesKey} />
+      )}
+
+      {!isModal && canReparse && candidate.campaignId && (
+        <ReasonModal
+          isOpen={reparseOpen}
+          onClose={() => setReparseOpen(false)}
+          onConfirm={submitReparse}
+          title="Re-parse & re-score"
+          confirmLabel="Re-parse"
+          reasonRequired={reparseMovesToScreening}
+          placeholder={reparseMovesToScreening ? "Why should this candidate be reconsidered?" : "Why re-parse this resume? (optional)"}
+          description="This parses the stored resume again and updates the candidate's current skills with the new result. The previous version is kept - you can see what changed under Parse changes. The candidate is then re-scored."
+          extraContent={
+            isRejected && (
+              <p className={`text-xs rounded-lg px-3 py-2 ${reparseMovesToScreening ? "bg-indigo-50 text-indigo-800" : "bg-amber-50 text-amber-800"}`}>
+                {reparseMovesToScreening
+                  ? "This candidate is Rejected. Re-parsing moves them back to Screening with your reason, and they are re-scored."
+                  : "This candidate is Rejected and stays Rejected - only a recruiter can move them back to Screening."}
+              </p>
+            )
+          }
+        />
+      )}
+
       {!isModal && candidate.campaignId && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
           <CandidateOverridePanel candidate={candidate} onChanged={setOverridePatch} />

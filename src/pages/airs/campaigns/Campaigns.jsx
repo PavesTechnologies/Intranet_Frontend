@@ -41,6 +41,8 @@ const DEFAULT_CAMPAIGN_FORM = {
   prompt_template_id: "",
   ai_evaluate_prompt_id: "",
   deterministic_threshold: 70,
+  max_missing_core_pct: 25,
+  max_missing_core_skills: 3,
 };
 
 const STATUS_OPTIONS = [
@@ -282,10 +284,13 @@ export default function Campaigns() {
     // don't fire a doomed request per visible card; cards fall back to the
     // "Pipeline metrics unavailable" state.
     if (!canViewPipeline) return;
+    // The ref holds one Set for the component's lifetime; read it once so the
+    // cleanup below releases ids from the same Set this run added them to.
+    const requestedIds = requestedIdsRef.current;
     const idsOnPage = [...new Set(paginatedCampaigns.map((c) => c.id).filter(Boolean))];
-    const missing = idsOnPage.filter((id) => !(id in pipelineStats) && !requestedIdsRef.current.has(id));
+    const missing = idsOnPage.filter((id) => !(id in pipelineStats) && !requestedIds.has(id));
     if (missing.length === 0) return;
-    missing.forEach((id) => requestedIdsRef.current.add(id));
+    missing.forEach((id) => requestedIds.add(id));
 
     let cancelled = false;
     (async () => {
@@ -309,7 +314,7 @@ export default function Campaigns() {
       // or unmounted before it resolved) so they're retried instead of stuck
       // "requested" forever; ids that did land are already excluded above via
       // the `id in pipelineStats` check, so this is a no-op for those.
-      missing.forEach((id) => requestedIdsRef.current.delete(id));
+      missing.forEach((id) => requestedIds.delete(id));
     };
   }, [paginatedCampaigns, pipelineStats, canViewPipeline]);
 
@@ -348,6 +353,8 @@ export default function Campaigns() {
       semantic_threshold: Number(campaignForm.semantic_threshold),
       ai_threshold: Number(campaignForm.ai_threshold),
       deterministic_threshold: Number(campaignForm.deterministic_threshold),
+      max_missing_core_pct: Number(campaignForm.max_missing_core_pct),
+      max_missing_core_skills: Number(campaignForm.max_missing_core_skills),
       hiring_manager_id: String(campaignForm.hiring_manager_id).trim(),
       recruiter_id: String(campaignForm.recruiter_id).trim(),
       prompt_template_id: String(campaignForm.prompt_template_id || "").trim(),

@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { celebrations } from "../../services/dashboard";
-import LoadingSpinner from "../LoadingSpinner";
 
-const WHEN_COLORS = {
-  Today: "bg-emerald-50 text-emerald-600",
-  Tomorrow: "bg-amber-50 text-amber-600",
-};
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function getInitials(name) {
   if (!name) return "??";
@@ -14,98 +12,150 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-const AVATAR_COLORS = [
-  "bg-teal-400", "bg-rose-400", "bg-blue-400", "bg-violet-400",
-  "bg-orange-400", "bg-emerald-400", "bg-pink-400", "bg-indigo-400"
-];
-
-function getColor(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+/** dateStr is DD/MM/YY → { day, month (0-based) } or null */
+function parseDayMonth(dateStr) {
+  const [d, m] = String(dateStr || "").split("/");
+  const day = parseInt(d, 10);
+  const month = parseInt(m, 10) - 1;
+  if (Number.isNaN(day) || Number.isNaN(month)) return null;
+  return { day, month };
 }
 
 function formatDate(dateStr) {
-  // Assuming dateStr is DD/MM/YY
-  try {
-    const [day, month, year] = dateStr.split("/");
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${parseInt(day)} ${months[parseInt(month) - 1]}`;
-  } catch (e) {
-    return dateStr;
-  }
+  const dm = parseDayMonth(dateStr);
+  return dm ? `${dm.day} ${MONTHS[dm.month]}` : dateStr;
 }
 
-function whenColor(when) {
-  return WHEN_COLORS[when] ?? "bg-gray-50 text-gray-500";
+/** Days from today until the next occurrence of this day/month. */
+function daysUntil(dateStr) {
+  const dm = parseDayMonth(dateStr);
+  if (!dm) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(today.getFullYear(), dm.month, dm.day);
+  if (next < today) next = new Date(today.getFullYear() + 1, dm.month, dm.day);
+  return Math.round((next - today) / 86400000);
 }
 
-function Avatar({ initials, color, size = "md" }) {
-  const sz = size === "lg" ? "w-11 h-11 text-sm" : "w-8 h-8 text-xs";
+function relativeLabel(days) {
+  if (days === null) return "";
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  return `in ${days} days`;
+}
+
+const AVATAR_TONES = [
+  "bg-[#E6E5F7] text-[#0A0082]", "bg-[#FFE4EC] text-[#D6245A]", "bg-emerald-50 text-emerald-700",
+  "bg-amber-50 text-amber-700", "bg-sky-50 text-sky-700", "bg-violet-50 text-violet-700",
+];
+
+function toneFor(name = "") {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_TONES[Math.abs(hash) % AVATAR_TONES.length];
+}
+
+const TABS = [
+  { key: "birthdays", label: "Birthdays", empty: "No birthdays today", accent: "#FF3D72", emoji: "🎂", cheer: "Happy Birthday!", action: "Celebrating" },
+  { key: "anniversaries", label: "Anniversaries", empty: "No work anniversaries today", accent: "#0A0082", emoji: "🏆", cheer: "Congratulations!", action: "Milestone" },
+  { key: "newJoinees", label: "New Joinees", empty: "No new joinees today", accent: "#10b981", emoji: "👋", cheer: "Welcome aboard!", action: "New here" },
+];
+
+const CONFETTI = [
+  ["58%", "14%", "#FF3D72"], ["93%", "16%", "#0A0082"], ["86%", "86%", "#f59e0b"],
+  ["70%", "30%", "#10b981"], ["48%", "88%", "#5B66B8"],
+];
+
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+/** Festive card for people celebrating today. */
+function TodayCelebrants({ items, meta }) {
   return (
-    <div className={`rounded-full ${color} ${sz} flex items-center justify-center flex-shrink-0 font-semibold text-white shadow-sm border-2 border-white transition-transform duration-200`}>
-      {initials}
+    <div
+      className="relative mt-3 overflow-hidden rounded-xl p-4"
+      style={{ background: `linear-gradient(120deg, ${meta.accent}14 0%, #ffffff 70%)`, border: `1px solid ${meta.accent}26` }}
+    >
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        {CONFETTI.map(([l, t, c], i) => (
+          <span key={i} className="cel-confetti absolute h-1.5 w-1.5 rounded-sm" style={{ left: l, top: t, background: c, animationDelay: `${i * 0.4}s` }} />
+        ))}
+      </div>
+
+      <p className="relative mb-3 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest" style={{ color: meta.accent }}>
+        <span>{meta.emoji}</span> Today · {meta.cheer}
+      </p>
+      <ul className="relative space-y-2.5">
+        {items.map((item) => (
+          <li key={item.id} className="flex items-center gap-3">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-white font-heading text-sm font-semibold"
+              style={{ background: `${meta.accent}1F`, color: meta.accent, boxShadow: `0 0 0 2px ${meta.accent}` }}
+            >
+              {item.initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-heading text-sm font-semibold text-[#0A174E]">{item.name}</p>
+              <p className="text-xs text-[#78716C]">
+                {item.date}
+                {item.years ? <span className="ml-1.5 font-semibold" style={{ color: meta.accent }}>· {item.years} yr{item.years > 1 ? "s" : ""}</span> : null}
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm" style={{ background: meta.accent }}>
+              {meta.emoji} {meta.action}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-function CelebrationItem({ item, isActive }) {
+function PersonRow({ item }) {
+  const rel = relativeLabel(item.daysUntil);
+  const soon = item.daysUntil !== null && item.daysUntil <= 7;
   return (
-    <div className="group relative flex flex-col items-center gap-2 transition-all duration-300 hover:-translate-y-1">
-      {/* Name Tooltip */}
-      <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-gray-900/90 text-white text-[10px] px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap z-20 pointer-events-none translate-y-2 group-hover:translate-y-0">
-        <span className="font-semibold">{item.name}</span>
-        {item.years && <span className="ml-1 opacity-70">({item.years}y)</span>}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-900/90" />
+    <li className="flex items-center gap-3 rounded-lg px-1.5 py-2 transition hover:bg-[#F7F8FC]">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${toneFor(item.name)}`}>
+        {item.initials}
       </div>
-
-      {/* Avatar Container */}
-      <div className="relative">
-        <Avatar initials={item.initials} color={item.color} size="lg" />
-        {item.when === "Today" && (
-          <div className="absolute -top-1 -right-1 animate-bounce">
-            <span className="text-xs drop-shadow-sm">🎉</span>
-          </div>
-        )}
-      </div>
-
-      {/* Date + Name */}
-      <div className="flex flex-col items-center leading-tight gap-0.5">
-        <span className={`text-[10px] font-bold ${isActive ? 'text-gray-800' : 'text-gray-500'}`}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-semibold text-[#0A174E]">{item.name}</p>
+        <p className="text-[11px] text-[#A8A29E]">
           {item.date}
-        </span>
-        {/* <span className="text-[9px] text-gray-400 font-medium text-center max-w-[72px] truncate leading-tight">
-          {item.name.split(" ")[0]}
-          {item.years ? <span className="text-violet-400 font-semibold"> ({item.years}y)</span> : null}
-        </span> */}
+          {item.years ? ` · ${item.years} year${item.years > 1 ? "s" : ""}` : ""}
+        </p>
       </div>
-    </div>
+      {rel && (
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
+            soon ? "bg-[#FFE4EC] text-[#D6245A]" : "bg-[#F1F2F8] text-[#4B5275]"
+          }`}
+        >
+          {rel}
+        </span>
+      )}
+    </li>
   );
 }
 
-function EmptyState({ tab }) {
-  const messages = {
-    birthdays: "No birthdays today",
-    anniversaries: "No anniversaries today",
-    newJoinees: "No new joinees today",
-  };
+function SkeletonRows() {
   return (
-    <div className="flex flex-col items-center justify-center py-8 gap-3">
-      <div className="w-14 h-14 rounded-full bg-gray-50 flex items-center justify-center">
-        <svg className="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-          <path d="M12 3c0 0-2 2-2 4s2 2 2 2 2 0 2-2-2-4-2-4z" />
-          <rect x="3" y="9" width="18" height="12" rx="2" />
-          <line x1="3" y1="15" x2="21" y2="15" />
-          <line x1="8" y1="9" x2="8" y2="21" />
-          <line x1="16" y1="9" x2="16" y2="21" />
-        </svg>
-      </div>
-      <p className="text-xs text-gray-400 font-medium">{messages[tab]}</p>
-    </div>
+    <ul className="space-y-1 py-2 animate-pulse">
+      {[0, 1, 2].map((i) => (
+        <li key={i} className="flex items-center gap-3 px-1.5 py-2">
+          <div className="h-9 w-9 rounded-full bg-[#EEF0F7]" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-32 rounded bg-[#EEF0F7]" />
+            <div className="h-2.5 w-16 rounded bg-[#EEF0F7]" />
+          </div>
+          <div className="h-5 w-16 rounded-full bg-[#EEF0F7]" />
+        </li>
+      ))}
+    </ul>
   );
 }
+
+// ── Main ────────────────────────────────────────────────────────────────────
 
 export default function BirthdayAnniversaryPanel() {
   const [activeTab, setActiveTab] = useState("birthdays");
@@ -132,14 +182,14 @@ export default function BirthdayAnniversaryPanel() {
               id: index,
               name: item.name,
               initials: getInitials(item.name),
-              color: getColor(item.name),
-              when: isToday ? "Today" : formatDate(item.date),
               date: formatDate(item.date),
-              years: item.anniversaryYear || null
+              daysUntil: isToday ? 0 : daysUntil(item.date),
+              years: item.anniversaryYear || null,
             };
             if (isToday) result.today.push(processedItem);
             else result.upcoming.push(processedItem);
           });
+          result.upcoming.sort((a, b) => (a.daysUntil ?? 999) - (b.daysUntil ?? 999));
           return result;
         };
 
@@ -158,165 +208,73 @@ export default function BirthdayAnniversaryPanel() {
     fetchData();
   }, []);
 
-  const TABS = [
-    {
-      key: "birthdays",
-      label: "Birthdays",
-      count: celebrationData.birthdays.today.length,
-      activeClass: "bg-rose-50 text-rose-600",
-      dotClass: "bg-rose-400",
-      icon: (
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-          <path d="M12 3c0 0-2 2-2 4s2 2 2 2 2 0 2-2-2-4-2-4z" />
-          <rect x="3" y="9" width="18" height="12" rx="2" />
-          <line x1="3" y1="15" x2="21" y2="15" />
-          <line x1="8" y1="9" x2="8" y2="21" />
-          <line x1="16" y1="9" x2="16" y2="21" />
-        </svg>
-      ),
-    },
-    {
-      key: "anniversaries",
-      label: "Work Anniversary",
-      count: celebrationData.anniversaries.today.length,
-      activeClass: "bg-violet-50 text-violet-600",
-      dotClass: "bg-violet-400",
-      icon: (
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-          <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
-        </svg>
-      ),
-    },
-    {
-      key: "newJoinees",
-      label: "New Joinees",
-      count: celebrationData.newJoinees.today.length,
-      activeClass: "bg-blue-50 text-blue-600",
-      dotClass: "bg-blue-400",
-      icon: (
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <line x1="19" y1="8" x2="19" y2="14" />
-          <line x1="22" y1="11" x2="16" y2="11" />
-        </svg>
-      ),
-    },
-  ];
-
-  const activeTabMeta = TABS.find((t) => t.key === activeTab);
+  const tab = TABS.find((t) => t.key === activeTab);
   const data = celebrationData[activeTab];
   const todayItems = data?.today ?? [];
   const upcomingItems = data?.upcoming ?? [];
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <style>{`
+        @keyframes celConfetti { 0%,100% { transform: translateY(0) rotate(0deg); opacity: .9 } 50% { transform: translateY(-6px) rotate(90deg); opacity: .5 } }
+        .cel-confetti { animation: celConfetti 3s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .cel-confetti { animation: none; } }
+      `}</style>
+
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className={`w-1.5 h-4 rounded-full ${activeTabMeta?.dotClass}`} />
-          <span className="text-sm font-semibold text-gray-800">Celebrations</span>
-        </div>
+      <div className="flex items-center gap-2.5 px-4 pt-4">
+        <span className="h-1 w-6 rounded bg-gradient-to-r from-[#0A0082] to-[#FF3D72]" />
+        <span className="font-heading text-sm font-semibold text-[#0A174E]">Celebrations</span>
       </div>
 
-      <>
-        {/* Segmented tabs */}
+      {/* Tabs — plain text with an underline on the active one */}
+      <div className="mt-3 flex gap-4 sm:gap-5 border-b border-gray-100 px-4" role="tablist">
+        {TABS.map((t) => {
+          const isActive = activeTab === t.key;
+          const d = celebrationData[t.key];
+          const total = d.today.length + d.upcoming.length;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(t.key)}
+              className={`-mb-px shrink-0 whitespace-nowrap border-b-2 pb-2 text-xs font-medium transition-colors ${isActive ? "border-[#0A0082] text-[#0A0082]" : "border-transparent text-gray-400 hover:text-gray-600"}`}
+            >
+              {t.label}
+              {total > 0 && <span className="ml-1 text-gray-400">({total})</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading ? (
         <div className="px-4 pb-3">
-          <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
-            {TABS.map((tab) => {
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${isActive
-                    ? `${tab.activeClass} shadow-sm`
-                    : "text-gray-400 hover:text-gray-600"
-                    }`}
-                >
-                  {tab.icon}
-                  <span className="hidden sm:inline truncate">{tab.label}</span>
-                  <span className={`min-w-[16px] h-4 rounded-full text-[10px] font-semibold flex items-center justify-center px-1 ${isActive ? "bg-white/70" : "bg-gray-200 text-gray-500"
-                    }`}>
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <SkeletonRows />
         </div>
+      ) : (
+        <div className="px-4 pb-3">
+          {todayItems.length > 0 ? (
+            <TodayCelebrants items={todayItems} meta={tab} />
+          ) : (
+            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#F4F6FC] px-2.5 py-1 text-[11px] text-[#78716C]">
+              <span aria-hidden="true">{tab.emoji}</span> {tab.empty}
+            </p>
+          )}
 
-        {loading ? (
-          <div className="px-4 pb-10 flex flex-col items-center justify-center gap-3">
-            <LoadingSpinner text="Loading Celebrations..." />
-          </div>
-        ) : (
-          <div className="px-4 pb-5">
-            <div className="grid grid-cols-2 gap-6">
-              {/* Today Section */}
-              <div className={`relative p-5 rounded-2xl transition-all duration-500 group/today ${activeTab === "birthdays"
-                ? "bg-gradient-to-br from-rose-50/80 via-orange-50/50 to-white border border-rose-100/50 shadow-sm shadow-rose-100/20"
-                : activeTab === "anniversaries"
-                  ? "bg-gradient-to-br from-violet-50/80 via-purple-50/50 to-white border border-violet-100/50 shadow-sm shadow-violet-100/20"
-                  : "bg-gradient-to-br from-blue-50/80 via-emerald-50/50 to-white border border-blue-100/50 shadow-sm shadow-blue-100/20"
-                }`}>
-
-                {todayItems.length > 0 && (
-                  <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-                    <div className="absolute -bottom-6 -left-6 w-56 h-56 opacity-[0.08] transform -rotate-12 transition-all duration-1000 ease-out group-hover/today:translate-x-8 group-hover/today:-translate-y-8 group-hover/today:rotate-0 group-hover/today:scale-125 z-0 flex items-center justify-center">
-                      <span className="text-[100px] select-none">
-                        {activeTab === "birthdays" ? "🎉" : activeTab === "anniversaries" ? "🏆" : "🚀"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-start mb-5">
-                  <p className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${activeTab === "birthdays" ? "text-rose-500" : activeTab === "anniversaries" ? "text-violet-500" : "text-blue-500"
-                    }`}>
-                    {activeTab === "birthdays" ? <span>🎂</span> : activeTab === "anniversaries" ? <span>✨</span> : <span>🤝</span>}
-                    Today
-                  </p>
-                  {todayItems.length > 0 && (
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter animate-pulse ${activeTab === "birthdays" ? "bg-rose-100/80 text-rose-600" : activeTab === "anniversaries" ? "bg-violet-100/80 text-violet-600" : "bg-blue-100/80 text-blue-600"
-                      }`}>
-                      {activeTab === "birthdays" ? "Party Time!" : activeTab === "anniversaries" ? "Congrats!" : "Welcome!"}
-                    </span>
-                  )}
-                </div>
-
-                {todayItems.length === 0 ? (
-                  <EmptyState tab={activeTab} />
-                ) : (
-                  <div className="flex flex-wrap gap-x-6 gap-y-6">
-                    {todayItems.map((item) => (
-                      <CelebrationItem key={item.id} item={item} isActive={true} />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Upcoming Section */}
-              <div className="p-5 border border-transparent">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-5">
-                  Upcoming
-                </p>
-                {upcomingItems.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-gray-100 rounded-2xl">
-                    <p className="text-[10px] text-gray-400 font-medium">No upcoming celebrations</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-x-6 gap-y-6">
-                    {upcomingItems.map((item) => (
-                      <CelebrationItem key={item.id} item={item} isActive={false} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </>
+          <p className="mt-4 mb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#A8A29E]">Coming up</p>
+          {upcomingItems.length === 0 ? (
+            <p className="py-3 text-xs text-gray-400">Nothing coming up</p>
+          ) : (
+            <ul className="-mx-1.5 max-h-64 overflow-y-auto">
+              {upcomingItems.map((item) => (
+                <PersonRow key={`u-${item.id}`} item={item} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

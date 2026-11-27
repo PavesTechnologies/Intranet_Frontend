@@ -33,6 +33,9 @@ vi.mock("../hooks/useNda", () => ({
   useSendNda: () => ({ mutateAsync: sendMutateAsync, isPending: false }),
   useUpdateNdaStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUploadSignedNda: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useVendorNdaHistory: () => ({ data: null, isLoading: false, isError: false, error: null }),
+  useReplaceNda: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useReplaceSignedNda: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 // The vendor profile supplies the address / tax registration the document names.

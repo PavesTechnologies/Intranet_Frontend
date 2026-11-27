@@ -3,6 +3,15 @@
 import axios from "axios";
 import { notifySessionExpired } from "./sessionExpiry";
 
+if (
+  typeof window !== "undefined" &&
+  import.meta.env?.VITE_AR_API_BASE_URL &&
+  import.meta.env.VITE_AR_API_BASE_URL !== "http://localhost:8080"
+) {
+  window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};
+  window.__APP_CONFIG__.AR_BASE_URL = import.meta.env.VITE_AR_API_BASE_URL;
+}
+
 const BASE_URL = window.__APP_CONFIG__.USER_MANAGEMENT_URL;
 
 // ─────────────────────────────────────

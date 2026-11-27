@@ -24,4 +24,6 @@ dist-ssr
 *.sw?
 .env
 public/config.js
+*.timestamp-*.mjs
+vite.config.js.timestamp*
 

@@ -58,17 +58,29 @@ export const useLineItemReviews = (reportId) =>
 const invalidateApprovalCaches = (qc, reportId) => {
   qc.invalidateQueries({ queryKey: ["approvalMyQueue"] });
   qc.invalidateQueries({ queryKey: ["approvalMyHistory"] });
+  qc.invalidateQueries({ queryKey: ["financeQueue"] });
   if (reportId) {
     qc.invalidateQueries({ queryKey: APPROVAL_STATUS_KEY(reportId) });
     qc.invalidateQueries({ queryKey: LINE_ITEM_REVIEWS_KEY(reportId) });
+    qc.invalidateQueries({ queryKey: ["reportLineItems", reportId] });
+    qc.invalidateQueries({ queryKey: ["reportReviews", reportId] });
+    qc.invalidateQueries({ queryKey: ["financeReviews", reportId] });
+    // The review panels' own copy of the report (status pill, Approval Progress fallback).
+    qc.invalidateQueries({ queryKey: ["expenseReviewReport", reportId] });
   }
 };
+
+// mutate(reportId), or mutate({ reportId, lateSubmissionReason }) for a report past its submission deadline.
+const submitArgs = (vars) => (typeof vars === "object" && vars !== null ? vars : { reportId: vars });
 
 export const useSubmitReport = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (reportId) => approvalWorkflowApi.submit(reportId).then(unwrap),
-    onSuccess: (_data, reportId) => invalidateApprovalCaches(qc, reportId),
+    mutationFn: (vars) => {
+      const { reportId, lateSubmissionReason } = submitArgs(vars);
+      return approvalWorkflowApi.submit(reportId, lateSubmissionReason).then(unwrap);
+    },
+    onSuccess: (_data, vars) => invalidateApprovalCaches(qc, submitArgs(vars).reportId),
   });
 };
 
@@ -115,6 +127,20 @@ export const useRejectReport = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ reportId, comment }) => approvalWorkflowApi.rejectReport(reportId, comment).then(unwrap),
+    onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
+  });
+};
+
+/**
+ * A SEPARATE, approver-side authorization of a policy exception - distinct from the employee's own
+ * justify() (policyApi.js). Invalidates the same caches as reviewLineItem, since the queue's
+ * pendingLineItems[].policyViolations[] entry needs to reflect the newly-set approverJustification.
+ */
+export const useApproveException = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, lineItemId, violationId, justification }) =>
+      approvalWorkflowApi.approveException(reportId, lineItemId, violationId, justification).then(unwrap),
     onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
   });
 };

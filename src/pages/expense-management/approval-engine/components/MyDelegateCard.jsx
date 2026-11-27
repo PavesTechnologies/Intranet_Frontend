@@ -5,6 +5,7 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApprovalDelegations, useSaveApprovalDelegation, useDeleteApprovalDelegation } from "../hooks/useApprovalDelegations";
 import EmployeeLabel from "./EmployeeLabel";
+import EmployeeSelect from "./EmployeeSelect";
 import { formatDate } from "../constants/approvalLabels";
 
 /**
@@ -37,14 +38,18 @@ export default function MyDelegateCard() {
   };
 
   const handleSave = () => {
-    if (!form.delegateId.trim() || !form.startDate || !form.endDate) {
+    if (!form.delegateId || !form.startDate || !form.endDate) {
       showStatusToast("Delegate, start date, and end date are all required.", "error");
+      return;
+    }
+    if (form.endDate < form.startDate) {
+      showStatusToast("End date can't be before the start date.", "error");
       return;
     }
     saveDelegation.mutate(
       {
         id: myDelegation?.delegationId,
-        payload: { delegatorId: myEmployeeId, delegateId: form.delegateId.trim(), startDate: form.startDate, endDate: form.endDate, status: "ACTIVE" },
+        payload: { delegatorId: myEmployeeId, delegateId: form.delegateId, startDate: form.startDate, endDate: form.endDate, status: "ACTIVE" },
       },
       {
         onSuccess: () => {
@@ -67,13 +72,13 @@ export default function MyDelegateCard() {
   if (!myEmployeeId) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[#0A0082]/20 bg-[#0A0082]/[0.025] px-4 py-3">
       <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-indigo-50 text-[#0A0082]">
-          <UserRoundCog className="h-4 w-4" />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0A0082] shadow-sm ring-1 ring-[#0A0082]/10">
+          <UserRoundCog className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-900">My Delegate</p>
+          <p className="text-sm font-semibold text-[#0a174e]">My Delegate</p>
           {myDelegation ? (
             <p className="text-xs text-gray-500">
               <EmployeeLabel employeeId={myDelegation.delegateId} className="font-medium text-gray-700" /> covers your approvals from{" "}
@@ -87,22 +92,26 @@ export default function MyDelegateCard() {
 
       {isEditing ? (
         <div className="flex flex-wrap items-end gap-2">
-          <input
-            className="text-sm border border-gray-300 rounded-md px-2 py-1.5 w-36"
-            placeholder="Delegate Employee ID"
-            value={form.delegateId}
-            onChange={(e) => setForm((f) => ({ ...f, delegateId: e.target.value }))}
-          />
+          <div className="w-72">
+            <EmployeeSelect
+              value={form.delegateId}
+              onChange={(delegateId) => setForm((f) => ({ ...f, delegateId }))}
+              excludeIds={[String(myEmployeeId)]}
+              placeholder="Search for a delegate…"
+              isDisabled={saveDelegation.isPending}
+            />
+          </div>
           <input
             type="date"
-            className="text-sm border border-gray-300 rounded-md px-2 py-1.5"
+            className="text-sm border border-gray-300 rounded-lg px-2 h-[42px]"
             value={form.startDate}
             onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
           />
           <input
             type="date"
-            className="text-sm border border-gray-300 rounded-md px-2 py-1.5"
+            className="text-sm border border-gray-300 rounded-lg px-2 h-[42px]"
             value={form.endDate}
+            min={form.startDate || undefined}
             onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
           />
           <Button size="small" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>

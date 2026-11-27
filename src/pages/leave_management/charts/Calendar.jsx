@@ -183,6 +183,8 @@
 import React, { useState, useEffect } from "react";
 import api from "../../../api/axiosInstance";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import Button from "../../../components/Button/Button";
+import FormSelect from "../../../components/forms/FormSelect";
 
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -194,16 +196,13 @@ const months = [
 // ── Inline native select — fixes truncation, matches dashboard style ─────────
 function NativeSelect({ options, value, onChange }) {
   return (
-    <select
+    <FormSelect
+      name="calendarNativeSelect"
+      options={options}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="appearance-none bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg px-3 py-1.5 pr-7 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-colors"
-      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
+      buttonClassName="bg-gray-50 h-9 px-3"
+    />
   );
 }
 
@@ -305,18 +304,24 @@ export default function Calendar() {
         </div>
 
         <div className="flex items-center gap-1">
-          <button
+          <Button
             onClick={prevMonth}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+            variant="ghost"
+            size="icon"
+            aria-label="Previous month"
+            className="w-7 h-7 text-gray-500 hover:text-gray-700"
           >
             <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={nextMonth}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+            variant="ghost"
+            size="icon"
+            aria-label="Next month"
+            className="w-7 h-7 text-gray-500 hover:text-gray-700"
           >
             <ChevronRight className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </div>
 

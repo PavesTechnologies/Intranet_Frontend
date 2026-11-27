@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, lazy, Suspense } from "react";
 import "react-phone-input-2/lib/style.css";
 import { Toaster } from "react-hot-toast";
 
@@ -19,300 +19,343 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 
 import LoginPage from "./pages/LoginPage";
 import Layout from "./components/Layout/Layout";
-import Dashboard from "./pages/Dashboard";
-import Calendar from "./pages/Calendar";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Calendar = lazy(() => import("./pages/Calendar"));
 
 // Finance Management (Application Switcher landing page)
-import FinanceDashboard from "./pages/finance/FinanceDashboard";
-import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES } from "./config/sidebarConfig";
+const FinanceDashboard = lazy(() => import("./pages/finance/FinanceDashboard"));
+import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES, XMS_APPROVALS_PAGE_ROLES } from "./config/sidebarConfig";
 
 // Accounts Payable
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
 import { AP_ALL_ROLES } from "./pages/accounts-payable/constants/apRoles";
-import APDashboardPage from "./pages/accounts-payable/dashboard/pages/APDashboardPage.jsx";
-import VendorListPage from "./pages/accounts-payable/vendor/pages/VendorListPage.jsx";
-import VendorDetailPage from "./pages/accounts-payable/vendor/pages/VendorDetailPage.jsx";
-import VendorOnboardingPage from "./pages/accounts-payable/vendor/pages/VendorOnboardingPage.jsx";
-import VendorUpdatePage from "./pages/accounts-payable/vendor/pages/VendorUpdatePage.jsx";
-import InternalRequestsPage from "./pages/accounts-payable/vendor/pages/InternalRequestsPage.jsx";
-import InternalRequestDetailPage from "./pages/accounts-payable/vendor/pages/InternalRequestDetailPage.jsx";
-import InvoiceUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx";
-import InvoiceOcrReviewQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceOcrReviewQueuePage.jsx";
-import InvoiceValidationQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceValidationQueuePage.jsx";
-import InvoiceListPage from "./pages/accounts-payable/invoice/pages/InvoiceListPage.jsx";
-import InvoiceDetailPage from "./pages/accounts-payable/invoice/pages/InvoiceDetailPage.jsx";
-import PaymentReadyPage from "./pages/accounts-payable/payment/pages/PaymentReadyPage.jsx";
-import PaymentHistoryPage from "./pages/accounts-payable/payment/pages/PaymentHistoryPage.jsx";
-import PaymentMarkAsPaidPage from "./pages/accounts-payable/payment/pages/PaymentMarkAsPaidPage.jsx";
-import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx";
+import { AP_MANAGEMENT_ANY } from "./pages/accounts-payable/constants/paymentTerms";
+import { VENDOR_PERMISSIONS, VENDOR_ANY_PERMISSIONS } from "./pages/accounts-payable/constants/vendorPermissions";
+const APDashboardPage = lazy(() => import("./pages/accounts-payable/dashboard/pages/APDashboardPage.jsx"));
+const DashboardActivityPage = lazy(() => import("./pages/accounts-payable/dashboard/pages/DashboardActivityPage.jsx"));
+const VendorListPage = lazy(() => import("./pages/accounts-payable/vendor/pages/VendorListPage.jsx"));
+const VendorDetailPage = lazy(() => import("./pages/accounts-payable/vendor/pages/VendorDetailPage.jsx"));
+const VendorOnboardingPage = lazy(() => import("./pages/accounts-payable/vendor/pages/VendorOnboardingPage.jsx"));
+const VendorUpdatePage = lazy(() => import("./pages/accounts-payable/vendor/pages/VendorUpdatePage.jsx"));
+const InternalRequestsPage = lazy(() => import("./pages/accounts-payable/vendor/pages/InternalRequestsPage.jsx"));
+const InternalRequestDetailPage = lazy(() => import("./pages/accounts-payable/vendor/pages/InternalRequestDetailPage.jsx"));
+const InvoiceUploadPage = lazy(() => import("./pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx"));
+const InvoiceBulkUploadPage = lazy(() => import("./pages/accounts-payable/invoice/pages/InvoiceBulkUploadPage.jsx"));
+const InvoiceBulkBatchPage = lazy(() => import("./pages/accounts-payable/invoice/pages/InvoiceBulkBatchPage.jsx"));
+const InvoiceReviewWorkbenchPage = lazy(() => import("./pages/accounts-payable/invoice/pages/InvoiceReviewWorkbenchPage.jsx"));
+const APAutomationPage = lazy(() => import("./pages/accounts-payable/automation/pages/APAutomationPage.jsx"));
+import { AP_AUTOMATION_PERMISSIONS } from "./pages/accounts-payable/constants/apAutomation";
+import { APPROVAL_PERMISSIONS as REVIEW_SEND_PERMISSIONS } from "./pages/accounts-payable/constants/approvalPermissions";
+const InvoiceOcrReviewQueuePage = lazy(() => import("./pages/accounts-payable/invoice/pages/InvoiceOcrReviewQueuePage.jsx"));
+const InvoiceValidationQueuePage = lazy(() => import("./pages/accounts-payable/invoice/pages/InvoiceValidationQueuePage.jsx"));
+const InvoiceListPage = lazy(() => import("./pages/accounts-payable/invoice/pages/InvoiceListPage.jsx"));
+const InvoiceDetailPage = lazy(() => import("./pages/accounts-payable/invoice/pages/InvoiceDetailPage.jsx"));
+const PaymentReadyPage = lazy(() => import("./pages/accounts-payable/payment/pages/PaymentReadyPage.jsx"));
+const PaymentHistoryPage = lazy(() => import("./pages/accounts-payable/payment/pages/PaymentHistoryPage.jsx"));
+const PaymentMarkAsPaidPage = lazy(() => import("./pages/accounts-payable/payment/pages/PaymentMarkAsPaidPage.jsx"));
+const PaymentInvoiceDetailPage = lazy(() => import("./pages/accounts-payable/payment/pages/PaymentInvoiceDetailPage.jsx"));
+const TdsTrackingPage = lazy(() => import("./pages/accounts-payable/tds-tracking/pages/TdsTrackingPage.jsx"));
+const TdsTrackingDetailPage = lazy(() => import("./pages/accounts-payable/tds-tracking/pages/TdsTrackingDetailPage.jsx"));
+const TdsChallansPage = lazy(() => import("./pages/accounts-payable/tds-tracking/pages/TdsChallansPage.jsx"));
+const TdsChallanNewPage = lazy(() => import("./pages/accounts-payable/tds-tracking/pages/TdsChallanNewPage.jsx"));
+const TdsFilingNewPage = lazy(() => import("./pages/accounts-payable/tds-tracking/pages/TdsFilingNewPage.jsx"));
+const BulkImportPage = lazy(() => import("./pages/accounts-payable/bulk-import/pages/BulkImportPage.jsx"));
+const RecurringSchedulesPage = lazy(() => import("./pages/accounts-payable/recurring/pages/RecurringSchedulesPage.jsx"));
+const GstItcPage = lazy(() => import("./pages/accounts-payable/gst/pages/GstItcPage.jsx"));
+const ApGuidePage = lazy(() => import("./pages/accounts-payable/guide/pages/ApGuidePage.jsx"));
+const AccountingExportPage = lazy(() => import("./pages/accounts-payable/accounting-export/pages/AccountingExportPage.jsx"));
+const VendorNotesPage = lazy(() => import("./pages/accounts-payable/vendor-notes/pages/VendorNotesPage.jsx"));
+const WorkAssignmentPage = lazy(() => import("./pages/accounts-payable/work-assignment/pages/WorkAssignmentPage.jsx"));
+import { WORK_ASSIGN_LEAD_PERMISSIONS } from "./pages/accounts-payable/constants/workAssignment";
+import { VENDOR_NOTE_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/vendorNotes";
+import { GST_ITC_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/gstItc";
+import { ACCOUNTING_EXPORT_PERMISSIONS } from "./pages/accounts-payable/constants/accountingExport";
+import { RECURRING_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/recurring";
+const BulkImportJobPage = lazy(() => import("./pages/accounts-payable/bulk-import/pages/BulkImportJobPage.jsx"));
+import { PAYMENT_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/paymentPermissions";
+import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/tdsTrackingPermissions";
+const PaymentQueuePage = lazy(() => import("./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx"));
 import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDetailsPage.jsx";
-import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
-import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
-import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
-import ApprovalPolicyFormPage from "./pages/accounts-payable/system-configuration/pages/ApprovalPolicyFormPage.jsx";
+const APReportsPage = lazy(() => import("./pages/accounts-payable/reports/pages/APReportsPage.jsx"));
+const APSettingsPage = lazy(() => import("./pages/accounts-payable/settings/pages/APSettingsPage.jsx"));
+const SystemConfigurationPage = lazy(() => import("./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx"));
+const ApprovalPolicyFormPage = lazy(() => import("./pages/accounts-payable/system-configuration/pages/ApprovalPolicyFormPage.jsx"));
 import { APPROVAL_PERMISSIONS } from "./pages/accounts-payable/constants/approvalPermissions";
 import { INVOICE_PERMISSIONS } from "./pages/accounts-payable/constants/invoicePermissions";
 import {
   PROCUREMENT_PERMISSIONS,
   PROCUREMENT_ANY_VIEW_PERMISSIONS,
+  ONBOARDING_ANY,
 } from "./pages/accounts-payable/constants/procurementPermissions";
-import ProcurementPage from "./pages/accounts-payable/procurement/pages/ProcurementPage.jsx";
-import PrDetailPage from "./pages/accounts-payable/procurement/pages/PrDetailPage.jsx";
-import PurchaseOrderDetailPage from "./pages/accounts-payable/procurement/pages/PurchaseOrderDetailPage.jsx";
-import RfqDetailPage from "./pages/accounts-payable/procurement/pages/RfqDetailPage.jsx";
+const ProcurementPage = lazy(() => import("./pages/accounts-payable/procurement/pages/ProcurementPage.jsx"));
+const PrDetailPage = lazy(() => import("./pages/accounts-payable/procurement/pages/PrDetailPage.jsx"));
+const PurchaseOrderDetailPage = lazy(() => import("./pages/accounts-payable/procurement/pages/PurchaseOrderDetailPage.jsx"));
+const RfqDetailPage = lazy(() => import("./pages/accounts-payable/procurement/pages/RfqDetailPage.jsx"));
+const NotificationCenterPage = lazy(() => import("./pages/accounts-payable/notifications/pages/NotificationCenterPage.jsx"));
 
 
 // Resource Management
-import AdminPannel from "./pages/resource_management/pages/admin/AdminPannel.jsx";
-import ClientPage from "./pages/resource_management/models/ClientPage.jsx";
-import AssetList from "./pages/resource_management/assests/AssetList.jsx";
-import AssetDetail from "./pages/resource_management/assests/AssetDetail.jsx";
-import RMSProjectList from "./pages/resource_management/pages/project/RMSProjectList.jsx";
-import RMSProjectDetails from "./pages/resource_management/pages/project/RMSProjectDetails.jsx";
-import WorkforceAvailability from "./pages/resource_management/pages/workforce/WorkforceAvailability.jsx";
-import ResourceIntelligenceCenter from "./pages/resource_management/components/resource-intelligence/ResourceIntelligenceCenter.jsx";
-import DemandWorkspacePage from "./pages/resource_management/demand/pages/DemandWorkspacePage.jsx";
-import DemandDetailPage from "./pages/resource_management/demand/pages/DemandDetailPage.jsx";
-import PMRoleOffPage from "./pages/resource_management/pages/roleoff/pm.js";
-import RMRoleOffPage from "./pages/resource_management/pages/roleoff/rm.js";
-import DMRoleOffPage from "./pages/resource_management/pages/roleoff/dm.js";
-import BenchPage from "./pages/resource_management/bench/pages/BenchPage.jsx";
-import RoleOffDashboard from "./pages/resource_management/pages/roleoff/RoleOffDashboard.jsx";
-import BenchPoolDashboard from "./pages/resource_management/bench/pages/BenchPoolDashboard.jsx";
-import UtilizationPerformanceDashboard from "./pages/resource_management/bench/pages/UtilizationPerformanceDashboard.jsx";
-import OperationalProjectDetailPage from "./pages/resource_management/bench/pages/OperationalProjectDetailPage.jsx";
-import UtilizationReportingDashboard from "./pages/resource_management/bench/pages/UtilizationReportingDashboard.jsx";
+const AdminPannel = lazy(() => import("./pages/resource_management/pages/admin/AdminPannel.jsx"));
+const ClientPage = lazy(() => import("./pages/resource_management/models/ClientPage.jsx"));
+const AssetList = lazy(() => import("./pages/resource_management/assests/AssetList.jsx"));
+const AssetDetail = lazy(() => import("./pages/resource_management/assests/AssetDetail.jsx"));
+const RMSProjectList = lazy(() => import("./pages/resource_management/pages/project/RMSProjectList.jsx"));
+const RMSProjectDetails = lazy(() => import("./pages/resource_management/pages/project/RMSProjectDetails.jsx"));
+const WorkforceAvailability = lazy(() => import("./pages/resource_management/pages/workforce/WorkforceAvailability.jsx"));
+const ResourceIntelligenceCenter = lazy(() => import("./pages/resource_management/components/resource-intelligence/ResourceIntelligenceCenter.jsx"));
+const DemandWorkspacePage = lazy(() => import("./pages/resource_management/demand/pages/DemandWorkspacePage.jsx"));
+const DemandDetailPage = lazy(() => import("./pages/resource_management/demand/pages/DemandDetailPage.jsx"));
+const PMRoleOffPage = lazy(() => import("./pages/resource_management/pages/roleoff/pm.js"));
+const RMRoleOffPage = lazy(() => import("./pages/resource_management/pages/roleoff/rm.js"));
+const DMRoleOffPage = lazy(() => import("./pages/resource_management/pages/roleoff/dm.js"));
+const BenchPage = lazy(() => import("./pages/resource_management/bench/pages/BenchPage.jsx"));
+const RoleOffDashboard = lazy(() => import("./pages/resource_management/pages/roleoff/RoleOffDashboard.jsx"));
+const BenchPoolDashboard = lazy(() => import("./pages/resource_management/bench/pages/BenchPoolDashboard.jsx"));
+const UtilizationPerformanceDashboard = lazy(() => import("./pages/resource_management/bench/pages/UtilizationPerformanceDashboard.jsx"));
+const OperationalProjectDetailPage = lazy(() => import("./pages/resource_management/bench/pages/OperationalProjectDetailPage.jsx"));
+const UtilizationReportingDashboard = lazy(() => import("./pages/resource_management/bench/pages/UtilizationReportingDashboard.jsx"));
 
 // Timesheets
 
-import InitialPasswordSetup from "./pages/UserManagement/auth/InitialPasswordSetup";
-import TimesheetHistoryPage from "./pages/Timesheet/TimesheetHistoryPage";
+const InitialPasswordSetup = lazy(() => import("./pages/UserManagement/auth/InitialPasswordSetup"));
+const TimesheetHistoryPage = lazy(() => import("./pages/Timesheet/TimesheetHistoryPage"));
 import ManagerApprovalPage from "./pages/Timesheet/ManagerApproval/ManagerApprovalPage";
-import DashboardPage from "./pages/Timesheet/DashboardPage";
-import ManagerDashboard from "./pages/Timesheet/ManagerDashboard";
-import IntranetForm from "./components/forms/IntranetForm";
-import ReportDashboard from "./pages/Timesheet/ReportDashboard";
-import MonthlyTSReport from "./pages/Timesheet/MonthlyTSReport";
-import ManagerReportSection from "./pages/Timesheet/ManagerReportSection";
-import ManagerMonthlyReport from "./pages/Timesheet/ManagerMonthlyReport";
-import TSAdminPanel from "./pages/Timesheet/Admin/TSAdminPannel.jsx";
-import TimesheetHistory from "./pages/Timesheet/TimesheetHistory.jsx";
+const DashboardPage = lazy(() => import("./pages/Timesheet/DashboardPage"));
+const ManagerDashboard = lazy(() => import("./pages/Timesheet/ManagerDashboard"));
+const IntranetForm = lazy(() => import("./components/forms/IntranetForm"));
+const ReportDashboard = lazy(() => import("./pages/Timesheet/ReportDashboard"));
+const MonthlyTSReport = lazy(() => import("./pages/Timesheet/MonthlyTSReport"));
+const ManagerReportSection = lazy(() => import("./pages/Timesheet/ManagerReportSection"));
+const ManagerMonthlyReport = lazy(() => import("./pages/Timesheet/ManagerMonthlyReport"));
+const TSAdminPanel = lazy(() => import("./pages/Timesheet/Admin/TSAdminPannel.jsx"));
+const TimesheetHistory = lazy(() => import("./pages/Timesheet/TimesheetHistory.jsx"));
 
 // ✅ Project Management
-import ProjectDashboard from "./pages/Projects/manager/ProjectDashboard";
+const ProjectDashboard = lazy(() => import("./pages/Projects/manager/ProjectDashboard"));
 import Summary from "./pages/Projects/Summary/Summary.jsx";
 // import Backlog from "./pages/Projects/manager/Backlog/Backlog";
 import Board from "./pages/Projects/manager/Board";
 import CreateProjectModal from "./pages/Projects/manager/CreateProjectModal";
-import ProjectTabs from "./pages/Projects/manager/ProjectTabs";
+const ProjectTabs = lazy(() => import("./pages/Projects/manager/ProjectTabs"));
 import ReadOnlyDashboard from "./pages/Projects/User/ReadOnlyDashboard";
 
 import UserBacklog from "./pages/Projects/User/UserBacklog/userbacklog";
 import UserProjectTabs from "./pages/Projects/User/UserProjectTabs";
-import ProjectList from "./pages/Projects/manager/ProjectList";
+const ProjectList = lazy(() => import("./pages/Projects/manager/ProjectList"));
 import UserProjectList from "./pages/Projects/User/UserProjectList";
 import EmployeePerformance from "./pages/Projects/manager/EmployeePerformance";
 import Userprofile from "./pages/Projects/User/Userprofile";
-import IssueTracker from "./pages/Projects/manager/Backlog/IssueTracker";
-import ViewSheet from "./pages/Projects/manager/Backlog/ViewSheet";
-import ProjectStatusReportWrapper from "./pages/Projects/manager/ProjectStatusReportWrapper";
+const IssueTracker = lazy(() => import("./pages/Projects/manager/Backlog/IssueTracker"));
+const ViewSheet = lazy(() => import("./pages/Projects/manager/Backlog/ViewSheet"));
+const ProjectStatusReportWrapper = lazy(() => import("./pages/Projects/manager/ProjectStatusReportWrapper"));
 import UserIssueTracker from "./pages/Projects/User/UserBacklog/IssueTracker";
-import CycleRunsPage from "./pages/Projects/Testmanagement/TestExecution/CycleRunsPage";
-import AddCasesFromProjectModal from "./pages/Projects/Testmanagement/TestDesign/modals/AddCasesFromProjectModal.jsx";
-import MyWorkPage from "./pages/Projects/MyWork/MyWorkPage";
+const CycleRunsPage = lazy(() => import("./pages/Projects/Testmanagement/TestExecution/CycleRunsPage"));
+const AddCasesFromProjectModal = lazy(() => import("./pages/Projects/Testmanagement/TestDesign/modals/AddCasesFromProjectModal.jsx"));
+const MyWorkPage = lazy(() => import("./pages/Projects/MyWork/MyWorkPage"));
 // ✅ Employee Onboarding
-import EmpDashboard from "./pages/employee-onboarding/EmpDashboard.jsx";
-import EmployeeProfileView from "./pages/employee-onboarding/employeeProfile/EmployeeProfileView.jsx";
-import CreateOffer from "./pages/employee-onboarding/components/CreateOffer";
-import BulkUpload from "./pages/employee-onboarding/components/BulkUpload.jsx";
-import ViewEmpDetails from "./pages/employee-onboarding/components/ViewEmpDetails.jsx";
-import HrConfiguration from "./pages/employee-onboarding/hr-configuration/HrConfiguration.jsx";
-import CountryManagement from "./pages/employee-onboarding/hr-configuration/country/CountryManagement.jsx";
-import IdentityTypeManagement from "./pages/employee-onboarding/hr-configuration/identity/IdentityTypeManagement.jsx";
-import CountryIdentityMapping from "./pages/employee-onboarding/hr-configuration/mapping/CountryIdentityMapping.jsx";
-import EducationDashboard from "./pages/employee-onboarding/hr-configuration/education/EducationDashboard.jsx";
-import EducationLevelManagement from "./pages/employee-onboarding/hr-configuration/education/levels/EducationLevelManagement.jsx";
-import EducationDocumentManagement from "./pages/employee-onboarding/hr-configuration/education/documents/EducationDocumentManagement.jsx";
-import CountryEducationMapping from "./pages/employee-onboarding/hr-configuration/education/mapping/CountryEducationMapping.jsx";
-import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration/education/degrees/DegreeMasterManagement.jsx";
+const EmpDashboard = lazy(() => import("./pages/employee-onboarding/EmpDashboard.jsx"));
+const EmployeeProfileView = lazy(() => import("./pages/employee-onboarding/employeeProfile/EmployeeProfileView.jsx"));
+const CreateOffer = lazy(() => import("./pages/employee-onboarding/components/CreateOffer"));
+const BulkUpload = lazy(() => import("./pages/employee-onboarding/components/BulkUpload.jsx"));
+const ViewEmpDetails = lazy(() => import("./pages/employee-onboarding/components/ViewEmpDetails.jsx"));
+const HrConfiguration = lazy(() => import("./pages/employee-onboarding/hr-configuration/HrConfiguration.jsx"));
+const CountryManagement = lazy(() => import("./pages/employee-onboarding/hr-configuration/country/CountryManagement.jsx"));
+const IdentityTypeManagement = lazy(() => import("./pages/employee-onboarding/hr-configuration/identity/IdentityTypeManagement.jsx"));
+const CountryIdentityMapping = lazy(() => import("./pages/employee-onboarding/hr-configuration/mapping/CountryIdentityMapping.jsx"));
+const EducationDashboard = lazy(() => import("./pages/employee-onboarding/hr-configuration/education/EducationDashboard.jsx"));
+const EducationLevelManagement = lazy(() => import("./pages/employee-onboarding/hr-configuration/education/levels/EducationLevelManagement.jsx"));
+const EducationDocumentManagement = lazy(() => import("./pages/employee-onboarding/hr-configuration/education/documents/EducationDocumentManagement.jsx"));
+const CountryEducationMapping = lazy(() => import("./pages/employee-onboarding/hr-configuration/education/mapping/CountryEducationMapping.jsx"));
+const DegreeMasterManagement = lazy(() => import("./pages/employee-onboarding/hr-configuration/education/degrees/DegreeMasterManagement.jsx"));
 
 // import AdminApprovalActions from "./pages/employee-onboarding/admin/AdminApprovalActions.jsx";
-import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx"; import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
+const AdminApprovalDashboard = lazy(() => import("./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx")); import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
 
 // AI Screening (AIRS)
-import RecruiterDashboardPage from "./pages/airs/dashboard/RecruiterDashboardPage.jsx";
-import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
-import JdCreate from "./pages/airs/pages/JdCreate.jsx";
-import JdDetails from "./pages/airs/pages/JdDetails.jsx";
-import Campaigns from "./pages/airs/campaigns/Campaigns.jsx";
-import CampaignDetails from "./pages/airs/campaigns/CampaignDetails.jsx";
+const RecruiterDashboardPage = lazy(() => import("./pages/airs/dashboard/RecruiterDashboardPage.jsx"));
+const JdLibrary = lazy(() => import("./pages/airs/pages/JdLibrary.jsx"));
+const JdCreate = lazy(() => import("./pages/airs/pages/JdCreate.jsx"));
+const JdDetails = lazy(() => import("./pages/airs/pages/JdDetails.jsx"));
+const Campaigns = lazy(() => import("./pages/airs/campaigns/Campaigns.jsx"));
+const CampaignDetails = lazy(() => import("./pages/airs/campaigns/CampaignDetails.jsx"));
 
 import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
 
-import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
-import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
-import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
-import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
-import HMReviewPage from "./pages/airs/hm-review/HMReviewPage.jsx";
-import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
-import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
-import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
-import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
-import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
-import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
-import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
-import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
-import HierarchyPage from "./pages/airs/skill-ontology/HierarchyPage.jsx";
-import UnknownSkillDetailPage from "./pages/airs/skill-ontology/UnknownSkillDetailPage.jsx";
-import PromptTemplatesPage from "./pages/airs/prompt-templates/PromptTemplatesPage.jsx";
-import PromptTemplateViewPage from "./pages/airs/prompt-templates/PromptTemplateViewPage.jsx";
+const ResumeIntakePage = lazy(() => import("./pages/airs/resume-intake/ResumeIntakePage.jsx"));
+const IntakeFlowPage = lazy(() => import("./pages/airs/resume-intake/intake/IntakeFlowPage.jsx"));
+const ReviewPage = lazy(() => import("./pages/airs/resume-intake/intake/ReviewPage.jsx"));
+const CandidateScorePage = lazy(() => import("./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx"));
+const HMReviewPage = lazy(() => import("./pages/airs/hm-review/HMReviewPage.jsx"));
+const InterviewCalendarPage = lazy(() => import("./pages/airs/interview-calendar/InterviewCalendarPage.jsx"));
+const PipelineBoardPage = lazy(() => import("./pages/airs/pipeline/PipelineBoardPage.jsx"));
+const PipelineCandidateScorecardPage = lazy(() => import("./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx"));
+const TalentPoolPage = lazy(() => import("./pages/airs/talent-pool/TalentPoolPage.jsx"));
+const TalentPoolCandidateProfilePage = lazy(() => import("./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx"));
+const SettingsPage = lazy(() => import("./pages/airs/settings/SettingsPage.jsx"));
+const SkillOntologyPage = lazy(() => import("./pages/airs/skill-ontology/SkillOntologyPage.jsx"));
+const SkillDetailPage = lazy(() => import("./pages/airs/skill-ontology/SkillDetailPage.jsx"));
+const HierarchyPage = lazy(() => import("./pages/airs/skill-ontology/HierarchyPage.jsx"));
+const UnknownSkillDetailPage = lazy(() => import("./pages/airs/skill-ontology/UnknownSkillDetailPage.jsx"));
+const PromptTemplatesPage = lazy(() => import("./pages/airs/prompt-templates/PromptTemplatesPage.jsx"));
+const PromptTemplateViewPage = lazy(() => import("./pages/airs/prompt-templates/PromptTemplateViewPage.jsx"));
 
-import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
-import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
-import HrProfileView from "./pages/employee-onboarding/hr/HrProfileView.jsx";
-import BackgroundCheckPage from "./pages/employee-onboarding/hr/BackgroundCheckPage.jsx";
-import OnboardingTask from "./pages/employee-onboarding/onboarding-task/OnboardingTask.jsx";
-import EmployeeDirectory from "./pages/employee-onboarding/employee-directory/EmployeeDirectory.jsx";
-import EmployeeVerification from "./pages/employee-onboarding/employee-verification/EmployeeVerification.jsx";
-import EmployeeDocumentsTemplate from "./pages/employee-onboarding/employee-documents-template/EmployeeDocumentsTemplate.jsx";
-import OrganizationTree from "./pages/employee-onboarding/organization-tree/OrganizationTree.jsx";
-import SummaryPage from "./pages/employee-onboarding/summary-page/SummaryPage.jsx";
-import EmployeeDocumentsPage from "./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx";
-import HeadcountDemographicsPage from "./pages/employee-onboarding/analytics/HeadcountDemographics.jsx";
-import EmployeeListPage from "./pages/employee-onboarding/employeelist/EmployeeList.jsx";
+const AdminOfferLettersDashboard = lazy(() => import("./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx"));
+const HrOnboardingDashboard = lazy(() => import("./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx"));
+const HrProfileView = lazy(() => import("./pages/employee-onboarding/hr/HrProfileView.jsx"));
+const BackgroundCheckPage = lazy(() => import("./pages/employee-onboarding/hr/BackgroundCheckPage.jsx"));
+const OnboardingTask = lazy(() => import("./pages/employee-onboarding/onboarding-task/OnboardingTask.jsx"));
+const EmployeeDirectory = lazy(() => import("./pages/employee-onboarding/employee-directory/EmployeeDirectory.jsx"));
+const EmployeeVerification = lazy(() => import("./pages/employee-onboarding/employee-verification/EmployeeVerification.jsx"));
+const EmployeeDocumentsTemplate = lazy(() => import("./pages/employee-onboarding/employee-documents-template/EmployeeDocumentsTemplate.jsx"));
+const OrganizationTree = lazy(() => import("./pages/employee-onboarding/organization-tree/OrganizationTree.jsx"));
+const SummaryPage = lazy(() => import("./pages/employee-onboarding/summary-page/SummaryPage.jsx"));
+const EmployeeDocumentsPage = lazy(() => import("./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx"));
+const HeadcountDemographicsPage = lazy(() => import("./pages/employee-onboarding/analytics/HeadcountDemographics.jsx"));
+const EmployeeListPage = lazy(() => import("./pages/employee-onboarding/employeelist/EmployeeList.jsx"));
 import EmployeeCredentials from "./pages/employee-onboarding/employee-credentials/EmployeeCredentials.jsx";
-import CoreEmployeeDetails from "./pages/employee-onboarding/core-employee/CoreEmployeeDetailsDashboard.jsx";
-import EmployeeOnboardingLayout from "./pages/employee-onboarding/EmployeeOnboardingLayout.jsx";
-import OnboardingSummary from "./pages/employee-onboarding/summary-page/OnboardingSummary.jsx";
-import DepartmentsMappingDashboard from "./pages/employee-onboarding/hr-configuration/departments/DepartmentsMappingDashboard.jsx";
-import DepartmentsList from "./pages/employee-onboarding/hr-configuration/departments/departmentsList/DepartmentsList.jsx";
-import DesignationsList from "./pages/employee-onboarding/hr-configuration/departments/designationsList/DesignationsList.jsx";
-import WeeklyJoiningDashboard from "./pages/employee-onboarding/weekly-joining-report-dashboard/WeeklyJoiningDashboard.jsx";
-import DocumentTemplates from "./pages/employee-onboarding/document-templates/DocumentTemplates.jsx";
-import ManageSkillTaxonomy from "./pages/employee-onboarding/manage-skill-taxonomy/ManageSkillTaxonomy.jsx";
-import AddCertificate from "./pages/employee-onboarding/manage-skill-taxonomy/AddCertificate.jsx";
+const CoreEmployeeDetails = lazy(() => import("./pages/employee-onboarding/core-employee/CoreEmployeeDetailsDashboard.jsx"));
+const EmployeeOnboardingLayout = lazy(() => import("./pages/employee-onboarding/EmployeeOnboardingLayout.jsx"));
+const OnboardingSummary = lazy(() => import("./pages/employee-onboarding/summary-page/OnboardingSummary.jsx"));
+const DepartmentsMappingDashboard = lazy(() => import("./pages/employee-onboarding/hr-configuration/departments/DepartmentsMappingDashboard.jsx"));
+const DepartmentsList = lazy(() => import("./pages/employee-onboarding/hr-configuration/departments/departmentsList/DepartmentsList.jsx"));
+const DesignationsList = lazy(() => import("./pages/employee-onboarding/hr-configuration/departments/designationsList/DesignationsList.jsx"));
+const WeeklyJoiningDashboard = lazy(() => import("./pages/employee-onboarding/weekly-joining-report-dashboard/WeeklyJoiningDashboard.jsx"));
+const DocumentTemplates = lazy(() => import("./pages/employee-onboarding/document-templates/DocumentTemplates.jsx"));
+const ManageSkillTaxonomy = lazy(() => import("./pages/employee-onboarding/manage-skill-taxonomy/ManageSkillTaxonomy.jsx"));
+const AddCertificate = lazy(() => import("./pages/employee-onboarding/manage-skill-taxonomy/AddCertificate.jsx"));
 
 import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx";
 
-import OfferPreview from "./pages/employee-onboarding/offer-preview/OfferPreview.jsx";
-import FinalOfferPreview from "./pages/employee-onboarding/final-offer-preview/FinalOfferPreview.jsx";
-import OfferGeneratedPreview from "./pages/employee-onboarding/offer-generated-preview/OfferGeneratedPreview.jsx";
+const OfferPreview = lazy(() => import("./pages/employee-onboarding/offer-preview/OfferPreview.jsx"));
+const FinalOfferPreview = lazy(() => import("./pages/employee-onboarding/final-offer-preview/FinalOfferPreview.jsx"));
+const OfferGeneratedPreview = lazy(() => import("./pages/employee-onboarding/offer-generated-preview/OfferGeneratedPreview.jsx"));
 
 // ✅ Expense Management (XMS)
-import XmsDashboardPage from "./pages/expense-management/pages/dashboard/DashboardPage.jsx";
-import XmsCreateExpensePage from "./pages/expense-management/pages/expenses/CreateExpensePage.jsx";
-import XmsMyExpensesPage from "./pages/expense-management/pages/expenses/MyExpensesPage.jsx";
-import XmsAllExpensesPage from "./pages/expense-management/pages/expenses/AllExpensesPage.jsx";
-import XmsExpenseReportsPage from "./pages/expense-management/pages/expenses/ExpenseReportsPage.jsx";
-import XmsExpenseReportDetailPage from "./pages/expense-management/pages/expenses/ExpenseReportDetailPage.jsx";
-import XmsReceiptLibraryPage from "./pages/expense-management/pages/receipts/ReceiptLibraryPage.jsx";
-import XmsOcrProcessingPage from "./pages/expense-management/pages/receipts/OcrProcessingPage.jsx";
-import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx";
-import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
-import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
-import XmsApprovalsPage from "./pages/expense-management/approval-engine/pages/ApprovalsPage.jsx";
-import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx";
-import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
-import XmsCatchAllFlowPage from "./pages/expense-management/approval-engine/pages/CatchAllFlowPage.jsx";
-import XmsDepartmentApproversPage from "./pages/expense-management/approval-engine/pages/DepartmentApproversPage.jsx";
-import XmsDelegationsPage from "./pages/expense-management/approval-engine/pages/DelegationsPage.jsx";
-import XmsVerificationPage from "./pages/expense-management/pages/finance/VerificationPage.jsx";
-import XmsReimbursementsPage from "./pages/expense-management/pages/finance/ReimbursementsPage.jsx";
-import XmsPaymentStatusPage from "./pages/expense-management/pages/finance/PaymentStatusPage.jsx";
-import XmsApPaymentQueuePage from "./pages/expense-management/pages/ap-payments/ApPaymentQueuePage.jsx";
-import XmsBillableExpensesPage from "./pages/expense-management/pages/client-billing/BillableExpensesPage.jsx";
-import XmsInvoiceHandoffPage from "./pages/expense-management/pages/client-billing/InvoiceHandoffPage.jsx";
-import XmsInvoiceStatusPage from "./pages/expense-management/pages/client-billing/InvoiceStatusPage.jsx";
-import XmsExpenseCategoriesPage from "./pages/expense-management/pages/masters/CategoriesLedgerPage.jsx";
-import XmsGlAccountsPage from "./pages/expense-management/pages/masters/GlAccountsPage.jsx";
-import XmsCostCenterManagementPage from "./pages/expense-management/pages/masters/CostCenterManagementPage.jsx";
-import XmsProjectsMasterPage from "./pages/expense-management/pages/masters/ProjectsMasterPage.jsx";
-import XmsClientsMasterPage from "./pages/expense-management/pages/masters/ClientsMasterPage.jsx";
-import XmsCurrencyManagementPage from "./pages/expense-management/pages/masters/CurrencyManagementPage.jsx";
-import XmsTaxConfigurationPage from "./pages/expense-management/pages/masters/TaxConfigurationPage.jsx";
-import XmsPolicyDashboardPage from "./pages/expense-management/pages/PolicyDashboard.jsx";
-import XmsPolicyBundlesPage from "./pages/expense-management/pages/PolicyBundles.jsx";
-import XmsPolicyRulesPage from "./pages/expense-management/pages/PolicyRules.jsx";
-import XmsPolicyGroupsPage from "./pages/expense-management/pages/PolicyGroups.jsx";
-import XmsPolicyAssignmentsPage from "./pages/expense-management/pages/PolicyAssignments.jsx";
-import XmsSeverityThresholdPage from "./pages/expense-management/pages/SeverityThreshold.jsx";
-import XmsPolicyVersionsPage from "./pages/expense-management/pages/PolicyVersions.jsx";
+const XmsDashboardPage = lazy(() => import("./pages/expense-management/pages/dashboard/DashboardPage.jsx"));
+const XmsCreateExpensePage = lazy(() => import("./pages/expense-management/pages/expenses/CreateExpensePage.jsx"));
+const XmsSupplementaryClaimsPage = lazy(() => import("./pages/expense-management/pages/supplementary/SupplementaryClaimsPage.jsx"));
+const XmsSupplementaryClaimDetailPage = lazy(() => import("./pages/expense-management/pages/supplementary/SupplementaryClaimDetailPage.jsx"));
+const XmsSupplementaryQueuePage = lazy(() => import("./pages/expense-management/pages/supplementary/SupplementaryQueuePage.jsx"));
+const XmsFinanceCreateSupplementaryPage = lazy(() => import("./pages/expense-management/pages/supplementary/FinanceCreateSupplementaryPage.jsx"));
+const XmsFinanceReceiptReleasePage = lazy(() => import("./pages/expense-management/pages/supplementary/FinanceReceiptReleasePage.jsx"));
+const XmsApSupplementaryPaymentsPage = lazy(() => import("./pages/expense-management/pages/supplementary/ApSupplementaryPaymentsPage.jsx"));
+const XmsMyExpensesPage = lazy(() => import("./pages/expense-management/pages/expenses/MyExpensesPage.jsx"));
+const XmsAllExpensesPage = lazy(() => import("./pages/expense-management/pages/expenses/AllExpensesPage.jsx"));
+const XmsExpenseReportsPage = lazy(() => import("./pages/expense-management/pages/expenses/ExpenseReportsPage.jsx"));
+const XmsExpenseReportDetailPage = lazy(() => import("./pages/expense-management/pages/expenses/ExpenseReportDetailPage.jsx"));
+const XmsRequestAdvancePage = lazy(() => import("./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx"));
+const XmsMyAdvancesPage = lazy(() => import("./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx"));
+const XmsSettlementPage = lazy(() => import("./pages/expense-management/pages/cash-advance/SettlementPage.jsx"));
+const XmsCashAdvanceApprovalsPage = lazy(() => import("./pages/expense-management/pages/cash-advance/CashAdvanceApprovalsPage.jsx"));
+const XmsCashAdvanceDetailPage = lazy(() => import("./pages/expense-management/pages/cash-advance/CashAdvanceDetailPage.jsx"));
+const XmsApprovalsPage = lazy(() => import("./pages/expense-management/approval-engine/pages/ApprovalsPage.jsx"));
+const XmsApprovalFlowsPage = lazy(() => import("./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx"));
+const XmsApprovalFlowBuilderPage = lazy(() => import("./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx"));
+const XmsCatchAllFlowPage = lazy(() => import("./pages/expense-management/approval-engine/pages/CatchAllFlowPage.jsx"));
+const XmsDepartmentApproversPage = lazy(() => import("./pages/expense-management/approval-engine/pages/DepartmentApproversPage.jsx"));
+const XmsGlobalSearchPage = lazy(() => import("./pages/expense-management/pages/GlobalSearchPage.jsx"));
+const XmsAdvancedFilterPage = lazy(() => import("./pages/expense-management/pages/AdvancedFilterPage.jsx"));
+const XmsDelegationsPage = lazy(() => import("./pages/expense-management/approval-engine/pages/DelegationsPage.jsx"));
+const XmsFinancePage = lazy(() => import("./pages/expense-management/pages/finance/FinancePage.jsx"));
+const XmsApPaymentQueuePage = lazy(() => import("./pages/expense-management/pages/ap-payments/ApPaymentQueuePage.jsx"));
+const XmsClientBillingPage = lazy(() => import("./pages/expense-management/pages/client-billing/ClientBillingPage.jsx"));
+const XmsExpenseCategoriesPage = lazy(() => import("./pages/expense-management/pages/masters/CategoriesLedgerPage.jsx"));
+const XmsGlAccountsPage = lazy(() => import("./pages/expense-management/pages/masters/GlAccountsPage.jsx"));
+const XmsCostCenterManagementPage = lazy(() => import("./pages/expense-management/pages/masters/CostCenterManagementPage.jsx"));
+const XmsCurrencyManagementPage = lazy(() => import("./pages/expense-management/pages/masters/CurrencyManagementPage.jsx"));
+const XmsTaxConfigurationPage = lazy(() => import("./pages/expense-management/pages/masters/TaxConfigurationPage.jsx"));
+const XmsPolicyDashboardPage = lazy(() => import("./pages/expense-management/pages/PolicyDashboard.jsx"));
+const XmsPolicyBundlesPage = lazy(() => import("./pages/expense-management/pages/PolicyBundles.jsx"));
+const XmsPolicyRulesPage = lazy(() => import("./pages/expense-management/pages/PolicyRules.jsx"));
+const XmsPolicyCarryForwardPage = lazy(() => import("./pages/expense-management/pages/PolicyCarryForward.jsx"));
+const XmsPolicyGroupsPage = lazy(() => import("./pages/expense-management/pages/PolicyGroups.jsx"));
+const XmsPolicyAssignmentsPage = lazy(() => import("./pages/expense-management/pages/PolicyAssignments.jsx"));
+const XmsSeverityThresholdPage = lazy(() => import("./pages/expense-management/pages/SeverityThreshold.jsx"));
+const XmsPolicyVersionsPage = lazy(() => import("./pages/expense-management/pages/PolicyVersions.jsx"));
 import { POLICY_VIEW_ROLES } from "./pages/expense-management/components/policy/common/policyEnums.js";
-import XmsReportsPage from "./pages/expense-management/pages/reports/ReportsPage.jsx";
-import XmsNotificationsPage from "./pages/expense-management/pages/activity/NotificationsPage.jsx";
-import XmsAuditLogsPage from "./pages/expense-management/pages/activity/AuditLogsPage.jsx";
-import XmsSettingsPage from "./pages/expense-management/pages/settings/SettingsPage.jsx";
+const XmsReportsPage = lazy(() => import("./pages/expense-management/pages/reports/ReportsPage.jsx"));
+const XmsItcRegisterPage = lazy(() => import("./pages/expense-management/pages/reports/ItcRegisterPage.jsx"));
+const XmsNotificationsPage = lazy(() => import("./pages/expense-management/pages/activity/NotificationsPage.jsx"));
+const XmsAuditLogsPage = lazy(() => import("./pages/expense-management/pages/activity/AuditLogsPage.jsx"));
+const XmsSettingsPage = lazy(() => import("./pages/expense-management/pages/settings/SettingsPage.jsx"));
 
 // ✅ User Management
-import CreateUser from "./pages/UserManagement/admin/userManagement/CreateUser";
-import EditUser from "./pages/UserManagement/admin/userManagement/EditUser";
-import UpdateUserRoles from "./pages/UserManagement/admin/userManagement/UpdateUserRoles";
-import EditUserRoleForm from "./pages/UserManagement/admin/userManagement/EditUserRoleForm";
-import UsersTable from "./pages/UserManagement/admin/userManagement/UsersTable";
+const CreateUser = lazy(() => import("./pages/UserManagement/admin/userManagement/CreateUser"));
+const EditUser = lazy(() => import("./pages/UserManagement/admin/userManagement/EditUser"));
+const UpdateUserRoles = lazy(() => import("./pages/UserManagement/admin/userManagement/UpdateUserRoles"));
+const EditUserRoleForm = lazy(() => import("./pages/UserManagement/admin/userManagement/EditUserRoleForm"));
+const UsersTable = lazy(() => import("./pages/UserManagement/admin/userManagement/UsersTable"));
 
 // ✅ Roles & Permissions
-import RoleManagement from "./pages/UserManagement/admin/roleManagement/RoleManagement";
-import PermissionManagement from "./pages/UserManagement/admin/permissionManagement/PermissionManagement";
-import PermissionGroupManagement from "./pages/UserManagement/admin/permissionGroupManagement/PermissionGroupManagement";
-import GroupDetails from "./pages/UserManagement/admin/permissionGroupManagement/GroupDetails";
+const RoleManagement = lazy(() => import("./pages/UserManagement/admin/roleManagement/RoleManagement"));
+const PermissionManagement = lazy(() => import("./pages/UserManagement/admin/permissionManagement/PermissionManagement"));
+const PermissionGroupManagement = lazy(() => import("./pages/UserManagement/admin/permissionGroupManagement/PermissionGroupManagement"));
+const GroupDetails = lazy(() => import("./pages/UserManagement/admin/permissionGroupManagement/GroupDetails"));
 
-import AccessPointForm from "./pages/UserManagement/admin/accessPointManagement/AccessPointForm";
-import AccessPointDetails from "./pages/UserManagement/admin/accessPointManagement/AccessPointDetails";
-import AccessPointEdit from "./pages/UserManagement/admin/accessPointManagement/AccessPointEdit";
-import AccessPointMapping from "./pages/UserManagement/admin/accessPointManagement/AccessPointMapping";
-import AccessPointManagement from "./pages/UserManagement/admin/accessPointManagement/AccessPointManagement";
-import BulkAccessPointCreate from "./pages/UserManagement/admin/accessPointManagement/BulkAccessPointCreate";
-import BulkPermissionMapping from "./pages/UserManagement/admin/accessPointManagement/BulkPermissionMapping";
-import Profile from "./pages/UserManagement/user/Profile";
-import EditProfile from "./pages/UserManagement/user/EditProfile";
+const AccessPointForm = lazy(() => import("./pages/UserManagement/admin/accessPointManagement/AccessPointForm"));
+const AccessPointDetails = lazy(() => import("./pages/UserManagement/admin/accessPointManagement/AccessPointDetails"));
+const AccessPointEdit = lazy(() => import("./pages/UserManagement/admin/accessPointManagement/AccessPointEdit"));
+const AccessPointMapping = lazy(() => import("./pages/UserManagement/admin/accessPointManagement/AccessPointMapping"));
+const AccessPointManagement = lazy(() => import("./pages/UserManagement/admin/accessPointManagement/AccessPointManagement"));
+const BulkAccessPointCreate = lazy(() => import("./pages/UserManagement/admin/accessPointManagement/BulkAccessPointCreate"));
+const BulkPermissionMapping = lazy(() => import("./pages/UserManagement/admin/accessPointManagement/BulkPermissionMapping"));
+const Profile = lazy(() => import("./pages/UserManagement/user/Profile"));
+const EditProfile = lazy(() => import("./pages/UserManagement/user/EditProfile"));
 
-import Register from "./pages/UserManagement/auth/Register";
-import InterviewFeedbackFormPage from "./pages/public/InterviewFeedbackFormPage.jsx";
+const Register = lazy(() => import("./pages/UserManagement/auth/Register"));
+const InterviewFeedbackFormPage = lazy(() => import("./pages/public/InterviewFeedbackFormPage.jsx"));
 
 
 // ✅ Leave Management
-import EmployeePanel from "./pages/leave_management/EmployeePanel";
-import AdminPanel from "./pages/leave_management/AdminPanel";
-import HRManageTools from "./pages/leave_management/HRManageTools";
-import EmployeeLeaveBalances from "./pages/leave_management/models/EmployeeLeaveBalances";
-import Unauthorized from "./pages/leave_management/Unauthorized";
-import EditHolidaysPage from "./pages/leave_management/models/EditHolidaysPage";
+import PageContainer from "./components/patterns/PageContainer";
+const EmployeePanel = lazy(() => import("./pages/leave_management/EmployeePanel"));
+const AdminPanel = lazy(() => import("./pages/leave_management/AdminPanel"));
+const HRManageTools = lazy(() => import("./pages/leave_management/HRManageTools"));
+const EmployeeLeaveBalances = lazy(() => import("./pages/leave_management/models/EmployeeLeaveBalances"));
+const Unauthorized = lazy(() => import("./pages/leave_management/Unauthorized"));
+const EditHolidaysPage = lazy(() => import("./pages/leave_management/models/EditHolidaysPage"));
 // import ManagerDashboard from "./pages/Timesheet/ManagerDashboard";
-import LeavePolicy from "./pages/leave_management/models/LeavePolicy";
-import LeaveDetailsPage from "./pages/leave_management/charts/LeaveDetailsPage";
-import ManageBlockLeave from "./pages/leave_management/models/ManageBlockLeave";
+const LeavePolicy = lazy(() => import("./pages/leave_management/models/LeavePolicy"));
+const LeaveDetailsPage = lazy(() => import("./pages/leave_management/charts/LeaveDetailsPage"));
+const ManageBlockLeave = lazy(() => import("./pages/leave_management/models/ManageBlockLeave"));
 // import ProtectedRoute from "./pages/leave_management/ProtectedRoutes";
-import ApprovalRulesPage from "./pages/leave_management/models/ApprovalRulesPage.jsx";
-import RiskRegisterPage from "./pages/Projects/manager/riskManagement/RiskRegisterPage.jsx";
-import LeaveUploadWizard from "./pages/leave_management/models/LeaveUploadWizard.jsx";
-import ApplyLeaveOnBehalf from "./pages/leave_management/models/ApplyLeaveOnBehalf.jsx";
+const ApprovalRulesPage = lazy(() => import("./pages/leave_management/models/ApprovalRulesPage.jsx"));
+const RiskRegisterPage = lazy(() => import("./pages/Projects/manager/riskManagement/RiskRegisterPage.jsx"));
+const LeaveUploadWizard = lazy(() => import("./pages/leave_management/models/LeaveUploadWizard.jsx"));
+const ApplyLeaveOnBehalf = lazy(() => import("./pages/leave_management/models/ApplyLeaveOnBehalf.jsx"));
 import { JobProgressProvider, useJobProgress } from "./contexts/JobProgressContext.jsx";
 import LeaveBalanceJobProgress from "./pages/leave_management/models/LeaveBalanceJobProgress.jsx";
 
-import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
-import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
+const EmployeeExitDashboard = lazy(() => import("./pages/employee-exit/EmployeeExitDashboard.jsx"));
+const ExitDetailsPage = lazy(() => import("./pages/employee-exit/ExitDetailsPage.jsx"));
 
-import AccountReceivableLayout from "./pages/account_receivable/pages/AccountReceivableLayout.jsx";
-import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboard.jsx";
-import Overview from "./pages/account_receivable/pages/Overview.jsx";
-import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
-import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
-import BillingApprovals from "./pages/account_receivable/pages/BillingApprovals.jsx";
-import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
-import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
-import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
-import InvoiceGeneration from "./pages/account_receivable/pages/InvoiceGeneration.jsx";
-import InvoiceGenerationDetail from "./pages/account_receivable/pages/InvoiceGenerationDetail.jsx";
-import InvoiceApproval from "./pages/account_receivable/pages/InvoiceApproval.jsx";
-import InvoiceDetail from "./pages/account_receivable/pages/InvoiceDetail.jsx";
-import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
-import MasterDataOverview from "./pages/account_receivable/pages/master-data/MasterDataOverview.jsx";
-import BillingTypeMasterPage from "./pages/account_receivable/pages/master-data/BillingTypeMasterPage.jsx";
-import BillingFrequencyMasterPage from "./pages/account_receivable/pages/master-data/BillingFrequencyMasterPage.jsx";
-import PaymentTermsMasterPage from "./pages/account_receivable/pages/master-data/PaymentTermsMasterPage.jsx";
-import TaxConfigurationMasterPage from "./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx";
-import TaxConfigurationRegionDetailPage from "./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx";
-import CompanyProfilePage from "./pages/account_receivable/pages/master-data/CompanyProfilePage.jsx";
+const AccountReceivableLayout = lazy(() => import("./pages/account_receivable/pages/AccountReceivableLayout.jsx"));
+const AccountReceivableDashboard = lazy(() => import("./pages/account_receivable/dashboard/pages/ARDashboardPage.jsx"));
+const Overview = lazy(() => import("./pages/account_receivable/pages/Overview.jsx"));
+const BillingConfigurations = lazy(() => import("./pages/account_receivable/pages/BillingConfigurations.jsx"));
+const NewConfigurationWizard = lazy(() => import("./pages/account_receivable/pages/NewConfigurationWizard.jsx"));
+const BillingApprovals = lazy(() => import("./pages/account_receivable/pages/BillingApprovals.jsx"));
+const BillingDataAcquisition = lazy(() => import("./pages/account_receivable/pages/BillingDataAcquisition.jsx"));
+const AcquisitionDetail = lazy(() => import("./pages/account_receivable/pages/AcquisitionDetail.jsx"));
+const TaxCalculationPage = lazy(() => import("./pages/account_receivable/pages/TaxCalculation.jsx"));
+const InvoiceGeneration = lazy(() => import("./pages/account_receivable/pages/InvoiceGeneration.jsx"));
+const InvoiceGenerationDetail = lazy(() => import("./pages/account_receivable/pages/InvoiceGenerationDetail.jsx"));
+const InvoiceApproval = lazy(() => import("./pages/account_receivable/pages/InvoiceApproval.jsx"));
+const InvoiceDetail = lazy(() => import("./pages/account_receivable/pages/InvoiceDetail.jsx"));
+const Receivables = lazy(() => import("./pages/account_receivable/pages/Receivables.jsx"));
+const Payments = lazy(() => import("./pages/account_receivable/pages/Payments.jsx"));
+const CustomerLedger = lazy(() => import("./pages/account_receivable/pages/CustomerLedger.jsx"));
+const AdjustmentNotes = lazy(() => import("./pages/account_receivable/pages/AdjustmentNotes.jsx"));
+const Collections = lazy(() => import("./pages/account_receivable/pages/Collections.jsx"));
+const Configurations = lazy(() => import("./pages/account_receivable/pages/Configurations.jsx"));
+const MasterDataOverview = lazy(() => import("./pages/account_receivable/pages/master-data/MasterDataOverview.jsx"));
+const BillingTypeMasterPage = lazy(() => import("./pages/account_receivable/pages/master-data/BillingTypeMasterPage.jsx"));
+const BillingFrequencyMasterPage = lazy(() => import("./pages/account_receivable/pages/master-data/BillingFrequencyMasterPage.jsx"));
+const PaymentTermsMasterPage = lazy(() => import("./pages/account_receivable/pages/master-data/PaymentTermsMasterPage.jsx"));
+const TaxConfigurationMasterPage = lazy(() => import("./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx"));
+const TaxConfigurationRegionDetailPage = lazy(() => import("./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx"));
+const CompanyProfilePage = lazy(() => import("./pages/account_receivable/pages/master-data/CompanyProfilePage.jsx"));
+const CurrencyExchangeRateMasterPage = lazy(() => import("./pages/account_receivable/pages/master-data/CurrencyExchangeRateMasterPage.jsx"));
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -321,7 +364,14 @@ import OnboardingSummaryPage from "./pages/employee-onboarding/summary-page/Summ
 
 
 
-const ProtectedRoute = ({ children, allowedRoles, requiredPermissions }) => {
+export const ProtectedRoute = ({
+  children,
+  allowedRoles,
+  requiredPermissions,
+  orPermissions,
+  anyPermissions,
+  permission,
+}) => {
   const { isAuthenticated, user, logout, hasAnyPermission } = useAuth();
   const location = useLocation();
   const isfirsttlogin = localStorage.getItem("isfirsttlogin");
@@ -354,24 +404,35 @@ const ProtectedRoute = ({ children, allowedRoles, requiredPermissions }) => {
     // match: hasRole,
     // });
 
-    if (!hasRole) {
+    // `orPermissions`: lacking the role is still fine with any of these permissions (e.g. the AP
+    // Dashboard / Reports for management users who hold no AP role).
+    if (!hasRole && !(orPermissions?.length && hasAnyPermission(orPermissions))) {
       return <Navigate to="/unauthorized" replace />;
     }
   }
 
-  // ✅ Permission-based restriction check (any-of) — for modules where UMS permission codes are
-  // the source of truth instead of a frontend role list (e.g. Invoice Management: a pure
-  // Approver or Finance user need not hold any of Admin/AP_Executive/Finance_Executive to be
-  // let in). Independent of allowedRoles above — a route may use either, not necessarily both.
-  if (requiredPermissions && requiredPermissions.length > 0) {
-    if (!hasAnyPermission(requiredPermissions)) {
-      return <Navigate to="/unauthorized" replace />;
-    }
+  // ✅ Permission-based restriction checks — for modules where UMS permission codes are the
+  // source of truth instead of a frontend role list (e.g. Invoice Management: a pure Approver or
+  // Finance user need not hold any of Admin/AP_Executive/Finance_Executive to be let in). A route
+  // may use these alone or on top of allowedRoles; when both are given, both must pass.
+  //   requiredPermissions / anyPermissions — any-of (two spellings in use across App.jsx)
+  //   permission                           — a single required code
+  // Each supplied prop is its own gate, so combining them can only narrow access.
+  const permissionGates = [requiredPermissions, anyPermissions, permission ? [permission] : null];
+  if (permissionGates.some((gate) => gate?.length > 0 && !hasAnyPermission(gate))) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
   // ✅ Default: render protected content
   return <>{children}</>;
 };
+
+// Shown while a lazily loaded page chunk downloads.
+const RouteFallback = () => (
+  <div className="flex min-h-[40vh] items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
+  </div>
+);
 
 const SaveLastPath = () => {
   const location = useLocation();
@@ -464,6 +525,7 @@ const AppRoutes = () => {
 
   return (
     <>
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
@@ -500,18 +562,40 @@ const AppRoutes = () => {
           />
 
           {/* Accounts Payable — page skeletons only, business logic lands in later phases */}
+          {/* Module root has no page: send it to the dashboard, whose own ProtectedRoute
+              applies the AP access check (non-AP users land on /unauthorized from there). */}
+          <Route
+            path={AP_ROUTES.ROOT}
+            element={<Navigate to={AP_ROUTES.DASHBOARD} replace />}
+          />
+          <Route
+            path={AP_ROUTES.GUIDE}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
+                <ApGuidePage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path={AP_ROUTES.DASHBOARD}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
                 <APDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.DASHBOARD_ACTIVITY}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <DashboardActivityPage />
               </ProtectedRoute>
             }
           />
           <Route
             path={AP_ROUTES.VENDOR_LIST}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={VENDOR_ANY_PERMISSIONS}>
                 <VendorListPage />
               </ProtectedRoute>
             }
@@ -519,7 +603,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_ONBOARD}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={[VENDOR_PERMISSIONS.VENDOR_MANAGE, PROCUREMENT_PERMISSIONS.ONBOARDING_PROCESS]}>
                 <VendorOnboardingPage />
               </ProtectedRoute>
             }
@@ -527,7 +611,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_INTERNAL_REQUESTS}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} anyPermissions={ONBOARDING_ANY.VIEW}>
                 <InternalRequestsPage />
               </ProtectedRoute>
             }
@@ -535,7 +619,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_INTERNAL_REQUEST_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} anyPermissions={ONBOARDING_ANY.VIEW}>
                 <InternalRequestDetailPage />
               </ProtectedRoute>
             }
@@ -543,7 +627,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={VENDOR_ANY_PERMISSIONS}>
                 <VendorDetailPage />
               </ProtectedRoute>
             }
@@ -551,7 +635,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_UPDATE()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={[VENDOR_PERMISSIONS.VENDOR_MANAGE]}>
                 <VendorUpdatePage />
               </ProtectedRoute>
             }
@@ -561,6 +645,38 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceUploadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.INVOICE_BULK_UPLOAD}
+            element={
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD, INVOICE_PERMISSIONS.EMAIL_INTAKE_MANAGE]}>
+                <InvoiceBulkUploadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.AP_AUTOMATION}
+            element={
+              <ProtectedRoute requiredPermissions={[AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE]}>
+                <APAutomationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.INVOICE_REVIEW_WORKBENCH}
+            element={
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW, REVIEW_SEND_PERMISSIONS.INVOICE_SEND_FOR_APPROVAL]}>
+                <InvoiceReviewWorkbenchPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.INVOICE_BULK_BATCH()}
+            element={
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD]}>
+                <InvoiceBulkBatchPage />
               </ProtectedRoute>
             }
           />
@@ -612,10 +728,12 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           /> */}
+          {/* Payment Management / TDS Tracking — gated on the same permissions their backend
+              endpoints enforce (payment_route.py / tds_tracking_route.py), not INVOICE_VIEW. */}
           <Route
             path={AP_ROUTES.PAYMENT_READY}
             element={
-              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
                 <PaymentReadyPage />
               </ProtectedRoute>
             }
@@ -623,8 +741,120 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.PAYMENT_HISTORY}
             element={
-              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
                 <PaymentHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PAYMENT_DETAIL()}
+            element={
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
+                <PaymentInvoiceDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_TRACKING}
+            element={
+              <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
+                <TdsTrackingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.BULK_IMPORT}
+            element={
+              <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS"]}>
+                <BulkImportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_HISTORY_IMPORT}
+            element={
+              <ProtectedRoute requiredPermissions={["TDS_TRACKING_UPDATE"]}>
+                <BulkImportPage scope="tds-history" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.BULK_IMPORT_JOB()}
+            element={
+              <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"]}>
+                <BulkImportJobPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.WORK_ASSIGNMENT}
+            element={
+              <ProtectedRoute requiredPermissions={WORK_ASSIGN_LEAD_PERMISSIONS}>
+                <WorkAssignmentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.VENDOR_NOTES}
+            element={
+              <ProtectedRoute requiredPermissions={VENDOR_NOTE_VIEW_PERMISSIONS}>
+                <VendorNotesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.GST_ITC}
+            element={
+              <ProtectedRoute requiredPermissions={GST_ITC_VIEW_PERMISSIONS}>
+                <GstItcPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.ACCOUNTING_EXPORT}
+            element={
+              <ProtectedRoute requiredPermissions={ACCOUNTING_EXPORT_PERMISSIONS}>
+                <AccountingExportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.RECURRING}
+            element={
+              <ProtectedRoute requiredPermissions={RECURRING_VIEW_PERMISSIONS}>
+                <RecurringSchedulesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_CHALLANS}
+            element={
+              <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
+                <TdsChallansPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_CHALLAN_NEW}
+            element={
+              <ProtectedRoute requiredPermissions={["TDS_TRACKING_UPDATE"]}>
+                <TdsChallanNewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_FILING_NEW}
+            element={
+              <ProtectedRoute requiredPermissions={["TDS_TRACKING_UPDATE"]}>
+                <TdsFilingNewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_TRACKING_DETAIL()}
+            element={
+              <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
+                <TdsTrackingDetailPage />
               </ProtectedRoute>
             }
           />
@@ -639,7 +869,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.REPORTS}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
                 <APReportsPage />
               </ProtectedRoute>
             }
@@ -673,6 +903,16 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
                 <ApprovalPolicyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.NOTIFICATIONS}
+            element={
+              // Every AP user may read their own notifications - the backend derives the
+              // recipient from the JWT, so there is nothing finer to gate on here.
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <NotificationCenterPage />
               </ProtectedRoute>
             }
           />
@@ -821,7 +1061,29 @@ const AppRoutes = () => {
             />
             <Route
               path="invoice-approval"
-              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceApproval /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_CHECKER_ROLES}><InvoiceApproval /></ProtectedRoute>}
+            />
+            {/* Outstanding receivables — read-only monitoring, needed by maker and checker alike. */}
+            <Route
+              path="receivables"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><Receivables /></ProtectedRoute>}
+            />
+            {/* Post-invoice flow — payments, ledger & aging, credit/debit notes, reminders & collections. */}
+            <Route
+              path="payments"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><Payments /></ProtectedRoute>}
+            />
+            <Route
+              path="customer-ledger"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><CustomerLedger /></ProtectedRoute>}
+            />
+            <Route
+              path="adjustment-notes"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><AdjustmentNotes /></ProtectedRoute>}
+            />
+            <Route
+              path="collections"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><Collections /></ProtectedRoute>}
             />
             <Route
               path="invoices/:snapshotId"
@@ -875,6 +1137,14 @@ const AppRoutes = () => {
             <Route
               path="configurations/company-profile"
               element={<Navigate to="/account-receivable/master-data/company-profile" replace />}
+            />
+            <Route
+              path="master-data/exchange-rates"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><CurrencyExchangeRateMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations/exchange-rates"
+              element={<Navigate to="/account-receivable/master-data/exchange-rates" replace />}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
@@ -1219,7 +1489,9 @@ const AppRoutes = () => {
             path="/leave-management/manager"
             element={
               <ProtectedRoute allowedRoles={["Manager"]}>
-                <AdminPanel />
+                <PageContainer density="comfortable">
+                  <AdminPanel />
+                </PageContainer>
               </ProtectedRoute>
             }
           />
@@ -1227,7 +1499,9 @@ const AppRoutes = () => {
             path="/leave-management/hr"
             element={
               <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
-                <HRManageTools />
+                <PageContainer density="comfortable">
+                  <HRManageTools />
+                </PageContainer>
               </ProtectedRoute>
             }
           />
@@ -1685,20 +1959,29 @@ const AppRoutes = () => {
           </Route>
 
           {/* Expense Management (XMS) */}
-          <Route path="/expense-management/dashboard" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsDashboardPage /></ProtectedRoute>} />
+          <Route path="/expense-management/dashboard" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsDashboardPage /></ProtectedRoute>} />
+
+          {/* EP12-S1: Global Search */}
+          <Route path="/expense-management/search" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsGlobalSearchPage /></ProtectedRoute>} />
+          <Route path="/expense-management/filters" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsAdvancedFilterPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
+          {/* Supplementary claims: employee screens. The backend checks the report, the period and every action. */}
+          <Route path="/expense-management/expenses/supplementary" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Finance_Executive", "Admin"]}><XmsSupplementaryClaimsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/supplementary/:claimId" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Finance_Executive", "Admin"]}><XmsSupplementaryClaimDetailPage mode="employee" /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports/:reportId" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsExpenseReportDetailPage /></ProtectedRoute>} />
-          <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
+          {/* Same roles as the backend's /xms/manager/team endpoints and the dashboard's "My team" tab. */}
+          <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager", "Reporting_Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsExpenseReportsPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/receipts/library" element={<ProtectedRoute allowedRoles={["General"]}><XmsReceiptLibraryPage /></ProtectedRoute>} />
-          <Route path="/expense-management/receipts/ocr-processing" element={<ProtectedRoute allowedRoles={["General"]}><XmsOcrProcessingPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/cash-advance/request" element={<ProtectedRoute allowedRoles={["General"]}><XmsRequestAdvancePage /></ProtectedRoute>} />
           <Route path="/expense-management/cash-advance/my" element={<ProtectedRoute allowedRoles={["General"]}><XmsMyAdvancesPage /></ProtectedRoute>} />
-          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General"]}><XmsSettlementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General", "Finance", "FINANCE_EXECUTIVE", "Admin"]}><XmsSettlementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement/:advanceId" element={<ProtectedRoute allowedRoles={["General", "Finance", "FINANCE_EXECUTIVE", "Admin"]}><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/approvals" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsCashAdvanceApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/:advanceId" element={<ProtectedRoute allowedRoles={["General"]}><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
 
           {/* No role gate (§1.5): any employee can be a resolved approver (NAMED_USER/DEPARTMENT_OWNER/
               COST_CENTER_OWNER), not just "Manager" - the backend itself has no role restriction on
@@ -1706,7 +1989,8 @@ const AppRoutes = () => {
           <Route path="/expense-management/approvals/pending" element={<Navigate to="/expense-management/approvals" replace />} />
           <Route path="/expense-management/approvals/approved" element={<Navigate to="/expense-management/approvals" replace />} />
           <Route path="/expense-management/approvals/rejected" element={<Navigate to="/expense-management/approvals" replace />} />
-          <Route path="/expense-management/approvals" element={<ProtectedRoute><XmsApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals" element={<ProtectedRoute allowedRoles={XMS_APPROVALS_PAGE_ROLES}><XmsApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/cash-advance/:advanceId" element={<ProtectedRoute><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
 
           {/* Approval Rules (Admin config) - ADMIN-only, matching the Masters section's own role gate. */}
           <Route path="/expense-management/approval-rules/flows" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsApprovalFlowsPage /></ProtectedRoute>} />
@@ -1719,38 +2003,50 @@ const AppRoutes = () => {
           {/* FinanceVerificationController's @PreAuthorize requires exactly FINANCE_EXECUTIVE —
               the generic "Finance" role passes this route gate but then 403s on every API call,
               so it's deliberately excluded here (see sidebarConfig.js's XMS_FINANCE_VERIFICATION). */}
-          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsFinancePage /></ProtectedRoute>} />
+          {/* Supplementary claims: manager queue and review. Only the employee's own reporting manager is accepted by the backend. */}
+          <Route path="/expense-management/manager/supplementary-claims" element={<ProtectedRoute allowedRoles={["Manager", "Reporting_manager"]}><XmsSupplementaryQueuePage variant="manager" /></ProtectedRoute>} />
+          <Route path="/expense-management/manager/supplementary-claims/:claimId" element={<ProtectedRoute allowedRoles={["Manager", "Reporting_manager"]}><XmsSupplementaryClaimDetailPage mode="manager" /></ProtectedRoute>} />
+          {/* Supplementary claims: Finance. Each route needs the Finance role AND its UMS permission (fails closed). */}
+          <Route path="/expense-management/finance/supplementary-claims" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsSupplementaryQueuePage variant="finance" /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/supplementary-claims/new" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]} requiredPermissions={["SUPP_CLAIM_CREATE_FOR_EMPLOYEE"]}><XmsFinanceCreateSupplementaryPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/supplementary-claims/:claimId" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsSupplementaryClaimDetailPage mode="finance" /></ProtectedRoute>} />
+          {/* Receipt release: the request and the decision are separate permissions; the backend refuses self-approval. */}
+          <Route path="/expense-management/finance/receipt-releases" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]} requiredPermissions={["RECEIPT_RELEASE_REQUEST", "RECEIPT_RELEASE_APPROVE"]}><XmsFinanceReceiptReleasePage /></ProtectedRoute>} />
+          {/* AP payment for approved supplementary claims. Settlement happens only when AP confirms a payment. */}
+          <Route path="/expense-management/ap/supplementary-payments" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApSupplementaryPaymentsPage /></ProtectedRoute>} />
+          {/* Old Verification / Reimbursements / Payment Status URLs, merged into the one page above. */}
+          <Route path="/expense-management/finance/*" element={<Navigate to="/expense-management/finance" replace />} />
           <Route path="/expense-management/ap-payments/queue" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApPaymentQueuePage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
-          <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />
-          <Route path="/expense-management/client-billing/invoice-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsInvoiceStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsClientBillingPage /></ProtectedRoute>} />
+          {/* Old three-page Client Billing URLs, merged into the one page above. */}
+          <Route path="/expense-management/client-billing/*" element={<Navigate to="/expense-management/client-billing" replace />} />
 
           <Route path="/expense-management/masters/expense-categories" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsExpenseCategoriesPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/gl-accounts" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsGlAccountsPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/cost-center-management" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCostCenterManagementPage /></ProtectedRoute>} />
-          <Route path="/expense-management/masters/projects" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsProjectsMasterPage /></ProtectedRoute>} />
-          <Route path="/expense-management/masters/clients" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsClientsMasterPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/currency-management" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCurrencyManagementPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/tax-configuration" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsTaxConfigurationPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/policy-engine/dashboard" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyDashboardPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/bundles" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyBundlesPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/rules" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyRulesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/carry-forward" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyCarryForwardPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/groups" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyGroupsPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/assignments" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyAssignmentsPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/severity-thresholds" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsSeverityThresholdPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/versions" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyVersionsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Finance_Executive", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/itc-register" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive", "Admin", "Super_Admin"]}><XmsItcRegisterPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
           <Route path="/expense-management/activity/audit-logs" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsAuditLogsPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/settings" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsSettingsPage /></ProtectedRoute>} />
         </Route>
       </Routes>
+      </Suspense>
       <SaveLastPath />
     </>
   );

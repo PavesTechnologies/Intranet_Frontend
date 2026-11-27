@@ -1,48 +1,71 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { CreditCard } from "lucide-react";
+import { CheckCircle2, CircleDashed, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import { useMarkReadyForPaymentMutation } from "../../payment/hooks/usePaymentMutations";
 import { useInvoiceTds } from "../hooks/useInvoiceTds";
+import { useInvoicePaymentTerms } from "../hooks/useInvoicePaymentTerms";
+import { PAYABLE_TERM_STATUSES } from "../../constants/paymentTerms";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { formatCurrency, calculateBalance } from "../../utils/formatters";
+import { formatCurrency, formatDate, formatTime, calculateBalance } from "../../utils/formatters";
 import { INVOICE_STATUS } from "../../constants/invoiceStatus";
 import { AP_ROUTES } from "../../constants/routes";
 import { Link } from "react-router-dom";
+
+/** "₹17,700.00 — 10% under TDS - Professional or Technical Services (Section 194J, ...)" — built
+ * entirely from fields useInvoiceTds already returns, never recomputed. Degrades gracefully if
+ * the rule/rate isn't populated (still shows the amount alone) rather than showing a broken line. */
+function buildTdsBasisLine(tds, symbol) {
+  if (!tds?.tds_applicable) return null;
+  const amount = formatCurrency(tds.tds_amount ?? 0, symbol);
+  const parts = [];
+  if (tds.tds_rate != null) parts.push(`${tds.tds_rate}%`);
+  if (tds.tds_rule?.rule_name) parts.push(`under ${tds.tds_rule.rule_name}`);
+  const basis = parts.join(" ");
+  const withRef = tds.tds_rule?.legal_reference ? `${basis} (${tds.tds_rule.legal_reference})` : basis;
+  return withRef ? `${amount} — ${withRef}` : amount;
+}
 
 /**
  * Payment readiness/status for this invoice. "Mark Ready for Payment" is the one manual gate
  * between Approved and payable (Backend/Business_Layer/services/payment_service.py:
  * mark_ready_for_payment) — never automatic just because the invoice was approved. Individual
- * payment transactions aren't listed here: GET /apm/payment has no invoice_id filter (only
- * vendor_id/status_id), so per-invoice payment history isn't fetchable without pulling every
- * payment in the system — see the Payment History page (filtered by vendor/status) instead.
+ * payments (and their receipts) are listed on the invoice's payment detail page
+ * (GET /apm/payment/invoice/{id}, AP_ROUTES.PAYMENT_DETAIL), where Record Payment also lives.
  */
 export default function InvoicePaymentPanel({ invoice }) {
-  const { canMarkPaid } = useApPermissions();
+  const { canMarkPaid, canViewPaymentManagement, canViewTdsTracking, canViewPaymentTerms } = useApPermissions();
   const markReady = useMarkReadyForPaymentMutation();
   // TDS Phase 1: the backend does not itself enforce "TDS verified before ready-for-payment" —
   // same frontend-only sequencing as InvoiceApprovalPanel's send-for-approval gate (see
   // InvoiceTdsPanel for the actual verify UI). A 404 here just means "not yet determined."
   const { data: tds } = useInvoiceTds(invoice.id);
+  // Payment terms must be COMPLIANT or verified by Finance before Mark Ready for Payment — the
+  // backend enforces this (payment_service.mark_ready_for_payment); this only explains the block.
+  // A not-yet-evaluated invoice is checked by the backend at mark-ready time, so it isn't blocked here.
+  const { data: paymentTerms } = useInvoicePaymentTerms(invoice.id, { enabled: canViewPaymentTerms });
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reasonOpen, setReasonOpen] = useState(false);
 
   const symbol = invoice.currency?.symbol || "₹";
   const balance = calculateBalance(invoice.netAmount, invoice.amountPaid);
   const isApproved = invoice.status === INVOICE_STATUS.APPROVED;
   const tdsVerified = tds?.determination_status === "VERIFIED";
   const tdsBlocksMarkReady = isApproved && !tdsVerified;
-  const canOfferMarkReady = isApproved && canMarkPaid && tdsVerified;
-  // Phase 1 display only — the backend's PaymentService does not yet subtract TDS from what it
-  // actually allocates as payable (see spec section 11); invoice.netAmount still drives real
-  // payment creation. Shown once a determination exists so Finance isn't surprised by the gap
-  // between this figure and what payment actually processes.
-  const netVendorPayable =
-    tds?.tds_amount != null ? Number(invoice.netAmount || 0) - Number(tds.tds_amount) : null;
+  const termsBlockMarkReady =
+    isApproved && Boolean(paymentTerms?.evaluated) && !PAYABLE_TERM_STATUSES.includes(paymentTerms.validation_status);
+  const canOfferMarkReady = isApproved && canMarkPaid && tdsVerified && !termsBlockMarkReady;
+  // Backend-enforced, not a display estimate: PaymentService now caps allocation at
+  // net_amount - tds_amount and rejects anything over it. invoice.payableAmount comes straight
+  // off the invoice-details response (mapInvoiceRecord) — the same field the backend itself
+  // computed — rather than being re-derived here from tds_amount, so this can never drift from
+  // what payment creation will actually accept. Null until TDS has been determined.
+  const netVendorPayable = invoice.payableAmount;
+  const tdsBasisLine = buildTdsBasisLine(tds, symbol);
   const isPayable =
     invoice.status === INVOICE_STATUS.READY_FOR_PAYMENT ||
     invoice.status === INVOICE_STATUS.PARTIALLY_PAID;
@@ -85,19 +108,66 @@ export default function InvoicePaymentPanel({ invoice }) {
             </div>
           )}
         </dl>
+
+        {tds && (
+          <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">TDS Deducted</span>
+              {!tds.tds_applicable && <span className="text-sm font-medium text-gray-700">No TDS deducted</span>}
+            </div>
+            {tds.tds_applicable && tdsBasisLine && (
+              <p className="mt-1 text-sm text-gray-800">{tdsBasisLine}</p>
+            )}
+            {tds.determination_reason && (
+              <button
+                type="button"
+                onClick={() => setReasonOpen((open) => !open)}
+                className="mt-1 flex items-center gap-1 text-xs font-medium text-[#0A0082] hover:underline"
+              >
+                {reasonOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {reasonOpen ? "Hide reason" : "Why this determination?"}
+              </button>
+            )}
+            {reasonOpen && tds.determination_reason && (
+              <p className="mt-1 text-xs text-gray-600">{tds.determination_reason}</p>
+            )}
+            <p className="mt-2 text-xs text-gray-500">
+              {tdsVerified
+                ? `Verified by ${tds.verified_by || "—"}${tds.verified_at ? ` on ${formatDate(tds.verified_at)} ${formatTime(tds.verified_at)}` : ""}`
+                : "Not yet verified"}
+            </p>
+          </div>
+        )}
         {netVendorPayable != null && (
           <p className="mb-3 text-xs italic text-gray-500">
-            Net Amount minus TDS — a Phase 1 display figure only; payment is still processed against
-            the Net Amount above.
+            Net Amount minus TDS — this is the amount actually payable to the vendor; the withheld
+            portion is remitted separately.
           </p>
         )}
 
-        {isApproved && (
-          <p className="mb-3 text-xs italic text-gray-500">
-            {tdsBlocksMarkReady
-              ? "Approved, but not yet payable — TDS must be verified before this invoice can be marked ready for payment."
-              : "Approved, but not yet payable — Finance must mark it ready for payment first."}
-          </p>
+        {isApproved && (tdsBlocksMarkReady || termsBlockMarkReady) ? (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3" role="status">
+            <p className="text-xs font-semibold text-amber-900">Approved - before it can be marked ready for payment:</p>
+            <ul className="mt-2 space-y-1.5 text-xs">
+              {[
+                { done: !tdsBlocksMarkReady, label: "TDS verified", fix: "Verify TDS", href: "#invoice-tds" },
+                { done: !termsBlockMarkReady, label: "Payment terms confirmed", fix: "Check payment terms", href: "#invoice-payment-terms" },
+              ].map((item) => (
+                <li key={item.label} className="flex items-center justify-between gap-2">
+                  <span className={item.done ? "flex items-center gap-1.5 text-emerald-700" : "flex items-center gap-1.5 text-amber-900"}>
+                    {item.done ? <CheckCircle2 size={14} aria-hidden="true" /> : <CircleDashed size={14} aria-hidden="true" />}
+                    {item.label}
+                  </span>
+                  {!item.done && canMarkPaid && (
+                    <a href={item.href} className="font-medium text-[#0A0082] hover:underline">{item.fix} →</a>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {!canMarkPaid && <p className="mt-2 text-xs text-amber-800">Finance verifies these and releases it for payment.</p>}
+          </div>
+        ) : isApproved && (
+          <p className="mb-3 text-xs text-gray-500">Approved - Finance marks it ready for payment, then it can be paid.</p>
         )}
 
         {canOfferMarkReady && (
@@ -105,17 +175,40 @@ export default function InvoicePaymentPanel({ invoice }) {
             <CreditCard size={14} /> Mark Ready for Payment
           </Button>
         )}
+        {isApproved && canMarkPaid && !canOfferMarkReady && (
+          <Button variant="primary" size="small" className="w-full" disabled title="Complete the steps above first">
+            <CreditCard size={14} /> Mark Ready for Payment
+          </Button>
+        )}
 
         {isPayable && balance > 0 && canMarkPaid && (
           <Link
-            to={AP_ROUTES.PAYMENT_MARK_PAID(invoice.id)}
+            to={AP_ROUTES.PAYMENT_DETAIL(invoice.id)}
             className="mt-2 block w-full rounded-lg border border-[#0A0082] px-3 py-2 text-center text-sm font-medium text-[#0A0082] hover:bg-[#0A0082]/5"
           >
             Pay Invoice
           </Link>
         )}
 
-        {invoice.status === INVOICE_STATUS.PAID && <StatusBadge label="Paid" size="sm" />}
+        {invoice.status === INVOICE_STATUS.PAID && <ApStatusBadge status={INVOICE_STATUS.PAID} />}
+
+        {/* Every recorded payment (with receipts) and the separate TDS tracking lifecycle live
+            on their own pages — linked here rather than duplicated. */}
+        {(canViewPaymentManagement && (isPayable || invoice.status === INVOICE_STATUS.PAID)) ||
+        (canViewTdsTracking && tds?.tds_applicable) ? (
+          <div className="mt-3 flex flex-col gap-1 border-t border-gray-100 pt-2 text-sm">
+            {canViewPaymentManagement && (isPayable || invoice.status === INVOICE_STATUS.PAID) && (
+              <Link to={AP_ROUTES.PAYMENT_DETAIL(invoice.id)} className="text-[#0A0082] hover:underline">
+                Payment history & receipts →
+              </Link>
+            )}
+            {canViewTdsTracking && tds?.tds_applicable && (
+              <Link to={AP_ROUTES.TDS_TRACKING_DETAIL(invoice.id)} className="text-[#0A0082] hover:underline">
+                TDS tracking (deduction / challan / filing) →
+              </Link>
+            )}
+          </div>
+        ) : null}
       </PageCardContent>
 
       <Modal

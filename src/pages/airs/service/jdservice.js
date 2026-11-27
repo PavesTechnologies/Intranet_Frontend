@@ -296,6 +296,57 @@ export const getJDSkills = async (jdId) => {
     }
 };
 
+// PATCH /skills/jd-skills/{id} — change a JD skill's mandatory flag and
+// core/supporting importance (importance is required when mandatory is true).
+// 409 = the JD is used by an active campaign; 400 = importance missing, or the
+// change would leave the JD without a core skill.
+export const updateJDSkill = async (jdSkillId, { mandatory, importance }) => {
+    try {
+        const response = await api.patch(
+            `${BASE_URL}/skills/jd-skills/${jdSkillId}`,
+            { mandatory, importance: mandatory ? importance : null },
+            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        );
+        toast.success(response.data?.message || "JD skill updated.");
+        return response.data;
+    } catch (error) {
+        console.error("Error updating JD skill:", error);
+        toast.error(getErrorMessage(error, "Failed to update JD skill."));
+        throw error;
+    }
+};
+
+// DELETE /skills/jd-skills/{id} — removes the skill from this JD only; the
+// skill stays in the skill ontology. Same 409/400 rules as updateJDSkill.
+export const removeJDSkill = async (jdSkillId) => {
+    try {
+        const response = await api.delete(`${BASE_URL}/skills/jd-skills/${jdSkillId}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        toast.success(response.data?.message || "Skill removed from JD.");
+        return response.data;
+    } catch (error) {
+        console.error("Error removing JD skill:", error);
+        toast.error(getErrorMessage(error, "Failed to remove skill from JD."));
+        throw error;
+    }
+};
+
+// GET /job-descriptions/education-options — distinct degree/field values
+// already used across JDs, for the JD form's suggestions. Silent: a failure
+// just means no suggestions, the inputs still accept free text.
+export const getEducationOptions = async () => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/education-options`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching education options:", error);
+        return null;
+    }
+};
+
 export const getJDUnknownSkills = async (jdId) => {
     try {
         const response = await api.get(`${BASE_URL}/skills/jd/${jdId}/unknown-skills`, {

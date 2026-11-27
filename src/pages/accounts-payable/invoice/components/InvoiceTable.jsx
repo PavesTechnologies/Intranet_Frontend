@@ -1,19 +1,23 @@
 import { Link } from "react-router-dom";
 import GenericTable from "../../../../components/Table/table";
-import StatusBadge from "../../../../components/status/statusbadge";
+import ApStatusBadge from "../../components/ApStatusBadge";
 import { formatCurrency, formatDate, calculateBalance, isOverdue } from "../../utils/formatters";
 import { AP_ROUTES } from "../../constants/routes";
 import { INVOICE_TYPE_LABELS } from "../../constants/invoiceTypes";
 import InvoiceRowActions from "./InvoiceRowActions";
+import InvoiceTdsStatusCell from "./InvoiceTdsStatusCell";
 
 const HEADERS = ["Invoice #", "Vendor", "Invoice Date", "Due Date", "Type", "Net Amount", "Paid", "Balance", "Status", "Actions"];
 const COLUMNS = ["invoiceNumber", "vendor", "invoiceDate", "dueDate", "type", "netAmount", "paid", "balance", "status", "actions"];
+// TDS Status tab: the TDS verification state sits right after the invoice status.
+const TDS_HEADERS = [...HEADERS.slice(0, 9), "TDS Status", ...HEADERS.slice(9)];
+const TDS_COLUMNS = [...COLUMNS.slice(0, 9), "tdsStatus", ...COLUMNS.slice(9)];
 
 /**
  * Reusable across Invoice Management, OCR Review, and Validation views — never fed raw
  * database IDs (vendor is shown by name, currency by its own display fields, etc.).
  */
-export default function InvoiceTable({ invoices, loading }) {
+export default function InvoiceTable({ invoices, loading, showTdsStatus = false }) {
   const rows = invoices.map((invoice) => {
     const balance = calculateBalance(invoice.netAmount, invoice.amountPaid);
     const overdue = isOverdue(invoice.dueDate, invoice.netAmount, invoice.amountPaid);
@@ -34,17 +38,37 @@ export default function InvoiceTable({ invoices, loading }) {
         </span>
       ),
       type: INVOICE_TYPE_LABELS[invoice.invoiceType] || invoice.invoiceType,
-      netAmount: formatCurrency(invoice.netAmount, symbol),
+      netAmount: (
+        <div>
+          <div>{formatCurrency(invoice.netAmount, symbol)}</div>
+          {/* Only shown once TDS is actually determined and applicable — a null/false
+              tds_applicable means either "not yet determined" or "no TDS," and in both cases
+              payable would just repeat net_amount, so nothing extra is shown. */}
+          {invoice.tdsApplicable && invoice.payableAmount != null && (
+            <div className="text-xs font-normal text-gray-500">
+              Payable: {formatCurrency(invoice.payableAmount, symbol)}
+            </div>
+          )}
+        </div>
+      ),
       paid: formatCurrency(invoice.amountPaid, symbol),
       balance: (
         <span className={balance > 0 ? "text-red-600" : "text-green-600"}>
           {formatCurrency(balance, symbol)}
         </span>
       ),
-      status: <StatusBadge label={invoice.status} size="sm" />,
+      status: <ApStatusBadge status={invoice.status} />,
+      ...(showTdsStatus && { tdsStatus: <InvoiceTdsStatusCell invoiceId={invoice.id} /> }),
       actions: <InvoiceRowActions invoice={invoice} />,
     };
   });
 
-  return <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={loading} />;
+  return (
+    <GenericTable
+      headers={showTdsStatus ? TDS_HEADERS : HEADERS}
+      columns={showTdsStatus ? TDS_COLUMNS : COLUMNS}
+      rows={rows}
+      loading={loading}
+    />
+  );
 }

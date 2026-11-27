@@ -55,12 +55,15 @@ export default function AllHolidaysGrid({ holidays, onClose }) {
               </span>
             </div>
           </div>
-          <button
-  onClick={onClose}
-  className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 transition-all"
->
-  <X className="w-6 h-6 text-white stroke-[3]" />
-</button>
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="icon"
+            aria-label="Close"
+            className="w-10 h-10 text-white hover:text-white/70"
+          >
+            <X className="w-6 h-6 text-white stroke-[3]" />
+          </Button>
         </div>
 
         {/* Scrollable Grid */}
@@ -160,12 +163,13 @@ export default function AllHolidaysGrid({ holidays, onClose }) {
           <p className="text-xs text-gray-400">
             Press <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 font-mono text-[10px]">Esc</kbd> to close
           </p>
-          <button
+          <Button
             onClick={onClose}
-            className="px-5 py-2 text-sm font-semibold text-white bg-indigo-900 hover:bg-indigo-700 rounded-lg transition-colors"
+            variant="outline"
+            className="px-5 py-2 text-sm font-semibold text-white bg-indigo-900 hover:bg-indigo-700"
           >
             Close
-          </button>
+          </Button>
         </div>
       </div>
 

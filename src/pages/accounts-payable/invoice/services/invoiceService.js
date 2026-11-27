@@ -51,7 +51,58 @@ function withNormalizedStatus(error) {
   return error;
 }
 
+/**
+ * Search + status + type + date filtering and pagination over the full invoice list — pure, so
+ * the list hook can fetch the array once and re-run this on every search/filter change without
+ * another network round trip. Params are the same as invoiceService.getInvoices.
+ * @returns {{items: Array, total: number, page: number, pageSize: number, totalPages: number}}
+ */
+export function filterInvoices(all = [], params = {}) {
+  const {
+    search = "",
+    status = "",
+    statuses = null,
+    invoiceType = "",
+    dateField = "invoiceDate",
+    dateFrom = "",
+    dateTo = "",
+    page = 1,
+    pageSize = 10,
+  } = params;
+
+  const filtered = all.filter((invoice) => {
+    if (statuses && !statuses.includes(invoice.status)) return false;
+    if (status && invoice.status !== status) return false;
+    if (invoiceType && invoice.invoiceType !== invoiceType) return false;
+    if (!matchesSearch(invoice, search)) return false;
+    if (!matchesDateRange(invoice, dateField, dateFrom, dateTo)) return false;
+    return true;
+  });
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const start = (safePage - 1) * pageSize;
+  const items = filtered.slice(start, start + pageSize);
+
+  return { items, total, page: safePage, pageSize, totalPages };
+}
+
 export const invoiceService = {
+  /**
+   * The full mapped invoice list (GET /invoice-details/invoice), unfiltered. The endpoint takes
+   * no query params, so this is the one request behind every search/filter combination.
+   * @returns {Promise<Array>}
+   */
+  async getAllInvoices() {
+    try {
+      return await fetchAllInvoices();
+    } catch (error) {
+      console.error("Error in invoiceService.getAllInvoices:", error);
+      throw withNormalizedStatus(error);
+    }
+  },
+
   /**
    * @param {Object} [params]
    * @param {string} [params.search] - matches invoice number or vendor name
@@ -71,36 +122,7 @@ export const invoiceService = {
    */
   async getInvoices(params = {}) {
     try {
-      const {
-        search = "",
-        status = "",
-        statuses = null,
-        invoiceType = "",
-        dateField = "invoiceDate",
-        dateFrom = "",
-        dateTo = "",
-        page = 1,
-        pageSize = 10,
-      } = params;
-
-      const all = await fetchAllInvoices();
-
-      const filtered = all.filter((invoice) => {
-        if (statuses && !statuses.includes(invoice.status)) return false;
-        if (status && invoice.status !== status) return false;
-        if (invoiceType && invoice.invoiceType !== invoiceType) return false;
-        if (!matchesSearch(invoice, search)) return false;
-        if (!matchesDateRange(invoice, dateField, dateFrom, dateTo)) return false;
-        return true;
-      });
-
-      const total = filtered.length;
-      const totalPages = Math.max(1, Math.ceil(total / pageSize));
-      const safePage = Math.min(Math.max(1, page), totalPages);
-      const start = (safePage - 1) * pageSize;
-      const items = filtered.slice(start, start + pageSize);
-
-      return { items, total, page: safePage, pageSize, totalPages };
+      return filterInvoices(await fetchAllInvoices(), params);
     } catch (error) {
       console.error("Error in invoiceService.getInvoices:", error);
       throw withNormalizedStatus(error);
@@ -361,9 +383,20 @@ export const invoiceService = {
       const totalInvoicesThisMonth = all.filter((invoice) => isThisMonth(invoice.invoiceDate)).length;
       const pendingApprovalCount = all.filter((invoice) => invoice.status === INVOICE_STATUS.PENDING_APPROVAL).length;
 
-      // "Ready for payment" is a UI-level grouping over Approved invoices with an outstanding
-      // balance — there is no distinct READY_FOR_PAYMENT status on the backend.
-      const readyForPayment = all.filter((invoice) => invoice.status === INVOICE_STATUS.APPROVED);
+      // Ready for payment = marked ready by Finance (READY_FOR_PAYMENT) or part-paid with a balance left.
+      const readyForPayment = all.filter((invoice) =>
+        invoice.status === INVOICE_STATUS.READY_FOR_PAYMENT || invoice.status === INVOICE_STATUS.PARTIALLY_PAID);
+      const count = (...statuses) => all.filter((invoice) => statuses.includes(invoice.status)).length;
+      const statusCounts = {
+        total: all.length,
+        toReview: count(INVOICE_STATUS.OCR_REVIEW_PENDING, INVOICE_STATUS.OCR_FAILED),
+        returned: count(INVOICE_STATUS.RETURNED_FOR_REVIEW),
+        readyToSend: count(INVOICE_STATUS.OCR_REVIEWED),
+        pendingApproval: count(INVOICE_STATUS.PENDING_APPROVAL),
+        approved: count(INVOICE_STATUS.APPROVED),
+        approvedOrLater: count(INVOICE_STATUS.APPROVED, INVOICE_STATUS.READY_FOR_PAYMENT, INVOICE_STATUS.PARTIALLY_PAID, INVOICE_STATUS.PAID),
+        rejected: count(INVOICE_STATUS.REJECTED),
+      };
       const readyForPaymentBalance = readyForPayment.reduce(
         (sum, invoice) => sum + calculateBalance(invoice.netAmount, invoice.amountPaid),
         0
@@ -387,6 +420,7 @@ export const invoiceService = {
         readyForPaymentBalance,
         paidThisMonthCount: paidThisMonthInvoiceIds.size,
         paidThisMonthAmount,
+        statusCounts,
       };
     } catch (error) {
       console.error("Error in invoiceService.getInvoiceSummary:", error);

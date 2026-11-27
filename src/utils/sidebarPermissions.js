@@ -13,6 +13,8 @@
  *     on a nav item whose page will just 403.
  *   - Items with children                → children are filtered first; the parent is
  *                                          suppressed automatically if no children survive.
+ *   - collapseSingleChild: true          → when exactly one child survives, the parent renders as
+ *                                          a plain link to that child instead of a one-item submenu.
  *
  * @param {Array}    items              - Menu config items (from sidebarConfig.js)
  * @param {Function} hasRole            - hasRole(rolesArray: string[]) from useAuth()
@@ -23,13 +25,29 @@
  */
 export function filterMenuByRole(items, hasRole, hasAnyPermission = () => true) {
   return items.reduce((acc, item) => {
+    // `roleOrPermissions`: visible with ANY of these roles OR ANY of these permissions (e.g. the AP
+    // Dashboard, open to every AP role and to management users who hold no AP role at all).
+    const passesEither = !item.roleOrPermissions
+      || hasRole(item.roleOrPermissions.roles || [])
+      || hasAnyPermission(item.roleOrPermissions.permissions || []);
     const passesRole = !item.allowedRoles || hasRole(item.allowedRoles);
+    // `hiddenForRoles`: hidden from users holding any of these roles, even when they also hold an allowed role.
+    // Either an array of roles, or `{ roles, unless }` to keep the item for users who also hold an `unless` role
+    // (e.g. Approvals is hidden for Finance unless they are also a manager).
+    const hidden = item.hiddenForRoles;
+    const passesHidden = !hidden || (Array.isArray(hidden)
+      ? !hasRole(hidden)
+      : !hasRole(hidden.roles || []) || hasRole(hidden.unless || []));
     const passesPermission = !item.requiredPermissions || hasAnyPermission(item.requiredPermissions);
-    if (!passesRole || !passesPermission) return acc;
+    if (!passesEither) return acc;
+    if (!passesRole || !passesPermission || !passesHidden) return acc;
 
     if (item.children?.length) {
       const visibleChildren = filterMenuByRole(item.children, hasRole, hasAnyPermission);
-      if (visibleChildren.length > 0) {
+      if (item.collapseSingleChild && visibleChildren.length === 1) {
+        const { children: _children, ...link } = item;
+        acc.push({ ...link, to: visibleChildren[0].to });
+      } else if (visibleChildren.length > 0) {
         acc.push({ ...item, children: visibleChildren });
       }
       // parent suppressed when all children are hidden for this role

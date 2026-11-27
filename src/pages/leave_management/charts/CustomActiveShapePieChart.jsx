@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { toast } from "react-toastify";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
+import { InlineLoader } from "../../../components/patterns/Loaders";
 
 // Color palette
 const COLORS = [
@@ -139,7 +140,7 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
         </span>
       </div>
       {loading ? (
-        <p className="text-sm text-gray-500 animate-pulse">Loading...</p>
+        <InlineLoader text="Loading..." />
       ) : data.length > 0 ? (
         <div className="w-full flex justify-center items-center">
           <ResponsiveContainer

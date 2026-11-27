@@ -132,6 +132,28 @@ export default function NewCampaignForm({
                         labelClassName={LABEL_CLASS}
                     />
                     <FormInput
+                        label="Max Missing Core Skills (%)"
+                        name="max_missing_core_pct"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={campaignForm.max_missing_core_pct}
+                        onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
+                        title="Core skills a candidate may miss and still pass: this % of the JD's core skills (rounded down), never more than the cap."
+                    />
+                    <FormInput
+                        label="Max Missing Core Skills (cap)"
+                        name="max_missing_core_skills"
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={campaignForm.max_missing_core_skills}
+                        onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
+                        title="Core skills a candidate may miss and still pass: this % of the JD's core skills (rounded down), never more than the cap."
+                    />
+                    <FormInput
                         label="Relevance Weight"
                         name="weight_semantic"
                         type="number"

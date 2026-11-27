@@ -12,7 +12,6 @@ import {
   SlidersHorizontal,
   FileSpreadsheet,
 } from "lucide-react";
-import StatusBadge from "../../../../components/status/statusbadge";
 import Button from "../../../../components/Button/Button";
 
 export default function BillingReadinessCard({
@@ -24,15 +23,36 @@ export default function BillingReadinessCard({
 }) {
   if (!config) return null;
 
-  const status = config.billingStatus || "NOT_ACQUIRED";
+  const rawStatus =
+    config.snapshotLifecycleStatus ||
+    acquisitionResults?.snapshotLifecycleStatus ||
+    config.billingStatus ||
+    acquisitionResults?.billingStatus ||
+    "NOT_ACQUIRED";
+  const status = String(rawStatus).toUpperCase();
   const laborRes = acquisitionResults?.labor || {};
   const readiness = laborRes.readiness || {};
 
-  const isApprovedStatus = ["READY", "READY_TO_TAX", "READY_FOR_TAX", "TAX_COMPLETED", "IN_TAX"].includes(status);
+  const isApprovedStatus = [
+    "READY",
+    "READY_TO_TAX",
+    "READY_FOR_TAX",
+    "TAX_COMPLETED",
+    "IN_TAX",
+    "INVOICED",
+    "ALREADY_BILLED",
+    "BILLED",
+  ].includes(status);
   const approvedCount = readiness.approvedCount ?? (isApprovedStatus ? laborRes.records?.length || 0 : 0);
   const pendingCount = readiness.pendingCount ?? 0;
   const approvedHours = readiness.approvedHours ?? (isApprovedStatus ? laborRes.records?.reduce((acc, r) => acc + Number(r.hours || 0), 0) : 0);
   const pendingHours = readiness.pendingHours ?? 0;
+
+  const isExpenseEligible = Boolean(config?.expenseBillingEligible);
+  const expenseRes = acquisitionResults?.expense || {};
+  const expenseRecords = expenseRes.records || config?.existingSnapshot?.expenseRecords || [];
+  const expenseCount = expenseRecords.length;
+  const expenseAmount = Number(expenseRes.amount ?? config?.existingSnapshot?.expenseAmount ?? 0);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
@@ -42,7 +62,6 @@ export default function BillingReadinessCard({
           <FileCheck className="h-4 w-4 text-indigo-600" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Billing Readiness</h3>
         </div>
-        <StatusBadge label={status} size="sm" />
       </div>
 
       {/* State-driven Content */}
@@ -81,12 +100,23 @@ export default function BillingReadinessCard({
               ? "Tax has been calculated successfully for this billing snapshot."
               : status === "IN_TAX"
               ? "Tax calculation is currently processing."
+              : isExpenseEligible && expenseCount > 0
+              ? "All required timesheets and eligible expenses are verified and ready for billing."
               : "All required timesheets are approved and billing is ready."}
           </p>
-          <div className="flex items-center gap-3 text-xs font-semibold text-emerald-800 border-t border-emerald-200/60 pt-1.5">
-            <span>Approved: <strong className="font-mono">{approvedCount}</strong></span>
-            <span>&middot;</span>
-            <span>Billable Hours: <strong className="font-mono">{approvedHours} hrs</strong></span>
+          <div className="flex flex-col gap-1.5 text-xs font-semibold text-emerald-800 border-t border-emerald-200/60 pt-1.5">
+            <div className="flex items-center gap-3">
+              <span>Labor Approved: <strong className="font-mono">{approvedCount}</strong></span>
+              <span>&middot;</span>
+              <span>Billable Hours: <strong className="font-mono">{approvedHours} hrs</strong></span>
+            </div>
+            {isExpenseEligible && (
+              <div className="flex items-center gap-3 text-emerald-900">
+                <span>Expenses: <strong className="font-mono">{expenseCount}</strong> records</span>
+                <span>&middot;</span>
+                <span>Cost Basis: <strong className="font-mono">{config?.currency || "USD"} {expenseAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+              </div>
+            )}
           </div>
         </div>
       ) : status === "PARTIALLY_READY" ? (
@@ -104,11 +134,11 @@ export default function BillingReadinessCard({
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-2 text-center">
               <div className="text-[11px] text-slate-500 font-medium">Approved</div>
-              <div className="font-mono font-bold text-emerald-700">{approvedCount} ({approvedHours}h)</div>
+              <div className="tabular-nums font-bold text-emerald-700">{approvedCount} ({approvedHours}h)</div>
             </div>
             <div className="rounded-md border border-amber-200 bg-amber-50/50 p-2 text-center">
               <div className="text-[11px] text-amber-700 font-medium">Pending</div>
-              <div className="font-mono font-bold text-amber-800">{pendingCount} ({pendingHours}h)</div>
+              <div className="tabular-nums font-bold text-amber-800">{pendingCount} ({pendingHours}h)</div>
             </div>
           </div>
         </div>
@@ -142,8 +172,8 @@ export default function BillingReadinessCard({
             Billing configuration is incomplete. Complete setup before acquiring billing data.
           </p>
         </div>
-      ) : status === "ALREADY_BILLED" ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900 space-y-1">
+      ) : status === "ALREADY_BILLED" || status === "INVOICED" || status === "BILLED" ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900 space-y-2">
           <div className="flex items-center gap-1.5 font-bold text-blue-900 text-xs">
             <FileSpreadsheet className="h-4 w-4 text-blue-600 flex-shrink-0" />
             Billing Period Invoiced
@@ -151,15 +181,40 @@ export default function BillingReadinessCard({
           <p className="text-xs text-blue-800">
             This billing period has already been invoiced.
           </p>
+          {(approvedCount > 0 || approvedHours > 0) && (
+            <div className="flex items-center gap-3 text-xs font-semibold text-blue-800 border-t border-blue-200/60 pt-1.5">
+              <span>Billed Records: <strong className="tabular-nums">{approvedCount}</strong></span>
+              <span>&middot;</span>
+              <span>Total Hours: <strong className="tabular-nums">{approvedHours} hrs</strong></span>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 space-y-1">
+      ) : status === "ACQUISITION_FAILED" || status === "FAILED" || status === "ERROR" ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 space-y-2">
           <div className="flex items-center gap-1.5 font-bold text-rose-900 text-xs">
             <XCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
             Acquisition Failed
           </div>
           <p className="text-xs text-rose-800">
-            We couldn't retrieve billing data at this time.
+            {laborRes.error ||
+              expenseRes.error ||
+              acquisitionResults?.message ||
+              "We couldn't retrieve billing data at this time. Please try again."}
+          </p>
+          {expenseRes.error && !laborRes.error && laborRes.records?.length > 0 && (
+            <div className="rounded border border-rose-200/60 bg-white/60 p-2 text-[11px] text-slate-700">
+              <span className="font-semibold text-slate-900">Timesheets:</span> {laborRes.records.length} records ({approvedHours} hrs) verified, but snapshot creation was blocked by expense currency conversion policy.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-800 space-y-1">
+          <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+            <Info className="h-4 w-4 text-slate-500 flex-shrink-0" />
+            {rawStatus}
+          </div>
+          <p className="text-xs text-slate-600">
+            Status: {rawStatus}
           </p>
         </div>
       )}

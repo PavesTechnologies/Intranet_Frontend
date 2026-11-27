@@ -175,8 +175,11 @@ export default function JdLibrary() {
     }
   };
 
+  // Refetch whenever a query input changes (itemsPerPage is a constant).
+  // fetchJds is recreated every render, so it is deliberately not a dependency.
   useEffect(() => {
     fetchJds();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, statusFilter, jurisdictionFilter, sourceFilter, activeFilter, currentPage, sortField, sortOrder]);
 
   // 1. Sort handler
@@ -344,7 +347,7 @@ export default function JdLibrary() {
         onRowClick: () => navigate(`/ai-screening/jds/${jd.id}`),
       };
     });
-  }, [paginatedJds, navigate, setCloseJdId, setDeleteJdId]);
+  }, [paginatedJds, navigate, setDeleteJdId]);
 
   // Actions
   const handleDeleteConfirm = async () => {
@@ -613,7 +616,14 @@ export default function JdLibrary() {
         </TabsContent>
 
         <TabsContent value="processing" className="mt-0">
-          <JdProcessingList key={processingRefreshToken} />
+          <JdProcessingList
+            key={processingRefreshToken}
+            onTaskCompleted={() => {
+              // A finished JD belongs in the Processed list - show it there, freshly fetched.
+              setActiveTab("processed");
+              fetchJds();
+            }}
+          />
         </TabsContent>
       </Tabs>
 

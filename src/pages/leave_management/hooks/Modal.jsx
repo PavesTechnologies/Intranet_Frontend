@@ -1,4 +1,5 @@
 import React from "react";
+import Button from "../../../components/Button/Button";
 
 const Modal = ({ title, children, onClose, onConfirm, loading }) => {
   return (
@@ -9,20 +10,22 @@ const Modal = ({ title, children, onClose, onConfirm, loading }) => {
         <div className="mb-4">{children}</div>
 
         <div className="flex justify-end gap-2">
-          <button
+          <Button
             onClick={onClose}
-            className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
+            variant="outline"
+            className="px-4 py-2 border-gray-300 hover:bg-gray-100"
             disabled={loading}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            variant="primary"
+            className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700"
             disabled={loading}
           >
             {loading ? "Processing..." : "Confirm"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ const ProjectDemandManagement = lazy(() => import("./ProjectDemandManagement"));
 const ProjectConfigurations = lazy(() => import("./project/ProjectConfigurations"));
 const ProjectRoleOffManagement = lazy(() => import("./ProjectRoleOffManagement"));
 const SprintAnalyticsPage = lazy(() => import("./Analytics/index.jsx"));
+const MilestonesTab = lazy(() => import("../Milestones/index.jsx"));
 
 const SkeletonBlock = ({ className }) => (
   <div className={`animate-pulse bg-slate-100 rounded ${className}`} />
@@ -260,8 +261,17 @@ const ProjectTabs = () => {
   const token = localStorage.getItem("token");
   const { user } = useAuth();
   const isProjectManager = user?.roles?.includes("Project_Manager");
+  // Milestones are PM-only; match the backend's role normalisation ("Project Manager" / "PROJECT_MANAGER").
+  const canManageMilestones = (user?.roles ?? []).some(
+    (r) => typeof r === "string" && r.replace(/[\s_]/g, "").toUpperCase() === "PROJECTMANAGER"
+  );
 
   const [projectName, setProjectName] = useState("");
+  // Milestone codes are "<PROJECTKEY>-M001"; the Milestones tab previews the next one,
+  // and bounds milestone dates by the project's end date.
+  const [projectKey, setProjectKey] = useState("");
+  const [projectStartDate, setProjectStartDate] = useState("");
+  const [projectEndDate, setProjectEndDate] = useState("");
   const [notFound, setNotFound] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
 
@@ -289,7 +299,13 @@ const ProjectTabs = () => {
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((res) => { setProjectName(res.data.name); setNotFound(false); })
+      .then((res) => {
+        setProjectName(res.data.name);
+        setProjectKey(res.data.projectKey ?? "");
+        setProjectStartDate(res.data.startDate ?? "");
+        setProjectEndDate(res.data.endDate ?? "");
+        setNotFound(false);
+      })
       .catch(() => setNotFound(true));
   }, [projectId, token]);
 
@@ -319,6 +335,20 @@ const ProjectTabs = () => {
       return <Board projectId={pid} projectName={projectName} />;
     if (selectedTab === "risk-management")
       return <RiskRegisterPage projectId={pid} />;
+    if (selectedTab === "milestones")
+      return canManageMilestones ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <MilestonesTab
+            projectId={pid}
+            projectName={projectName}
+            projectKey={projectKey}
+            projectStartDate={projectStartDate}
+            projectEndDate={projectEndDate}
+          />
+        </Suspense>
+      ) : (
+        <div className="p-6 text-sm text-slate-500">Milestones are available to project managers only.</div>
+      );
     // if (selectedTab.startsWith("test-management"))
     //   return <TestManagement projectId={pid} />;
 
@@ -374,6 +404,7 @@ const ProjectTabs = () => {
     { name: "Backlog", tab: "backlog" },
     { name: "Board", tab: "board" },
     { name: "Risk", tab: "risk-management" },
+    ...(canManageMilestones ? [{ name: "Milestones", tab: "milestones" }] : []),
     // { name: "Test",    tab: "test-management" },
   ];
 

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Pencil, FolderKanban, Coins, Receipt, ShieldCheck } from "lucide-react";
+import { Pencil, FolderKanban, Coins, Receipt, ShieldCheck, Info } from "lucide-react";
 
+import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
@@ -13,6 +14,7 @@ import ProjectStep from "../components/billing-setup/ProjectStep";
 import BillingConfigurationStep from "../components/billing-setup/BillingConfigurationStep";
 import BillingControlsStep from "../components/billing-setup/BillingControlsStep";
 import ReviewActivateStep from "../components/billing-setup/ReviewActivateStep";
+import { isValidCurrency } from "../utils/format";
 import {
   extractBillingConfigurationId,
   fetchBillingConfigurationById,
@@ -24,16 +26,26 @@ import {
   saveBillingConfigurationRecord,
 } from "../services/billingConfigService";
 import { getActiveCurrencies } from "../services/toolPricingService";
+import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLockService";
+import useRecordLock from "../hooks/useRecordLock";
+import { RecordLockOwnIndicator } from "../components/common/RecordLockNotice";
 
 const INITIAL_WIZARD_DATA = {
   setupMode: "EXISTING",
   projectInfo: {
     projectSource: "ENTERPRISE",
+    // PROJECT (default) vs PRODUCT_SERVICE (Recurring-only — a standalone
+    // product/application/service with no project at all). See ProjectStep.
+    billingContext: "PROJECT",
+    productName: "",
+    productDescription: "",
   },
   billingConfig: {
     billingType: "",
     billingMode: "",
     billingFrequency: "",
+    billingFrequencyId: "",
+    billingFrequencyName: "",
     timeAndMaterial: {
       rateCard: "",
       rate: "",
@@ -42,6 +54,15 @@ const INITIAL_WIZARD_DATA = {
       effectiveTo: "",
       rateCardId: null,
       roles: [],
+      hasDiscount: false,
+      discountType: "PERCENTAGE",
+      discountValue: "",
+      discountedRate: "",
+      discountStartDate: "",
+      discountEndDate: "",
+      remarks: "",
+      includeInInvoice: true,
+      discountPeriods: [],
       overtimeRule: "NONE",
       minimumBillingHours: "",
       maximumBillableHoursPerDay: "",
@@ -70,6 +91,18 @@ const INITIAL_WIZARD_DATA = {
     },
     milestones: [],
     milestoneSettings: { billOnlyCompletedMilestones: false, allowPartialMilestoneBilling: false },
+    // Milestone Plan billing (BillingMilestonePlanConfiguration, via
+    // /api/billing-milestone-plan) — distinct from the legacy milestones/
+    // milestoneSettings above. Supports FULL_PAYMENT / INSTALLMENTS today;
+    // MILESTONES (PMS-driven) will be added later without changing this shape.
+    // Amounts on each entry are backend-calculated, populated after save/fetch.
+    milestonePlan: {
+      milestonePlanId: null,
+      totalContractValue: "",
+      paymentStructure: "FULL_PAYMENT",
+      entries: [{ sequence: 1, percentage: 100, billingDate: "" }],
+      remarks: "",
+    },
     // Recurring billing (BillingRecurringConfiguration, via
     // /api/billing-recurring) — Billing Frequency itself (chosen above via
     // billingFrequency/billingFrequencyId) determines the recurring period;
@@ -78,12 +111,21 @@ const INITIAL_WIZARD_DATA = {
     // value/source and effective dates.
     recurring: {
       recurringConfigurationId: null,
+      // Mirrors projectInfo.billingContext (kept in sync by RecurringBillingForm)
+      // so the payload builder always has it alongside the rest of this record.
+      billingContext: "PROJECT",
+      productName: "",
+      productDescription: "",
       contractValueSource: "",
       contractValue: "",
       pmsProjectBudget: "",
       recurringStartDate: "",
       recurringEndDate: "",
       remarks: "",
+      renewalMode: "",
+      renewalEffectiveFrom: "",
+      renewalContractValue: "",
+      renewalBillingFrequencyId: "",
     },
   },
   controls: {
@@ -118,6 +160,17 @@ function getMissingFields(step, data) {
   switch (step) {
     case 1: {
       const project = data.projectInfo || {};
+      const billingContext = project.billingContext || "PROJECT";
+
+      if (billingContext === "PRODUCT_SERVICE") {
+        // Standalone Product/Application/Service billing — no project at
+        // all, but a client is still required (see ProjectStep).
+        if (!project.clientId && !project.clientName) missing.push("Client Name");
+        if (!project.productName) missing.push("Product / Application / Service Name");
+        if (!project.productDescription) missing.push("Product / Service Description");
+        break;
+      }
+
       const source = project.projectSource || "ENTERPRISE";
       if (source === "ENTERPRISE") {
         if (!project.clientId) missing.push("Client Name");
@@ -140,7 +193,12 @@ function getMissingFields(step, data) {
     case 2: {
       const config = data.billingConfig || {};
       const project = data.projectInfo || {};
-      if (!(project.projectBudgetCurrency || project.currency)) missing.push("Billing Currency (select a project with a currency)");
+      const currency = project.projectBudgetCurrency || project.currency;
+      if (!currency) {
+        missing.push("Billing Currency");
+      } else if (!isValidCurrency(currency)) {
+        missing.push("Valid ISO 4217 Billing Currency");
+      }
       if (!config.billingType) missing.push("Billing Type");
       // billingFrequencyId is the value the frequency PillSelectGroup actually
       // selects on (BillingConfigurationStep.jsx) and what RecurringBillingForm
@@ -152,50 +210,173 @@ function getMissingFields(step, data) {
       if (config.billingType === "TIME_MATERIAL") {
         if (!config.billingMode) missing.push("Pricing Model");
         else if (config.billingMode === "STANDARD") {
-          if (!config.timeAndMaterial?.rate) missing.push("Rate");
-          if (!config.timeAndMaterial?.ratePeriod) missing.push("Rate Period");
+          const tm = config.timeAndMaterial || {};
+          if (!tm.rate) missing.push("Rate");
+          else if (Number(tm.rate) <= 0) missing.push("Rate must be greater than 0");
+          if (!tm.ratePeriod) missing.push("Rate Period");
+
+          const periods = Array.isArray(tm.discountPeriods) ? tm.discountPeriods : [];
+          if (periods.length > 0) {
+            for (let i = 0; i < periods.length; i++) {
+              const p = periods[i];
+              const pLabel = p.periodName?.trim() || `Discount Period #${i + 1}`;
+              if (!p.periodName?.trim()) missing.push(`Period Name for discount period #${i + 1}`);
+              const dv = Number(p.discountValue);
+              if (p.discountValue === "" || p.discountValue === null || p.discountValue === undefined || Number.isNaN(dv) || dv <= 0) {
+                missing.push(`Valid positive discount value for ${pLabel}`);
+              } else if (p.discountType === "PERCENTAGE" && dv >= 100) {
+                missing.push(`Discount percentage must be less than 100% for ${pLabel}`);
+              } else if ((p.discountType === "FIXED_AMOUNT" || p.discountType === "FIXED") && tm.rate && dv >= Number(tm.rate)) {
+                missing.push(`Fixed discount must be less than standard rate for ${pLabel}`);
+              }
+              if (!p.effectiveFrom) missing.push(`Start date for ${pLabel}`);
+              if (!p.effectiveTo) missing.push(`End date for ${pLabel}`);
+              if (p.effectiveFrom && p.effectiveTo && p.effectiveFrom > p.effectiveTo) {
+                missing.push(`Start date cannot be after end date for ${pLabel}`);
+              }
+            }
+
+            for (let i = 0; i < periods.length; i++) {
+              for (let j = i + 1; j < periods.length; j++) {
+                const a = periods[i];
+                const b = periods[j];
+                if (a.effectiveFrom && a.effectiveTo && b.effectiveFrom && b.effectiveTo) {
+                  if (a.effectiveFrom <= b.effectiveTo && a.effectiveTo >= b.effectiveFrom) {
+                    missing.push(`Discount periods "${a.periodName || `#${i + 1}`}" and "${b.periodName || `#${j + 1}`}" overlap`);
+                  }
+                }
+              }
+            }
+          } else if (tm.hasDiscount) {
+            const dv = Number(tm.discountValue);
+            if (!tm.discountValue || Number.isNaN(dv) || dv <= 0) {
+              missing.push("Valid positive discount value");
+            } else if (tm.discountType === "PERCENTAGE" && dv >= 100) {
+              missing.push("Discount percentage must be less than 100%");
+            } else if ((tm.discountType === "FIXED_AMOUNT" || tm.discountType === "FIXED") && dv >= Number(tm.rate)) {
+              missing.push("Fixed discount must be less than standard rate");
+            }
+            if (tm.discountStartDate && tm.discountEndDate && tm.discountStartDate > tm.discountEndDate) {
+              missing.push("Discount Start Date cannot be after Discount End Date");
+            }
+          }
         } else if (config.billingMode === "ROLE_BASED") {
           const roles = config.timeAndMaterial?.roles || [];
           if (roles.length === 0) missing.push("At least one role-based rate");
-          else if (!roles.every((r) => Boolean(r.role && r.rate && r.ratePeriod))) {
-            missing.push("Role, Rate, and Rate Period for every role row");
+          else {
+            if (!roles.every((r) => Boolean((r.role || r.roleName) && r.rate && r.ratePeriod))) {
+              missing.push("Role, Rate, and Rate Period for every role row");
+            }
+            const invalidRate = roles.some((r) => Number(r.rate) <= 0);
+            if (invalidRate) missing.push("Rate must be greater than 0 for all roles");
+
+            const roleNames = roles.map((r) => String(r.roleName || r.role || "").trim().toLowerCase()).filter(Boolean);
+            if (new Set(roleNames).size !== roleNames.length) {
+              missing.push("Role names must be unique for all roles");
+            }
+
+            for (const r of roles) {
+              const roleTitle = r.roleName || r.role || "role";
+              const periods = Array.isArray(r.discountPeriods) ? r.discountPeriods : [];
+              if (periods.length > 0) {
+                for (let pi = 0; pi < periods.length; pi++) {
+                  const p = periods[pi];
+                  if (!p.periodName?.trim()) {
+                    missing.push(`Period name for ${roleTitle} period #${pi + 1}`);
+                  }
+                  const dv = Number(p.discountValue);
+                  if (p.discountValue === "" || p.discountValue === null || Number.isNaN(dv) || dv <= 0) {
+                    missing.push(`Valid positive discount value for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  } else if (p.discountType === "PERCENTAGE" && dv >= 100) {
+                    missing.push(`Discount percentage must be less than 100% for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  } else if ((p.discountType === "FIXED_AMOUNT" || p.discountType === "FIXED") && dv >= Number(r.rate)) {
+                    missing.push(`Fixed discount must be less than base rate for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  }
+                  if (!p.effectiveFrom || !p.effectiveTo) {
+                    missing.push(`Start and End dates for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  } else if (p.effectiveFrom > p.effectiveTo) {
+                    missing.push(`Start date cannot be after end date for ${roleTitle} "${p.periodName || `#${pi + 1}`}"`);
+                  }
+                }
+                for (let i = 0; i < periods.length; i++) {
+                  for (let j = i + 1; j < periods.length; j++) {
+                    const a = periods[i];
+                    const b = periods[j];
+                    if (a.effectiveFrom && a.effectiveTo && b.effectiveFrom && b.effectiveTo) {
+                      if (a.effectiveFrom <= b.effectiveTo && a.effectiveTo >= b.effectiveFrom) {
+                        missing.push(`Discount periods overlap for ${roleTitle} ("${a.periodName || `#${i + 1}`}" and "${b.periodName || `#${j + 1}`}")`);
+                      }
+                    }
+                  }
+                }
+              } else if (r.hasDiscount || (r.discountType && r.discountType !== "NONE" && r.discountValue)) {
+                const dv = Number(r.discountValue);
+                if (Number.isNaN(dv) || dv <= 0) {
+                  missing.push(`Valid discount value for role ${roleTitle}`);
+                } else if (r.discountType === "PERCENTAGE" && dv >= 100) {
+                  missing.push(`Discount percentage must be less than 100% for role ${roleTitle}`);
+                } else if ((r.discountType === "FIXED_AMOUNT" || r.discountType === "FIXED") && dv >= Number(r.rate)) {
+                  missing.push(`Fixed discount must be less than rate for role ${roleTitle}`);
+                }
+                if (r.discountStartDate && r.discountEndDate && r.discountStartDate > r.discountEndDate) {
+                  missing.push(`Discount Start Date cannot be after End Date for role ${roleTitle}`);
+                }
+              }
+            }
           }
         }
       } else if (config.billingType === "RECURRING") {
         const recurring = config.recurring || {};
-        const projectStartDate = project.startDate;
-        const projectEndDate = project.endDate;
+        const billingContext = project.billingContext || "PROJECT";
+        const isProductService = billingContext === "PRODUCT_SERVICE";
+        const projectStartDate = isProductService ? null : project.startDate;
+        const projectEndDate = isProductService ? null : project.endDate;
 
-        if (!recurring.contractValueSource) missing.push("Contract Value Source");
-        const contractValue = Number(recurring.contractValue);
-        if (recurring.contractValue === "" || recurring.contractValue === null || recurring.contractValue === undefined) {
-          missing.push("Contract Value");
-        } else if (Number.isNaN(contractValue) || contractValue <= 0) {
-          missing.push("Contract Value must be greater than 0");
+        const contractValueSource = recurring.contractValueSource || (isProductService ? "MANUAL" : "PMS");
+        const isPmsSource = contractValueSource === "PMS";
+
+        if (isPmsSource) {
+          const projectBudgetNum = Number(project.projectBudget);
+          const projectBudgetIsBlank =
+            project.projectBudget === "" ||
+            project.projectBudget === null ||
+            project.projectBudget === undefined ||
+            Number.isNaN(projectBudgetNum) ||
+            projectBudgetNum <= 0;
+          if (projectBudgetIsBlank) {
+            missing.push("Project Budget is not available for the selected project");
+          }
+        } else {
+          const contractValue = Number(recurring.contractValue);
+          if (recurring.contractValue === "" || recurring.contractValue === null || recurring.contractValue === undefined) {
+            missing.push("Manual Budget");
+          } else if (Number.isNaN(contractValue) || contractValue <= 0) {
+            missing.push("Manual Budget must be greater than 0");
+          }
         }
 
-        if (!recurring.recurringStartDate) missing.push("Billing Start Date");
-        if (!recurring.recurringEndDate) missing.push("Billing End Date");
+        if (!recurring.recurringStartDate) missing.push("Effective From");
+        if (!recurring.recurringEndDate) missing.push("Effective To");
         if (
           recurring.recurringStartDate &&
           projectStartDate &&
           recurring.recurringStartDate < projectStartDate
         ) {
-          missing.push("Billing Start Date must be on or after the Project Start Date");
+          missing.push("Effective From must be on or after the Project Start Date");
         }
         if (
           recurring.recurringEndDate &&
           projectEndDate &&
           recurring.recurringEndDate > projectEndDate
         ) {
-          missing.push("Billing End Date must be on or before the Project End Date");
+          missing.push("Effective To must be on or before the Project End Date");
         }
         if (
           recurring.recurringStartDate &&
           recurring.recurringEndDate &&
           recurring.recurringEndDate < recurring.recurringStartDate
         ) {
-          missing.push("Billing End Date must be on or after the Billing Start Date");
+          missing.push("Effective To must be on or after Effective From");
         }
       } else if (config.billingType === "FIXED_PRICE") {
         const fixedPrice = config.fixedPrice || {};
@@ -234,6 +415,91 @@ function getMissingFields(step, data) {
         }
       } else if (config.billingType === "MILESTONE") {
         if ((config.milestones || []).length === 0) missing.push("At least one Milestone");
+      } else if (config.billingType === "MILESTONE_PLAN") {
+        const milestonePlan = config.milestonePlan || {};
+        const paymentStructure = milestonePlan.paymentStructure || "FULL_PAYMENT";
+        const entries = milestonePlan.entries || [];
+
+        // Milestone Plan has no separate Total Contract Value input — Project
+        // Budget (already shown in Project Financials, same `project` object
+        // used by the Recurring/PMS check above) is the single source of
+        // truth for the contract amount. Validate that instead of
+        // milestonePlan.totalContractValue, which is just a derived mirror of
+        // it (see MilestonePlanForm's totalContractValueNum) and must never
+        // gate Next on its own.
+        const projectBudgetNum = Number(project.projectBudget);
+        const projectBudgetIsBlank =
+          project.projectBudget === "" ||
+          project.projectBudget === null ||
+          project.projectBudget === undefined ||
+          Number.isNaN(projectBudgetNum) ||
+          projectBudgetNum <= 0;
+        if (projectBudgetIsBlank) {
+          missing.push("Project Budget is not available for the selected project");
+        }
+        // Milestone Plan details are persisted immediately by their own "Save
+        // Milestone Plan Details" button, not by the final Create/Submit — so
+        // the user must have successfully saved before this step lets them
+        // continue (mirrors Fixed Price's fixedPriceConfigurationId check).
+        else if (!milestonePlan.milestonePlanId) missing.push("Save Milestone Plan Details before continuing");
+
+        if (paymentStructure === "FULL_PAYMENT") {
+          if (!entries[0]?.billingDate) missing.push("Billing Date");
+        } else if (paymentStructure === "MILESTONES") {
+          if (entries.length === 0) {
+            missing.push("At least one Milestone");
+          } else {
+            const hasInvalidPercentage = entries.some((entry) => {
+              const percentNum = Number(entry.percentage);
+              const decimalPlaces = (entry.percentage?.toString().split(".")[1] || "").length;
+              return (
+                entry.percentage === "" ||
+                entry.percentage === null ||
+                entry.percentage === undefined ||
+                Number.isNaN(percentNum) ||
+                percentNum <= 0 ||
+                percentNum > 100 ||
+                decimalPlaces > 2
+              );
+            });
+            if (hasInvalidPercentage) missing.push("Percentage (greater than 0 and up to 100 with at most 2 decimal places) for every milestone");
+
+            const hasMissingDate = entries.some((entry) => !entry.billingDate);
+            if (hasMissingDate) missing.push("Billing Date for every milestone");
+
+            const dates = entries.map((e) => e.billingDate).filter(Boolean);
+            const hasDuplicateDates = new Set(dates).size !== dates.length;
+            if (hasDuplicateDates) missing.push("Each milestone must have a unique billing date");
+
+            const totalPercentage = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
+            if (!hasInvalidPercentage && totalPercentage > 100.001) {
+              missing.push("Total milestone percentage cannot exceed 100%");
+            }
+          }
+        } else if (entries.length === 0) {
+          missing.push("At least one Installment");
+        } else {
+          const hasInvalidPercentage = entries.some((entry) => {
+            const percentNum = Number(entry.percentage);
+            return (
+              entry.percentage === "" ||
+              entry.percentage === null ||
+              entry.percentage === undefined ||
+              Number.isNaN(percentNum) ||
+              percentNum <= 0 ||
+              percentNum > 100
+            );
+          });
+          if (hasInvalidPercentage) missing.push("Percentage (greater than 0 and up to 100) for every installment");
+
+          const hasMissingDate = entries.some((entry) => !entry.billingDate);
+          if (hasMissingDate) missing.push("Billing Date for every installment");
+
+          const totalPercentage = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
+          if (!hasInvalidPercentage && Math.abs(totalPercentage - 100) > 0.01) {
+            missing.push("Total installment percentage must equal 100%");
+          }
+        }
       }
       break;
     }
@@ -269,8 +535,9 @@ function getStepValidationMessage(step, data) {
 function getDraftGuardMessage(wizardData) {
   const projectInfo = wizardData.projectInfo || {};
   const billingConfig = wizardData.billingConfig || {};
-  if (!projectInfo.clientId) return "Please select a Client before continuing.";
-  if (!projectInfo.projectId) return "Please select a Project before continuing.";
+  const isProductService = projectInfo.billingContext === "PRODUCT_SERVICE";
+  if (!projectInfo.clientId && !projectInfo.clientName) return "Please select a Client before continuing.";
+  if (!isProductService && !projectInfo.projectId) return "Please select a Project before continuing.";
   if (!billingConfig.billingTypeId) return "Please select a Billing Type before continuing.";
   return null;
 }
@@ -289,6 +556,7 @@ export default function NewConfigurationWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [savedConfigId, setSavedConfigId] = useState(extractBillingConfigurationId(configId));
   const [approvalStatus, setApprovalStatus] = useState(null);
+  const [billingStatus, setBillingStatus] = useState(null);
   const [creatingDraft, setCreatingDraft] = useState(false);
   // Currency master list (real UUID currencyId per currency code) — the only
   // currency master source in this codebase, see toolPricingService.getActiveCurrencies.
@@ -297,6 +565,61 @@ export default function NewConfigurationWizard() {
   // Editing an already-submitted (non-Draft) configuration should only ever
   // update that record, never re-run the create/submit-for-approval flow.
   const isEditingExisting = Boolean(configId) && Boolean(approvalStatus) && approvalStatus !== "DRAFT";
+  // Re-approval workflow: saving an APPROVED configuration makes the backend
+  // snapshot the approved version and move it to PENDING_APPROVAL. The
+  // frontend keeps no versioning of its own — it only avoids the Draft-only
+  // endpoints for such a record (see ensureBillingConfigurationId) and tells
+  // the user the save starts a re-approval cycle.
+  const isEditingApproved = isEditingExisting && approvalStatus === "APPROVED";
+  // A PENDING_APPROVAL configuration is edited in place, like an APPROVED one:
+  // it is no longer a draft, so it must also stay off the Draft-only endpoints
+  // (PUT .../draft via Save Draft or ensureBillingConfigurationId).
+  const isEditingPendingApproval = isEditingExisting && approvalStatus === "PENDING_APPROVAL";
+  const isEditingSubmitted = isEditingApproved || isEditingPendingApproval;
+
+  // Editing an existing configuration needs the backend EDIT lock before the
+  // form is shown; a refused lock (409 or any failure) keeps the user on the
+  // read-only view. Viewing never takes a lock — it only reads lock status
+  // (GET) so Edit can be disabled while someone else holds it. The heartbeat
+  // lives here, in the parent session, so changing steps or saving a child
+  // section (rate card, fixed price, recurring, milestone, schedule) never
+  // touches the lock. It is released only on unmount, i.e. when final save,
+  // save draft, cancel or back leave the workflow. A brand-new configuration
+  // (no configId) never takes a lock.
+  const [editLockReady, setEditLockReady] = useState(false);
+  const recordLock = useRecordLock(RECORD_LOCK_RESOURCE.BILLING_CONFIGURATION, {
+    watchResourceId: viewOnly && configId ? configId : null,
+  });
+  const { acquire: acquireRecordLock } = recordLock;
+  const editLockLost = Boolean(configId) && !viewOnly && recordLock.lockLost;
+
+  // A protected mutation answered 409: the backend message is already in the
+  // toast; re-read the lock so the banner/disabled state catches up. Unsaved
+  // form state is left as it is.
+  const handleLockConflict = (error) => {
+    if (error?.response?.status === 409 && configId) recordLock.handleMutationConflict(configId);
+  };
+
+  useEffect(() => {
+    if (!configId || viewOnly) return undefined;
+    let cancelled = false;
+    acquireRecordLock(configId, RECORD_LOCK_ACTION.EDIT).then((result) => {
+      if (cancelled) return;
+      if (result.acquired) setEditLockReady(true);
+      else if (!result.cancelled) setViewOnly(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [configId, viewOnly, acquireRecordLock]);
+
+  const handleStartEdit = async () => {
+    const result = await acquireRecordLock(configId, RECORD_LOCK_ACTION.EDIT);
+    if (result.acquired) {
+      setEditLockReady(true);
+      setViewOnly(false);
+    }
+  };
 
   useEffect(() => {
     if (!configId) return;
@@ -309,22 +632,19 @@ export default function NewConfigurationWizard() {
 
         const { summary, detail } = result;
         if (detail) {
-          // The existing project may be excluded from the available-projects
-          // list (it's already configured), so its projectCode isn't always
-          // present on the raw detail response. Some backends key the PMS
-          // project by its projectId with no separate code — fall back to the
-          // existing projectId so Project Summary/validation never see a
-          // blank code for a project that's already selected.
-          const projectInfo = detail.projectInfo || {};
-          const projectCode = projectInfo.projectCode || (projectInfo.projectId ? String(projectInfo.projectId) : "");
+          // detail.projectInfo already carries the canonical selected project
+          // for the saved projectId (getBillingConfigurationById resolves it
+          // through normalizeProject/mergeProjectSources — the same pipeline
+          // ProjectStep uses for a NEW configuration), so it is applied once
+          // here and nothing later re-initializes it.
           setWizardData((prev) => ({
             ...prev,
             ...detail,
-            projectInfo: { ...projectInfo, projectCode },
           }));
         }
         setSavedConfigId(summary.id || configId);
         setApprovalStatus(summary.approvalStatus || null);
+        setBillingStatus(summary.billingStatus || null);
         setCurrentStep(summary.approvalStatus === "DRAFT" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
       } catch (error) {
         if (!isMounted) return;
@@ -341,6 +661,33 @@ export default function NewConfigurationWizard() {
       isMounted = false;
     };
   }, [configId, navigate]);
+
+  // Background polling for latest Billing Configuration data while viewing (every 12 seconds)
+  useEffect(() => {
+    if (!configId || !viewOnly) return undefined;
+
+    const refreshData = async () => {
+      if (document.visibilityState === "hidden" || saving || submitting) return;
+      try {
+        const result = await fetchBillingConfigurationById(configId);
+        if (result?.detail) {
+          setWizardData((prev) => ({
+            ...prev,
+            ...result.detail,
+          }));
+        }
+        if (result?.summary) {
+          setApprovalStatus(result.summary.approvalStatus || null);
+          setBillingStatus(result.summary.billingStatus || null);
+        }
+      } catch {
+        // Silent background polling
+      }
+    };
+
+    const interval = setInterval(refreshData, 12_000);
+    return () => clearInterval(interval);
+  }, [configId, viewOnly, saving, submitting]);
 
   useEffect(() => {
     let isMounted = true;
@@ -415,6 +762,19 @@ export default function NewConfigurationWizard() {
   const handleNext = async () => {
     const validationMessage = getStepValidationMessage(currentStep, wizardData);
     if (validationMessage) {
+      if (currentStep === 2) {
+        setWizardData((prev) => ({
+          ...prev,
+          billingConfig: {
+            ...prev.billingConfig,
+            _validateTrigger: Date.now(),
+            timeAndMaterial: {
+              ...(prev.billingConfig?.timeAndMaterial || {}),
+              _validateTrigger: Date.now(),
+            },
+          },
+        }));
+      }
       showStatusToast(validationMessage, "warning");
       return;
     }
@@ -429,6 +789,19 @@ export default function NewConfigurationWizard() {
     }
     const validationMessage = getStepValidationMessage(currentStep, wizardData);
     if (validationMessage) {
+      if (currentStep === 2) {
+        setWizardData((prev) => ({
+          ...prev,
+          billingConfig: {
+            ...prev.billingConfig,
+            _validateTrigger: Date.now(),
+            timeAndMaterial: {
+              ...(prev.billingConfig?.timeAndMaterial || {}),
+              _validateTrigger: Date.now(),
+            },
+          },
+        }));
+      }
       showStatusToast(validationMessage, "warning");
       return;
     }
@@ -439,6 +812,12 @@ export default function NewConfigurationWizard() {
   const handleProjectInfoChange = (projectInfo) => {
     setWizardData((prev) => {
       const setupMode = projectInfo.projectSource === "ENTERPRISE" ? "EXISTING" : "STANDALONE";
+      const nextBillingType = projectInfo.billingType || prev.billingConfig.billingType;
+      const projectChanged =
+        String(projectInfo.projectId || "") !== String(prev.projectInfo.projectId || "");
+      const resetRecurringFrequency =
+        nextBillingType === "RECURRING" &&
+        (prev.billingConfig.billingType !== "RECURRING" || projectChanged);
 
       // We do not preselect any billingMode. Let the user explicitly choose it on Step 2.
       let billingMode = prev.billingConfig.billingMode;
@@ -452,8 +831,16 @@ export default function NewConfigurationWizard() {
         projectInfo,
         billingConfig: {
           ...prev.billingConfig,
-          billingType: projectInfo.billingType || prev.billingConfig.billingType,
-          billingFrequency: projectInfo.billingFrequency || prev.billingConfig.billingFrequency,
+          billingType: nextBillingType,
+          billingFrequency:
+            nextBillingType === "RECURRING"
+              ? resetRecurringFrequency
+                ? ""
+                : prev.billingConfig.billingFrequency || ""
+              : projectInfo.billingFrequency || prev.billingConfig.billingFrequency,
+          ...(resetRecurringFrequency
+            ? { billingFrequencyId: "", billingFrequencyName: "" }
+            : {}),
           billingMode,
         },
       };
@@ -499,6 +886,11 @@ export default function NewConfigurationWizard() {
   // rate card row (and deletes any absent from wizard state), which would race with
   // the single-row create/update the rate card button is about to perform itself.
   const ensureBillingConfigurationId = async () => {
+    // An APPROVED or PENDING_APPROVAL configuration is not a draft — never
+    // re-push it through PUT .../draft. Its parent record already exists with
+    // valid ids; its field changes are persisted (and, for APPROVED,
+    // snapshotted by the backend) by the final Update Billing Setup save.
+    if (savedConfigId && isEditingSubmitted) return savedConfigId;
     if (savedConfigId) {
       // The draft may have been created (below) before billingFrequencyId —
       // or a later billingTypeId change — was known; re-push the current
@@ -536,11 +928,14 @@ export default function NewConfigurationWizard() {
 
     const projectInfo = wizardData.projectInfo || {};
     const billingConfig = wizardData.billingConfig || {};
-    const clientId = projectInfo.clientId;
+    const clientId = projectInfo.clientId || projectInfo.clientName;
     const projectId = projectInfo.projectId;
     const billingTypeId = billingConfig.billingTypeId;
+    // PRODUCT_SERVICE never has a projectId (see getDraftGuardMessage) — only
+    // clientId/billingTypeId gate draft creation in that case.
+    const isProductService = projectInfo.billingContext === "PRODUCT_SERVICE";
 
-    if (!clientId || !projectId || !billingTypeId) return;
+    if (!clientId || (!isProductService && !projectId) || !billingTypeId) return;
 
     // [1] clientId/projectId/billingTypeId available — draft creation can proceed.
     console.log("[NewConfigurationWizard] draft-required fields ready:", {
@@ -575,7 +970,9 @@ export default function NewConfigurationWizard() {
     configId,
     savedConfigId,
     wizardData.projectInfo?.clientId,
+    wizardData.projectInfo?.clientName,
     wizardData.projectInfo?.projectId,
+    wizardData.projectInfo?.billingContext,
     wizardData.billingConfig?.billingTypeId,
   ]);
 
@@ -587,12 +984,36 @@ export default function NewConfigurationWizard() {
       navigate(CONFIGURATIONS_PATH);
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to save draft."), "error");
+      handleLockConflict(error);
     } finally {
       setSaving(false);
     }
   };
 
   const handleCancel = () => navigate(CONFIGURATIONS_PATH);
+
+  // The message follows the status the backend actually returned — e.g. an
+  // edited APPROVED configuration comes back PENDING_APPROVAL — rather than a
+  // status transition assumed here.
+  const getFinalSaveMessage = (response) => {
+    if (!isEditingExisting) return "Billing setup submitted for approval successfully.";
+    const resultingStatus = String(response?.approvalStatus || response?.data?.approvalStatus || "").trim().toUpperCase();
+    return resultingStatus === "PENDING_APPROVAL" && approvalStatus !== "PENDING_APPROVAL"
+      ? "Changes submitted for approval. Billing stays inactive until Finance approves them."
+      : "Billing setup updated successfully.";
+  };
+
+  // An edited PENDING_APPROVAL configuration normally stays PENDING_APPROVAL,
+  // so the Checker reviews the updated values. If the backend instead reverts
+  // it to DRAFT, re-submit it through the existing submit action so it never
+  // sits outside the approval queue.
+  const resubmitIfRevertedToDraft = async (response, billingConfigurationId) => {
+    if (!isEditingPendingApproval) return;
+    const resultingStatus = String(response?.approvalStatus || response?.data?.approvalStatus || "").trim().toUpperCase();
+    if (resultingStatus === "DRAFT") {
+      await submitConfigurationForApproval(billingConfigurationId);
+    }
+  };
 
   const handleFinalSubmit = async () => {
     // Fixed Price creation is its own flow: the Fixed Price record itself is already
@@ -603,10 +1024,15 @@ export default function NewConfigurationWizard() {
     // Editing an already-submitted config (isEditingExisting) just persists the
     // update in place — it never re-submits for approval.
     const isFixedPriceCreate = wizardData.billingConfig?.billingType === "FIXED_PRICE" && !isEditingExisting;
+    // Same story for Milestone Plan: its record is already saved immediately via
+    // the "Save Milestone Plan Details" button — see the milestonePlanId check
+    // in getMissingFields. Final submit here must never call the Milestone Plan
+    // API a second time.
+    const isMilestonePlanCreate = wizardData.billingConfig?.billingType === "MILESTONE_PLAN" && !isEditingExisting;
 
     setSubmitting(true);
     try {
-      if (isFixedPriceCreate) {
+      if (isFixedPriceCreate || isMilestonePlanCreate) {
         // isDraftSave: false persists via the plain PUT .../{id} (not
         // .../draft) — this is the final save before submitting for approval.
         const { configResponse, configId } = await saveBillingConfigurationRecord(wizardData, savedConfigId, {
@@ -638,12 +1064,11 @@ export default function NewConfigurationWizard() {
         // only persists the update and does not re-trigger the workflow.
         if (!isEditingExisting) {
           await submitConfigurationForApproval(billingConfigurationId);
+        } else {
+          await resubmitIfRevertedToDraft(configResponse, billingConfigurationId);
         }
 
-        showStatusToast(
-          isEditingExisting ? "Billing setup updated successfully." : "Billing setup submitted for approval successfully.",
-          "success"
-        );
+        showStatusToast(getFinalSaveMessage(configResponse), "success");
         navigate(CONFIGURATIONS_PATH);
         return;
       }
@@ -681,18 +1106,18 @@ export default function NewConfigurationWizard() {
       // only persists the update and does not re-trigger the workflow.
       if (!isEditingExisting) {
         await submitConfigurationForApproval(billingConfigurationId);
+      } else {
+        await resubmitIfRevertedToDraft(saveResult, billingConfigurationId);
       }
 
-      showStatusToast(
-        isEditingExisting ? "Billing setup updated successfully." : "Billing setup submitted for approval successfully.",
-        "success"
-      );
+      showStatusToast(getFinalSaveMessage(saveResult), "success");
       navigate(CONFIGURATIONS_PATH);
     } catch (error) {
       const fallbackMessage = isFixedPriceCreate
         ? "Failed to create billing configuration."
         : `Failed to ${isEditingExisting ? "update" : "submit"} billing configuration.`;
       showStatusToast(getApiErrorMessage(error, fallbackMessage), "error");
+      handleLockConflict(error);
     } finally {
       setSubmitting(false);
     }
@@ -701,42 +1126,44 @@ export default function NewConfigurationWizard() {
   const isLastStep = currentStep === STEPS.length;
   // Native `disabled` only reflects an in-flight request — a step with missing
   // fields stays clickable so onNext can explain what's missing via toast.
-  const nextDisabled = (isLastStep && submitting) || creatingDraft;
+  const nextDisabled = (isLastStep && (submitting || editLockLost)) || creatingDraft;
   const nextIncomplete = !isLastStep && !isStepValid(currentStep, wizardData);
 
   if (loadingExisting) {
     return (
-      <div className="p-6">
+      <div className="flex h-80 items-center justify-center">
+        <Loader size="lg" />
+      </div>
+    );
+  }
+
+  if (configId && !viewOnly && !editLockReady) {
+    return (
+      <div className="flex h-80 flex-col items-center justify-center">
         <Loader />
+        <p className="text-center text-sm text-slate-500">Acquiring lock...</p>
       </div>
     );
   }
 
   if (viewOnly) {
+    // The review's own overview card is the page header — Back and Edit
+    // Configuration live inside it rather than in a separate header card.
     return (
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex items-center gap-3">
-            <BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Overview" />
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Billing Setup Record</span>
-              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-                {wizardData.projectInfo?.projectName || "Billing Configuration"}
-              </h1>
-            </div>
-          </div>
-          <Button variant="primary" size="small" onClick={() => setViewOnly(false)}>
-            <Pencil className="mr-1 h-4 w-4" /> Edit Configuration
-          </Button>
-        </div>
-
-        <ReviewActivateStep wizardData={wizardData} />
+      <div className="mx-auto w-full max-w-6xl">
+        <RecordLockOwnIndicator actionType={recordLock.ownLockAction(configId)} className="mb-3" />
+        <ReviewActivateStep
+          wizardData={wizardData}
+          // Backend-reported changes awaiting approval (empty unless pending).
+          pendingChanges={wizardData.changes}
+          leading={<BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Overview" />}
+        />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6 pb-8">
   {/* Header */}
   <div className="space-y-2">
     <div className="flex items-center gap-3">
@@ -744,31 +1171,40 @@ export default function NewConfigurationWizard() {
         onClick={handleCancel}
         label="Back to Billing Setups"
       />
-
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-          {configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
-        </h1>
-
-        <p className="mt-1 ml-0.5 text-sm leading-6 text-slate-500 sm:ml-1 sm:text-[15px]">
-          Configure billing details for a project
-        </p>
+      <div className="min-w-0 flex-1">
+        <PageHeader
+          title={configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
+          subtitle="Configure billing details for a project"
+        />
       </div>
     </div>
+    {configId && !editLockLost && (
+      <RecordLockOwnIndicator actionType={recordLock.ownLockAction(configId)} />
+    )}
   </div>
 
+  {editLockLost && !recordLock.conflict && (
+    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-900" role="status">
+      <Info className="mt-px h-4 w-4 shrink-0 text-amber-600" />
+      <span>Your edit lock on this billing configuration has expired. Reload the page to continue editing.</span>
+    </div>
+  )}
+
   {/* Wizard Stepper */}
-  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6">
+  <PageCard className="px-4 py-4 sm:px-6">
     <WizardStepper
       steps={STEPS}
       currentStep={currentStep}
       onStepClick={handleStepClick}
     />
-  </div>
+  </PageCard>
 
   {/* Active Form Step Container */}
-  <PageCard className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <PageCard>
     <PageCardContent className="space-y-6 p-5 sm:p-6 lg:p-8">
+      {/* Without the EDIT lock every section's controls (incl. child saves) are
+          disabled, but what the user entered stays on screen. */}
+      <fieldset disabled={editLockLost} className="m-0 min-w-0 space-y-6 border-0 p-0">
       {currentStep === 1 && (
         <ProjectStep
           value={wizardData.projectInfo}
@@ -795,11 +1231,26 @@ export default function NewConfigurationWizard() {
       )}
 
       {currentStep === 4 && (
-        <ReviewActivateStep
-          wizardData={wizardData}
-          onEditStep={handleStepClick}
-        />
+        <div className="space-y-3">
+          {isEditingApproved && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-900" role="note">
+              <Info className="mt-px h-4 w-4 shrink-0 text-amber-600" />
+              <span>
+                This configuration is <strong className="font-semibold">Approved</strong>
+                {billingStatus ? ` and ${String(billingStatus).charAt(0)}${String(billingStatus).slice(1).toLowerCase()}` : ""}. Saving these
+                changes sends them to Finance for re-approval — the configuration moves to Pending Approval and billing is
+                inactive until the changes are approved.
+              </span>
+            </div>
+          )}
+          <ReviewActivateStep
+            wizardData={wizardData}
+            onEditStep={handleStepClick}
+          />
+        </div>
       )}
+
+      </fieldset>
 
       {/* Navigation — existing component and props unchanged */}
       <div className="mt-2 border-t border-slate-200 pt-5">
@@ -810,7 +1261,9 @@ export default function NewConfigurationWizard() {
           nextIncomplete={nextIncomplete}
           finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
           finalLoadingText={isEditingExisting ? "Updating..." : "Submitting..."}
-          showSaveDraft={currentStep > 1}
+          // Save Draft uses the Draft-only endpoint; an APPROVED or
+          // PENDING_APPROVAL configuration is saved once, via Update Billing Setup.
+          showSaveDraft={currentStep > 1 && !isEditingSubmitted && !editLockLost}
           saving={saving}
           activating={submitting || creatingDraft}
           onBack={handleBack}
